@@ -6,6 +6,7 @@ build/
 
 # Local data — re-seeded on each server boot
 server/data.json
+data.json
 
 # Env files (keep .env.example tracked)
 .env
