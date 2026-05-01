@@ -1,33 +1,26 @@
 import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
-import { ParticipationButtons } from "../components/ParticipationButtons";
 import { Avatar } from "../components/Avatar";
-import { ThemeToggle } from "../components/ThemeToggle";
+import { GetThereSheet } from "../components/GetThereSheet";
 import { LoadingScreen } from "../components/LoadingScreen";
-import type { ParticipationState, PlanDTO } from "../types/shared";
-import { formatPlanDate, formatPlanTime, formatRelative } from "../lib/format";
+import { ParticipationButtons } from "../components/ParticipationButtons";
+import { ShareSheet } from "../components/ShareSheet";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { useAuth } from "../context/AuthContext";
-
-type CommentDTO = {
-  id: string;
-  body: string;
-  createdAt: string;
-  user: { id: string; displayName: string };
-};
-
-type PlanDetail = PlanDTO & { comments: CommentDTO[] };
+import { formatPlanDate, formatPlanTime } from "../lib/format";
+import type { ParticipationState, PlanDTO, PublicUser } from "../types/shared";
 
 export function PlanDetailPage() {
   const { id = "" } = useParams();
   const { user } = useAuth();
-  const [plan, setPlan] = useState<PlanDetail | null>(null);
-  const [comment, setComment] = useState("");
-  const [posting, setPosting] = useState(false);
+  const navigate = useNavigate();
+  const [plan, setPlan] = useState<PlanDTO | null>(null);
+  const [showShare, setShowShare] = useState(false);
+  const [showGetThere, setShowGetThere] = useState(false);
 
   const load = async () => {
-    const data = await api<PlanDetail>(`/api/plans/${id}`);
+    const data = await api<PlanDTO>(`/api/plans/${id}`);
     setPlan(data);
   };
 
@@ -35,225 +28,141 @@ export function PlanDetailPage() {
     void load();
   }, [id]);
 
-  const postComment = async (event: FormEvent) => {
-    event.preventDefault();
-    const trimmed = comment.trim();
-    if (!trimmed) return;
-    setPosting(true);
-    try {
-      await api(`/api/plans/${id}/comments`, {
-        method: "POST",
-        body: JSON.stringify({ body: trimmed }),
-      });
-      setComment("");
-      await load();
-    } finally {
-      setPosting(false);
-    }
-  };
-
-  if (!plan) {
+  if (!plan || !user) {
     return <LoadingScreen tagline="Loading plan" />;
   }
 
   const onStateChange = (next: ParticipationState | null) => {
     setPlan((prev) => {
-      if (!prev || !user) return prev;
+      if (!prev) return prev;
+      const me: PublicUser = {
+        id: user.id,
+        firstName: user.firstName,
+        neighborhoodId: user.neighborhoodId,
+        avatarSeed: user.avatarSeed,
+        avatarStyle: user.avatarStyle,
+      };
       const goingFiltered = prev.participants.going.filter((u) => u.id !== user.id);
       const interestedFiltered = prev.participants.interested.filter((u) => u.id !== user.id);
-      const me = { id: user.id, displayName: user.displayName };
       const going = next === "going" ? [...goingFiltered, me] : goingFiltered;
       const interested = next === "interested" ? [...interestedFiltered, me] : interestedFiltered;
-      return {
-        ...prev,
-        myState: next,
-        participants: { going, interested },
-      };
+      return { ...prev, myState: next, participants: { going, interested } };
     });
   };
 
-  const isCreator = user && plan.creator.id === user.id;
+  const isHosting = plan.creator.id === user.id;
+  const inPlan = isHosting || plan.myState === "going";
 
   return (
     <main className="app-shell app-shell--wide">
       <header className="app-header">
-        <Link to="/" className="detail-back" style={{ marginBottom: 0 }}>
-          ← Back
-        </Link>
-        <div className="app-header-actions">
-          <ThemeToggle />
-        </div>
+        <Link to="/" className="detail-back">← Back</Link>
+        <ThemeToggle />
       </header>
 
-      <div className="detail-layout">
-        <section className="plan-hero">
-          <div className="row-between">
-            <h1>{plan.title}</h1>
-            {isCreator ? <span className="badge">Hosting</span> : null}
-          </div>
+      <section className="plan-hero">
+        <div className="plan-title-row">
+          <span className="plan-title-emoji">{plan.hostEmoji}</span>
+          <h1>{plan.title}</h1>
+        </div>
 
-          <div className="plan-meta-row">
-            <span className="icon">📍</span>
-            <div>
-              <div>
-                <strong>{plan.location.name}</strong>
-              </div>
-              {plan.location.address && plan.location.address !== plan.location.name ? (
-                <div className="meta-secondary">{plan.location.address}</div>
-              ) : null}
-              <a
-                className="maps-link"
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                  plan.location.address || plan.location.name
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Open in Maps ↗
-              </a>
-            </div>
-          </div>
+        <div className="plan-when">
+          {formatPlanDate(plan.date)} · {formatPlanTime(plan.time, plan.isFlexibleTime)}
+        </div>
+        <div className="plan-where">
+          <strong>{plan.location.name}</strong>
+          {plan.location.address && plan.location.address !== plan.location.name && (
+            <div className="meta-secondary">{plan.location.address}</div>
+          )}
+        </div>
 
-          <div className="plan-meta-row">
-            <span className="icon">📅</span>
-            <div>
-              <div>
-                <strong>{formatPlanDate(plan.date)}</strong>
-              </div>
-              <div className="meta-secondary">
-                {formatPlanTime(plan.time, plan.isFlexibleTime)}
-              </div>
-            </div>
-          </div>
+        <button
+          type="button"
+          className="host-row"
+          onClick={() => navigate(`/profile/${plan.creator.id}`)}
+        >
+          <Avatar seed={plan.creator.avatarSeed} style={plan.creator.avatarStyle} size="md" />
+          <span>
+            Hosted by <strong>{plan.creator.firstName}</strong>
+          </span>
+        </button>
 
-          <div className="plan-meta-row">
-            <span className="icon">👤</span>
-            <div>
-              <div>
-                Hosted by <strong>{plan.creator.displayName}</strong>
-              </div>
-            </div>
-          </div>
+        {plan.description && <p className="plan-description">{plan.description}</p>}
 
-          {plan.tags.length > 0 ? (
-            <div className="tag-chip-row">
-              {plan.tags.map((tag) => (
-                <span key={tag} className="tag-chip">
-                  {tag}
-                </span>
+        {plan.tags.length > 0 && (
+          <div className="tag-chip-row">
+            {plan.tags.map((tag) => (
+              <span key={tag} className="tag-chip">{tag}</span>
+            ))}
+          </div>
+        )}
+
+        <ParticipationButtons
+          planId={plan.id}
+          initialState={plan.myState}
+          onChange={onStateChange}
+        />
+
+        <div className="plan-actions-row">
+          <button type="button" className="action-btn" onClick={() => setShowGetThere(true)}>
+            🚗 Get there
+          </button>
+          <button type="button" className="action-btn" onClick={() => setShowShare(true)}>
+            ↗ Share
+          </button>
+        </div>
+      </section>
+
+      <section className="who-block">
+        <h3 className="who-block-heading">Going · {plan.participants.going.length}</h3>
+        {plan.participants.going.length === 0 ? (
+          <p className="subtle">No one's locked in yet. Be the first to say "I'm in."</p>
+        ) : (
+          <div className="participant-list-going">
+            {plan.participants.going.map((person) => (
+              <Link key={person.id} to={`/profile/${person.id}`} className="participant-row">
+                <Avatar seed={person.avatarSeed} style={person.avatarStyle} size="lg" />
+                <div>
+                  <div className="participant-name">
+                    {person.firstName}
+                    {person.id === user.id && <span className="you-pill">You</span>}
+                  </div>
+                  {person.id === plan.creator.id && <div className="participant-role">Host</div>}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {plan.participants.interested.length > 0 && (
+          <>
+            <h3 className="who-block-heading" style={{ marginTop: 18 }}>
+              Interested · {plan.participants.interested.length}
+            </h3>
+            <div className="participant-list-interested">
+              {plan.participants.interested.map((person) => (
+                <Link key={person.id} to={`/profile/${person.id}`} className="participant-row">
+                  <Avatar seed={person.avatarSeed} style={person.avatarStyle} size="sm" />
+                  <span className="participant-name">
+                    {person.firstName}
+                    {person.id === user.id && <span className="you-pill">You</span>}
+                  </span>
+                </Link>
               ))}
             </div>
-          ) : null}
+          </>
+        )}
+      </section>
 
-          {plan.description ? (
-            <p style={{ margin: 0, color: "var(--text-muted)" }}>{plan.description}</p>
-          ) : null}
+      {inPlan && (
+        <Link to={`/plans/${plan.id}/chat`} className="chat-entry">
+          💬 Group chat ({plan.participants.going.length})
+          <span className="chat-entry-arrow">→</span>
+        </Link>
+      )}
 
-          <ParticipationButtons
-            planId={plan.id}
-            initialState={plan.myState}
-            onChange={onStateChange}
-          />
-        </section>
-
-        <div className="detail-secondary">
-          <section className="who-block">
-            <h3 className="who-block-heading">
-              Going · {plan.participants.going.length}
-            </h3>
-            {plan.participants.going.length === 0 ? (
-              <p className="subtle" style={{ margin: "8px 0 0" }}>
-                No one's locked in yet. Be the first to say "I'm in."
-              </p>
-            ) : (
-              <div className="participant-list-going">
-                {plan.participants.going.map((person) => (
-                  <div key={person.id} className="participant-row">
-                    <Avatar name={person.displayName} size="lg" />
-                    <div>
-                      <div className="participant-name">
-                        {person.displayName}
-                        {user && person.id === user.id ? (
-                          <span className="you-pill">You</span>
-                        ) : null}
-                      </div>
-                      {person.id === plan.creator.id ? (
-                        <div className="participant-role">Host</div>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {plan.participants.interested.length > 0 ? (
-              <>
-                <h3 className="who-block-heading" style={{ marginTop: 18 }}>
-                  Interested · {plan.participants.interested.length}
-                </h3>
-                <div className="participant-list-interested">
-                  {plan.participants.interested.map((person) => (
-                    <div key={person.id} className="participant-row">
-                      <Avatar name={person.displayName} size="sm" />
-                      <div>
-                        <div className="participant-name">
-                          {person.displayName}
-                          {user && person.id === user.id ? (
-                            <span className="you-pill">You</span>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : null}
-          </section>
-
-          <section className="who-block">
-            <h3 className="who-block-heading">Coordination</h3>
-            <div className="stack-tight" style={{ marginTop: 4 }}>
-              {plan.comments.length === 0 ? (
-                <p className="subtle" style={{ margin: "8px 0 0" }}>
-                  No messages yet. Drop a quick note for the group.
-                </p>
-              ) : (
-                plan.comments.map((c) => (
-                  <div key={c.id} className="comment">
-                    <Avatar name={c.user.displayName} size="sm" />
-                    <div>
-                      <div>
-                        <span className="comment-author">{c.user.displayName}</span>
-                        <span className="comment-when">{formatRelative(c.createdAt)}</span>
-                      </div>
-                      <div className="comment-body">{c.body}</div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <form
-              onSubmit={(event) => void postComment(event)}
-              className="stack"
-              style={{ marginTop: 12 }}
-            >
-              <textarea
-                placeholder="Say something to the group…"
-                value={comment}
-                onChange={(event) => setComment(event.target.value)}
-              />
-              <button
-                type="submit"
-                className="btn btn-secondary btn-block"
-                disabled={posting || !comment.trim()}
-              >
-                {posting ? "Posting…" : "Post"}
-              </button>
-            </form>
-          </section>
-        </div>
-      </div>
+      {showShare && <ShareSheet plan={plan} onClose={() => setShowShare(false)} />}
+      {showGetThere && <GetThereSheet plan={plan} onClose={() => setShowGetThere(false)} />}
     </main>
   );
 }

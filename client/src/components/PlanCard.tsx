@@ -1,26 +1,23 @@
 import { Link } from "react-router-dom";
 import type { PlanDTO } from "../types/shared";
 import { formatPlanDate, formatPlanTime } from "../lib/format";
-import { useAuth } from "../context/AuthContext";
+import { Avatar } from "./Avatar";
 
 export function PlanCard({ plan }: { plan: PlanDTO }) {
-  const { user } = useAuth();
   const goingCount = plan.participants.going.length;
-  const isHosting = user && plan.creator.id === user.id;
-  const youAreGoing = plan.myState === "going";
 
   return (
     <Link to={`/plans/${plan.id}`} className="plan-card">
-      <div className="plan-card-header">
-        <h3 className="plan-card-title">{plan.title}</h3>
-        {isHosting ? (
-          <span className="badge">Hosting</span>
-        ) : youAreGoing ? (
-          <span className="badge">You're in</span>
-        ) : plan.myState === "interested" ? (
-          <span className="badge badge-muted">Interested</span>
-        ) : null}
+      <div className="plan-card-host">
+        <Avatar seed={plan.creator.avatarSeed} style={plan.creator.avatarStyle} size="sm" />
+        <span className="plan-card-host-name">
+          {plan.hostEmoji} {plan.creator.firstName}
+        </span>
+        {plan.myState === "going" && <span className="badge">You're in</span>}
+        {plan.myState === "interested" && <span className="badge badge-muted">Interested</span>}
       </div>
+
+      <h3 className="plan-card-title">{plan.title}</h3>
 
       <div className="plan-card-meta">
         <div>

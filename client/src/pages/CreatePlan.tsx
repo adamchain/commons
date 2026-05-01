@@ -1,40 +1,58 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
-import { ThemeToggle } from "../components/ThemeToggle";
 import { LocationAutocomplete } from "../components/LocationAutocomplete";
-import type { PlanTag } from "../types/shared";
+import { ThemeToggle } from "../components/ThemeToggle";
+import { useAuth } from "../context/AuthContext";
+import {
+  ALL_INTERESTS,
+  INTEREST_EMOJI,
+  type InterestTag,
+  type NeighborhoodDTO,
+} from "../types/shared";
 
-const TAGS: PlanTag[] = ["coffee", "workout", "social", "outdoors", "events"];
+const HOST_EMOJIS = ["✨", "🧘", "🏃", "☕", "🍻", "🎶", "🎨", "🥞", "🚴", "🥾", "🎲", "📚", "🏋️"];
 
 const today = (): string => {
   const d = new Date();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${month}-${day}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
 export function CreatePlanPage() {
+  const { user } = useAuth();
+  const [neighborhoods, setNeighborhoods] = useState<NeighborhoodDTO[]>([]);
   const [form, setForm] = useState({
     title: "",
     locationName: "",
     locationAddress: "",
+    neighborhoodId: user?.neighborhoodId ?? "",
     date: today(),
     time: "19:00",
     isFlexibleTime: false,
-    tags: [] as PlanTag[],
+    tags: [] as InterestTag[],
     description: "",
+    hostEmoji: "✨",
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    void api<NeighborhoodDTO[]>("/api/neighborhoods").then(setNeighborhoods).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (user?.neighborhoodId && !form.neighborhoodId) {
+      setForm((f) => ({ ...f, neighborhoodId: user.neighborhoodId! }));
+    }
+  }, [user, form.neighborhoodId]);
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
-    if (!form.title.trim() || !form.locationName.trim() || !form.date) {
-      setError("Title, location, and date are required.");
+    if (!form.title.trim() || !form.locationName.trim() || !form.date || !form.neighborhoodId) {
+      setError("Title, location, neighborhood, and date are required.");
       return;
     }
     setSubmitting(true);
@@ -43,15 +61,17 @@ export function CreatePlanPage() {
         method: "POST",
         body: JSON.stringify({
           title: form.title.trim(),
+          neighborhoodId: form.neighborhoodId,
           location: {
             name: form.locationName.trim(),
             address: form.locationAddress.trim() || form.locationName.trim(),
           },
           date: form.date,
-          time: form.isFlexibleTime ? "Flexible" : form.time,
+          time: form.isFlexibleTime ? "" : form.time,
           isFlexibleTime: form.isFlexibleTime,
           tags: form.tags,
           description: form.description.trim() || undefined,
+          hostEmoji: form.hostEmoji,
         }),
       });
       navigate(`/plans/${created.id}`);
@@ -62,7 +82,7 @@ export function CreatePlanPage() {
     }
   };
 
-  const toggleTag = (tag: PlanTag) => {
+  const toggleTag = (tag: InterestTag) => {
     setForm((prev) => {
       if (prev.tags.includes(tag)) return { ...prev, tags: prev.tags.filter((t) => t !== tag) };
       if (prev.tags.length >= 3) return prev;
@@ -75,10 +95,8 @@ export function CreatePlanPage() {
   return (
     <main className="app-shell app-shell--mid">
       <header className="app-header">
-        <Link to="/" className="detail-back" style={{ marginBottom: 0 }}>← Back</Link>
-        <div className="app-header-actions">
-          <ThemeToggle />
-        </div>
+        <Link to="/" className="detail-back">← Back</Link>
+        <ThemeToggle />
       </header>
       <h1 className="brand" style={{ marginBottom: 8 }}>Make a plan</h1>
       <p className="brand-tagline" style={{ marginBottom: 24 }}>
@@ -98,6 +116,21 @@ export function CreatePlanPage() {
             />
           </div>
           <div>
+            <label htmlFor="emoji">Vibe emoji</label>
+            <div className="emoji-row">
+              {HOST_EMOJIS.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  className={`emoji-pill ${form.hostEmoji === e ? "is-active" : ""}`}
+                  onClick={() => setForm((f) => ({ ...f, hostEmoji: e }))}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
             <label htmlFor="description">Description (optional)</label>
             <textarea
               id="description"
@@ -111,7 +144,7 @@ export function CreatePlanPage() {
         <section className="form-section">
           <p className="form-section-title">Where</p>
           <div>
-            <label htmlFor="locName">Search a spot</label>
+            <label>Search a spot</label>
             <LocationAutocomplete
               name={form.locationName}
               address={form.locationAddress}
@@ -119,11 +152,22 @@ export function CreatePlanPage() {
                 setForm((f) => ({ ...f, locationName: name, locationAddress: address }))
               }
             />
-            {form.locationAddress && form.locationAddress !== form.locationName ? (
-              <p className="subtle" style={{ marginTop: 6 }}>
-                {form.locationAddress}
-              </p>
-            ) : null}
+            {form.locationAddress && form.locationAddress !== form.locationName && (
+              <p className="subtle" style={{ marginTop: 6 }}>{form.locationAddress}</p>
+            )}
+          </div>
+          <div>
+            <label htmlFor="neighborhood">Neighborhood</label>
+            <select
+              id="neighborhood"
+              value={form.neighborhoodId}
+              onChange={(e) => setForm((f) => ({ ...f, neighborhoodId: e.target.value }))}
+            >
+              <option value="">Pick one…</option>
+              {neighborhoods.map((n) => (
+                <option key={n.id} value={n.id}>{n.name}</option>
+              ))}
+            </select>
           </div>
         </section>
 
@@ -150,10 +194,7 @@ export function CreatePlanPage() {
               />
             </div>
           </div>
-          <label
-            className="flex-toggle"
-            style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500, color: "var(--text)" }}
-          >
+          <label className="flex-toggle" style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500, color: "var(--text)" }}>
             <input
               type="checkbox"
               checked={form.isFlexibleTime}
@@ -166,7 +207,7 @@ export function CreatePlanPage() {
         <section className="form-section">
           <p className="form-section-title">Tags · pick up to 3</p>
           <div className="create-tag-chips">
-            {TAGS.map((tag) => {
+            {ALL_INTERESTS.map((tag) => {
               const selected = form.tags.includes(tag);
               return (
                 <button
@@ -176,14 +217,14 @@ export function CreatePlanPage() {
                   onClick={() => toggleTag(tag)}
                   disabled={!selected && tagsAtMax}
                 >
-                  {tag}
+                  {INTEREST_EMOJI[tag]} {tag}
                 </button>
               );
             })}
           </div>
         </section>
 
-        {error ? <p className="error-text">{error}</p> : null}
+        {error && <p className="error-text">{error}</p>}
 
         <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
           {submitting ? "Posting…" : "Post plan"}
