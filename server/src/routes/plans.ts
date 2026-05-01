@@ -1,95 +1,141 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/requireAuth.js";
-import { store, type PlanRecord } from "../store.js";
-import type { ParticipationState, PlanDTO, PlanTag } from "../types/shared.js";
+import { store, type PlanRecord, type UserRecord } from "../store.js";
+import { rankPlansForUser } from "../lib/recommend.js";
+import {
+  ALL_INTERESTS,
+  type InterestTag,
+  type ParticipationState,
+  type PlanDTO,
+  type PublicUser,
+} from "../types/shared.js";
 
 export const plansRouter = Router();
 
-const ALLOWED_TAGS: PlanTag[] = ["coffee", "workout", "social", "outdoors", "events"];
+function publicUser(userId: string): PublicUser {
+  const user = store.findUserById(userId);
+  if (!user) {
+    return { id: userId, firstName: "Unknown", neighborhoodId: null, avatarSeed: "missing", avatarStyle: "avataaars" };
+  }
+  return userToPublic(user);
+}
 
-function planSummary(plan: PlanRecord): PlanDTO {
+export function userToPublic(user: UserRecord): PublicUser {
+  return {
+    id: user.id,
+    firstName: user.firstName || "Friend",
+    neighborhoodId: user.neighborhoodId,
+    avatarSeed: user.avatarSeed,
+    avatarStyle: user.avatarStyle,
+  };
+}
+
+export function planSummary(plan: PlanRecord, viewerId: string | null): PlanDTO {
   const creator = store.findUserById(plan.creatorId);
   const participations = store.listParticipationsForPlan(plan.id);
   const going = participations.filter((p) => p.state === "going");
   const interested = participations.filter((p) => p.state === "interested");
+  const mine = viewerId ? participations.find((p) => p.userId === viewerId) : undefined;
   return {
     id: plan.id,
     title: plan.title,
-    creator: {
-      id: creator?.id ?? "",
-      displayName: creator?.displayName ?? "Unknown",
-    },
+    creator: creator ? userToPublic(creator) : publicUser(plan.creatorId),
+    neighborhoodId: plan.neighborhoodId,
     location: plan.location,
     date: plan.date,
     time: plan.time,
     isFlexibleTime: plan.isFlexibleTime,
+    endTime: plan.endTime,
     tags: plan.tags,
     description: plan.description,
+    hostEmoji: plan.hostEmoji,
     participants: {
-      going: going.map((p) => userBrief(p.userId)),
-      interested: interested.map((p) => userBrief(p.userId)),
+      going: going.map((p) => publicUser(p.userId)),
+      interested: interested.map((p) => publicUser(p.userId)),
     },
-    myState: null,
+    myState: mine?.state ?? null,
   };
 }
 
-function userBrief(userId: string): { id: string; displayName: string } {
-  const user = store.findUserById(userId);
-  return { id: user?.id ?? userId, displayName: user?.displayName ?? "Unknown" };
-}
+// Public preview for the pre-signup tease (PRD §3.1).
+plansRouter.get("/preview", (_req, res) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const upcoming = store
+    .listPlans()
+    .filter((p) => new Date(p.date).getTime() >= today.getTime())
+    .slice(0, 6);
+  res.json(upcoming.map((p) => planSummary(p, null)));
+});
 
 plansRouter.get("/", requireAuth, (req, res) => {
   const userId = String(req.userId);
-  const plans = store.listPlans().map((plan) => {
-    const dto = planSummary(plan);
-    const mine = store.findParticipation(plan.id, userId);
-    dto.myState = mine?.state ?? null;
-    return dto;
-  });
-  res.json(plans);
+  const me = store.findUserById(userId);
+  if (!me) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  // If the user has a neighborhood, scope to that + adjacent. Otherwise show everything.
+  const scope = me.neighborhoodId ? store.neighborhoodScope(me.neighborhoodId) : null;
+  const candidates = scope ? store.listPlansByNeighborhoods(scope) : store.listPlans();
+  const ranked = rankPlansForUser(me, candidates);
+  res.json(ranked.map((plan) => planSummary(plan, userId)));
 });
 
 plansRouter.post("/", requireAuth, (req, res) => {
   const userId = String(req.userId);
+  const me = store.findUserById(userId);
+  if (!me) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
   const title = String(req.body?.title ?? "").trim();
   const location = req.body?.location ?? {};
   const locationName = String(location.name ?? "").trim();
   const locationAddress = String(location.address ?? "").trim();
+  const lat = typeof location.lat === "number" ? location.lat : undefined;
+  const lng = typeof location.lng === "number" ? location.lng : undefined;
   const dateInput = String(req.body?.date ?? "").trim();
   const time = String(req.body?.time ?? "").trim();
   const isFlexibleTime = Boolean(req.body?.isFlexibleTime);
   const description = req.body?.description ? String(req.body.description).trim() : undefined;
+  const hostEmoji = String(req.body?.hostEmoji ?? "").trim() || "✨";
+  const neighborhoodId = String(req.body?.neighborhoodId ?? me.neighborhoodId ?? "").trim();
 
   const tagsInput = Array.isArray(req.body?.tags) ? (req.body.tags as unknown[]) : [];
   const tags = tagsInput
     .map((t) => String(t))
-    .filter((t): t is PlanTag => ALLOWED_TAGS.includes(t as PlanTag))
+    .filter((t): t is InterestTag => ALL_INTERESTS.includes(t as InterestTag))
     .slice(0, 3);
 
-  if (!title || !locationName || !dateInput) {
-    res.status(400).json({ error: "Title, location and date are required" });
+  if (!title || !locationName || !dateInput || !neighborhoodId) {
+    res.status(400).json({ error: "Title, location, date, and neighborhood are required" });
     return;
   }
-
-  const isoDate = new Date(dateInput).toISOString();
+  if (!store.findNeighborhoodById(neighborhoodId)) {
+    res.status(400).json({ error: "Unknown neighborhood" });
+    return;
+  }
 
   const plan = store.createPlan({
     creatorId: userId,
     title,
-    location: { name: locationName, address: locationAddress || locationName },
-    date: isoDate,
-    time: isFlexibleTime ? "Flexible" : time || "Flexible",
+    neighborhoodId,
+    location: { name: locationName, address: locationAddress || locationName, lat, lng },
+    date: dateInput,
+    time: isFlexibleTime ? "" : time,
     isFlexibleTime: isFlexibleTime || !time,
     tags,
     description,
+    hostEmoji,
   });
 
   store.upsertParticipation(plan.id, userId, "going");
+  store.ensureGroupConversation(plan.id, [userId]);
   store.log("plan_created", { planId: plan.id, creatorId: userId });
 
-  const dto = planSummary(plan);
-  dto.myState = "going";
-  res.status(201).json(dto);
+  res.status(201).json(planSummary(plan, userId));
 });
 
 plansRouter.get("/:id", requireAuth, (req, res) => {
@@ -100,23 +146,8 @@ plansRouter.get("/:id", requireAuth, (req, res) => {
     res.status(404).json({ error: "Plan not found" });
     return;
   }
-
-  const dto = planSummary(plan);
-  const mine = store.findParticipation(planId, userId);
-  dto.myState = mine?.state ?? null;
-
-  const comments = store.listCommentsForPlan(planId).map((c) => {
-    const user = store.findUserById(c.userId);
-    return {
-      id: c.id,
-      body: c.body,
-      createdAt: c.createdAt,
-      user: { id: user?.id ?? c.userId, displayName: user?.displayName ?? "Unknown" },
-    };
-  });
-
   store.log("plan_viewed", { planId, userId });
-  res.json({ ...dto, comments });
+  res.json(planSummary(plan, userId));
 });
 
 plansRouter.put("/:id/participation", requireAuth, (req, res) => {
@@ -127,12 +158,17 @@ plansRouter.put("/:id/participation", requireAuth, (req, res) => {
     res.status(400).json({ error: "Invalid participation state" });
     return;
   }
-  if (!store.findPlanById(planId)) {
+  const plan = store.findPlanById(planId);
+  if (!plan) {
     res.status(404).json({ error: "Plan not found" });
     return;
   }
   const existing = store.findParticipation(planId, userId);
   store.upsertParticipation(planId, userId, state);
+  // Joining adds you to the group conversation.
+  if (state === "going") {
+    store.ensureGroupConversation(planId, [plan.creatorId, userId]);
+  }
   store.log("participation_changed", {
     planId,
     userId,
@@ -147,6 +183,8 @@ plansRouter.delete("/:id/participation", requireAuth, (req, res) => {
   const userId = String(req.userId);
   const existing = store.findParticipation(planId, userId);
   store.deleteParticipation(planId, userId);
+  // A removal counts as a soft "decline" for the recommendation algo.
+  store.recordDecline(userId, planId);
   store.log("participation_changed", {
     planId,
     userId,
@@ -154,35 +192,4 @@ plansRouter.delete("/:id/participation", requireAuth, (req, res) => {
     to: null,
   });
   res.json({ ok: true });
-});
-
-plansRouter.post("/:id/comments", requireAuth, (req, res) => {
-  const planId = String(req.params.id);
-  const userId = String(req.userId);
-  const body = String(req.body?.body ?? "").trim();
-  if (!body) {
-    res.status(400).json({ error: "Comment body is required" });
-    return;
-  }
-  if (!store.findPlanById(planId)) {
-    res.status(404).json({ error: "Plan not found" });
-    return;
-  }
-  const comment = store.createComment(planId, userId, body);
-  store.log("comment_posted", { planId, userId, commentId: comment.id });
-  res.status(201).json({ ok: true });
-});
-
-plansRouter.get("/:id/comments", requireAuth, (req, res) => {
-  const planId = String(req.params.id);
-  const comments = store.listCommentsForPlan(planId).map((c) => {
-    const user = store.findUserById(c.userId);
-    return {
-      id: c.id,
-      body: c.body,
-      createdAt: c.createdAt,
-      user: { id: user?.id ?? c.userId, displayName: user?.displayName ?? "Unknown" },
-    };
-  });
-  res.json(comments);
 });

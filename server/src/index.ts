@@ -5,7 +5,11 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import { authRouter } from "./routes/auth.js";
+import { chatRouter } from "./routes/chat.js";
+import { feedbackRouter } from "./routes/feedback.js";
+import { neighborhoodsRouter } from "./routes/neighborhoods.js";
 import { plansRouter } from "./routes/plans.js";
+import { profileRouter } from "./routes/profile.js";
 import { seedIfEmpty } from "./seed.js";
 
 const app = express();
@@ -28,6 +32,10 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/plans", plansRouter);
+app.use("/api/neighborhoods", neighborhoodsRouter);
+app.use("/api/feedback", feedbackRouter);
+app.use("/api/profile", profileRouter);
+app.use("/api", chatRouter); // chat router defines its own paths under /plans/.../conversation and /conversations/...
 
 if (isProduction) {
   const here = path.dirname(fileURLToPath(import.meta.url));
