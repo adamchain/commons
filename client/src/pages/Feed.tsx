@@ -6,6 +6,7 @@ import { FeedbackPrompt } from "../components/FeedbackPrompt";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { PlanCard } from "../components/PlanCard";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { WeekGlance } from "../components/WeekGlance";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime } from "../lib/format";
 import type { NeighborhoodDTO, PlanDTO } from "../types/shared";
@@ -28,9 +29,20 @@ export function FeedPage() {
     window.location.href = "/onboarding";
   };
 
-  const myNeighborhood = neighborhoods.find((n) => n.id === user?.neighborhoodId);
+  const hoodById = useMemo(() => new Map(neighborhoods.map((n) => [n.id, n.name])), [neighborhoods]);
+
+  const primaryHoodId = user ? user.neighborhoodIds?.[0] ?? user.neighborhoodId : null;
+  const myNeighborhood = primaryHoodId ? neighborhoods.find((n) => n.id === primaryHoodId) : undefined;
 
   const buckets = useMemo(() => bucketByWhen(plans ?? []), [plans]);
+
+  const viewerGoingPlanIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of plans ?? []) {
+      if (p.myState === "going") set.add(p.id);
+    }
+    return set;
+  }, [plans]);
 
   if (plans === null) {
     return <LoadingScreen tagline="Gathering plans" />;
@@ -47,13 +59,19 @@ export function FeedPage() {
         </div>
         <div className="app-header-actions">
           <Link to="/plans/new" className="app-header-cta">
-            + Make a plan
+            + Post a plan
           </Link>
           <ThemeToggle />
           <button type="button" className="user-pill" onClick={() => void logout()} title="Sign out">
             {user && (
               <>
-                <Avatar seed={user.avatarSeed} style={user.avatarStyle} photoDataUrl={user.avatarPhotoDataUrl} size="sm" />
+                <Avatar
+                  seed={user.avatarSeed}
+                  style={user.avatarStyle}
+                  photoDataUrl={user.avatarPhotoDataUrl}
+                  name={user.firstName || undefined}
+                  size="sm"
+                />
                 <span>{user.firstName || "Sign out"}</span>
               </>
             )}
@@ -62,6 +80,8 @@ export function FeedPage() {
       </header>
 
       <FeedbackPrompt />
+
+      <WeekGlance plans={plans} viewerGoingPlanIds={viewerGoingPlanIds} />
 
       <div className="view-toggle">
         <button className={`view-toggle-btn ${view === "list" ? "is-active" : ""}`} onClick={() => setView("list")}>
@@ -75,12 +95,16 @@ export function FeedPage() {
         </button>
       </div>
 
-      {view === "list" && <ListView buckets={buckets} />}
+      {view === "list" && (
+        <div id="feed-plans">
+          <ListView buckets={buckets} hoodById={hoodById} />
+        </div>
+      )}
       {view === "map" && <MapView plans={plans} />}
       {view === "calendar" && <CalendarView plans={plans} />}
 
       <Link to="/plans/new" className="fab-create">
-        + Make a plan
+        + Post it
       </Link>
     </main>
   );
@@ -111,37 +135,48 @@ function bucketByWhen(plans: PlanDTO[]): Buckets {
   return { happeningNow, thisWeek, later };
 }
 
-function ListView({ buckets }: { buckets: Buckets }) {
+function ListView({ buckets, hoodById }: { buckets: Buckets; hoodById: Map<string, string> }) {
   const total = buckets.happeningNow.length + buckets.thisWeek.length + buckets.later.length;
   if (total === 0) {
     return (
-      <div className="empty-state">
-        <p style={{ margin: 0 }}>No plans in your neighborhood yet. Be the first to post one.</p>
+      <div className="empty-state empty-state-feed">
+        <p style={{ margin: 0 }}>Nothing yet — be the first to post a plan.</p>
+        <Link to="/plans/new" className="btn-primary" style={{ marginTop: 16, display: "inline-block" }}>
+          Post something
+        </Link>
       </div>
     );
   }
   return (
     <>
       {buckets.happeningNow.length > 0 && (
-        <Section title="Happening today" plans={buckets.happeningNow} />
+        <Section title="Happening today" plans={buckets.happeningNow} hoodById={hoodById} />
       )}
       {buckets.thisWeek.length > 0 && (
-        <Section title="This week" plans={buckets.thisWeek} />
+        <Section title="This week" plans={buckets.thisWeek} hoodById={hoodById} />
       )}
       {buckets.later.length > 0 && (
-        <Section title="Later" plans={buckets.later} />
+        <Section title="Later" plans={buckets.later} hoodById={hoodById} />
       )}
     </>
   );
 }
 
-function Section({ title, plans }: { title: string; plans: PlanDTO[] }) {
+function Section({
+  title,
+  plans,
+  hoodById,
+}: {
+  title: string;
+  plans: PlanDTO[];
+  hoodById: Map<string, string>;
+}) {
   return (
     <>
       <h2 className="section-title">{title}</h2>
       <div className="plan-grid">
         {plans.map((plan) => (
-          <PlanCard key={plan.id} plan={plan} />
+          <PlanCard key={plan.id} plan={plan} neighborhoodName={hoodById.get(plan.neighborhoodId)} />
         ))}
       </div>
     </>
@@ -149,9 +184,6 @@ function Section({ title, plans }: { title: string; plans: PlanDTO[] }) {
 }
 
 function MapView({ plans }: { plans: PlanDTO[] }) {
-  // Real Google Maps integration is gated on an API key. For v1 we render a
-  // schematic map using lat/lng deltas — pins are clickable and open the
-  // bottom sheet behavior described in PRD §17.
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const withCoords = plans.filter((p) => p.location.lat !== undefined && p.location.lng !== undefined);
   if (withCoords.length === 0) {

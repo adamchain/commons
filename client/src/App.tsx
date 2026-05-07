@@ -27,7 +27,6 @@ export default function App() {
       <Route path="/plans/new" element={<Protected><CreatePlanPage /></Protected>} />
       <Route path="/plans/:id" element={<Protected><PlanDetailPage /></Protected>} />
       <Route path="/plans/:planId/chat" element={<Protected><ChatPage /></Protected>} />
-      <Route path="/plans/:planId/chat/:conversationId" element={<Protected><ChatPage /></Protected>} />
       <Route path="/profile/:userId" element={<Protected><ProfilePage /></Protected>} />
     </Routes>
   );

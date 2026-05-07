@@ -32,10 +32,23 @@ function jaccard<T>(a: T[], b: T[]): number {
 }
 
 function proximityScore(user: UserRecord, plan: PlanRecord): number {
-  if (!user.neighborhoodId) return 0.5; // unknown — neutral
-  if (plan.neighborhoodId === user.neighborhoodId) return 1.0;
-  const scope = store.neighborhoodScope(user.neighborhoodId);
-  return scope.includes(plan.neighborhoodId) ? 0.5 : 0;
+  const hoods =
+    user.neighborhoodIds && user.neighborhoodIds.length > 0
+      ? user.neighborhoodIds
+      : user.neighborhoodId
+        ? [user.neighborhoodId]
+        : [];
+  if (hoods.length === 0) return 0.5;
+  let best = 0;
+  for (const h of hoods) {
+    if (plan.neighborhoodId === h) {
+      best = Math.max(best, 1);
+      continue;
+    }
+    const scope = store.neighborhoodScope(h);
+    if (scope.includes(plan.neighborhoodId)) best = Math.max(best, 0.5);
+  }
+  return best;
 }
 
 function socialProofScore(plan: PlanRecord): number {

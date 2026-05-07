@@ -8,10 +8,39 @@ import {
   type InterestTag,
   type ParticipationState,
   type PlanDTO,
+  type PlanKind,
+  type PlanVisibility,
   type PublicUser,
 } from "../types/shared.js";
 
 export const plansRouter = Router();
+
+function userHoods(me: UserRecord): string[] {
+  if (me.neighborhoodIds?.length) return me.neighborhoodIds;
+  if (me.neighborhoodId) return [me.neighborhoodId];
+  return [];
+}
+
+function combinedNeighborhoodScope(me: UserRecord): string[] | null {
+  const hoods = userHoods(me);
+  if (hoods.length === 0) return null;
+  const set = new Set<string>();
+  for (const id of hoods) {
+    store.neighborhoodScope(id).forEach((x) => set.add(x));
+  }
+  return [...set];
+}
+
+function planVisibleToViewer(plan: PlanRecord, me: UserRecord): boolean {
+  const v: PlanVisibility = plan.visibility ?? "everyone";
+  if (v === "network") return false;
+  if (v === "community") {
+    const tag = plan.visibilityCommunityTag;
+    if (!tag) return true;
+    return me.interests.includes(tag);
+  }
+  return true;
+}
 
 export function userToPublic(user: UserRecord): PublicUser {
   return {
@@ -50,6 +79,8 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
   }
 
   const creator = users.get(plan.creatorId);
+  const planKind = plan.planKind ?? "standard";
+  const visibility = plan.visibility ?? "everyone";
   return {
     id: plan.id,
     title: plan.title,
@@ -59,10 +90,16 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     date: plan.date,
     time: plan.time,
     isFlexibleTime: plan.isFlexibleTime,
+    isFlexibleLocation: plan.isFlexibleLocation ?? false,
     endTime: plan.endTime,
     tags: plan.tags,
     description: plan.description,
     hostEmoji: plan.hostEmoji,
+    planKind,
+    visibility,
+    visibilityCommunityTag: plan.visibilityCommunityTag ?? null,
+    isRecurring: plan.isRecurring ?? false,
+    lockedAt: plan.lockedAt ?? null,
     participants: {
       going: going.map((p) => pu(p.userId)),
       interested: interested.map((p) => pu(p.userId)),
@@ -90,9 +127,9 @@ plansRouter.get("/", requireAuth, async (req, res) => {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  // If the user has a neighborhood, scope to that + adjacent. Otherwise show everything.
-  const scope = me.neighborhoodId ? store.neighborhoodScope(me.neighborhoodId) : null;
-  const candidates = scope ? store.listPlansByNeighborhoods(scope) : store.listPlans();
+  const scope = combinedNeighborhoodScope(me);
+  const inHood = scope ? store.listPlansByNeighborhoods(scope) : store.listPlans();
+  const candidates = inHood.filter((p) => planVisibleToViewer(p, me));
   const ranked = rankPlansForUser(me, candidates);
   const summaries = await Promise.all(ranked.map((plan) => planSummary(plan, userId)));
   res.json(summaries);
@@ -115,9 +152,14 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   const dateInput = String(req.body?.date ?? "").trim();
   const time = String(req.body?.time ?? "").trim();
   const isFlexibleTime = Boolean(req.body?.isFlexibleTime);
+  const isFlexibleLocation = Boolean(req.body?.isFlexibleLocation);
   const description = req.body?.description ? String(req.body.description).trim() : undefined;
   const hostEmoji = String(req.body?.hostEmoji ?? "").trim() || "✨";
-  const neighborhoodId = String(req.body?.neighborhoodId ?? me.neighborhoodId ?? "").trim();
+  const neighborhoodId = String(req.body?.neighborhoodId ?? userHoods(me)[0] ?? "").trim();
+  const planKind = (req.body?.planKind === "looking_for" ? "looking_for" : "standard") as PlanKind;
+  const rawVis = String(req.body?.visibility ?? "everyone");
+  const visibility = (["everyone", "community", "network"].includes(rawVis) ? rawVis : "everyone") as PlanVisibility;
+  const isRecurring = Boolean(req.body?.isRecurring);
 
   const tagsInput = Array.isArray(req.body?.tags) ? (req.body.tags as unknown[]) : [];
   const tags = tagsInput
@@ -125,26 +167,55 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     .filter((t): t is InterestTag => ALL_INTERESTS.includes(t as InterestTag))
     .slice(0, 3);
 
-  if (!title || !locationName || !dateInput || !neighborhoodId) {
-    res.status(400).json({ error: "Title, location, date, and neighborhood are required" });
+  let visibilityCommunityTag: InterestTag | null = null;
+  if (visibility === "community") {
+    const tagPick = req.body?.visibilityCommunityTag
+      ? String(req.body.visibilityCommunityTag)
+      : tags[0];
+    if (!tagPick || !ALL_INTERESTS.includes(tagPick as InterestTag)) {
+      res.status(400).json({ error: "Pick a vibe tag for community visibility" });
+      return;
+    }
+    visibilityCommunityTag = tagPick as InterestTag;
+  }
+
+  if (!title || !dateInput || !neighborhoodId) {
+    res.status(400).json({ error: "Title, date, and neighborhood are required" });
+    return;
+  }
+  if (!isFlexibleLocation && !locationName) {
+    res.status(400).json({ error: "Add a spot or turn on flexible location" });
     return;
   }
   if (!store.findNeighborhoodById(neighborhoodId)) {
     res.status(400).json({ error: "Unknown neighborhood" });
     return;
   }
+  if (visibility === "network") {
+    res.status(400).json({ error: "Network visibility is coming soon — choose Everyone or A community" });
+    return;
+  }
+
+  const resolvedLocationName = isFlexibleLocation ? (locationName || "Flexible location") : locationName;
+  const resolvedAddress = locationAddress || resolvedLocationName;
 
   const plan = store.createPlan({
     creatorId: userId,
     title,
     neighborhoodId,
-    location: { name: locationName, address: locationAddress || locationName, lat, lng },
+    location: { name: resolvedLocationName, address: resolvedAddress, lat, lng },
     date: dateInput,
     time: isFlexibleTime ? "" : time,
     isFlexibleTime: isFlexibleTime || !time,
+    isFlexibleLocation,
     tags,
     description,
     hostEmoji,
+    planKind,
+    visibility,
+    visibilityCommunityTag,
+    isRecurring,
+    lockedAt: null,
   });
 
   store.upsertParticipation(plan.id, userId, "going");

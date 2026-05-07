@@ -34,11 +34,18 @@ function generateCode(): string {
 }
 
 function meFromUser(user: UserRecord): MeDTO {
+  const neighborhoodIds =
+    user.neighborhoodIds && user.neighborhoodIds.length > 0
+      ? user.neighborhoodIds
+      : user.neighborhoodId
+        ? [user.neighborhoodId]
+        : [];
   return {
     id: user.id,
     phoneNumber: user.phoneNumber,
     firstName: user.firstName,
-    neighborhoodId: user.neighborhoodId,
+    neighborhoodId: user.neighborhoodId ?? neighborhoodIds[0] ?? null,
+    neighborhoodIds,
     interests: user.interests,
     avatarSeed: user.avatarSeed,
     avatarStyle: user.avatarStyle,
@@ -126,7 +133,13 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
   const patch: UserPatch = {};
   if (typeof req.body?.firstName === "string") patch.firstName = req.body.firstName.trim();
   if (typeof req.body?.neighborhoodId === "string") patch.neighborhoodId = req.body.neighborhoodId;
-  if (Array.isArray(req.body?.interests)) patch.interests = req.body.interests.slice(0, 2);
+  if (Array.isArray(req.body?.neighborhoodIds)) {
+    patch.neighborhoodIds = (req.body.neighborhoodIds as unknown[]).map(String).filter(Boolean);
+    if (patch.neighborhoodIds.length > 0 && !patch.neighborhoodId) {
+      patch.neighborhoodId = patch.neighborhoodIds[0]!;
+    }
+  }
+  if (Array.isArray(req.body?.interests)) patch.interests = req.body.interests.slice(0, 3);
   if (typeof req.body?.avatarSeed === "string") patch.avatarSeed = req.body.avatarSeed;
   if (typeof req.body?.avatarStyle === "string") patch.avatarStyle = req.body.avatarStyle;
   if (typeof req.body?.avatarPhotoDataUrl === "string") patch.avatarPhotoDataUrl = req.body.avatarPhotoDataUrl;

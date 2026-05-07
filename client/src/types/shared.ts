@@ -1,49 +1,51 @@
 // Commons v2 shared types — kept in sync between client/src/types/shared.ts
 // and server/src/types/shared.ts. Edit both when changing.
 
+/** Community interest filters — Philly launch set (COMMONS-seeded). */
 export type InterestTag =
-  | "coffee"
-  | "yoga"
-  | "running"
-  | "hiking"
-  | "biking"
-  | "lifting"
-  | "brunch"
-  | "drinks"
-  | "music"
-  | "art"
-  | "books"
-  | "games";
+  | "fitness_outdoors"
+  | "food_drinks"
+  | "arts_culture"
+  | "music_nightlife"
+  | "thrifting"
+  | "local_events"
+  | "wellness"
+  | "coffee_cowork"
+  | "dog_owners"
+  | "running";
+
+export const INTEREST_LABELS: Record<InterestTag, string> = {
+  fitness_outdoors: "Fitness + Outdoors",
+  food_drinks: "Food + Drinks",
+  arts_culture: "Arts + Culture",
+  music_nightlife: "Music + Nightlife",
+  thrifting: "Thrifting",
+  local_events: "Local Events",
+  wellness: "Wellness",
+  coffee_cowork: "Coffee + Co-working",
+  dog_owners: "Dog owners",
+  running: "Running",
+};
 
 export const ALL_INTERESTS: InterestTag[] = [
-  "coffee",
-  "yoga",
+  "fitness_outdoors",
+  "food_drinks",
+  "arts_culture",
+  "music_nightlife",
+  "thrifting",
+  "local_events",
+  "wellness",
+  "coffee_cowork",
+  "dog_owners",
   "running",
-  "hiking",
-  "biking",
-  "lifting",
-  "brunch",
-  "drinks",
-  "music",
-  "art",
-  "books",
-  "games",
 ];
 
-export const INTEREST_EMOJI: Record<InterestTag, string> = {
-  coffee: "☕",
-  yoga: "🧘",
-  running: "🏃",
-  hiking: "🥾",
-  biking: "🚴",
-  lifting: "🏋️",
-  brunch: "🥞",
-  drinks: "🍻",
-  music: "🎶",
-  art: "🎨",
-  books: "📚",
-  games: "🎲",
-};
+/** Same set as interests — used in create-plan vibe picker. */
+export const VIBE_TAGS = ALL_INTERESTS;
+
+export type PlanKind = "standard" | "looking_for";
+
+export type PlanVisibility = "everyone" | "community" | "network";
 
 export type ParticipationState = "interested" | "going";
 
@@ -73,13 +75,22 @@ export interface PlanDTO {
   creator: PublicUser;
   neighborhoodId: string;
   location: { name: string; address: string; lat?: number; lng?: number };
-  date: string; // ISO date "2026-05-04"
-  time: string; // "09:00" or "" if flexible
+  date: string;
+  time: string;
   isFlexibleTime: boolean;
-  endTime?: string; // optional ISO datetime, used for post-event feedback timing
+  /** True when venue/time still open — card shows flexible tag. */
+  isFlexibleLocation: boolean;
+  endTime?: string;
   tags: InterestTag[];
   description?: string;
-  hostEmoji: string; // single emoji shown next to first name
+  hostEmoji: string;
+  planKind: PlanKind;
+  visibility: PlanVisibility;
+  /** When visibility is `community`, plan is shown to users who picked this interest. */
+  visibilityCommunityTag: InterestTag | null;
+  isRecurring: boolean;
+  /** Host locked venue + time from coordination thread. */
+  lockedAt: string | null;
   participants: {
     going: PublicUser[];
     interested: PublicUser[];
@@ -127,7 +138,10 @@ export interface MeDTO {
   id: string;
   phoneNumber: string;
   firstName: string;
+  /** @deprecated prefer neighborhoodIds — kept for older rows */
   neighborhoodId: string | null;
+  /** Areas the user spends time in — feeds personalization. */
+  neighborhoodIds?: string[];
   interests: InterestTag[];
   avatarSeed: string;
   avatarStyle: AvatarStyle;

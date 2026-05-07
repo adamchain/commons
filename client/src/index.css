@@ -740,9 +740,9 @@ label {
 
 .plan-hero h1 {
   font-size: 26px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.01em;
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: -0.01em;
   margin: 0;
   line-height: 1.15;
 }
@@ -2170,4 +2170,269 @@ label {
   justify-content: center;
   font-size: 36px;
   color: var(--text-muted);
+}
+
+/* ---------- Feed revamp (sentence-case cards, week strip) ---------- */
+
+.week-glance {
+  margin: 12px 0 20px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.week-glance-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  text-align: center;
+}
+
+.week-glance-day {
+  padding: 8px 4px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.week-glance-day.has-plans {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: rgba(255, 120, 73, 0.35);
+  font-weight: 700;
+}
+
+.week-glance-day.is-today {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.week-glance-dow {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.week-glance-num {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.week-glance-nudge {
+  margin: 12px 0 0;
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.week-glance-link {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.plan-card {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 16px 14px;
+  box-shadow: var(--shadow-card);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+
+.plan-card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.plan-card--looking {
+  border-left: 4px solid var(--accent);
+}
+
+.plan-card-looking-pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.plan-card-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 6px;
+  line-height: 1.25;
+}
+
+.plan-card-posted-by {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.plan-card-description {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-style: italic;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.plan-card-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.plan-card-when,
+.plan-card-flex-tag {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.plan-card-flex-tag {
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.plan-card-avatars {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.plan-card-initials {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.plan-card-going-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.plan-card-tags {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag-chip-quiet {
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+.plan-card-my-state {
+  margin-top: 10px;
+}
+
+.profile-avatar-preview {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.neighborhood-row.is-selected {
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+}
+
+.segmented {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.segmented button {
+  flex: 1;
+  min-width: 120px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.segmented button.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.form-question {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.coordination-banner {
+  background: var(--surface-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.coordination-banner p {
+  margin: 0;
+}
+
+.plan-description-quote {
+  font-style: italic;
+}
+
+.participation-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 8px;
+}
+
+.participation--loose .btn-going {
+  box-shadow: none;
+}
+
+.chat-thread-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 8px;
+}
+
+.empty-state-feed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.avatar-initials {
+  font-family: inherit;
 }

@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/http";
-import { AvatarBuilder } from "../components/AvatarBuilder";
+import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
 import {
   ALL_INTERESTS,
-  INTEREST_EMOJI,
+  INTEREST_LABELS,
   type AvatarStyle,
   type InterestTag,
   type MeDTO,
@@ -17,7 +17,7 @@ type Step = "phone" | "code" | "location" | "interests" | "profile";
 export function OnboardingPage() {
   const { user, refreshUser, setUser } = useAuth();
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>(() => decideInitialStep(user));
+  const [step, setStep] = useState<Step>(() => pickInitial(user));
   const [phoneNumber, setPhoneNumber] = useState("");
   const [smsConfigured, setSmsConfigured] = useState<boolean | null>(null);
   /** Set after requesting a code; drives code length rules (Verify vs local dev). */
@@ -32,10 +32,9 @@ export function OnboardingPage() {
     if (user?.onboardingComplete) navigate("/", { replace: true });
   }, [user, navigate]);
 
-  // Once authed, advance past the phone steps automatically.
   useEffect(() => {
     if (user && (step === "phone" || step === "code")) {
-      setStep(decideInitialStep(user));
+      setStep(pickInitial(user));
     }
   }, [user, step]);
 
@@ -71,7 +70,7 @@ export function OnboardingPage() {
         body: JSON.stringify({ phoneNumber, code }),
       });
       setUser(me);
-      setStep(decideInitialStep(me));
+      setStep(pickInitial(me));
     } catch (e) {
       setError(formatError(e));
     } finally {
@@ -153,11 +152,14 @@ export function OnboardingPage() {
   if (step === "location") {
     return (
       <LocationStep
-        me={user}
         onCoords={setCoords}
         coords={coords}
-        onSave={async (neighborhoodId) => {
-          await patchMe({ neighborhoodId });
+        onSave={async (neighborhoodIds) => {
+          const primary = neighborhoodIds[0] ?? null;
+          await patchMe({
+            neighborhoodIds,
+            neighborhoodId: primary,
+          });
           setStep("interests");
         }}
       />
@@ -195,11 +197,13 @@ export function OnboardingPage() {
   return null;
 }
 
-function decideInitialStep(user: MeDTO | null): Step {
+function pickInitial(user: MeDTO | null): Step {
   if (!user) return "phone";
-  if (user.onboardingComplete) return "phone"; // will redirect via effect
-  if (!user.neighborhoodId) return "location";
-  if (user.interests.length < 1) return "interests";
+  if (user.onboardingComplete) return "phone";
+  const hoods =
+    user.neighborhoodIds?.length ? user.neighborhoodIds : user.neighborhoodId ? [user.neighborhoodId] : [];
+  if (hoods.length === 0) return "location";
+  if (user.interests.length < 2) return "interests";
   return "profile";
 }
 
@@ -232,12 +236,12 @@ function LocationStep({
   onCoords,
   onSave,
 }: {
-  me: MeDTO;
   coords: { lat: number; lng: number } | null;
   onCoords: (c: { lat: number; lng: number } | null) => void;
-  onSave: (neighborhoodId: string) => Promise<void>;
+  onSave: (neighborhoodIds: string[]) => Promise<void>;
 }) {
   const [neighborhoods, setNeighborhoods] = useState<NeighborhoodDTO[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("");
   const [busy, setBusy] = useState(false);
   const [permissionState, setPermissionState] = useState<"idle" | "asking" | "granted" | "denied">(
@@ -297,8 +301,8 @@ function LocationStep({
 
   return (
     <OnboardingShell
-      title={coords ? "Pick your neighborhood" : "Where do you live?"}
-      subtitle={coords ? "Sorted by closest to you." : "Pick the area you spend the most time in."}
+      title={coords ? "Where do you spend time?" : "Where do you hang out?"}
+      subtitle={coords ? "Sorted by closest to you. Tap all that apply." : "Pick every area that fits — we’ll personalize your feed."}
     >
       <input
         className="onboarding-input"
@@ -307,24 +311,48 @@ function LocationStep({
         onChange={(e) => setFilter(e.target.value)}
       />
       <ul className="neighborhood-list">
-        {sorted.map((n) => (
-          <li key={n.id}>
-            <button
-              type="button"
-              className="neighborhood-row"
-              disabled={busy}
-              onClick={async () => { setBusy(true); await onSave(n.id); }}
-            >
-              <span className="neighborhood-name">{n.name}</span>
-              <span className="neighborhood-metro">
-                {coords && n.lat !== undefined && n.lng !== undefined
-                  ? `${formatMiles(distance(coords, n))} away`
-                  : n.metro}
-              </span>
-            </button>
-          </li>
-        ))}
+        {sorted.map((n) => {
+          const on = selected.has(n.id);
+          return (
+            <li key={n.id}>
+              <button
+                type="button"
+                className={`neighborhood-row ${on ? "is-selected" : ""}`}
+                disabled={busy}
+                onClick={() => {
+                  setSelected((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(n.id)) next.delete(n.id);
+                    else next.add(n.id);
+                    return next;
+                  });
+                }}
+              >
+                <span className="neighborhood-name">{n.name}</span>
+                <span className="neighborhood-metro">
+                  {coords && n.lat !== undefined && n.lng !== undefined
+                    ? `${formatMiles(distance(coords, n))} away`
+                    : n.metro}
+                </span>
+              </button>
+            </li>
+          );
+        })}
       </ul>
+      <button
+        className="btn-primary btn-block"
+        disabled={busy || selected.size === 0}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            await onSave([...selected]);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        Continue
+      </button>
     </OnboardingShell>
   );
 }
@@ -332,7 +360,7 @@ function LocationStep({
 function InterestsStep({ me, onSave }: { me: MeDTO; onSave: (interests: InterestTag[]) => Promise<void> }) {
   const [picked, setPicked] = useState<InterestTag[]>(me.interests);
   const [busy, setBusy] = useState(false);
-  const max = 2;
+  const max = 3;
 
   function toggle(t: InterestTag) {
     if (picked.includes(t)) {
@@ -343,7 +371,7 @@ function InterestsStep({ me, onSave }: { me: MeDTO; onSave: (interests: Interest
   }
 
   return (
-    <OnboardingShell title="Pick 2 things you like" subtitle="Shapes what you see. You can change these later.">
+    <OnboardingShell title="What are you into?" subtitle="Pick 2–3 communities — we’ll tune your feed from day one.">
       <div className="interest-grid">
         {ALL_INTERESTS.map((t) => {
           const isPicked = picked.includes(t);
@@ -356,18 +384,17 @@ function InterestsStep({ me, onSave }: { me: MeDTO; onSave: (interests: Interest
               className={`interest-tile ${isPicked ? "is-picked" : ""}`}
               onClick={() => toggle(t)}
             >
-              <span className="interest-emoji">{INTEREST_EMOJI[t]}</span>
-              <span className="interest-label">{t}</span>
+              <span className="interest-label">{INTEREST_LABELS[t]}</span>
             </button>
           );
         })}
       </div>
       <button
         className="btn-primary btn-block"
-        disabled={busy || picked.length !== max}
+        disabled={busy || picked.length < 2 || picked.length > max}
         onClick={async () => { setBusy(true); await onSave(picked); }}
       >
-        {picked.length}/{max} picked — Next
+        Next · {picked.length} picked
       </button>
     </OnboardingShell>
   );
@@ -381,34 +408,60 @@ function ProfileStep({
   onSave: (firstName: string, seed: string, style: AvatarStyle, photoDataUrl: string | null) => Promise<void>;
 }) {
   const [firstName, setFirstName] = useState(me.firstName);
+  const [photo, setPhoto] = useState<string | null>(me.avatarPhotoDataUrl ?? null);
   const [busy, setBusy] = useState(false);
 
   return (
-    <OnboardingShell title="Make your profile" subtitle="What should we call you, and how should you look?">
+    <OnboardingShell title="Your profile" subtitle="Photo or initials — whatever feels like you.">
+      <div className="profile-avatar-preview">
+        <Avatar
+          seed={me.avatarSeed}
+          style={me.avatarStyle}
+          photoDataUrl={photo ?? undefined}
+          name={firstName.trim() || undefined}
+          size="xl"
+        />
+      </div>
+      <label className="onboarding-fineprint" style={{ display: "block", marginBottom: 8 }}>
+        Add a photo (optional)
+        <input
+          type="file"
+          accept="image/*"
+          className="onboarding-input"
+          style={{ marginTop: 6 }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+              setPhoto(typeof reader.result === "string" ? reader.result : null);
+            };
+            reader.readAsDataURL(f);
+          }}
+        />
+      </label>
       <input
         className="onboarding-input"
         placeholder="First name"
         value={firstName}
         onChange={(e) => setFirstName(e.target.value)}
       />
-      <AvatarBuilder
-        initialSeed={me.avatarSeed}
-        initialStyle={me.avatarStyle}
-        initialPhotoDataUrl={me.avatarPhotoDataUrl}
-        onSave={async (seed, style, photo) => {
-          if (!firstName.trim()) return;
+      <button
+        type="button"
+        className="btn-primary btn-block"
+        disabled={busy || !firstName.trim()}
+        onClick={async () => {
           setBusy(true);
           try {
-            await onSave(firstName.trim(), seed, style, photo);
+            await onSave(firstName.trim(), me.avatarSeed, me.avatarStyle, photo);
           } finally {
             setBusy(false);
           }
         }}
-      />
-      {!firstName.trim() && (
-        <p className="onboarding-fineprint">Add your first name to continue.</p>
-      )}
-      {busy && <p className="onboarding-fineprint">Saving…</p>}
+      >
+        {busy ? "Saving…" : "Finish"}
+      </button>
+      {!firstName.trim() && <p className="onboarding-fineprint">Add your first name to continue.</p>}
     </OnboardingShell>
   );
 }

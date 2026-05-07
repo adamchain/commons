@@ -6,6 +6,8 @@ interface AvatarProps {
   size?: "sm" | "md" | "lg" | "xl";
   backgroundColor?: string;
   photoDataUrl?: string;
+  /** When set (and no photo), show initials instead of illustrated avatar. */
+  name?: string;
 }
 
 const PIXEL_SIZE: Record<NonNullable<AvatarProps["size"]>, number> = {
@@ -15,26 +17,36 @@ const PIXEL_SIZE: Record<NonNullable<AvatarProps["size"]>, number> = {
   xl: 128,
 };
 
-// DiceBear v9 public HTTP API — returns SVG. No auth, free, cacheable.
-// Docs: https://www.dicebear.com/styles/
+function initialsFrom(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0]!.slice(0, 1) + parts[1]!.slice(0, 1)).toUpperCase();
+  const one = parts[0] ?? "?";
+  return one.slice(0, 2).toUpperCase();
+}
+
 export function dicebearUrl(seed: string, style: AvatarStyle = "avataaars", pixelSize = 96, backgroundColor?: string): string {
   const params = new URLSearchParams({ seed, size: String(pixelSize) });
   if (backgroundColor) params.set("backgroundColor", backgroundColor);
   return `https://api.dicebear.com/9.x/${style}/svg?${params.toString()}`;
 }
 
-export function Avatar({ seed, style = "avataaars", size = "md", backgroundColor, photoDataUrl }: AvatarProps) {
+export function Avatar({ seed, style = "avataaars", size = "md", backgroundColor, photoDataUrl, name }: AvatarProps) {
   const px = PIXEL_SIZE[size];
   const cls = `avatar avatar-${size}`;
-  const src = photoDataUrl || dicebearUrl(seed, style, px * 2, backgroundColor);
-  return (
-    <img
-      src={src}
-      width={px}
-      height={px}
-      className={cls}
-      alt=""
-      loading="lazy"
-    />
-  );
+  if (photoDataUrl) {
+    return <img src={photoDataUrl} width={px} height={px} className={cls} alt="" loading="lazy" />;
+  }
+  if (name?.trim()) {
+    return (
+      <span
+        className={`${cls} avatar-initials`}
+        style={{ width: px, height: px, fontSize: px * 0.35 }}
+        aria-hidden
+      >
+        {initialsFrom(name)}
+      </span>
+    );
+  }
+  const src = dicebearUrl(seed, style, px * 2, backgroundColor);
+  return <img src={src} width={px} height={px} className={cls} alt="" loading="lazy" />;
 }

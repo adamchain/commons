@@ -1,49 +1,50 @@
 // Commons v2 shared types — kept in sync between client/src/types/shared.ts
 // and server/src/types/shared.ts. Edit both when changing.
 
+/** Community interest filters — Philly launch set (COMMONS-seeded). */
 export type InterestTag =
-  | "coffee"
-  | "yoga"
-  | "running"
-  | "hiking"
-  | "biking"
-  | "lifting"
-  | "brunch"
-  | "drinks"
-  | "music"
-  | "art"
-  | "books"
-  | "games";
+  | "fitness_outdoors"
+  | "food_drinks"
+  | "arts_culture"
+  | "music_nightlife"
+  | "thrifting"
+  | "local_events"
+  | "wellness"
+  | "coffee_cowork"
+  | "dog_owners"
+  | "running";
+
+export const INTEREST_LABELS: Record<InterestTag, string> = {
+  fitness_outdoors: "Fitness + Outdoors",
+  food_drinks: "Food + Drinks",
+  arts_culture: "Arts + Culture",
+  music_nightlife: "Music + Nightlife",
+  thrifting: "Thrifting",
+  local_events: "Local Events",
+  wellness: "Wellness",
+  coffee_cowork: "Coffee + Co-working",
+  dog_owners: "Dog owners",
+  running: "Running",
+};
 
 export const ALL_INTERESTS: InterestTag[] = [
-  "coffee",
-  "yoga",
+  "fitness_outdoors",
+  "food_drinks",
+  "arts_culture",
+  "music_nightlife",
+  "thrifting",
+  "local_events",
+  "wellness",
+  "coffee_cowork",
+  "dog_owners",
   "running",
-  "hiking",
-  "biking",
-  "lifting",
-  "brunch",
-  "drinks",
-  "music",
-  "art",
-  "books",
-  "games",
 ];
 
-export const INTEREST_EMOJI: Record<InterestTag, string> = {
-  coffee: "☕",
-  yoga: "🧘",
-  running: "🏃",
-  hiking: "🥾",
-  biking: "🚴",
-  lifting: "🏋️",
-  brunch: "🥞",
-  drinks: "🍻",
-  music: "🎶",
-  art: "🎨",
-  books: "📚",
-  games: "🎲",
-};
+export const VIBE_TAGS = ALL_INTERESTS;
+
+export type PlanKind = "standard" | "looking_for";
+
+export type PlanVisibility = "everyone" | "community" | "network";
 
 export type ParticipationState = "interested" | "going";
 
@@ -62,7 +63,7 @@ export interface NeighborhoodDTO {
   id: string;
   name: string;
   metro: string;
-  adjacent: string[]; // neighborhood ids
+  adjacent: string[];
   lat?: number;
   lng?: number;
 }
@@ -73,13 +74,19 @@ export interface PlanDTO {
   creator: PublicUser;
   neighborhoodId: string;
   location: { name: string; address: string; lat?: number; lng?: number };
-  date: string; // ISO date "2026-05-04"
-  time: string; // "09:00" or "" if flexible
+  date: string;
+  time: string;
   isFlexibleTime: boolean;
-  endTime?: string; // optional ISO datetime, used for post-event feedback timing
+  isFlexibleLocation: boolean;
+  endTime?: string;
   tags: InterestTag[];
   description?: string;
-  hostEmoji: string; // single emoji shown next to first name
+  hostEmoji: string;
+  planKind: PlanKind;
+  visibility: PlanVisibility;
+  visibilityCommunityTag: InterestTag | null;
+  isRecurring: boolean;
+  lockedAt: string | null;
   participants: {
     going: PublicUser[];
     interested: PublicUser[];
@@ -128,6 +135,7 @@ export interface MeDTO {
   phoneNumber: string;
   firstName: string;
   neighborhoodId: string | null;
+  neighborhoodIds?: string[];
   interests: InterestTag[];
   avatarSeed: string;
   avatarStyle: AvatarStyle;

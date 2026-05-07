@@ -12,6 +12,7 @@ const UserSchema = new mongoose.Schema<UserRecord>(
     },
     firstName: { type: String, required: true },
     neighborhoodId: { type: String, default: null },
+    neighborhoodIds: { type: [String], default: [] },
     interests: [{ type: String }],
     avatarSeed: { type: String, required: true },
     avatarStyle: {

@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { LoadingScreen } from "../components/LoadingScreen";
-import { useAuth } from "../context/AuthContext";
 import { formatPlanDate } from "../lib/format";
 import {
   HOST_TAG_LABELS,
-  type ConversationDTO,
   type HostTag,
   type PlanDTO,
   type PublicUser,
@@ -24,8 +22,6 @@ interface ProfilePayload {
 
 export function ProfilePage() {
   const { userId = "" } = useParams();
-  const { user } = useAuth();
-  const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfilePayload | null>(null);
 
   useEffect(() => {
@@ -33,17 +29,6 @@ export function ProfilePage() {
   }, [userId]);
 
   if (!profile) return <LoadingScreen tagline="Loading profile" />;
-
-  const isMe = user?.id === profile.user.id;
-
-  async function startDm() {
-    if (!profile?.sharedPlanId || !profile.user) return;
-    const dm = await api<ConversationDTO>(`/api/plans/${profile.sharedPlanId}/dms`, {
-      method: "POST",
-      body: JSON.stringify({ otherUserId: profile.user.id }),
-    });
-    navigate(`/plans/${profile.sharedPlanId}/chat/${dm.id}`);
-  }
 
   const topTags: Array<[HostTag, number]> = (Object.entries(profile.tagCounts) as Array<[HostTag, number]>)
     .filter(([, count]) => count > 0)
@@ -57,7 +42,13 @@ export function ProfilePage() {
       </header>
 
       <section className="profile-hero">
-        <Avatar seed={profile.user.avatarSeed} style={profile.user.avatarStyle} photoDataUrl={profile.user.avatarPhotoDataUrl} size="xl" />
+        <Avatar
+          seed={profile.user.avatarSeed}
+          style={profile.user.avatarStyle}
+          photoDataUrl={profile.user.avatarPhotoDataUrl}
+          name={profile.user.firstName}
+          size="xl"
+        />
         <div className="profile-name">{profile.user.firstName}</div>
         {profile.neighborhood && (
           <div className="profile-neighborhood">📍 {profile.neighborhood.name}</div>
@@ -73,11 +64,6 @@ export function ProfilePage() {
           </div>
         )}
 
-        {!isMe && profile.sharedPlanId && (
-          <button type="button" className="btn-primary btn-block" onClick={() => void startDm()}>
-            Message in current plan
-          </button>
-        )}
       </section>
 
       {profile.upcoming.length > 0 && (

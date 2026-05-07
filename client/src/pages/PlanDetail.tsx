@@ -8,8 +8,8 @@ import { ParticipationButtons } from "../components/ParticipationButtons";
 import { ShareSheet } from "../components/ShareSheet";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { useAuth } from "../context/AuthContext";
-import { formatPlanDate, formatPlanTime } from "../lib/format";
-import type { ParticipationState, PlanDTO, PublicUser } from "../types/shared";
+import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
+import { INTEREST_LABELS, type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
 
 export function PlanDetailPage() {
   const { id = "" } = useParams();
@@ -63,7 +63,7 @@ export function PlanDetailPage() {
       <section className="plan-hero">
         <div className="plan-title-row">
           <span className="plan-title-emoji">{plan.hostEmoji}</span>
-          <h1>{plan.title}</h1>
+          <h1>{sentenceCaseTitle(plan.title)}</h1>
         </div>
 
         <div className="plan-when">
@@ -87,13 +87,19 @@ export function PlanDetailPage() {
           </span>
         </button>
 
-        {plan.description && <p className="plan-description">{plan.description}</p>}
+        {plan.description && <p className="plan-description plan-description-quote">&ldquo;{plan.description}&rdquo;</p>}
 
         {plan.tags.length > 0 && (
           <div className="tag-chip-row">
             {plan.tags.map((tag) => (
-              <span key={tag} className="tag-chip">{tag}</span>
+              <span key={tag} className="tag-chip">{INTEREST_LABELS[tag] ?? tag}</span>
             ))}
+          </div>
+        )}
+
+        {(plan.isFlexibleTime || plan.isFlexibleLocation) && isHosting && (
+          <div className="coordination-banner" role="note">
+            <p>Still working out the details? Fill in venue &amp; time when you’re ready and lock it in.</p>
           </div>
         )}
 
@@ -101,6 +107,7 @@ export function PlanDetailPage() {
           planId={plan.id}
           initialState={plan.myState}
           onChange={onStateChange}
+          planKind={plan.planKind}
         />
 
         <div className="plan-actions-row">

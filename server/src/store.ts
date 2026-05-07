@@ -6,6 +6,8 @@ import type {
   HostTag,
   InterestTag,
   ParticipationState,
+  PlanKind,
+  PlanVisibility,
 } from "./types/shared.js";
 
 export interface UserRecord {
@@ -14,7 +16,10 @@ export interface UserRecord {
   /** `verify` = signed up via Twilio Verify; `seed` = demo data script only. */
   accountSource?: "verify" | "seed";
   firstName: string;
+  /** Primary hood — mirrors first of neighborhoodIds when set. */
   neighborhoodId: string | null;
+  /** Optional on legacy rows. */
+  neighborhoodIds?: string[];
   interests: InterestTag[];
   avatarSeed: string;
   avatarStyle: AvatarStyle;
@@ -41,10 +46,17 @@ export interface PlanRecord {
   date: string;
   time: string;
   isFlexibleTime: boolean;
+  /** Optional on legacy rows — normalized when serving. */
+  isFlexibleLocation?: boolean;
   endTime?: string;
   tags: InterestTag[];
   description?: string;
   hostEmoji: string;
+  planKind?: PlanKind;
+  visibility?: PlanVisibility;
+  visibilityCommunityTag?: InterestTag | null;
+  isRecurring?: boolean;
+  lockedAt?: string | null;
   createdAt: string;
 }
 
@@ -186,6 +198,7 @@ export const store = {
       accountSource: opts?.accountSource ?? "verify",
       firstName: "",
       neighborhoodId: null,
+      neighborhoodIds: [] as string[],
       interests: [],
       avatarSeed: randomUUID(),
       avatarStyle: "avataaars",
@@ -235,8 +248,14 @@ export const store = {
   },
   createPlan(input: Omit<PlanRecord, "id" | "createdAt">): PlanRecord {
     const plan: PlanRecord = {
-      id: randomUUID(),
+      isFlexibleLocation: false,
+      planKind: "standard",
+      visibility: "everyone",
+      visibilityCommunityTag: null,
+      isRecurring: false,
+      lockedAt: null,
       ...input,
+      id: randomUUID(),
       createdAt: new Date().toISOString(),
     };
     snapshot.plans.push(plan);

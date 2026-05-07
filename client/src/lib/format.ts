@@ -1,3 +1,13 @@
+/** Display titles like a text — not shouty event listings. */
+export function sentenceCaseTitle(raw: string): string {
+  const t = raw.trim();
+  if (!t) return raw;
+  return t
+    .split(/\s+/)
+    .map((w) => (w.length <= 2 && /^[A-Z]+$/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
+    .join(" ");
+}
+
 export function formatPlanDate(iso: string): string {
   const d = new Date(iso);
   const today = new Date();

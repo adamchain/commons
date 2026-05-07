@@ -36,60 +36,60 @@ interface SeedNeighborhood {
   lng: number;
 }
 
-const PHOENIX_NEIGHBORHOODS: SeedNeighborhood[] = [
-  { key: "arcadia",             name: "Arcadia",             metro: "Phoenix", adjacentKeys: ["biltmore", "camelback-east"],                  lat: 33.4969, lng: -111.9847 },
-  { key: "biltmore",            name: "Biltmore",            metro: "Phoenix", adjacentKeys: ["arcadia", "camelback-east"],                   lat: 33.5093, lng: -112.0260 },
-  { key: "camelback-east",      name: "Camelback East",      metro: "Phoenix", adjacentKeys: ["arcadia", "biltmore", "downtown-phx"],         lat: 33.5028, lng: -112.0440 },
-  { key: "downtown-phx",        name: "Downtown Phoenix",    metro: "Phoenix", adjacentKeys: ["camelback-east", "roosevelt-row", "garfield"], lat: 33.4484, lng: -112.0740 },
-  { key: "roosevelt-row",       name: "Roosevelt Row",       metro: "Phoenix", adjacentKeys: ["downtown-phx", "garfield"],                    lat: 33.4583, lng: -112.0707 },
-  { key: "garfield",            name: "Garfield",            metro: "Phoenix", adjacentKeys: ["roosevelt-row", "downtown-phx"],               lat: 33.4520, lng: -112.0596 },
-  { key: "tempe",               name: "Tempe",               metro: "Phoenix", adjacentKeys: ["mill-ave", "old-town-scottsdale"],             lat: 33.4255, lng: -111.9400 },
-  { key: "mill-ave",            name: "Mill Ave",            metro: "Phoenix", adjacentKeys: ["tempe"],                                       lat: 33.4282, lng: -111.9396 },
-  { key: "old-town-scottsdale", name: "Old Town Scottsdale", metro: "Phoenix", adjacentKeys: ["tempe"],                                       lat: 33.4942, lng: -111.9261 },
+/** COMMONS-seeded Philly neighborhoods — adjacent graph is approximate for proximity ranking. */
+const PHILLY_NEIGHBORHOODS: SeedNeighborhood[] = [
+  { key: "center_city", name: "Center City", metro: "Philadelphia", adjacentKeys: ["rittenhouse", "old_city", "graduate_hospital"], lat: 39.9526, lng: -75.1652 },
+  { key: "rittenhouse", name: "Rittenhouse", metro: "Philadelphia", adjacentKeys: ["center_city", "fairmount", "graduate_hospital"], lat: 39.949, lng: -75.171 },
+  { key: "old_city", name: "Old City", metro: "Philadelphia", adjacentKeys: ["center_city", "northern_liberties"], lat: 39.9522, lng: -75.1438 },
+  { key: "northern_liberties", name: "Northern Liberties", metro: "Philadelphia", adjacentKeys: ["old_city", "fishtown"], lat: 39.9625, lng: -75.139 },
+  { key: "fishtown", name: "Fishtown", metro: "Philadelphia", adjacentKeys: ["northern_liberties"], lat: 39.9707, lng: -75.1297 },
+  { key: "south_philly", name: "South Philly", metro: "Philadelphia", adjacentKeys: ["center_city"], lat: 39.9279, lng: -75.159 },
+  { key: "west_philly", name: "West Philly", metro: "Philadelphia", adjacentKeys: ["center_city", "fairmount"], lat: 39.9526, lng: -75.2125 },
+  { key: "manayunk", name: "Manayunk", metro: "Philadelphia", adjacentKeys: ["fairmount"], lat: 40.0253, lng: -75.2214 },
+  { key: "fairmount", name: "Fairmount", metro: "Philadelphia", adjacentKeys: ["rittenhouse", "center_city", "manayunk"], lat: 39.9673, lng: -75.179 },
+  { key: "graduate_hospital", name: "Graduate Hospital", metro: "Philadelphia", adjacentKeys: ["rittenhouse", "center_city"], lat: 39.942, lng: -75.175 },
 ];
 
 const SEED_USERS: SeedUser[] = [
-  { phoneNumber: "+15555550100", firstName: "You",   neighborhoodKey: "arcadia",        interests: ["coffee", "yoga", "running"], avatarSeed: "you-seed" },
-  { phoneNumber: "+15555550101", firstName: "Jamie", neighborhoodKey: "arcadia",        interests: ["yoga", "coffee", "brunch"],  avatarSeed: "jamie-seed" },
-  { phoneNumber: "+15555550102", firstName: "Sam",   neighborhoodKey: "biltmore",       interests: ["lifting", "running", "drinks"], avatarSeed: "sam-seed" },
-  { phoneNumber: "+15555550103", firstName: "Alex",  neighborhoodKey: "downtown-phx",   interests: ["music", "drinks", "art"],    avatarSeed: "alex-seed" },
-  { phoneNumber: "+15555550104", firstName: "Riley", neighborhoodKey: "roosevelt-row",  interests: ["art", "coffee", "books"],    avatarSeed: "riley-seed" },
-  { phoneNumber: "+15555550105", firstName: "Pat",   neighborhoodKey: "tempe",          interests: ["biking", "hiking", "running"], avatarSeed: "pat-seed" },
-  { phoneNumber: "+15555550106", firstName: "Sky",   neighborhoodKey: "old-town-scottsdale", interests: ["brunch", "drinks", "music"], avatarSeed: "sky-seed" },
-  { phoneNumber: "+15555550107", firstName: "Dee",   neighborhoodKey: "garfield",       interests: ["games", "books", "coffee"],  avatarSeed: "dee-seed" },
+  { phoneNumber: "+15555550100", firstName: "You", neighborhoodKey: "rittenhouse", interests: ["coffee_cowork", "wellness", "running"], avatarSeed: "you-seed" },
+  { phoneNumber: "+15555550101", firstName: "Jamie", neighborhoodKey: "rittenhouse", interests: ["wellness", "coffee_cowork", "food_drinks"], avatarSeed: "jamie-seed" },
+  { phoneNumber: "+15555550102", firstName: "Sam", neighborhoodKey: "fairmount", interests: ["fitness_outdoors", "running", "music_nightlife"], avatarSeed: "sam-seed" },
+  { phoneNumber: "+15555550103", firstName: "Alex", neighborhoodKey: "old_city", interests: ["music_nightlife", "food_drinks", "arts_culture"], avatarSeed: "alex-seed" },
+  { phoneNumber: "+15555550104", firstName: "Riley", neighborhoodKey: "northern_liberties", interests: ["arts_culture", "coffee_cowork", "local_events"], avatarSeed: "riley-seed" },
+  { phoneNumber: "+15555550105", firstName: "Pat", neighborhoodKey: "south_philly", interests: ["fitness_outdoors", "dog_owners", "running"], avatarSeed: "pat-seed" },
 ];
 
 const SEED_PLANS: SeedPlan[] = [
   {
     creatorPhone: "+15555550101",
-    title: "Yoga in Encanto Park",
-    neighborhoodKey: "downtown-phx",
-    location: { name: "Encanto Park", address: "2605 N 15th Ave, Phoenix, AZ", lat: 33.4751, lng: -112.0922 },
+    title: "Yoga in Rittenhouse Square",
+    neighborhoodKey: "rittenhouse",
+    location: { name: "Rittenhouse Square", address: "1800 Walnut St, Philadelphia, PA", lat: 39.949, lng: -75.171 },
     daysFromNow: 3,
     time: "09:00",
     isFlexibleTime: true,
     endHoursAfterStart: 1,
-    tags: ["yoga", "coffee"],
-    description: "Bring a mat. Coffee after at Songbird if anyone's down.",
+    tags: ["wellness", "coffee_cowork"],
+    description: "Bring a mat. Coffee after if folks want.",
     hostEmoji: "🧘",
-    going: ["+15555550101", "+15555550100", "+15555550104", "+15555550107"],
-    interested: ["+15555550102", "+15555550106"],
+    going: ["+15555550101", "+15555550100", "+15555550104"],
+    interested: ["+15555550102", "+15555550103"],
     messages: [
-      { senderPhone: "+15555550104", body: "What's the parking situation?", minutesAgo: 220 },
-      { senderPhone: "+15555550101", body: "Lot off 15th is free on weekends.", minutesAgo: 90 },
+      { senderPhone: "+15555550104", body: "Which corner are we meeting?", minutesAgo: 220 },
+      { senderPhone: "+15555550101", body: "Southwest side — near the fountain.", minutesAgo: 90 },
     ],
   },
   {
     creatorPhone: "+15555550102",
-    title: "Sunrise run — Camelback Mountain",
-    neighborhoodKey: "biltmore",
-    location: { name: "Echo Canyon Trailhead", address: "5700 N Echo Canyon Pkwy, Phoenix, AZ", lat: 33.5191, lng: -112.0072 },
+    title: "Sunrise run — Schuylkill Banks",
+    neighborhoodKey: "fairmount",
+    location: { name: "Schuylkill Banks Trailhead", address: "2500 Walnut St, Philadelphia, PA", lat: 39.9513, lng: -75.182 },
     daysFromNow: 1,
-    time: "05:30",
+    time: "06:30",
     isFlexibleTime: false,
     endHoursAfterStart: 2,
-    tags: ["running", "hiking"],
-    description: "Echo Canyon to summit. Easy regroup at the saddle for slower runners.",
+    tags: ["running", "fitness_outdoors"],
+    description: "Easy pace — regroup at the bridge.",
     hostEmoji: "🏃",
     going: ["+15555550102", "+15555550105"],
     interested: ["+15555550100", "+15555550101"],
@@ -97,83 +97,32 @@ const SEED_PLANS: SeedPlan[] = [
   },
   {
     creatorPhone: "+15555550103",
-    title: "Live music at Crescent Ballroom",
-    neighborhoodKey: "downtown-phx",
-    location: { name: "Crescent Ballroom", address: "308 N 2nd Ave, Phoenix, AZ", lat: 33.4533, lng: -112.0780 },
+    title: "Live music at Johnny Brenda's",
+    neighborhoodKey: "fishtown",
+    location: { name: "Johnny Brenda's", address: "1201 N Frankford Ave, Philadelphia, PA", lat: 39.9714, lng: -75.1339 },
     daysFromNow: 2,
     time: "20:00",
     isFlexibleTime: false,
-    tags: ["music", "drinks"],
-    description: "Local indie showcase. $10 cover, cash bar.",
+    tags: ["music_nightlife", "food_drinks"],
+    description: "Local bands — small cover at the door.",
     hostEmoji: "🎶",
-    going: ["+15555550103", "+15555550106", "+15555550104"],
-    interested: ["+15555550107", "+15555550100"],
-    messages: [
-      { senderPhone: "+15555550106", body: "Doors at 7? Or 8?", minutesAgo: 30 },
-      { senderPhone: "+15555550103", body: "Doors 7, music starts 8.", minutesAgo: 25 },
-    ],
+    going: ["+15555550103", "+15555550104"],
+    interested: ["+15555550105", "+15555550100"],
+    messages: [],
   },
   {
     creatorPhone: "+15555550104",
-    title: "First Friday gallery walk",
-    neighborhoodKey: "roosevelt-row",
-    location: { name: "Roosevelt Row", address: "Roosevelt St & 2nd St, Phoenix, AZ" },
+    title: "First Friday crawl — galleries",
+    neighborhoodKey: "old_city",
+    location: { name: "Old City Arts District", address: "N 3rd St & Market St, Philadelphia, PA" },
     daysFromNow: 5,
     time: "Flexible",
     isFlexibleTime: true,
-    tags: ["art", "music"],
-    description: "Loose plan — meet at MonOrchid then drift down the row.",
+    tags: ["arts_culture", "local_events"],
+    description: "Loose route — meet at the flagpole then drift.",
     hostEmoji: "🎨",
     going: ["+15555550104"],
-    interested: ["+15555550100", "+15555550107", "+15555550103"],
-    messages: [],
-  },
-  {
-    creatorPhone: "+15555550105",
-    title: "Bike loop around Tempe Town Lake",
-    neighborhoodKey: "tempe",
-    location: { name: "Tempe Beach Park", address: "80 W Rio Salado Pkwy, Tempe, AZ", lat: 33.4308, lng: -111.9434 },
-    daysFromNow: 4,
-    time: "07:00",
-    isFlexibleTime: false,
-    endHoursAfterStart: 2,
-    tags: ["biking"],
-    description: "Casual pace, ~15 miles total with a coffee stop halfway.",
-    hostEmoji: "🚴",
-    going: ["+15555550105", "+15555550102"],
-    interested: ["+15555550100"],
-    messages: [],
-  },
-  {
-    creatorPhone: "+15555550106",
-    title: "Brunch at The Henry",
-    neighborhoodKey: "old-town-scottsdale",
-    location: { name: "The Henry", address: "4455 E Camelback Rd, Phoenix, AZ", lat: 33.5095, lng: -111.9831 },
-    daysFromNow: 6,
-    time: "11:00",
-    isFlexibleTime: false,
-    tags: ["brunch", "coffee"],
-    description: "Got a 6-top reserved. Two open spots.",
-    hostEmoji: "🥞",
-    going: ["+15555550106", "+15555550103", "+15555550101", "+15555550104"],
-    interested: ["+15555550100"],
-    messages: [
-      { senderPhone: "+15555550103", body: "Lactose-free option?", minutesAgo: 600 },
-    ],
-  },
-  {
-    creatorPhone: "+15555550107",
-    title: "Board game night",
-    neighborhoodKey: "garfield",
-    location: { name: "Snakes & Lattes", address: "302 E Pierce St, Phoenix, AZ" },
-    daysFromNow: 2,
-    time: "19:00",
-    isFlexibleTime: false,
-    tags: ["games", "drinks"],
-    description: "Bringing Catan + Codenames. Open to whatever else people want to play.",
-    hostEmoji: "🎲",
-    going: ["+15555550107", "+15555550100"],
-    interested: ["+15555550104"],
+    interested: ["+15555550100", "+15555550103"],
     messages: [],
   },
 ];
@@ -187,7 +136,6 @@ function dateForOffset(days: number): string {
 
 function isoEndForPlan(date: string, time: string, hoursAfterStart: number | undefined): string | undefined {
   if (!hoursAfterStart) return undefined;
-  // time like "09:00" — combine with date
   if (!/^\d{2}:\d{2}$/.test(time)) return undefined;
   const [h, m] = time.split(":").map(Number);
   const start = new Date(date + "T00:00:00.000Z");
@@ -211,23 +159,20 @@ function includeSeedDemoData(): boolean {
 export async function seedIfEmpty(): Promise<void> {
   if (store.listNeighborhoods().length > 0) return;
 
-  // Neighborhoods first — we need the ids to assign users + plans.
   const neighborhoodIdByKey = new Map<string, string>();
-  // Two-pass: create records with empty adjacent, then fill adjacent ids.
   const recordsByKey = new Map<string, ReturnType<typeof seedNeighborhood>>();
-  for (const n of PHOENIX_NEIGHBORHOODS) {
+  for (const n of PHILLY_NEIGHBORHOODS) {
     const record = seedNeighborhood(n);
     neighborhoodIdByKey.set(n.key, record.id);
     recordsByKey.set(n.key, record);
   }
-  for (const n of PHOENIX_NEIGHBORHOODS) {
+  for (const n of PHILLY_NEIGHBORHOODS) {
     const record = recordsByKey.get(n.key);
     if (!record) continue;
     record.adjacent = n.adjacentKeys
       .map((k) => neighborhoodIdByKey.get(k))
       .filter((id): id is string => Boolean(id));
   }
-  // Persist neighborhoods now that adjacency is filled.
   store.reset({
     users: [],
     neighborhoods: Array.from(recordsByKey.values()),
@@ -246,7 +191,6 @@ export async function seedIfEmpty(): Promise<void> {
     return;
   }
 
-  // Demo users (tagged accountSource: seed — not real auth accounts)
   const userIdByPhone = new Map<string, string>();
   for (const seed of SEED_USERS) {
     const neighborhoodId = neighborhoodIdByKey.get(seed.neighborhoodKey) ?? null;
@@ -256,6 +200,7 @@ export async function seedIfEmpty(): Promise<void> {
       accountSource: "seed",
       firstName: seed.firstName,
       neighborhoodId,
+      neighborhoodIds: neighborhoodId ? [neighborhoodId] : [],
       interests: seed.interests,
       avatarSeed: seed.avatarSeed,
       avatarStyle: "avataaars",
@@ -264,7 +209,6 @@ export async function seedIfEmpty(): Promise<void> {
     userIdByPhone.set(seed.phoneNumber, user.id);
   }
 
-  // Plans + participations + chat
   for (const seed of SEED_PLANS) {
     const creatorId = userIdByPhone.get(seed.creatorPhone);
     const neighborhoodId = neighborhoodIdByKey.get(seed.neighborhoodKey);
@@ -279,10 +223,16 @@ export async function seedIfEmpty(): Promise<void> {
       date,
       time: seed.time,
       isFlexibleTime: seed.isFlexibleTime,
+      isFlexibleLocation: false,
       endTime: isoEndForPlan(date, seed.time, seed.endHoursAfterStart),
       tags: seed.tags,
       description: seed.description,
       hostEmoji: seed.hostEmoji,
+      planKind: "standard",
+      visibility: "everyone",
+      visibilityCommunityTag: null,
+      isRecurring: false,
+      lockedAt: null,
     });
 
     const goingIds: string[] = [];
@@ -322,6 +272,5 @@ function seedNeighborhood(seed: SeedNeighborhood) {
 }
 
 function cryptoUuid(): string {
-  // Lazy require to avoid top-level import cycle in tests.
   return globalThis.crypto.randomUUID();
 }

@@ -15,6 +15,7 @@ function newUserRecord(phoneNumber: string, opts?: CreateUserOptions): UserRecor
     accountSource: opts?.accountSource ?? "verify",
     firstName: "",
     neighborhoodId: null,
+    neighborhoodIds: [],
     interests: [],
     avatarSeed: randomUUID(),
     avatarStyle: "avataaars",

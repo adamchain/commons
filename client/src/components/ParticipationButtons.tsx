@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { api } from "../api/http";
-import type { ParticipationState } from "../types/shared";
+import type { ParticipationState, PlanKind } from "../types/shared";
 
 export function ParticipationButtons({
   planId,
   initialState,
   onChange,
+  planKind = "standard",
 }: {
   planId: string;
   initialState: ParticipationState | null;
   onChange: (next: ParticipationState | null) => void;
+  planKind?: PlanKind;
 }) {
   const [state, setState] = useState<ParticipationState | null>(initialState);
   const [pending, setPending] = useState(false);
@@ -40,9 +42,13 @@ export function ParticipationButtons({
 
   const goingActive = state === "going";
   const interestedActive = state === "interested";
+  const loose = planKind === "looking_for";
 
   return (
-    <div className="participation">
+    <div className={`participation ${loose ? "participation--loose" : ""}`}>
+      <p className="participation-hint">
+        {loose ? "Loose idea — tap if you’re tentatively interested." : "Committed vs tentative — pick what fits."}
+      </p>
       <button
         type="button"
         className={`btn-going ${goingActive ? "is-active" : ""}`}
@@ -57,7 +63,7 @@ export function ParticipationButtons({
         onClick={() => void toggleState("interested")}
         disabled={pending}
       >
-        {interestedActive ? "You're interested" : "Interested"}
+        {interestedActive ? (loose ? "You're down" : "You're interested") : loose ? "I'm down" : "Interested"}
       </button>
     </div>
   );
