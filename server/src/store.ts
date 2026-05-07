@@ -11,11 +11,14 @@ import type {
 export interface UserRecord {
   id: string;
   phoneNumber: string;
+  /** `verify` = signed up via Twilio Verify; `seed` = demo data script only. */
+  accountSource?: "verify" | "seed";
   firstName: string;
   neighborhoodId: string | null;
   interests: InterestTag[];
   avatarSeed: string;
   avatarStyle: AvatarStyle;
+  avatarPhotoDataUrl?: string;
   onboardingComplete: boolean;
   createdAt: string;
 }
@@ -25,6 +28,8 @@ export interface NeighborhoodRecord {
   name: string;
   metro: string;
   adjacent: string[];
+  lat?: number;
+  lng?: number;
 }
 
 export interface PlanRecord {
@@ -171,15 +176,20 @@ export const store = {
   findUserByPhone(phoneNumber: string): UserRecord | undefined {
     return snapshot.users.find((u) => u.phoneNumber === phoneNumber);
   },
-  createUser(phoneNumber: string): UserRecord {
+  createUser(
+    phoneNumber: string,
+    opts?: { accountSource?: "verify" | "seed" },
+  ): UserRecord {
     const user: UserRecord = {
       id: randomUUID(),
       phoneNumber,
+      accountSource: opts?.accountSource ?? "verify",
       firstName: "",
       neighborhoodId: null,
       interests: [],
       avatarSeed: randomUUID(),
       avatarStyle: "avataaars",
+      avatarPhotoDataUrl: undefined,
       onboardingComplete: false,
       createdAt: new Date().toISOString(),
     };

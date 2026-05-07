@@ -57,7 +57,7 @@ export function ProfilePage() {
       </header>
 
       <section className="profile-hero">
-        <Avatar seed={profile.user.avatarSeed} style={profile.user.avatarStyle} size="xl" />
+        <Avatar seed={profile.user.avatarSeed} style={profile.user.avatarStyle} photoDataUrl={profile.user.avatarPhotoDataUrl} size="xl" />
         <div className="profile-name">{profile.user.firstName}</div>
         {profile.neighborhood && (
           <div className="profile-neighborhood">📍 {profile.neighborhood.name}</div>

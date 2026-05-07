@@ -53,7 +53,7 @@ export function FeedPage() {
           <button type="button" className="user-pill" onClick={() => void logout()} title="Sign out">
             {user && (
               <>
-                <Avatar seed={user.avatarSeed} style={user.avatarStyle} size="sm" />
+                <Avatar seed={user.avatarSeed} style={user.avatarStyle} photoDataUrl={user.avatarPhotoDataUrl} size="sm" />
                 <span>{user.firstName || "Sign out"}</span>
               </>
             )}

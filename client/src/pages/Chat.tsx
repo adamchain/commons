@@ -100,7 +100,7 @@ export function ChatPage() {
                   disabled={p.id === user.id}
                   title={p.id === user.id ? "" : `DM ${p.firstName}`}
                 >
-                  <Avatar seed={p.avatarSeed} style={p.avatarStyle} size="sm" />
+                  <Avatar seed={p.avatarSeed} style={p.avatarStyle} photoDataUrl={p.avatarPhotoDataUrl} size="sm" />
                   <span>{p.firstName}</span>
                 </button>
               ))}
@@ -116,7 +116,7 @@ export function ChatPage() {
               const mine = m.sender.id === user.id;
               return (
                 <div key={m.id} className={`chat-bubble-row ${mine ? "is-mine" : ""}`}>
-                  {!mine && <Avatar seed={m.sender.avatarSeed} style={m.sender.avatarStyle} size="sm" />}
+                  {!mine && <Avatar seed={m.sender.avatarSeed} style={m.sender.avatarStyle} photoDataUrl={m.sender.avatarPhotoDataUrl} size="sm" />}
                   <div className="chat-bubble">
                     {!mine && <div className="chat-bubble-author">{m.sender.firstName}</div>}
                     <div className="chat-bubble-body">{m.body}</div>

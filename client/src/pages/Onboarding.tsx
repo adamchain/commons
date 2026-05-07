@@ -10,28 +10,31 @@ import {
   type InterestTag,
   type MeDTO,
   type NeighborhoodDTO,
-  type PlanDTO,
 } from "../types/shared";
 
-type Step = "tease" | "phone" | "code" | "name" | "neighborhood" | "interests" | "avatar";
+type Step = "phone" | "code" | "location" | "interests" | "profile";
 
 export function OnboardingPage() {
   const { user, refreshUser, setUser } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>(() => decideInitialStep(user));
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [smsConfigured, setSmsConfigured] = useState<boolean | null>(null);
+  /** Set after requesting a code; drives code length rules (Verify vs local dev). */
+  const [authMode, setAuthMode] = useState<"verify" | "dev" | null>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
 
-  // If logged-in user navigates here with onboarding done, send them home.
+  // If logged-in user lands here with onboarding done, send them home.
   useEffect(() => {
     if (user?.onboardingComplete) navigate("/", { replace: true });
   }, [user, navigate]);
 
-  // If they log in via code-verify mid-flow, advance them past phone steps.
+  // Once authed, advance past the phone steps automatically.
   useEffect(() => {
-    if (user && (step === "phone" || step === "code" || step === "tease")) {
+    if (user && (step === "phone" || step === "code")) {
       setStep(decideInitialStep(user));
     }
   }, [user, step]);
@@ -40,11 +43,17 @@ export function OnboardingPage() {
     setError(null);
     setBusy(true);
     try {
-      const result = await api<{ phoneNumber: string }>("/api/auth/request-code", {
+      const result = await api<{
+        phoneNumber: string;
+        smsConfigured: boolean;
+        authMode?: "verify" | "dev";
+      }>("/api/auth/request-code", {
         method: "POST",
         body: JSON.stringify({ phoneNumber }),
       });
       setPhoneNumber(result.phoneNumber);
+      setSmsConfigured(result.smsConfigured);
+      setAuthMode(result.authMode ?? (result.smsConfigured ? "verify" : "dev"));
       setStep("code");
     } catch (e) {
       setError(formatError(e));
@@ -79,12 +88,9 @@ export function OnboardingPage() {
     return me;
   }
 
-  if (step === "tease") {
-    return <TeaseStep onSignUp={() => setStep("phone")} />;
-  }
   if (step === "phone") {
     return (
-      <OnboardingShell title="What's your number?" subtitle="We'll text you a code.">
+      <OnboardingShell title="Sign up" subtitle="We'll text you a code.">
         <input
           className="onboarding-input"
           type="tel"
@@ -98,6 +104,13 @@ export function OnboardingPage() {
         <button className="btn-primary btn-block" disabled={busy || !phoneNumber} onClick={requestCode}>
           {busy ? "Sending…" : "Send code"}
         </button>
+        <p className="onboarding-fineprint">
+          {smsConfigured === false
+            ? "Local dev: the server prints the code in its terminal — check the API console."
+            : smsConfigured === true
+              ? "You'll get a text with your verification code (Twilio Verify). Message rates may apply."
+              : "We'll text you a code to verify your number."}
+        </p>
       </OnboardingShell>
     );
   }
@@ -109,13 +122,23 @@ export function OnboardingPage() {
           type="text"
           inputMode="numeric"
           autoComplete="one-time-code"
-          maxLength={6}
-          placeholder="123456"
+          maxLength={authMode === "dev" ? 6 : 10}
+          placeholder={authMode === "dev" ? "123456" : "Code"}
           value={code}
           onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
         />
         {error && <div className="onboarding-error">{error}</div>}
-        <button className="btn-primary btn-block" disabled={busy || code.length !== 6} onClick={verifyCode}>
+        {smsConfigured === false && (
+          <p className="onboarding-fineprint">Use the code from the server terminal (local dev).</p>
+        )}
+        <button
+          className="btn-primary btn-block"
+          disabled={
+            busy ||
+            (authMode === "dev" ? code.length !== 6 : code.length < 4 || code.length > 10)
+          }
+          onClick={verifyCode}
+        >
           {busy ? "Verifying…" : "Verify"}
         </button>
         <button className="btn-link" onClick={() => setStep("phone")} type="button">
@@ -127,21 +150,42 @@ export function OnboardingPage() {
   if (!user) {
     return <OnboardingShell title="Loading…" subtitle="" />;
   }
-  if (step === "name") {
-    return <NameStep me={user} onSave={async (firstName) => { await patchMe({ firstName }); setStep("neighborhood"); }} />;
-  }
-  if (step === "neighborhood") {
-    return <NeighborhoodStep me={user} onSave={async (neighborhoodId) => { await patchMe({ neighborhoodId }); setStep("interests"); }} />;
+  if (step === "location") {
+    return (
+      <LocationStep
+        me={user}
+        onCoords={setCoords}
+        coords={coords}
+        onSave={async (neighborhoodId) => {
+          await patchMe({ neighborhoodId });
+          setStep("interests");
+        }}
+      />
+    );
   }
   if (step === "interests") {
-    return <InterestsStep me={user} onSave={async (interests) => { await patchMe({ interests }); setStep("avatar"); }} />;
-  }
-  if (step === "avatar") {
     return (
-      <AvatarStep
+      <InterestsStep
         me={user}
-        onSave={async (avatarSeed, avatarStyle) => {
-          await patchMe({ avatarSeed, avatarStyle, onboardingComplete: true });
+        onSave={async (interests) => {
+          await patchMe({ interests });
+          setStep("profile");
+        }}
+      />
+    );
+  }
+  if (step === "profile") {
+    return (
+      <ProfileStep
+        me={user}
+        onSave={async (firstName, avatarSeed, avatarStyle, avatarPhotoDataUrl) => {
+          await patchMe({
+            firstName,
+            avatarSeed,
+            avatarStyle,
+            avatarPhotoDataUrl: avatarPhotoDataUrl ?? undefined,
+            onboardingComplete: true,
+          });
           await refreshUser();
           navigate("/", { replace: true });
         }}
@@ -152,12 +196,11 @@ export function OnboardingPage() {
 }
 
 function decideInitialStep(user: MeDTO | null): Step {
-  if (!user) return "tease";
-  if (user.onboardingComplete) return "tease"; // will redirect via effect
-  if (!user.firstName) return "name";
-  if (!user.neighborhoodId) return "neighborhood";
+  if (!user) return "phone";
+  if (user.onboardingComplete) return "phone"; // will redirect via effect
+  if (!user.neighborhoodId) return "location";
   if (user.interests.length < 1) return "interests";
-  return "avatar";
+  return "profile";
 }
 
 function formatError(e: unknown): string {
@@ -184,88 +227,79 @@ function OnboardingShell({ title, subtitle, children }: { title: string; subtitl
   );
 }
 
-function TeaseStep({ onSignUp }: { onSignUp: () => void }) {
-  const [plans, setPlans] = useState<PlanDTO[] | null>(null);
-  useEffect(() => {
-    void (async () => {
-      try {
-        const data = await api<PlanDTO[]>("/api/plans/preview");
-        setPlans(data);
-      } catch {
-        setPlans([]);
-      }
-    })();
-  }, []);
-
-  return (
-    <div className="tease">
-      <div className="tease-header">
-        <div className="onboarding-brand">COMMONS</div>
-        <p className="tease-tagline">A peek at what's happening near you</p>
-      </div>
-      <div className="tease-scroller">
-        {plans === null && <div className="tease-loading">Loading…</div>}
-        {plans && plans.length === 0 && <div className="tease-empty">No live plans yet.</div>}
-        {plans?.map((p) => (
-          <div key={p.id} className="tease-card">
-            <div className="tease-card-host">
-              <span className="tease-card-emoji">{p.hostEmoji}</span>
-              <span>{p.creator.firstName}</span>
-            </div>
-            <div className="tease-card-title">{p.title}</div>
-            <div className="tease-card-meta">
-              {p.location.name} · {p.isFlexibleTime ? "flexible" : p.time}
-            </div>
-            <div className="tease-card-going">{p.participants.going.length} going</div>
-          </div>
-        ))}
-      </div>
-      <button className="btn-primary btn-block tease-cta" onClick={onSignUp}>
-        Sign up to do more
-      </button>
-    </div>
-  );
-}
-
-function NameStep({ me, onSave }: { me: MeDTO; onSave: (n: string) => Promise<void> }) {
-  const [name, setName] = useState(me.firstName);
-  const [busy, setBusy] = useState(false);
-  return (
-    <OnboardingShell title="What's your first name?" subtitle="That's all we show others.">
-      <input
-        className="onboarding-input"
-        autoFocus
-        placeholder="Alex"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-      />
-      <button className="btn-primary btn-block" disabled={busy || !name.trim()} onClick={async () => { setBusy(true); await onSave(name.trim()); }}>
-        Next
-      </button>
-    </OnboardingShell>
-  );
-}
-
-function NeighborhoodStep({ onSave }: { me: MeDTO; onSave: (id: string) => Promise<void> }) {
+function LocationStep({
+  coords,
+  onCoords,
+  onSave,
+}: {
+  me: MeDTO;
+  coords: { lat: number; lng: number } | null;
+  onCoords: (c: { lat: number; lng: number } | null) => void;
+  onSave: (neighborhoodId: string) => Promise<void>;
+}) {
   const [neighborhoods, setNeighborhoods] = useState<NeighborhoodDTO[]>([]);
   const [filter, setFilter] = useState("");
   const [busy, setBusy] = useState(false);
+  const [permissionState, setPermissionState] = useState<"idle" | "asking" | "granted" | "denied">(
+    coords ? "granted" : "idle"
+  );
 
   useEffect(() => {
-    void (async () => {
-      const list = await api<NeighborhoodDTO[]>("/api/neighborhoods");
-      setNeighborhoods(list);
-    })();
+    void api<NeighborhoodDTO[]>("/api/neighborhoods").then(setNeighborhoods).catch(() => undefined);
   }, []);
 
-  const filtered = useMemo(() => {
+  function shareLocation() {
+    if (!("geolocation" in navigator)) {
+      setPermissionState("denied");
+      return;
+    }
+    setPermissionState("asking");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        onCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setPermissionState("granted");
+      },
+      () => {
+        setPermissionState("denied");
+      },
+      { enableHighAccuracy: false, timeout: 8000 }
+    );
+  }
+
+  // Sort by distance to user if we have coords; otherwise alphabetical.
+  const sorted = useMemo(() => {
+    const list = [...neighborhoods];
+    if (coords) {
+      list.sort((a, b) => distance(coords, a) - distance(coords, b));
+    } else {
+      list.sort((a, b) => a.name.localeCompare(b.name));
+    }
     const q = filter.trim().toLowerCase();
-    if (!q) return neighborhoods;
-    return neighborhoods.filter((n) => n.name.toLowerCase().includes(q) || n.metro.toLowerCase().includes(q));
-  }, [neighborhoods, filter]);
+    if (!q) return list;
+    return list.filter((n) => n.name.toLowerCase().includes(q) || n.metro.toLowerCase().includes(q));
+  }, [neighborhoods, coords, filter]);
+
+  if (permissionState === "idle") {
+    return (
+      <OnboardingShell title="Share your location" subtitle="So we can show you what's happening nearby.">
+        <button className="btn-primary btn-block" onClick={shareLocation}>
+          Allow location access
+        </button>
+        <button className="btn-link" type="button" onClick={() => setPermissionState("denied")}>
+          Skip — I'll pick manually
+        </button>
+      </OnboardingShell>
+    );
+  }
+  if (permissionState === "asking") {
+    return <OnboardingShell title="Getting your location…" subtitle="" />;
+  }
 
   return (
-    <OnboardingShell title="Where do you live?" subtitle="Pick the neighborhood you spend the most time in.">
+    <OnboardingShell
+      title={coords ? "Pick your neighborhood" : "Where do you live?"}
+      subtitle={coords ? "Sorted by closest to you." : "Pick the area you spend the most time in."}
+    >
       <input
         className="onboarding-input"
         placeholder="Search…"
@@ -273,7 +307,7 @@ function NeighborhoodStep({ onSave }: { me: MeDTO; onSave: (id: string) => Promi
         onChange={(e) => setFilter(e.target.value)}
       />
       <ul className="neighborhood-list">
-        {filtered.map((n) => (
+        {sorted.map((n) => (
           <li key={n.id}>
             <button
               type="button"
@@ -282,7 +316,11 @@ function NeighborhoodStep({ onSave }: { me: MeDTO; onSave: (id: string) => Promi
               onClick={async () => { setBusy(true); await onSave(n.id); }}
             >
               <span className="neighborhood-name">{n.name}</span>
-              <span className="neighborhood-metro">{n.metro}</span>
+              <span className="neighborhood-metro">
+                {coords && n.lat !== undefined && n.lng !== undefined
+                  ? `${formatMiles(distance(coords, n))} away`
+                  : n.metro}
+              </span>
             </button>
           </li>
         ))}
@@ -294,7 +332,7 @@ function NeighborhoodStep({ onSave }: { me: MeDTO; onSave: (id: string) => Promi
 function InterestsStep({ me, onSave }: { me: MeDTO; onSave: (interests: InterestTag[]) => Promise<void> }) {
   const [picked, setPicked] = useState<InterestTag[]>(me.interests);
   const [busy, setBusy] = useState(false);
-  const max = 3;
+  const max = 2;
 
   function toggle(t: InterestTag) {
     if (picked.includes(t)) {
@@ -305,7 +343,7 @@ function InterestsStep({ me, onSave }: { me: MeDTO; onSave: (interests: Interest
   }
 
   return (
-    <OnboardingShell title="Pick 3 interests" subtitle="Shapes what you see. You can change these later.">
+    <OnboardingShell title="Pick 2 things you like" subtitle="Shapes what you see. You can change these later.">
       <div className="interest-grid">
         {ALL_INTERESTS.map((t) => {
           const isPicked = picked.includes(t);
@@ -335,14 +373,59 @@ function InterestsStep({ me, onSave }: { me: MeDTO; onSave: (interests: Interest
   );
 }
 
-function AvatarStep({ me, onSave }: { me: MeDTO; onSave: (seed: string, style: AvatarStyle) => Promise<void> }) {
+function ProfileStep({
+  me,
+  onSave,
+}: {
+  me: MeDTO;
+  onSave: (firstName: string, seed: string, style: AvatarStyle, photoDataUrl: string | null) => Promise<void>;
+}) {
+  const [firstName, setFirstName] = useState(me.firstName);
+  const [busy, setBusy] = useState(false);
+
   return (
-    <OnboardingShell title="Make your face" subtitle="No photo needed.">
+    <OnboardingShell title="Make your profile" subtitle="What should we call you, and how should you look?">
+      <input
+        className="onboarding-input"
+        placeholder="First name"
+        value={firstName}
+        onChange={(e) => setFirstName(e.target.value)}
+      />
       <AvatarBuilder
         initialSeed={me.avatarSeed}
         initialStyle={me.avatarStyle}
-        onSave={onSave}
+        initialPhotoDataUrl={me.avatarPhotoDataUrl}
+        onSave={async (seed, style, photo) => {
+          if (!firstName.trim()) return;
+          setBusy(true);
+          try {
+            await onSave(firstName.trim(), seed, style, photo);
+          } finally {
+            setBusy(false);
+          }
+        }}
       />
+      {!firstName.trim() && (
+        <p className="onboarding-fineprint">Add your first name to continue.</p>
+      )}
+      {busy && <p className="onboarding-fineprint">Saving…</p>}
     </OnboardingShell>
   );
+}
+
+function distance(a: { lat: number; lng: number }, b: { lat?: number; lng?: number }): number {
+  if (b.lat === undefined || b.lng === undefined) return Infinity;
+  // Equirectangular approximation in miles — fine for sorting at city scale.
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const x = (toRad(b.lng) - toRad(a.lng)) * Math.cos(toRad((a.lat + b.lat) / 2));
+  const y = toRad(b.lat) - toRad(a.lat);
+  const miles = Math.sqrt(x * x + y * y) * 3958.8;
+  return miles;
+}
+
+function formatMiles(miles: number): string {
+  if (!isFinite(miles)) return "";
+  if (miles < 0.1) return "<0.1 mi";
+  if (miles < 10) return `${miles.toFixed(1)} mi`;
+  return `${Math.round(miles)} mi`;
 }

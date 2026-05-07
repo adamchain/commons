@@ -9,7 +9,7 @@ export function PlanCard({ plan }: { plan: PlanDTO }) {
   return (
     <Link to={`/plans/${plan.id}`} className="plan-card">
       <div className="plan-card-host">
-        <Avatar seed={plan.creator.avatarSeed} style={plan.creator.avatarStyle} size="sm" />
+        <Avatar seed={plan.creator.avatarSeed} style={plan.creator.avatarStyle} photoDataUrl={plan.creator.avatarPhotoDataUrl} size="sm" />
         <span className="plan-card-host-name">
           {plan.hostEmoji} {plan.creator.firstName}
         </span>

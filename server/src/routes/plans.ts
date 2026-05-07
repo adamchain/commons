@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { store, type PlanRecord, type UserRecord } from "../store.js";
+import { findUserById, findUsersByIds } from "../userRepo.js";
 import { rankPlansForUser } from "../lib/recommend.js";
 import {
   ALL_INTERESTS,
@@ -12,14 +13,6 @@ import {
 
 export const plansRouter = Router();
 
-function publicUser(userId: string): PublicUser {
-  const user = store.findUserById(userId);
-  if (!user) {
-    return { id: userId, firstName: "Unknown", neighborhoodId: null, avatarSeed: "missing", avatarStyle: "avataaars" };
-  }
-  return userToPublic(user);
-}
-
 export function userToPublic(user: UserRecord): PublicUser {
   return {
     id: user.id,
@@ -27,19 +20,40 @@ export function userToPublic(user: UserRecord): PublicUser {
     neighborhoodId: user.neighborhoodId,
     avatarSeed: user.avatarSeed,
     avatarStyle: user.avatarStyle,
+    avatarPhotoDataUrl: user.avatarPhotoDataUrl,
   };
 }
 
-export function planSummary(plan: PlanRecord, viewerId: string | null): PlanDTO {
-  const creator = store.findUserById(plan.creatorId);
+export async function planSummary(plan: PlanRecord, viewerId: string | null): Promise<PlanDTO> {
   const participations = store.listParticipationsForPlan(plan.id);
   const going = participations.filter((p) => p.state === "going");
   const interested = participations.filter((p) => p.state === "interested");
+  const ids = [
+    plan.creatorId,
+    ...going.map((p) => p.userId),
+    ...interested.map((p) => p.userId),
+  ];
+  const users = await findUsersByIds(ids);
   const mine = viewerId ? participations.find((p) => p.userId === viewerId) : undefined;
+
+  function pu(uid: string): PublicUser {
+    const u = users.get(uid);
+    return u
+      ? userToPublic(u)
+      : {
+          id: uid,
+          firstName: "Unknown",
+          neighborhoodId: null,
+          avatarSeed: "missing",
+          avatarStyle: "avataaars",
+        };
+  }
+
+  const creator = users.get(plan.creatorId);
   return {
     id: plan.id,
     title: plan.title,
-    creator: creator ? userToPublic(creator) : publicUser(plan.creatorId),
+    creator: creator ? userToPublic(creator) : pu(plan.creatorId),
     neighborhoodId: plan.neighborhoodId,
     location: plan.location,
     date: plan.date,
@@ -50,27 +64,28 @@ export function planSummary(plan: PlanRecord, viewerId: string | null): PlanDTO 
     description: plan.description,
     hostEmoji: plan.hostEmoji,
     participants: {
-      going: going.map((p) => publicUser(p.userId)),
-      interested: interested.map((p) => publicUser(p.userId)),
+      going: going.map((p) => pu(p.userId)),
+      interested: interested.map((p) => pu(p.userId)),
     },
     myState: mine?.state ?? null,
   };
 }
 
 // Public preview for the pre-signup tease (PRD §3.1).
-plansRouter.get("/preview", (_req, res) => {
+plansRouter.get("/preview", async (_req, res) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const upcoming = store
     .listPlans()
     .filter((p) => new Date(p.date).getTime() >= today.getTime())
     .slice(0, 6);
-  res.json(upcoming.map((p) => planSummary(p, null)));
+  const summaries = await Promise.all(upcoming.map((p) => planSummary(p, null)));
+  res.json(summaries);
 });
 
-plansRouter.get("/", requireAuth, (req, res) => {
+plansRouter.get("/", requireAuth, async (req, res) => {
   const userId = String(req.userId);
-  const me = store.findUserById(userId);
+  const me = await findUserById(userId);
   if (!me) {
     res.status(401).json({ error: "Unauthorized" });
     return;
@@ -79,12 +94,13 @@ plansRouter.get("/", requireAuth, (req, res) => {
   const scope = me.neighborhoodId ? store.neighborhoodScope(me.neighborhoodId) : null;
   const candidates = scope ? store.listPlansByNeighborhoods(scope) : store.listPlans();
   const ranked = rankPlansForUser(me, candidates);
-  res.json(ranked.map((plan) => planSummary(plan, userId)));
+  const summaries = await Promise.all(ranked.map((plan) => planSummary(plan, userId)));
+  res.json(summaries);
 });
 
-plansRouter.post("/", requireAuth, (req, res) => {
+plansRouter.post("/", requireAuth, async (req, res) => {
   const userId = String(req.userId);
-  const me = store.findUserById(userId);
+  const me = await findUserById(userId);
   if (!me) {
     res.status(401).json({ error: "Unauthorized" });
     return;
@@ -135,10 +151,10 @@ plansRouter.post("/", requireAuth, (req, res) => {
   store.ensureGroupConversation(plan.id, [userId]);
   store.log("plan_created", { planId: plan.id, creatorId: userId });
 
-  res.status(201).json(planSummary(plan, userId));
+  res.status(201).json(await planSummary(plan, userId));
 });
 
-plansRouter.get("/:id", requireAuth, (req, res) => {
+plansRouter.get("/:id", requireAuth, async (req, res) => {
   const planId = String(req.params.id);
   const userId = String(req.userId);
   const plan = store.findPlanById(planId);
@@ -147,7 +163,7 @@ plansRouter.get("/:id", requireAuth, (req, res) => {
     return;
   }
   store.log("plan_viewed", { planId, userId });
-  res.json(planSummary(plan, userId));
+  res.json(await planSummary(plan, userId));
 });
 
 plansRouter.put("/:id/participation", requireAuth, (req, res) => {

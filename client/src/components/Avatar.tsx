@@ -5,6 +5,7 @@ interface AvatarProps {
   style?: AvatarStyle;
   size?: "sm" | "md" | "lg" | "xl";
   backgroundColor?: string;
+  photoDataUrl?: string;
 }
 
 const PIXEL_SIZE: Record<NonNullable<AvatarProps["size"]>, number> = {
@@ -22,12 +23,13 @@ export function dicebearUrl(seed: string, style: AvatarStyle = "avataaars", pixe
   return `https://api.dicebear.com/9.x/${style}/svg?${params.toString()}`;
 }
 
-export function Avatar({ seed, style = "avataaars", size = "md", backgroundColor }: AvatarProps) {
+export function Avatar({ seed, style = "avataaars", size = "md", backgroundColor, photoDataUrl }: AvatarProps) {
   const px = PIXEL_SIZE[size];
   const cls = `avatar avatar-${size}`;
+  const src = photoDataUrl || dicebearUrl(seed, style, px * 2, backgroundColor);
   return (
     <img
-      src={dicebearUrl(seed, style, px * 2, backgroundColor)}
+      src={src}
       width={px}
       height={px}
       className={cls}

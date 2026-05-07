@@ -1,31 +1,22 @@
-// SMS sender. Real Twilio integration when credentials are present;
-// otherwise logs the code to the console so local dev works without keys.
+import twilio from "twilio";
 
-export async function sendSmsCode(phoneNumber: string, code: string): Promise<void> {
-  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER) {
-    // @ts-expect-error — twilio is an optional dep installed separately for prod SMS
-    const twilio = (await import("twilio")).default;
-    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-    await client.messages.create({
-      from: process.env.TWILIO_FROM_NUMBER,
-      to: phoneNumber,
-      body: `Your Commons code: ${code}`,
-    });
-    return;
-  }
+/** Programmable Messaging — invites only. Phone sign-in uses Twilio Verify (`lib/verify.ts`). */
 
-  // Local dev fallback when Twilio isn't configured.
-  console.log(`[sms] ${phoneNumber}: code = ${code}`);
+/** All three are required to send SMS via Twilio (not console). */
+export function isTwilioSmsConfigured(): boolean {
+  return Boolean(
+    process.env.TWILIO_ACCOUNT_SID?.trim() &&
+      process.env.TWILIO_AUTH_TOKEN?.trim() &&
+      process.env.TWILIO_FROM_NUMBER?.trim(),
+  );
 }
 
 export async function sendSmsInvite(phoneNumber: string, inviterFirstName: string, planTitle: string, link: string): Promise<void> {
   const body = `${inviterFirstName} invited you to "${planTitle}" on Commons. ${link}`;
-  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER) {
-    // @ts-expect-error — twilio is an optional dep installed separately for prod SMS
-    const twilio = (await import("twilio")).default;
-    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  if (isTwilioSmsConfigured()) {
+    const client = twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!);
     await client.messages.create({
-      from: process.env.TWILIO_FROM_NUMBER,
+      from: process.env.TWILIO_FROM_NUMBER!,
       to: phoneNumber,
       body,
     });

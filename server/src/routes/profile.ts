@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { store } from "../store.js";
+import { findUserById } from "../userRepo.js";
 import { planSummary, userToPublic } from "./plans.js";
 import type { HostTag } from "../types/shared.js";
 
@@ -9,10 +10,10 @@ export const profileRouter = Router();
 const HOST_TAGS: HostTag[] = ["great_host", "would_do_again", "made_me_feel_welcome"];
 
 // GET /api/profile/:userId — public-facing host profile
-profileRouter.get("/:userId", requireAuth, (req, res) => {
+profileRouter.get("/:userId", requireAuth, async (req, res) => {
   const targetId = String(req.params.userId);
   const viewerId = String(req.userId);
-  const target = store.findUserById(targetId);
+  const target = await findUserById(targetId);
   if (!target) {
     res.status(404).json({ error: "User not found" });
     return;
@@ -46,7 +47,7 @@ profileRouter.get("/:userId", requireAuth, (req, res) => {
     user: userToPublic(target),
     neighborhood: neighborhood ? { id: neighborhood.id, name: neighborhood.name, metro: neighborhood.metro } : null,
     tagCounts,
-    upcoming: upcoming.map((p) => planSummary(p, viewerId)),
+    upcoming: await Promise.all(upcoming.map((p) => planSummary(p, viewerId))),
     past: past
       .slice(-5)
       .reverse()

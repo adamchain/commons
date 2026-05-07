@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { verifySessionToken } from "../lib/jwt.js";
-import { store } from "../store.js";
+import { findUserById } from "../userRepo.js";
 
 declare module "express-serve-static-core" {
   interface Request {
@@ -8,7 +8,7 @@ declare module "express-serve-static-core" {
   }
 }
 
-export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const token = req.cookies?.session as string | undefined;
   if (!token) {
     res.status(401).json({ error: "Unauthorized" });
@@ -17,7 +17,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
 
   try {
     const payload = verifySessionToken(token);
-    const user = store.findUserById(payload.sub);
+    const user = await findUserById(payload.sub);
     if (!user) {
       res.status(401).json({ error: "Unauthorized" });
       return;

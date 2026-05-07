@@ -5,7 +5,7 @@ import type { NeighborhoodDTO } from "../types/shared.js";
 export const neighborhoodsRouter = Router();
 
 function toDto(n: ReturnType<typeof store.findNeighborhoodById> & {}): NeighborhoodDTO {
-  return { id: n.id, name: n.name, metro: n.metro, adjacent: n.adjacent };
+  return { id: n.id, name: n.name, metro: n.metro, adjacent: n.adjacent, lat: n.lat, lng: n.lng };
 }
 
 neighborhoodsRouter.get("/", (_req, res) => {

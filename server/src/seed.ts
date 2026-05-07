@@ -1,5 +1,6 @@
 import { store } from "./store.js";
 import type { InterestTag } from "./types/shared.js";
+import { createUser, findUserByPhone, updateUser } from "./userRepo.js";
 
 interface SeedUser {
   phoneNumber: string;
@@ -31,18 +32,20 @@ interface SeedNeighborhood {
   name: string;
   metro: string;
   adjacentKeys: string[];
+  lat: number;
+  lng: number;
 }
 
 const PHOENIX_NEIGHBORHOODS: SeedNeighborhood[] = [
-  { key: "arcadia", name: "Arcadia", metro: "Phoenix", adjacentKeys: ["biltmore", "camelback-east"] },
-  { key: "biltmore", name: "Biltmore", metro: "Phoenix", adjacentKeys: ["arcadia", "camelback-east"] },
-  { key: "camelback-east", name: "Camelback East", metro: "Phoenix", adjacentKeys: ["arcadia", "biltmore", "downtown-phx"] },
-  { key: "downtown-phx", name: "Downtown Phoenix", metro: "Phoenix", adjacentKeys: ["camelback-east", "roosevelt-row", "garfield"] },
-  { key: "roosevelt-row", name: "Roosevelt Row", metro: "Phoenix", adjacentKeys: ["downtown-phx", "garfield"] },
-  { key: "garfield", name: "Garfield", metro: "Phoenix", adjacentKeys: ["roosevelt-row", "downtown-phx"] },
-  { key: "tempe", name: "Tempe", metro: "Phoenix", adjacentKeys: ["mill-ave", "old-town-scottsdale"] },
-  { key: "mill-ave", name: "Mill Ave", metro: "Phoenix", adjacentKeys: ["tempe"] },
-  { key: "old-town-scottsdale", name: "Old Town Scottsdale", metro: "Phoenix", adjacentKeys: ["tempe"] },
+  { key: "arcadia",             name: "Arcadia",             metro: "Phoenix", adjacentKeys: ["biltmore", "camelback-east"],                  lat: 33.4969, lng: -111.9847 },
+  { key: "biltmore",            name: "Biltmore",            metro: "Phoenix", adjacentKeys: ["arcadia", "camelback-east"],                   lat: 33.5093, lng: -112.0260 },
+  { key: "camelback-east",      name: "Camelback East",      metro: "Phoenix", adjacentKeys: ["arcadia", "biltmore", "downtown-phx"],         lat: 33.5028, lng: -112.0440 },
+  { key: "downtown-phx",        name: "Downtown Phoenix",    metro: "Phoenix", adjacentKeys: ["camelback-east", "roosevelt-row", "garfield"], lat: 33.4484, lng: -112.0740 },
+  { key: "roosevelt-row",       name: "Roosevelt Row",       metro: "Phoenix", adjacentKeys: ["downtown-phx", "garfield"],                    lat: 33.4583, lng: -112.0707 },
+  { key: "garfield",            name: "Garfield",            metro: "Phoenix", adjacentKeys: ["roosevelt-row", "downtown-phx"],               lat: 33.4520, lng: -112.0596 },
+  { key: "tempe",               name: "Tempe",               metro: "Phoenix", adjacentKeys: ["mill-ave", "old-town-scottsdale"],             lat: 33.4255, lng: -111.9400 },
+  { key: "mill-ave",            name: "Mill Ave",            metro: "Phoenix", adjacentKeys: ["tempe"],                                       lat: 33.4282, lng: -111.9396 },
+  { key: "old-town-scottsdale", name: "Old Town Scottsdale", metro: "Phoenix", adjacentKeys: ["tempe"],                                       lat: 33.4942, lng: -111.9261 },
 ];
 
 const SEED_USERS: SeedUser[] = [
@@ -197,8 +200,16 @@ function isoMinutesAgo(minutes: number): string {
   return new Date(Date.now() - minutes * 60 * 1000).toISOString();
 }
 
-export function seedIfEmpty(): void {
-  if (!store.isEmpty()) return;
+/** Fake +1 numbers and demo plans — off in production unless SEED_DEMO_ACCOUNTS=1. Real auth accounts only use Twilio Verify. */
+function includeSeedDemoData(): boolean {
+  const explicit = process.env.SEED_DEMO_ACCOUNTS?.trim().toLowerCase();
+  if (explicit === "1" || explicit === "true" || explicit === "yes") return true;
+  if (explicit === "0" || explicit === "false" || explicit === "no") return false;
+  return process.env.NODE_ENV !== "production";
+}
+
+export async function seedIfEmpty(): Promise<void> {
+  if (store.listNeighborhoods().length > 0) return;
 
   // Neighborhoods first — we need the ids to assign users + plans.
   const neighborhoodIdByKey = new Map<string, string>();
@@ -230,12 +241,19 @@ export function seedIfEmpty(): void {
     logs: [],
   });
 
-  // Users
+  if (!includeSeedDemoData()) {
+    console.log("[seed] skipped demo users/plans (production). Only Verify sign-ups create accounts. Set SEED_DEMO_ACCOUNTS=1 to seed.");
+    return;
+  }
+
+  // Demo users (tagged accountSource: seed — not real auth accounts)
   const userIdByPhone = new Map<string, string>();
   for (const seed of SEED_USERS) {
     const neighborhoodId = neighborhoodIdByKey.get(seed.neighborhoodKey) ?? null;
-    const user = store.createUser(seed.phoneNumber);
-    store.updateUser(user.id, {
+    let user = await findUserByPhone(seed.phoneNumber);
+    if (!user) user = await createUser(seed.phoneNumber, { accountSource: "seed" });
+    await updateUser(user.id, {
+      accountSource: "seed",
       firstName: seed.firstName,
       neighborhoodId,
       interests: seed.interests,
@@ -298,6 +316,8 @@ function seedNeighborhood(seed: SeedNeighborhood) {
     name: seed.name,
     metro: seed.metro,
     adjacent: [] as string[],
+    lat: seed.lat,
+    lng: seed.lng,
   };
 }
 

@@ -1,13 +1,14 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { store } from "../store.js";
+import { findUserById, findUsersByIds } from "../userRepo.js";
 import { userToPublic } from "./plans.js";
 import type { ConversationDTO, MessageDTO } from "../types/shared.js";
 
 export const chatRouter = Router();
 
 // GET /api/plans/:planId/conversation — fetch the group conversation for a plan
-chatRouter.get("/plans/:planId/conversation", requireAuth, (req, res) => {
+chatRouter.get("/plans/:planId/conversation", requireAuth, async (req, res) => {
   const planId = String(req.params.planId);
   const userId = String(req.userId);
   const plan = store.findPlanById(planId);
@@ -22,11 +23,11 @@ chatRouter.get("/plans/:planId/conversation", requireAuth, (req, res) => {
     return;
   }
   const conv = store.ensureGroupConversation(planId, [plan.creatorId, userId]);
-  res.json(toConversationDto(conv, userId));
+  res.json(await toConversationDto(conv, userId));
 });
 
 // POST /api/plans/:planId/dms { otherUserId } — open or create a DM scoped to this plan
-chatRouter.post("/plans/:planId/dms", requireAuth, (req, res) => {
+chatRouter.post("/plans/:planId/dms", requireAuth, async (req, res) => {
   const planId = String(req.params.planId);
   const userId = String(req.userId);
   const otherUserId = String(req.body?.otherUserId ?? "");
@@ -49,11 +50,11 @@ chatRouter.post("/plans/:planId/dms", requireAuth, (req, res) => {
     return;
   }
   const conv = store.createDm(planId, userId, otherUserId);
-  res.json(toConversationDto(conv, userId));
+  res.json(await toConversationDto(conv, userId));
 });
 
 // GET /api/conversations/:id/messages
-chatRouter.get("/conversations/:id/messages", requireAuth, (req, res) => {
+chatRouter.get("/conversations/:id/messages", requireAuth, async (req, res) => {
   const convId = String(req.params.id);
   const userId = String(req.userId);
   const conv = store.findConversationById(convId);
@@ -65,12 +66,13 @@ chatRouter.get("/conversations/:id/messages", requireAuth, (req, res) => {
     res.status(403).json({ error: "Not a participant" });
     return;
   }
-  const messages = store.listMessagesForConversation(convId).map(toMessageDto);
+  const raw = store.listMessagesForConversation(convId);
+  const messages = await Promise.all(raw.map((m) => toMessageDto(m)));
   res.json(messages);
 });
 
 // POST /api/conversations/:id/messages { body }
-chatRouter.post("/conversations/:id/messages", requireAuth, (req, res) => {
+chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => {
   const convId = String(req.params.id);
   const userId = String(req.userId);
   const body = String(req.body?.body ?? "").trim();
@@ -88,30 +90,38 @@ chatRouter.post("/conversations/:id/messages", requireAuth, (req, res) => {
     return;
   }
   const message = store.createMessage(convId, userId, body);
-  res.status(201).json(toMessageDto(message));
+  res.status(201).json(await toMessageDto(message));
 });
 
-function toConversationDto(conv: ReturnType<typeof store.findConversationById> & {}, _viewerId: string): ConversationDTO {
+async function toConversationDto(
+  conv: NonNullable<ReturnType<typeof store.findConversationById>>,
+  _viewerId: string,
+): Promise<ConversationDTO> {
   const messages = store.listMessagesForConversation(conv.id);
+  const users = await findUsersByIds(conv.participantIds);
   return {
     id: conv.id,
     planId: conv.planId,
     type: conv.type,
     participants: conv.participantIds.map((id) => {
-      const u = store.findUserById(id);
-      return u ? userToPublic(u) : { id, firstName: "Unknown", neighborhoodId: null, avatarSeed: "missing", avatarStyle: "avataaars" as const };
+      const u = users.get(id);
+      return u
+        ? userToPublic(u)
+        : { id, firstName: "Unknown", neighborhoodId: null, avatarSeed: "missing", avatarStyle: "avataaars" as const };
     }),
     lastMessageAt: conv.lastMessageAt,
     unreadCount: messages.filter((m) => !m.readBy.includes(_viewerId)).length,
   };
 }
 
-function toMessageDto(m: ReturnType<typeof store.listMessagesForConversation>[number]): MessageDTO {
-  const sender = store.findUserById(m.senderId);
+async function toMessageDto(m: ReturnType<typeof store.listMessagesForConversation>[number]): Promise<MessageDTO> {
+  const sender = await findUserById(m.senderId);
   return {
     id: m.id,
     conversationId: m.conversationId,
-    sender: sender ? userToPublic(sender) : { id: m.senderId, firstName: "Unknown", neighborhoodId: null, avatarSeed: "missing", avatarStyle: "avataaars" },
+    sender: sender
+      ? userToPublic(sender)
+      : { id: m.senderId, firstName: "Unknown", neighborhoodId: null, avatarSeed: "missing", avatarStyle: "avataaars" },
     body: m.body,
     createdAt: m.createdAt,
   };

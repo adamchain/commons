@@ -53,6 +53,7 @@ export interface PublicUser {
   neighborhoodId: string | null;
   avatarSeed: string;
   avatarStyle: AvatarStyle;
+  avatarPhotoDataUrl?: string;
 }
 
 export type AvatarStyle = "avataaars" | "big-smile" | "fun-emoji";
@@ -62,6 +63,8 @@ export interface NeighborhoodDTO {
   name: string;
   metro: string;
   adjacent: string[]; // neighborhood ids
+  lat?: number;
+  lng?: number;
 }
 
 export interface PlanDTO {
@@ -128,6 +131,7 @@ export interface MeDTO {
   interests: InterestTag[];
   avatarSeed: string;
   avatarStyle: AvatarStyle;
+  avatarPhotoDataUrl?: string;
   onboardingComplete: boolean;
   createdAt: string;
 }

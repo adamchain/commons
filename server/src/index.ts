@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
+import { connectMongo } from "./lib/db.js";
 import { authRouter } from "./routes/auth.js";
 import { chatRouter } from "./routes/chat.js";
 import { feedbackRouter } from "./routes/feedback.js";
@@ -47,8 +48,16 @@ if (isProduction) {
   });
 }
 
-seedIfEmpty();
+async function bootstrap(): Promise<void> {
+  await connectMongo();
+  await seedIfEmpty();
 
-app.listen(port, () => {
-  console.log(`Commons API listening on http://localhost:${port}`);
+  app.listen(port, () => {
+    console.log(`Commons API listening on http://localhost:${port}`);
+  });
+}
+
+bootstrap().catch((err) => {
+  console.error("[boot]", err);
+  process.exit(1);
 });
