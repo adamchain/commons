@@ -4,12 +4,13 @@ import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { FeedbackPrompt } from "../components/FeedbackPrompt";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { NetworkPromptModal } from "../components/NetworkPromptModal";
 import { PlanCard } from "../components/PlanCard";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { WeekGlance } from "../components/WeekGlance";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime } from "../lib/format";
-import type { NeighborhoodDTO, PlanDTO } from "../types/shared";
+import type { MeDTO, NeighborhoodDTO, NetworkPromptDTO, PlanDTO } from "../types/shared";
 
 type ViewMode = "list" | "map" | "calendar";
 
@@ -17,12 +18,21 @@ export function FeedPage() {
   const [plans, setPlans] = useState<PlanDTO[] | null>(null);
   const [neighborhoods, setNeighborhoods] = useState<NeighborhoodDTO[]>([]);
   const [view, setView] = useState<ViewMode>("list");
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
+  const [networkPrompt, setNetworkPrompt] = useState<NetworkPromptDTO | null>(null);
+
+  const refreshPlans = () => void api<PlanDTO[]>("/api/plans").then(setPlans).catch(() => setPlans([]));
 
   useEffect(() => {
-    void api<PlanDTO[]>("/api/plans").then(setPlans).catch(() => setPlans([]));
+    refreshPlans();
     void api<NeighborhoodDTO[]>("/api/neighborhoods").then(setNeighborhoods).catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    void api<{ prompt: NetworkPromptDTO | null }>("/api/auth/network-prompt")
+      .then((r) => setNetworkPrompt(r.prompt))
+      .catch(() => setNetworkPrompt(null));
+  }, [plans]);
 
   const logout = async () => {
     await api("/api/auth/logout", { method: "POST" });
@@ -81,7 +91,15 @@ export function FeedPage() {
 
       <FeedbackPrompt />
 
-      <WeekGlance plans={plans} viewerGoingPlanIds={viewerGoingPlanIds} />
+      <WeekGlance plans={plans} viewerGoingPlanIds={viewerGoingPlanIds} viewerId={user?.id} />
+
+      {networkPrompt && (
+        <NetworkPromptModal
+          prompt={networkPrompt}
+          onClose={() => setNetworkPrompt(null)}
+          onUpdated={(me: MeDTO) => setUser(me)}
+        />
+      )}
 
       <div className="view-toggle">
         <button className={`view-toggle-btn ${view === "list" ? "is-active" : ""}`} onClick={() => setView("list")}>
@@ -97,7 +115,7 @@ export function FeedPage() {
 
       {view === "list" && (
         <div id="feed-plans">
-          <ListView buckets={buckets} hoodById={hoodById} />
+          <ListView buckets={buckets} hoodById={hoodById} onPlanRefresh={refreshPlans} />
         </div>
       )}
       {view === "map" && <MapView plans={plans} />}
@@ -135,7 +153,15 @@ function bucketByWhen(plans: PlanDTO[]): Buckets {
   return { happeningNow, thisWeek, later };
 }
 
-function ListView({ buckets, hoodById }: { buckets: Buckets; hoodById: Map<string, string> }) {
+function ListView({
+  buckets,
+  hoodById,
+  onPlanRefresh,
+}: {
+  buckets: Buckets;
+  hoodById: Map<string, string>;
+  onPlanRefresh: () => void;
+}) {
   const total = buckets.happeningNow.length + buckets.thisWeek.length + buckets.later.length;
   if (total === 0) {
     return (
@@ -150,13 +176,13 @@ function ListView({ buckets, hoodById }: { buckets: Buckets; hoodById: Map<strin
   return (
     <>
       {buckets.happeningNow.length > 0 && (
-        <Section title="Happening today" plans={buckets.happeningNow} hoodById={hoodById} />
+        <Section title="Happening today" plans={buckets.happeningNow} hoodById={hoodById} onPlanRefresh={onPlanRefresh} />
       )}
       {buckets.thisWeek.length > 0 && (
-        <Section title="This week" plans={buckets.thisWeek} hoodById={hoodById} />
+        <Section title="This week" plans={buckets.thisWeek} hoodById={hoodById} onPlanRefresh={onPlanRefresh} />
       )}
       {buckets.later.length > 0 && (
-        <Section title="Later" plans={buckets.later} hoodById={hoodById} />
+        <Section title="Later" plans={buckets.later} hoodById={hoodById} onPlanRefresh={onPlanRefresh} />
       )}
     </>
   );
@@ -166,17 +192,24 @@ function Section({
   title,
   plans,
   hoodById,
+  onPlanRefresh,
 }: {
   title: string;
   plans: PlanDTO[];
   hoodById: Map<string, string>;
+  onPlanRefresh: () => void;
 }) {
   return (
     <>
       <h2 className="section-title">{title}</h2>
       <div className="plan-grid">
         {plans.map((plan) => (
-          <PlanCard key={plan.id} plan={plan} neighborhoodName={hoodById.get(plan.neighborhoodId)} />
+          <PlanCard
+            key={plan.id}
+            plan={plan}
+            neighborhoodName={hoodById.get(plan.neighborhoodId)}
+            onPlanRefresh={onPlanRefresh}
+          />
         ))}
       </div>
     </>

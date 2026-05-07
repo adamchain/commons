@@ -26,6 +26,10 @@ export interface UserRecord {
   avatarPhotoDataUrl?: string;
   onboardingComplete: boolean;
   createdAt: string;
+  /** One-way network — people added after shared plans. */
+  networkIds?: string[];
+  /** Plan ids where the user dismissed the post-event network prompt. */
+  dismissedNetworkPromptPlanIds?: string[];
 }
 
 export interface NeighborhoodRecord {
@@ -84,6 +88,15 @@ export interface MessageRecord {
   body: string;
   createdAt: string;
   readBy: string[];
+  kind?: "user" | "system";
+}
+
+export interface PlanSuggestionRecord {
+  id: string;
+  planId: string;
+  userId: string;
+  body: string;
+  createdAt: string;
 }
 
 export interface FeedbackRecord {
@@ -128,6 +141,7 @@ interface Snapshot {
   declines: DeclineRecord[];
   smsCodes: SmsCodeRecord[];
   logs: LogRecord[];
+  planSuggestions: PlanSuggestionRecord[];
 }
 
 const DATA_PATH = resolve(process.cwd(), "data.json");
@@ -144,6 +158,7 @@ function emptySnapshot(): Snapshot {
     declines: [],
     smsCodes: [],
     logs: [],
+    planSuggestions: [],
   };
 }
 
@@ -155,6 +170,7 @@ function load(): Snapshot {
     return {
       ...emptySnapshot(),
       ...parsed,
+      planSuggestions: parsed.planSuggestions ?? [],
     };
   } catch {
     return emptySnapshot();
@@ -205,6 +221,8 @@ export const store = {
       avatarPhotoDataUrl: undefined,
       onboardingComplete: false,
       createdAt: new Date().toISOString(),
+      networkIds: [],
+      dismissedNetworkPromptPlanIds: [],
     };
     snapshot.users.push(user);
     persist();
@@ -261,6 +279,31 @@ export const store = {
     snapshot.plans.push(plan);
     persist();
     return plan;
+  },
+
+  updatePlan(id: string, patch: Partial<Omit<PlanRecord, "id" | "createdAt">>): PlanRecord | undefined {
+    const plan = snapshot.plans.find((p) => p.id === id);
+    if (!plan) return undefined;
+    Object.assign(plan, patch);
+    persist();
+    return plan;
+  },
+
+  // Plan suggestions (“looking for” replies)
+  listPlanSuggestions(planId: string): PlanSuggestionRecord[] {
+    return snapshot.planSuggestions.filter((s) => s.planId === planId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  },
+  createPlanSuggestion(planId: string, userId: string, body: string): PlanSuggestionRecord {
+    const row: PlanSuggestionRecord = {
+      id: randomUUID(),
+      planId,
+      userId,
+      body,
+      createdAt: new Date().toISOString(),
+    };
+    snapshot.planSuggestions.push(row);
+    persist();
+    return row;
   },
 
   // Participations
@@ -364,6 +407,24 @@ export const store = {
       body,
       createdAt: new Date().toISOString(),
       readBy: [senderId],
+      kind: "user",
+    };
+    snapshot.messages.push(message);
+    const conv = snapshot.conversations.find((c) => c.id === conversationId);
+    if (conv) conv.lastMessageAt = message.createdAt;
+    persist();
+    return message;
+  },
+
+  createSystemMessage(conversationId: string, body: string): MessageRecord {
+    const message: MessageRecord = {
+      id: randomUUID(),
+      conversationId,
+      senderId: "__system__",
+      body,
+      createdAt: new Date().toISOString(),
+      readBy: [],
+      kind: "system",
     };
     snapshot.messages.push(message);
     const conv = snapshot.conversations.find((c) => c.id === conversationId);

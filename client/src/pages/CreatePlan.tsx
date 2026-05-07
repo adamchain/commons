@@ -28,6 +28,8 @@ export function CreatePlanPage() {
     title: "",
     locationName: "",
     locationAddress: "",
+    locationLat: undefined as number | undefined,
+    locationLng: undefined as number | undefined,
     neighborhoodId: user?.neighborhoodIds?.[0] ?? user?.neighborhoodId ?? "",
     date: today(),
     time: "19:00",
@@ -91,6 +93,8 @@ export function CreatePlanPage() {
           location: {
             name: form.locationName.trim(),
             address: form.locationAddress.trim() || form.locationName.trim(),
+            lat: form.locationLat,
+            lng: form.locationLng,
           },
           date: form.isFlexibleDate ? today() : form.date,
           time: form.isFlexibleTime ? "" : form.time,
@@ -210,8 +214,14 @@ export function CreatePlanPage() {
             <LocationAutocomplete
               name={form.locationName}
               address={form.locationAddress}
-              onChange={({ name, address }) =>
-                setForm((f) => ({ ...f, locationName: name, locationAddress: address }))
+              onChange={({ name, address, lat, lng }) =>
+                setForm((f) => ({
+                  ...f,
+                  locationName: name,
+                  locationAddress: address,
+                  locationLat: lat,
+                  locationLng: lng,
+                }))
               }
             />
           )}

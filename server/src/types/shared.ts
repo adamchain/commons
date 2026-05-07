@@ -68,6 +68,13 @@ export interface NeighborhoodDTO {
   lng?: number;
 }
 
+export interface PlanSuggestionDTO {
+  id: string;
+  author: PublicUser;
+  body: string;
+  createdAt: string;
+}
+
 export interface PlanDTO {
   id: string;
   title: string;
@@ -87,6 +94,8 @@ export interface PlanDTO {
   visibilityCommunityTag: InterestTag | null;
   isRecurring: boolean;
   lockedAt: string | null;
+  /** Inline replies on “looking for” plans (feed + detail). */
+  suggestions: PlanSuggestionDTO[];
   participants: {
     going: PublicUser[];
     interested: PublicUser[];
@@ -106,7 +115,10 @@ export interface ConversationDTO {
 export interface MessageDTO {
   id: string;
   conversationId: string;
-  sender: PublicUser;
+  /** Defaults to `user` when omitted (legacy rows). */
+  kind?: "user" | "system";
+  /** Present for user messages; omitted for system lines. */
+  sender?: PublicUser;
   body: string;
   createdAt: string;
 }
@@ -142,4 +154,13 @@ export interface MeDTO {
   avatarPhotoDataUrl?: string;
   onboardingComplete: boolean;
   createdAt: string;
+  /** User ids in this person’s COMMONS network (one-way). */
+  networkUserIds?: string[];
+}
+
+export interface NetworkPromptDTO {
+  planId: string;
+  planTitle: string;
+  /** People you went with who aren’t in your network yet. */
+  others: PublicUser[];
 }

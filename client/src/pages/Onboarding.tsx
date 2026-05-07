@@ -10,9 +10,14 @@ import {
   type InterestTag,
   type MeDTO,
   type NeighborhoodDTO,
+  type PlanDTO,
 } from "../types/shared";
+import { formatPlanDate, sentenceCaseTitle } from "../lib/format";
 
-type Step = "phone" | "code" | "location" | "interests" | "profile";
+const API_BASE =
+  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? "http://localhost:4000" : "");
+
+type Step = "samples" | "phone" | "code" | "location" | "interests" | "profile";
 
 export function OnboardingPage() {
   const { user, refreshUser, setUser } = useAuth();
@@ -33,7 +38,7 @@ export function OnboardingPage() {
   }, [user, navigate]);
 
   useEffect(() => {
-    if (user && (step === "phone" || step === "code")) {
+    if (user && (step === "phone" || step === "code" || step === "samples")) {
       setStep(pickInitial(user));
     }
   }, [user, step]);
@@ -85,6 +90,10 @@ export function OnboardingPage() {
     });
     setUser(me);
     return me;
+  }
+
+  if (step === "samples") {
+    return <SamplesTeaser onContinue={() => setStep("phone")} />;
   }
 
   if (step === "phone") {
@@ -198,13 +207,68 @@ export function OnboardingPage() {
 }
 
 function pickInitial(user: MeDTO | null): Step {
-  if (!user) return "phone";
-  if (user.onboardingComplete) return "phone";
+  if (!user) return "samples";
+  if (user.onboardingComplete) return "samples";
   const hoods =
     user.neighborhoodIds?.length ? user.neighborhoodIds : user.neighborhoodId ? [user.neighborhoodId] : [];
   if (hoods.length === 0) return "location";
   if (user.interests.length < 2) return "interests";
   return "profile";
+}
+
+function SamplesTeaser({ onContinue }: { onContinue: () => void }) {
+  const [plans, setPlans] = useState<PlanDTO[]>([]);
+  const [ix, setIx] = useState(0);
+
+  useEffect(() => {
+    void fetch(`${API_BASE}/api/plans/preview`)
+      .then((r) => r.json() as Promise<PlanDTO[]>)
+      .then(setPlans)
+      .catch(() => setPlans([]));
+  }, []);
+
+  const p = plans[ix];
+
+  return (
+    <OnboardingShell title="What's on COMMONS" subtitle="Swipe through sample plans — then sign up when you're ready.">
+      {plans.length > 0 && p ? (
+        <div className="samples-carousel">
+          <div className="samples-card">
+            <span className="samples-emoji">{p.hostEmoji}</span>
+            <div className="samples-title">{sentenceCaseTitle(p.title)}</div>
+            <p className="samples-meta">
+              {formatPlanDate(p.date)}
+              {p.location?.name ? ` · ${p.location.name}` : ""}
+            </p>
+          </div>
+          <div className="samples-nav">
+            <button type="button" className="samples-prev" onClick={() => setIx((i) => (i - 1 + plans.length) % plans.length)}>
+              ←
+            </button>
+            <div className="samples-dots">
+              {plans.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className={`samples-dot ${i === ix ? "is-active" : ""}`}
+                  aria-label={`Plan ${i + 1}`}
+                  onClick={() => setIx(i)}
+                />
+              ))}
+            </div>
+            <button type="button" className="samples-next" onClick={() => setIx((i) => (i + 1) % plans.length)}>
+              →
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="onboarding-fineprint">Loading sample plans…</p>
+      )}
+      <button type="button" className="btn-primary btn-block" style={{ marginTop: 16 }} onClick={onContinue}>
+        Continue with phone
+      </button>
+    </OnboardingShell>
+  );
 }
 
 function formatError(e: unknown): string {

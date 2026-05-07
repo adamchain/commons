@@ -69,6 +69,13 @@ export interface NeighborhoodDTO {
   lng?: number;
 }
 
+export interface PlanSuggestionDTO {
+  id: string;
+  author: PublicUser;
+  body: string;
+  createdAt: string;
+}
+
 export interface PlanDTO {
   id: string;
   title: string;
@@ -91,6 +98,7 @@ export interface PlanDTO {
   isRecurring: boolean;
   /** Host locked venue + time from coordination thread. */
   lockedAt: string | null;
+  suggestions: PlanSuggestionDTO[];
   participants: {
     going: PublicUser[];
     interested: PublicUser[];
@@ -110,7 +118,8 @@ export interface ConversationDTO {
 export interface MessageDTO {
   id: string;
   conversationId: string;
-  sender: PublicUser;
+  kind?: "user" | "system";
+  sender?: PublicUser;
   body: string;
   createdAt: string;
 }
@@ -148,4 +157,11 @@ export interface MeDTO {
   avatarPhotoDataUrl?: string;
   onboardingComplete: boolean;
   createdAt: string;
+  networkUserIds?: string[];
+}
+
+export interface NetworkPromptDTO {
+  planId: string;
+  planTitle: string;
+  others: PublicUser[];
 }

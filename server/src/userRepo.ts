@@ -22,6 +22,8 @@ function newUserRecord(phoneNumber: string, opts?: CreateUserOptions): UserRecor
     avatarPhotoDataUrl: undefined,
     onboardingComplete: false,
     createdAt: new Date().toISOString(),
+    networkIds: [],
+    dismissedNetworkPromptPlanIds: [],
   };
 }
 

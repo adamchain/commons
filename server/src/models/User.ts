@@ -23,6 +23,8 @@ const UserSchema = new mongoose.Schema<UserRecord>(
     avatarPhotoDataUrl: { type: String },
     onboardingComplete: { type: Boolean, required: true },
     createdAt: { type: String, required: true },
+    networkIds: { type: [String], default: undefined },
+    dismissedNetworkPromptPlanIds: { type: [String], default: undefined },
   },
   { collection: "users" },
 );

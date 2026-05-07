@@ -24,3 +24,17 @@ export async function sendSmsInvite(phoneNumber: string, inviterFirstName: strin
   }
   console.log(`[sms-invite] ${phoneNumber}: ${body}`);
 }
+
+/** Short transactional texts (nudges, lock-in, reminders). Logs when SMS isn’t configured. */
+export async function sendTransactionalSms(phoneNumber: string, body: string): Promise<void> {
+  if (isTwilioSmsConfigured()) {
+    const client = twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!);
+    await client.messages.create({
+      from: process.env.TWILIO_FROM_NUMBER!,
+      to: phoneNumber,
+      body,
+    });
+    return;
+  }
+  console.log(`[sms] ${phoneNumber}: ${body}`);
+}

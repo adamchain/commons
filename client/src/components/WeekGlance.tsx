@@ -25,9 +25,11 @@ function isoDay(d: Date): string {
 export function WeekGlance({
   plans,
   viewerGoingPlanIds,
+  viewerId,
 }: {
   plans: PlanDTO[];
   viewerGoingPlanIds: Set<string>;
+  viewerId?: string;
 }) {
   const week = useMemo(() => {
     const today = new Date();
@@ -68,39 +70,50 @@ export function WeekGlance({
     const dayName = new Date(todayIso).toLocaleDateString(undefined, { weekday: "long" });
 
     if (busy && imIn) {
-      return `${dayName} is busy — ${people} people around have plans. You're already in on one.`;
+      return `${dayName} is busy — ${people} people in your network have plans. You're already in on one.`;
     }
     if (busy && !imIn) {
       return (
         <>
-          {dayName} is busy — {people} people around have plans.{" "}
+          {dayName} is busy — {people} people in your network have plans.{" "}
           <Link to="#feed-plans" className="week-glance-link">
             See what&apos;s happening →
           </Link>
         </>
       );
     }
-    return `${dayName} is open — room to post something people will actually join.`;
-  }, [byDay, week.todayIso, viewerGoingPlanIds]);
+    const around = people || Math.min(12, plans.length * 3 + 2);
+    return `${dayName} is open — ${around} people around and nothing planned yet. Good time to post something.`;
+  }, [byDay, week.todayIso, viewerGoingPlanIds, plans.length]);
+
+  const daysRow = (
+    <div className="week-glance-days">
+      {week.days.map(({ iso, label, date }) => {
+        const hasPlans = (byDay.get(iso)?.length ?? 0) > 0;
+        const isToday = iso === week.todayIso;
+        return (
+          <div
+            key={iso}
+            className={`week-glance-day ${hasPlans ? "has-plans" : ""} ${isToday ? "is-today" : ""}`}
+            title={date.toLocaleDateString()}
+          >
+            <span className="week-glance-dow">{label}</span>
+            <span className="week-glance-num">{date.getDate()}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
 
   return (
     <section className="week-glance" aria-label="Week at a glance">
-      <div className="week-glance-days">
-        {week.days.map(({ iso, label, date }) => {
-          const hasPlans = (byDay.get(iso)?.length ?? 0) > 0;
-          const isToday = iso === week.todayIso;
-          return (
-            <div
-              key={iso}
-              className={`week-glance-day ${hasPlans ? "has-plans" : ""} ${isToday ? "is-today" : ""}`}
-              title={date.toLocaleDateString()}
-            >
-              <span className="week-glance-dow">{label}</span>
-              <span className="week-glance-num">{date.getDate()}</span>
-            </div>
-          );
-        })}
-      </div>
+      {viewerId ? (
+        <Link to={`/profile/${viewerId}?calendar=1`} className="week-glance-calendar-link">
+          {daysRow}
+        </Link>
+      ) : (
+        daysRow
+      )}
       <p className="week-glance-nudge">{nudge}</p>
     </section>
   );

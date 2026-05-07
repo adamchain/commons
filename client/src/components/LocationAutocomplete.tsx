@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import { api } from "../api/http";
+
+export type LocationValue = { name: string; address: string; lat?: number; lng?: number };
 
 interface LocationSuggestion {
   name: string;
   address: string;
+  placeId?: string;
 }
 
 interface NominatimResult {
@@ -13,7 +17,7 @@ interface NominatimResult {
 
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 
-function buildSuggestion(result: NominatimResult): LocationSuggestion {
+function buildNominatimSuggestion(result: NominatimResult): LocationSuggestion {
   const fallbackName = result.display_name.split(",")[0]?.trim() ?? result.display_name;
   const name = (result.name && result.name.trim()) || fallbackName;
   return { name, address: result.display_name };
@@ -26,7 +30,7 @@ export function LocationAutocomplete({
 }: {
   name: string;
   address: string;
-  onChange: (next: { name: string; address: string }) => void;
+  onChange: (next: LocationValue) => void;
 }) {
   const [query, setQuery] = useState(name);
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
@@ -53,7 +57,7 @@ export function LocationAutocomplete({
 
   const runSearch = (term: string) => {
     aborterRef.current?.abort();
-    if (term.trim().length < 3) {
+    if (term.trim().length < 2) {
       setSuggestions([]);
       setLoading(false);
       return;
@@ -61,21 +65,49 @@ export function LocationAutocomplete({
     const controller = new AbortController();
     aborterRef.current = controller;
     setLoading(true);
-    const url = `${NOMINATIM_URL}?format=jsonv2&addressdetails=1&limit=6&q=${encodeURIComponent(term)}`;
-    fetch(url, {
-      signal: controller.signal,
-      headers: { Accept: "application/json" },
-    })
-      .then((res) => (res.ok ? (res.json() as Promise<NominatimResult[]>) : Promise.reject()))
-      .then((results) => {
-        setSuggestions(results.map(buildSuggestion));
-        setLoading(false);
-      })
-      .catch((err: unknown) => {
-        if ((err as { name?: string })?.name === "AbortError") return;
+
+    void (async () => {
+      try {
+        const g = await api<{ predictions: Array<{ placeId: string; name: string; address: string }> }>(
+          `/api/places/autocomplete?q=${encodeURIComponent(term)}`,
+          { signal: controller.signal },
+        );
+        if (g.predictions?.length) {
+          setSuggestions(
+            g.predictions.map((p) => ({
+              name: p.name,
+              address: p.address,
+              placeId: p.placeId,
+            })),
+          );
+          setLoading(false);
+          return;
+        }
+      } catch {
+        /* fall through to OSM */
+      }
+
+      if (term.trim().length < 3) {
         setSuggestions([]);
         setLoading(false);
-      });
+        return;
+      }
+      const url = `${NOMINATIM_URL}?format=jsonv2&addressdetails=1&limit=6&q=${encodeURIComponent(term)}`;
+      fetch(url, {
+        signal: controller.signal,
+        headers: { Accept: "application/json" },
+      })
+        .then((res) => (res.ok ? (res.json() as Promise<NominatimResult[]>) : Promise.reject()))
+        .then((results) => {
+          setSuggestions(results.map(buildNominatimSuggestion));
+          setLoading(false);
+        })
+        .catch((err: unknown) => {
+          if ((err as { name?: string })?.name === "AbortError") return;
+          setSuggestions([]);
+          setLoading(false);
+        });
+    })();
   };
 
   const handleInput = (value: string) => {
@@ -86,9 +118,27 @@ export function LocationAutocomplete({
     debounceRef.current = setTimeout(() => runSearch(value), 320);
   };
 
-  const pick = (suggestion: LocationSuggestion) => {
-    setQuery(suggestion.name);
-    onChange(suggestion);
+  const pick = async (suggestion: LocationSuggestion) => {
+    if (suggestion.placeId) {
+      try {
+        const d = await api<{ name: string; address: string; lat?: number; lng?: number }>(
+          `/api/places/details?placeId=${encodeURIComponent(suggestion.placeId)}`,
+        );
+        setQuery(d.name || suggestion.name);
+        onChange({
+          name: d.name || suggestion.name,
+          address: d.address || suggestion.address,
+          lat: d.lat,
+          lng: d.lng,
+        });
+      } catch {
+        setQuery(suggestion.name);
+        onChange({ name: suggestion.name, address: suggestion.address });
+      }
+    } else {
+      setQuery(suggestion.name);
+      onChange({ name: suggestion.name, address: suggestion.address });
+    }
     setOpen(false);
     setSuggestions([]);
   };
@@ -114,7 +164,7 @@ export function LocationAutocomplete({
               key={`${s.name}-${idx}`}
               type="button"
               className="location-suggestion"
-              onClick={() => pick(s)}
+              onClick={() => void pick(s)}
             >
               <div className="location-suggestion-name">{s.name}</div>
               <div className="location-suggestion-address">{s.address}</div>

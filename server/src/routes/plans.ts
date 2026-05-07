@@ -9,9 +9,11 @@ import {
   type ParticipationState,
   type PlanDTO,
   type PlanKind,
+  type PlanSuggestionDTO,
   type PlanVisibility,
   type PublicUser,
 } from "../types/shared.js";
+import { onPlanCreatedVenueNudge, notifyInterestedPlanLocked } from "../lib/nudges.js";
 
 export const plansRouter = Router();
 
@@ -81,6 +83,18 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
   const creator = users.get(plan.creatorId);
   const planKind = plan.planKind ?? "standard";
   const visibility = plan.visibility ?? "everyone";
+  const suggestionRows = store.listPlanSuggestions(plan.id);
+  const sugUserIds = suggestionRows.map((s) => s.userId);
+  const sugUsers = await findUsersByIds(sugUserIds);
+  const suggestions: PlanSuggestionDTO[] = suggestionRows.map((s) => {
+    const u = sugUsers.get(s.userId);
+    return {
+      id: s.id,
+      author: u ? userToPublic(u) : pu(s.userId),
+      body: s.body,
+      createdAt: s.createdAt,
+    };
+  });
   return {
     id: plan.id,
     title: plan.title,
@@ -100,6 +114,7 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     visibilityCommunityTag: plan.visibilityCommunityTag ?? null,
     isRecurring: plan.isRecurring ?? false,
     lockedAt: plan.lockedAt ?? null,
+    suggestions,
     participants: {
       going: going.map((p) => pu(p.userId)),
       interested: interested.map((p) => pu(p.userId)),
@@ -221,8 +236,95 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   store.upsertParticipation(plan.id, userId, "going");
   store.ensureGroupConversation(plan.id, [userId]);
   store.log("plan_created", { planId: plan.id, creatorId: userId });
+  void onPlanCreatedVenueNudge(plan).catch((err) => console.error("[nudge] venue", err));
 
   res.status(201).json(await planSummary(plan, userId));
+});
+
+plansRouter.post("/:id/suggestions", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const planId = String(req.params.id);
+  const body = String(req.body?.body ?? "").trim();
+  if (!body || body.length > 600) {
+    res.status(400).json({ error: "Add a short reply (600 characters max)" });
+    return;
+  }
+  const plan = store.findPlanById(planId);
+  if (!plan || (plan.planKind ?? "standard") !== "looking_for") {
+    res.status(400).json({ error: "Replies are for looking-for posts only" });
+    return;
+  }
+  const me = await findUserById(userId);
+  if (!me || !planVisibleToViewer(plan, me)) {
+    res.status(403).json({ error: "You can't reply to this plan" });
+    return;
+  }
+  store.createPlanSuggestion(planId, userId, body);
+  store.ensureGroupConversation(planId, [plan.creatorId, userId]);
+  const updated = store.findPlanById(planId)!;
+  res.status(201).json(await planSummary(updated, userId));
+});
+
+plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const planId = String(req.params.id);
+  const plan = store.findPlanById(planId);
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  if (plan.creatorId !== userId) {
+    res.status(403).json({ error: "Only the host can lock it in" });
+    return;
+  }
+
+  const location = req.body?.location ?? {};
+  const locationName = String(location.name ?? "").trim();
+  const locationAddress = String(location.address ?? "").trim();
+  const lat = typeof location.lat === "number" ? location.lat : undefined;
+  const lng = typeof location.lng === "number" ? location.lng : undefined;
+  const dateInput = String(req.body?.date ?? "").trim();
+  const time = String(req.body?.time ?? "").trim();
+  const isFlexibleTime = Boolean(req.body?.isFlexibleTime);
+
+  if (!locationName || !dateInput) {
+    res.status(400).json({ error: "Add a venue and date to lock in" });
+    return;
+  }
+
+  store.updatePlan(planId, {
+    planKind: "standard",
+    lockedAt: new Date().toISOString(),
+    location: {
+      name: locationName,
+      address: locationAddress || locationName,
+      lat,
+      lng,
+    },
+    date: dateInput,
+    time: isFlexibleTime ? "" : time,
+    isFlexibleTime,
+    isFlexibleLocation: false,
+  });
+
+  const updated = store.findPlanById(planId)!;
+  const conv = store.ensureGroupConversation(planId, [updated.creatorId]);
+  const host = await findUserById(userId);
+  const hostName = host?.firstName ?? "Host";
+  const dayLabel = new Date(dateInput).toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+  const timeLabel = isFlexibleTime || !time ? "flexible time" : time;
+  store.createSystemMessage(
+    conv.id,
+    `${hostName} locked in the plan — ${locationName}, ${dayLabel} · ${timeLabel}`,
+  );
+
+  await notifyInterestedPlanLocked(updated, hostName);
+
+  res.json(await planSummary(updated, userId));
 });
 
 plansRouter.get("/:id", requireAuth, async (req, res) => {
@@ -252,8 +354,9 @@ plansRouter.put("/:id/participation", requireAuth, (req, res) => {
   }
   const existing = store.findParticipation(planId, userId);
   store.upsertParticipation(planId, userId, state);
-  // Joining adds you to the group conversation.
   if (state === "going") {
+    store.ensureGroupConversation(planId, [plan.creatorId, userId]);
+  } else if (state === "interested" && (plan.planKind ?? "standard") === "looking_for") {
     store.ensureGroupConversation(planId, [plan.creatorId, userId]);
   }
   store.log("participation_changed", {

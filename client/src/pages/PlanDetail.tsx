@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { GetThereSheet } from "../components/GetThereSheet";
+import { LocationAutocomplete } from "../components/LocationAutocomplete";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { ParticipationButtons } from "../components/ParticipationButtons";
 import { ShareSheet } from "../components/ShareSheet";
@@ -18,6 +19,14 @@ export function PlanDetailPage() {
   const [plan, setPlan] = useState<PlanDTO | null>(null);
   const [showShare, setShowShare] = useState(false);
   const [showGetThere, setShowGetThere] = useState(false);
+  const [lockVenue, setLockVenue] = useState("");
+  const [lockVenueAddr, setLockVenueAddr] = useState("");
+  const [lockLat, setLockLat] = useState<number | undefined>();
+  const [lockLng, setLockLng] = useState<number | undefined>();
+  const [lockDate, setLockDate] = useState("");
+  const [lockTime, setLockTime] = useState("19:00");
+  const [lockFlexTime, setLockFlexTime] = useState(false);
+  const [lockBusy, setLockBusy] = useState(false);
 
   const load = async () => {
     const data = await api<PlanDTO>(`/api/plans/${id}`);
@@ -27,6 +36,18 @@ export function PlanDetailPage() {
   useEffect(() => {
     void load();
   }, [id]);
+
+  useEffect(() => {
+    if (!plan) return;
+    const locName = plan.location.name;
+    setLockVenue(locName === "Flexible location" ? "" : locName);
+    setLockVenueAddr(plan.location.address ?? "");
+    setLockLat(plan.location.lat);
+    setLockLng(plan.location.lng);
+    setLockDate(plan.date.slice(0, 10));
+    setLockTime(plan.time && !plan.isFlexibleTime ? plan.time : "19:00");
+    setLockFlexTime(plan.isFlexibleTime);
+  }, [plan?.id, plan?.date, plan?.lockedAt, plan?.isFlexibleTime, plan?.isFlexibleLocation]);
 
   if (!plan || !user) {
     return <LoadingScreen tagline="Loading plan" />;
@@ -51,7 +72,34 @@ export function PlanDetailPage() {
   };
 
   const isHosting = plan.creator.id === user.id;
-  const inPlan = isHosting || plan.myState === "going";
+  const canChat =
+    isHosting ||
+    plan.myState === "going" ||
+    (plan.planKind === "looking_for" && plan.myState === "interested");
+
+  async function lockIn() {
+    if (!lockVenue.trim() || !lockDate) return;
+    setLockBusy(true);
+    try {
+      const updated = await api<PlanDTO>(`/api/plans/${id}/lock`, {
+        method: "POST",
+        body: JSON.stringify({
+          location: {
+            name: lockVenue.trim(),
+            address: lockVenueAddr.trim() || lockVenue.trim(),
+            lat: lockLat,
+            lng: lockLng,
+          },
+          date: lockDate,
+          time: lockFlexTime ? "" : lockTime,
+          isFlexibleTime: lockFlexTime,
+        }),
+      });
+      setPlan(updated);
+    } finally {
+      setLockBusy(false);
+    }
+  }
 
   return (
     <main className="app-shell app-shell--wide">
@@ -98,8 +146,54 @@ export function PlanDetailPage() {
         )}
 
         {(plan.isFlexibleTime || plan.isFlexibleLocation) && isHosting && (
-          <div className="coordination-banner" role="note">
+          <div className="coordination-banner coordination-banner--expanded" role="note">
             <p>Still working out the details? Fill in venue &amp; time when you’re ready and lock it in.</p>
+            <label className="form-question">Venue</label>
+            <LocationAutocomplete
+              name={lockVenue}
+              address={lockVenueAddr}
+              onChange={(v) => {
+                setLockVenue(v.name);
+                setLockVenueAddr(v.address);
+                setLockLat(v.lat);
+                setLockLng(v.lng);
+              }}
+            />
+            <label className="form-question" htmlFor="lock-date">
+              Day
+            </label>
+            <input
+              id="lock-date"
+              className="onboarding-input"
+              type="date"
+              value={lockDate}
+              onChange={(e) => setLockDate(e.target.value)}
+            />
+            <label className="flex-toggle">
+              <input
+                type="checkbox"
+                checked={lockFlexTime}
+                onChange={(e) => setLockFlexTime(e.target.checked)}
+              />
+              Flexible time
+            </label>
+            {!lockFlexTime && (
+              <>
+                <label className="form-question" htmlFor="lock-time">
+                  Time
+                </label>
+                <input
+                  id="lock-time"
+                  className="onboarding-input"
+                  type="time"
+                  value={lockTime}
+                  onChange={(e) => setLockTime(e.target.value)}
+                />
+              </>
+            )}
+            <button type="button" className="btn-primary btn-block" disabled={lockBusy || !lockVenue.trim() || !lockDate} onClick={() => void lockIn()}>
+              {lockBusy ? "Saving…" : "Lock it in"}
+            </button>
           </div>
         )}
 
@@ -161,9 +255,9 @@ export function PlanDetailPage() {
         )}
       </section>
 
-      {inPlan && (
+      {canChat && (
         <Link to={`/plans/${plan.id}/chat`} className="chat-entry">
-          💬 Group chat ({plan.participants.going.length})
+          💬 Group chat ({plan.participants.going.length + plan.participants.interested.length})
           <span className="chat-entry-arrow">→</span>
         </Link>
       )}

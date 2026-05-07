@@ -184,6 +184,7 @@ export async function seedIfEmpty(): Promise<void> {
     declines: [],
     smsCodes: [],
     logs: [],
+    planSuggestions: [],
   });
 
   if (!includeSeedDemoData()) {

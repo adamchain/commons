@@ -78,12 +78,26 @@ export function ChatPage() {
             <div className="empty-state">No messages yet. Say hi.</div>
           ) : (
             messages.map((m) => {
-              const mine = m.sender.id === user.id;
+              if (m.kind === "system") {
+                return (
+                  <div key={m.id} className="chat-system-line">
+                    {m.body}
+                  </div>
+                );
+              }
+              const mine = m.sender!.id === user.id;
               return (
                 <div key={m.id} className={`chat-bubble-row ${mine ? "is-mine" : ""}`}>
-                  {!mine && <Avatar seed={m.sender.avatarSeed} style={m.sender.avatarStyle} photoDataUrl={m.sender.avatarPhotoDataUrl} size="sm" />}
+                  {!mine && (
+                    <Avatar
+                      seed={m.sender!.avatarSeed}
+                      style={m.sender!.avatarStyle}
+                      photoDataUrl={m.sender!.avatarPhotoDataUrl}
+                      size="sm"
+                    />
+                  )}
                   <div className="chat-bubble">
-                    {!mine && <div className="chat-bubble-author">{m.sender.firstName}</div>}
+                    {!mine && <div className="chat-bubble-author">{m.sender!.firstName}</div>}
                     <div className="chat-bubble-body">{m.body}</div>
                     <div className="chat-bubble-time">{formatRelative(m.createdAt)}</div>
                   </div>

@@ -6,6 +6,8 @@ import { store } from "../store.js";
 import type { UserRecord } from "../store.js";
 import { createUser, findUserByPhone, findUserById, updateUser, type UserPatch } from "../userRepo.js";
 import type { MeDTO } from "../types/shared.js";
+import { planHasEnded } from "../lib/planTime.js";
+import { nextNetworkPrompt, otherGoingIds, userWasGoing } from "../lib/networkPrompt.js";
 
 export const authRouter = Router();
 
@@ -52,6 +54,7 @@ function meFromUser(user: UserRecord): MeDTO {
     avatarPhotoDataUrl: user.avatarPhotoDataUrl,
     onboardingComplete: user.onboardingComplete,
     createdAt: user.createdAt,
+    networkUserIds: user.networkIds?.length ? user.networkIds : [],
   };
 }
 
@@ -157,4 +160,60 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
 authRouter.post("/logout", (_req, res) => {
   res.clearCookie("session");
   res.status(200).json({ ok: true });
+});
+
+authRouter.get("/network-prompt", requireAuth, async (req, res) => {
+  const prompt = await nextNetworkPrompt(String(req.userId));
+  res.json({ prompt });
+});
+
+authRouter.post("/network-add", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const planId = String(req.body?.planId ?? "");
+  const userIds = Array.isArray(req.body?.userIds) ? (req.body.userIds as unknown[]).map(String) : [];
+  if (!planId || userIds.length === 0) {
+    res.status(400).json({ error: "planId and userIds required" });
+    return;
+  }
+  const plan = store.findPlanById(planId);
+  if (!plan || !planHasEnded(plan)) {
+    res.status(400).json({ error: "This plan isn’t ready for network adds yet" });
+    return;
+  }
+  if (!userWasGoing(planId, userId)) {
+    res.status(403).json({ error: "You weren’t on this plan" });
+    return;
+  }
+  const allowed = new Set(otherGoingIds(planId));
+  const viewer = await findUserById(userId);
+  if (!viewer) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const next = new Set(viewer.networkIds ?? []);
+  for (const id of userIds) {
+    if (id === userId) continue;
+    if (!allowed.has(id)) continue;
+    next.add(id);
+  }
+  await updateUser(userId, { networkIds: [...next] });
+  const me = await userToMe(userId);
+  res.json({ ok: true, me });
+});
+
+authRouter.post("/network-dismiss", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const planId = String(req.body?.planId ?? "");
+  if (!planId) {
+    res.status(400).json({ error: "planId required" });
+    return;
+  }
+  const viewer = await findUserById(userId);
+  if (!viewer) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const dismiss = [...new Set([...(viewer.dismissedNetworkPromptPlanIds ?? []), planId])];
+  await updateUser(userId, { dismissedNetworkPromptPlanIds: dismiss });
+  res.json({ ok: true });
 });

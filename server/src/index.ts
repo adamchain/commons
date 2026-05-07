@@ -11,6 +11,8 @@ import { feedbackRouter } from "./routes/feedback.js";
 import { neighborhoodsRouter } from "./routes/neighborhoods.js";
 import { plansRouter } from "./routes/plans.js";
 import { profileRouter } from "./routes/profile.js";
+import { placesRouter } from "./routes/places.js";
+import { startNudgeSchedulers } from "./lib/nudges.js";
 import { seedIfEmpty } from "./seed.js";
 
 const app = express();
@@ -33,6 +35,7 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/plans", plansRouter);
+app.use("/api/places", placesRouter);
 app.use("/api/neighborhoods", neighborhoodsRouter);
 app.use("/api/feedback", feedbackRouter);
 app.use("/api/profile", profileRouter);
@@ -51,6 +54,7 @@ if (isProduction) {
 async function bootstrap(): Promise<void> {
   await connectMongo();
   await seedIfEmpty();
+  startNudgeSchedulers();
 
   app.listen(port, () => {
     console.log(`Commons API listening on http://localhost:${port}`);
