@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { LoadingScreen } from "../components/LoadingScreen";
@@ -24,11 +24,18 @@ interface ProfilePayload {
 export function ProfilePage() {
   const { userId = "" } = useParams();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfilePayload | null>(null);
   const [feedPlans, setFeedPlans] = useState<PlanDTO[]>([]);
   const isSelf = user?.id === userId;
   const showCalendar = Boolean(isSelf && searchParams.get("calendar") === "1");
+
+  const signOut = async () => {
+    await api("/api/auth/logout", { method: "POST" });
+    setUser(null);
+    navigate("/onboarding", { replace: true });
+  };
 
   useEffect(() => {
     void api<ProfilePayload>(`/api/profile/${userId}`).then(setProfile).catch(() => setProfile(null));
@@ -51,6 +58,11 @@ export function ProfilePage() {
     <main className="app-shell">
       <header className="app-header">
         <Link to="/" className="detail-back">← Back</Link>
+        {isSelf && (
+          <button type="button" className="btn-link" onClick={() => void signOut()}>
+            Sign out
+          </button>
+        )}
       </header>
 
       <section className="profile-hero">

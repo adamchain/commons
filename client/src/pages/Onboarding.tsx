@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import type { CSSProperties, ReactNode } from "react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
@@ -10,14 +11,9 @@ import {
   type InterestTag,
   type MeDTO,
   type NeighborhoodDTO,
-  type PlanDTO,
 } from "../types/shared";
-import { formatPlanDate, sentenceCaseTitle } from "../lib/format";
 
-const API_BASE =
-  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? "http://localhost:4000" : "");
-
-type Step = "samples" | "phone" | "code" | "location" | "interests" | "profile";
+type Step = "phone" | "code" | "location" | "interests" | "profile";
 
 export function OnboardingPage() {
   const { user, refreshUser, setUser } = useAuth();
@@ -40,7 +36,7 @@ export function OnboardingPage() {
   }, [user, navigate]);
 
   useEffect(() => {
-    if (user && (step === "phone" || step === "code" || step === "samples")) {
+    if (user && (step === "phone" || step === "code")) {
       setStep(pickInitial(user));
     }
   }, [user, step]);
@@ -115,13 +111,9 @@ export function OnboardingPage() {
     return me;
   }
 
-  if (step === "samples") {
-    return <SamplesTeaser onContinue={() => setStep("phone")} />;
-  }
-
   if (step === "phone") {
     return (
-      <OnboardingShell title="Sign up" subtitle="We'll text you a code.">
+      <OnboardingShell landing title="" subtitle="Plans, made together.">
         <input
           className="onboarding-input"
           type="tel"
@@ -147,7 +139,7 @@ export function OnboardingPage() {
   }
   if (step === "code") {
     return (
-      <OnboardingShell title="Enter the code" subtitle={`Sent to ${phoneNumber}`}>
+      <OnboardingShell landing title="Enter the code" subtitle={`Sent to ${phoneNumber}`}>
         <input
           className="onboarding-input onboarding-input-code"
           type="text"
@@ -230,84 +222,13 @@ export function OnboardingPage() {
 }
 
 function pickInitial(user: MeDTO | null): Step {
-  if (!user) return "samples";
-  if (user.onboardingComplete) return "samples";
+  if (!user) return "phone";
+  if (user.onboardingComplete) return "phone";
   const hoods =
     user.neighborhoodIds?.length ? user.neighborhoodIds : user.neighborhoodId ? [user.neighborhoodId] : [];
   if (hoods.length === 0) return "location";
   if (user.interests.length < 2) return "interests";
   return "profile";
-}
-
-function SamplesTeaser({ onContinue }: { onContinue: () => void }) {
-  const [plans, setPlans] = useState<PlanDTO[]>([]);
-  const [ix, setIx] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-
-  useEffect(() => {
-    setLoading(true);
-    setLoadError(false);
-    void fetch(`${API_BASE}/api/plans/preview`)
-      .then((r) => r.json() as Promise<PlanDTO[]>)
-      .then((data) => {
-        setPlans(Array.isArray(data) ? data : []);
-      })
-      .catch(() => {
-        setPlans([]);
-        setLoadError(true);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, []);
-
-  const p = plans[ix];
-
-  return (
-    <OnboardingShell title="What's on COMMONS" subtitle="Swipe through sample plans — then sign up when you're ready.">
-      {plans.length > 0 && p ? (
-        <div className="samples-carousel">
-          <div className="samples-card">
-            <span className="samples-emoji">{p.hostEmoji}</span>
-            <div className="samples-title">{sentenceCaseTitle(p.title)}</div>
-            <p className="samples-meta">
-              {formatPlanDate(p.date)}
-              {p.location?.name ? ` · ${p.location.name}` : ""}
-            </p>
-          </div>
-          <div className="samples-nav">
-            <button type="button" className="samples-prev" onClick={() => setIx((i) => (i - 1 + plans.length) % plans.length)}>
-              ←
-            </button>
-            <div className="samples-dots">
-              {plans.map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className={`samples-dot ${i === ix ? "is-active" : ""}`}
-                  aria-label={`Plan ${i + 1}`}
-                  onClick={() => setIx(i)}
-                />
-              ))}
-            </div>
-            <button type="button" className="samples-next" onClick={() => setIx((i) => (i + 1) % plans.length)}>
-              →
-            </button>
-          </div>
-        </div>
-      ) : loading ? (
-        <p className="onboarding-fineprint">Loading sample plans…</p>
-      ) : loadError ? (
-        <p className="onboarding-fineprint">Couldn’t load sample plans right now.</p>
-      ) : (
-        <p className="onboarding-fineprint">No sample plans yet — be the first to post one.</p>
-      )}
-      <button type="button" className="btn-primary btn-block" style={{ marginTop: 16 }} onClick={onContinue}>
-        Continue with phone
-      </button>
-    </OnboardingShell>
-  );
 }
 
 function formatError(e: unknown): string {
@@ -346,12 +267,109 @@ function formatPhoneInput(raw: string): string {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
-function OnboardingShell({ title, subtitle, children }: { title: string; subtitle: string; children?: React.ReactNode }) {
+/** Floating activity icons — same vocabulary as LoadingScreen to make sign-in feel continuous. */
+const ONBOARDING_ICONS: Array<{
+  key: string;
+  top: string;
+  left: string;
+  size: number;
+  delay: string;
+  duration: string;
+  rotate: string;
+  svg: ReactNode;
+}> = [
+  {
+    key: "coffee", top: "10%", left: "7%", size: 52, delay: "0s", duration: "5.5s", rotate: "-8deg",
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 8h1a4 4 0 1 1 0 8h-1" /><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" />
+        <path d="M6 2v3" /><path d="M10 2v3" /><path d="M14 2v3" />
+      </svg>
+    ),
+  },
+  {
+    key: "mountain", top: "18%", left: "82%", size: 64, delay: "0.6s", duration: "6.4s", rotate: "12deg",
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="m8 3 4 8 5-5 5 15H2L8 3z" />
+      </svg>
+    ),
+  },
+  {
+    key: "music", top: "72%", left: "12%", size: 50, delay: "0.3s", duration: "5.2s", rotate: "-14deg",
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+      </svg>
+    ),
+  },
+  {
+    key: "pizza", top: "78%", left: "78%", size: 56, delay: "1.8s", duration: "6.8s", rotate: "16deg",
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="m2 16 20 6-6-20A20 20 0 0 0 2 16" /><path d="M5.71 17.11a17.04 17.04 0 0 1 11.4-11.4" />
+      </svg>
+    ),
+  },
+  {
+    key: "pin", top: "44%", left: "90%", size: 38, delay: "1.4s", duration: "5.8s", rotate: "-6deg",
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" />
+      </svg>
+    ),
+  },
+  {
+    key: "wine", top: "42%", left: "4%", size: 40, delay: "0.4s", duration: "5.4s", rotate: "10deg",
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M8 22h8" /><path d="M12 11v11" /><path d="M19 3H5l1.4 7.5a6 6 0 0 0 11.2 0Z" />
+      </svg>
+    ),
+  },
+];
+
+function OnboardingShell({
+  title,
+  subtitle,
+  children,
+  landing = false,
+}: {
+  title: string;
+  subtitle: string;
+  children?: React.ReactNode;
+  /** Login/phone-entry styling — floating icons + big wordmark, like LoadingScreen. */
+  landing?: boolean;
+}) {
   return (
-    <div className="onboarding-shell">
-      <div className="onboarding-card">
-        <div className="onboarding-brand">COMMONS</div>
-        <h1 className="onboarding-title">{title}</h1>
+    <div className={`onboarding-shell ${landing ? "onboarding-shell--landing" : ""}`}>
+      {landing && (
+        <div className="loader-icons" aria-hidden="true">
+          {ONBOARDING_ICONS.map((icon) => {
+            const style: CSSProperties & { ["--rot"]?: string } = {
+              top: icon.top,
+              left: icon.left,
+              width: icon.size,
+              height: icon.size,
+              animationDelay: icon.delay,
+              animationDuration: icon.duration,
+              ["--rot"]: icon.rotate,
+            };
+            return (
+              <span key={icon.key} className="loader-icon" style={style}>
+                {icon.svg}
+              </span>
+            );
+          })}
+        </div>
+      )}
+      <div className={`onboarding-card ${landing ? "onboarding-card--landing" : ""}`}>
+        {landing ? (
+          <h1 className="loader-wordmark">COMMONS</h1>
+        ) : (
+          <div className="onboarding-brand">COMMONS</div>
+        )}
+        {title && <h2 className="onboarding-title">{title}</h2>}
         {subtitle && <p className="onboarding-subtitle">{subtitle}</p>}
         <div className="onboarding-body">{children}</div>
       </div>

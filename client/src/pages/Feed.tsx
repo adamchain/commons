@@ -37,10 +37,6 @@ export function FeedPage() {
       .catch(() => setNetworkPrompt(null));
   }, [plans]);
 
-  const logout = async () => {
-    await api("/api/auth/logout", { method: "POST" });
-    window.location.href = "/onboarding";
-  };
 
   const hoodById = useMemo(() => new Map(neighborhoods.map((n) => [n.id, n.name])), [neighborhoods]);
 
@@ -87,20 +83,18 @@ export function FeedPage() {
             + Post a plan
           </Link>
           <ThemeToggle />
-          <button type="button" className="user-pill" onClick={() => void logout()} title="Sign out">
-            {user && (
-              <>
-                <Avatar
-                  seed={user.avatarSeed}
-                  style={user.avatarStyle}
-                  photoDataUrl={user.avatarPhotoDataUrl}
-                  name={user.firstName || undefined}
-                  size="sm"
-                />
-                <span>{user.firstName || "Sign out"}</span>
-              </>
-            )}
-          </button>
+          {user && (
+            <Link to={`/profile/${user.id}`} className="user-pill" title="Your profile">
+              <Avatar
+                seed={user.avatarSeed}
+                style={user.avatarStyle}
+                photoDataUrl={user.avatarPhotoDataUrl}
+                name={user.firstName || undefined}
+                size="sm"
+              />
+              <span>{user.firstName || "Profile"}</span>
+            </Link>
+          )}
         </div>
       </header>
 

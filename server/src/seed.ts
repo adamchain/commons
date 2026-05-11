@@ -57,6 +57,12 @@ const SEED_USERS: SeedUser[] = [
   { phoneNumber: "+15555550103", firstName: "Alex", neighborhoodKey: "old_city", interests: ["music_nightlife", "food_drinks", "arts_culture"], avatarSeed: "alex-seed" },
   { phoneNumber: "+15555550104", firstName: "Riley", neighborhoodKey: "northern_liberties", interests: ["arts_culture", "coffee_cowork", "local_events"], avatarSeed: "riley-seed" },
   { phoneNumber: "+15555550105", firstName: "Pat", neighborhoodKey: "south_philly", interests: ["fitness_outdoors", "dog_owners", "running"], avatarSeed: "pat-seed" },
+  { phoneNumber: "+15555550106", firstName: "Sky", neighborhoodKey: "fishtown", interests: ["music_nightlife", "thrifting", "local_events"], avatarSeed: "sky-seed" },
+  { phoneNumber: "+15555550107", firstName: "Dee", neighborhoodKey: "graduate_hospital", interests: ["food_drinks", "wellness", "arts_culture"], avatarSeed: "dee-seed" },
+  { phoneNumber: "+15555550108", firstName: "Noor", neighborhoodKey: "center_city", interests: ["coffee_cowork", "arts_culture", "food_drinks"], avatarSeed: "noor-seed" },
+  { phoneNumber: "+15555550109", firstName: "Mar", neighborhoodKey: "west_philly", interests: ["thrifting", "music_nightlife", "arts_culture"], avatarSeed: "mar-seed" },
+  { phoneNumber: "+15555550110", firstName: "Theo", neighborhoodKey: "manayunk", interests: ["fitness_outdoors", "running", "dog_owners"], avatarSeed: "theo-seed" },
+  { phoneNumber: "+15555550111", firstName: "Ren", neighborhoodKey: "fairmount", interests: ["arts_culture", "local_events", "wellness"], avatarSeed: "ren-seed" },
 ];
 
 const SEED_PLANS: SeedPlan[] = [
@@ -125,6 +131,118 @@ const SEED_PLANS: SeedPlan[] = [
     interested: ["+15555550100", "+15555550103"],
     messages: [],
   },
+  {
+    creatorPhone: "+15555550106",
+    title: "Karaoke at Drinker's",
+    neighborhoodKey: "fishtown",
+    location: { name: "Drinker's Pub", address: "1903 Chestnut St, Philadelphia, PA", lat: 39.953, lng: -75.172 },
+    daysFromNow: 4,
+    time: "21:00",
+    isFlexibleTime: false,
+    endHoursAfterStart: 3,
+    tags: ["music_nightlife", "food_drinks"],
+    description: "No judgment zone — sign up at the bar.",
+    hostEmoji: "🎤",
+    going: ["+15555550106", "+15555550103", "+15555550107"],
+    interested: ["+15555550100", "+15555550101", "+15555550109"],
+    messages: [
+      { senderPhone: "+15555550107", body: "Putting Mr. Brightside on my list 😤", minutesAgo: 540 },
+    ],
+  },
+  {
+    creatorPhone: "+15555550107",
+    title: "Morning walk + coffee",
+    neighborhoodKey: "graduate_hospital",
+    location: { name: "Rittenhouse Square", address: "1800 Walnut St, Philadelphia, PA", lat: 39.949, lng: -75.171 },
+    daysFromNow: 6,
+    time: "09:00",
+    isFlexibleTime: true,
+    endHoursAfterStart: 1,
+    tags: ["wellness", "coffee_cowork"],
+    description: "Easy loop around the square, grabbing coffee after ☕️",
+    hostEmoji: "☕",
+    going: ["+15555550107"],
+    interested: ["+15555550100", "+15555550101", "+15555550111"],
+    messages: [],
+  },
+  {
+    creatorPhone: "+15555550108",
+    title: "Looking for — beginner yoga partner?",
+    neighborhoodKey: "center_city",
+    location: { name: "", address: "" },
+    daysFromNow: 2,
+    time: "Flexible",
+    isFlexibleTime: true,
+    tags: ["wellness", "fitness_outdoors"],
+    description: "Anyone go to a beginner studio and wouldn't mind I tagged along? Would love to grab coffee after too 🧘",
+    hostEmoji: "🧘",
+    going: ["+15555550108"],
+    interested: ["+15555550101", "+15555550111"],
+    messages: [],
+  },
+  {
+    creatorPhone: "+15555550109",
+    title: "Thrifting on Baltimore Ave",
+    neighborhoodKey: "west_philly",
+    location: { name: "Baltimore Ave Thrift Row", address: "4400 Baltimore Ave, Philadelphia, PA", lat: 39.9494, lng: -75.2098 },
+    daysFromNow: 5,
+    time: "13:00",
+    isFlexibleTime: false,
+    endHoursAfterStart: 3,
+    tags: ["thrifting", "arts_culture"],
+    description: "Three shops, two hours, one mediocre iced coffee.",
+    hostEmoji: "🧥",
+    going: ["+15555550109", "+15555550104"],
+    interested: ["+15555550100", "+15555550106"],
+    messages: [],
+  },
+  {
+    creatorPhone: "+15555550110",
+    title: "Dogs at Manayunk towpath",
+    neighborhoodKey: "manayunk",
+    location: { name: "Manayunk Tow Path", address: "Manayunk, Philadelphia, PA", lat: 40.0253, lng: -75.2214 },
+    daysFromNow: 1,
+    time: "16:30",
+    isFlexibleTime: false,
+    endHoursAfterStart: 2,
+    tags: ["dog_owners", "fitness_outdoors"],
+    description: "Bring your dog or just join — easy walk + chat.",
+    hostEmoji: "🐕",
+    going: ["+15555550110", "+15555550105"],
+    interested: ["+15555550100", "+15555550102"],
+    messages: [],
+  },
+  {
+    creatorPhone: "+15555550111",
+    title: "Open mic — Tattooed Mom",
+    neighborhoodKey: "south_philly",
+    location: { name: "Tattooed Mom", address: "530 South St, Philadelphia, PA", lat: 39.9412, lng: -75.1525 },
+    daysFromNow: 7,
+    time: "20:30",
+    isFlexibleTime: false,
+    tags: ["arts_culture", "local_events", "music_nightlife"],
+    description: "Reading something I wrote. Moral support welcome.",
+    hostEmoji: "📚",
+    going: ["+15555550111", "+15555550104"],
+    interested: ["+15555550103", "+15555550109"],
+    messages: [],
+  },
+  {
+    creatorPhone: "+15555550102",
+    title: "Sunday long run — 8 miles",
+    neighborhoodKey: "fairmount",
+    location: { name: "Lloyd Hall", address: "1 Boathouse Row, Philadelphia, PA", lat: 39.9665, lng: -75.18 },
+    daysFromNow: 6,
+    time: "07:00",
+    isFlexibleTime: false,
+    endHoursAfterStart: 2,
+    tags: ["running", "fitness_outdoors"],
+    description: "Easy pace, regroup at the loop turnaround.",
+    hostEmoji: "🏃",
+    going: ["+15555550102", "+15555550105", "+15555550110"],
+    interested: ["+15555550100"],
+    messages: [],
+  },
 ];
 
 function dateForOffset(days: number): string {
@@ -157,35 +275,43 @@ function includeSeedDemoData(): boolean {
 }
 
 export async function seedIfEmpty(): Promise<void> {
-  if (store.listNeighborhoods().length > 0) return;
-
+  // Seed neighborhoods only when the store is empty (preserves existing data on restart).
   const neighborhoodIdByKey = new Map<string, string>();
-  const recordsByKey = new Map<string, ReturnType<typeof seedNeighborhood>>();
-  for (const n of PHILLY_NEIGHBORHOODS) {
-    const record = seedNeighborhood(n);
-    neighborhoodIdByKey.set(n.key, record.id);
-    recordsByKey.set(n.key, record);
+  if (store.listNeighborhoods().length === 0) {
+    const recordsByKey = new Map<string, ReturnType<typeof seedNeighborhood>>();
+    for (const n of PHILLY_NEIGHBORHOODS) {
+      const record = seedNeighborhood(n);
+      neighborhoodIdByKey.set(n.key, record.id);
+      recordsByKey.set(n.key, record);
+    }
+    for (const n of PHILLY_NEIGHBORHOODS) {
+      const record = recordsByKey.get(n.key);
+      if (!record) continue;
+      record.adjacent = n.adjacentKeys
+        .map((k) => neighborhoodIdByKey.get(k))
+        .filter((id): id is string => Boolean(id));
+    }
+    store.reset({
+      users: [],
+      neighborhoods: Array.from(recordsByKey.values()),
+      plans: [],
+      participations: [],
+      conversations: [],
+      messages: [],
+      feedback: [],
+      declines: [],
+      smsCodes: [],
+      logs: [],
+      planSuggestions: [],
+    });
+  } else {
+    // Map existing neighborhoods back to keys by name so demo seeding works on restart.
+    const nameToKey = new Map(PHILLY_NEIGHBORHOODS.map((n) => [n.name, n.key]));
+    for (const record of store.listNeighborhoods()) {
+      const key = nameToKey.get(record.name);
+      if (key) neighborhoodIdByKey.set(key, record.id);
+    }
   }
-  for (const n of PHILLY_NEIGHBORHOODS) {
-    const record = recordsByKey.get(n.key);
-    if (!record) continue;
-    record.adjacent = n.adjacentKeys
-      .map((k) => neighborhoodIdByKey.get(k))
-      .filter((id): id is string => Boolean(id));
-  }
-  store.reset({
-    users: [],
-    neighborhoods: Array.from(recordsByKey.values()),
-    plans: [],
-    participations: [],
-    conversations: [],
-    messages: [],
-    feedback: [],
-    declines: [],
-    smsCodes: [],
-    logs: [],
-    planSuggestions: [],
-  });
 
   if (!includeSeedDemoData()) {
     console.log("[seed] skipped demo users/plans (production). Only Verify sign-ups create accounts. Set SEED_DEMO_ACCOUNTS=1 to seed.");
@@ -214,6 +340,12 @@ export async function seedIfEmpty(): Promise<void> {
     const creatorId = userIdByPhone.get(seed.creatorPhone);
     const neighborhoodId = neighborhoodIdByKey.get(seed.neighborhoodKey);
     if (!creatorId || !neighborhoodId) continue;
+
+    // Skip if this exact demo plan already exists (idempotent on restart).
+    const alreadySeeded = store
+      .listPlansByCreator(creatorId)
+      .some((p) => p.title === seed.title);
+    if (alreadySeeded) continue;
 
     const date = dateForOffset(seed.daysFromNow);
     const plan = store.createPlan({

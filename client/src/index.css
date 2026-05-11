@@ -1517,6 +1517,18 @@ label {
   justify-content: center;
   padding: 24px;
 }
+/* Landing/login variant: floating icons in the background, card floats on top. */
+.onboarding-shell--landing {
+  position: relative;
+  background: var(--bg-gradient);
+  overflow: hidden;
+}
+.onboarding-shell--landing .loader-icons {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
 .onboarding-card {
   width: 100%;
   max-width: 420px;
@@ -1528,6 +1540,19 @@ label {
   flex-direction: column;
   gap: 12px;
 }
+.onboarding-card--landing {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 36px 24px 32px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 18px 50px rgba(0,0,0,0.10);
+}
+.onboarding-card--landing .loader-wordmark {
+  font-size: 38px;
+  text-align: center;
+  animation: none;
+  margin: 0 0 4px;
+}
 .onboarding-brand {
   font-size: 14px;
   letter-spacing: 0.2em;
@@ -1535,9 +1560,10 @@ label {
   text-align: center;
 }
 .onboarding-title {
-  font-size: 26px;
+  font-size: 22px;
   margin: 0;
   text-align: center;
+  font-weight: 700;
 }
 .onboarding-subtitle {
   margin: 0;
