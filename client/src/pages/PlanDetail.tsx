@@ -129,7 +129,7 @@ export function PlanDetailPage() {
           className="host-row"
           onClick={() => navigate(`/profile/${plan.creator.id}`)}
         >
-          <Avatar seed={plan.creator.avatarSeed} style={plan.creator.avatarStyle} photoDataUrl={plan.creator.avatarPhotoDataUrl} emoji={plan.creator.avatarEmoji} size="md" />
+          <Avatar seed={plan.creator.avatarSeed} style={plan.creator.avatarStyle} photoDataUrl={plan.creator.avatarPhotoDataUrl} params={plan.creator.avatarParams} size="md" />
           <span>
             Hosted by <strong>{plan.creator.firstName}</strong>
           </span>
@@ -222,7 +222,7 @@ export function PlanDetailPage() {
           <div className="participant-list-going">
             {plan.participants.going.map((person) => (
               <Link key={person.id} to={`/profile/${person.id}`} className="participant-row">
-                <Avatar seed={person.avatarSeed} style={person.avatarStyle} photoDataUrl={person.avatarPhotoDataUrl} emoji={person.avatarEmoji} size="lg" />
+                <Avatar seed={person.avatarSeed} style={person.avatarStyle} photoDataUrl={person.avatarPhotoDataUrl} params={person.avatarParams} size="lg" />
                 <div>
                   <div className="participant-name">
                     {person.firstName}
@@ -243,7 +243,7 @@ export function PlanDetailPage() {
             <div className="participant-list-interested">
               {plan.participants.interested.map((person) => (
                 <Link key={person.id} to={`/profile/${person.id}`} className="participant-row">
-                  <Avatar seed={person.avatarSeed} style={person.avatarStyle} photoDataUrl={person.avatarPhotoDataUrl} emoji={person.avatarEmoji} size="sm" />
+                  <Avatar seed={person.avatarSeed} style={person.avatarStyle} photoDataUrl={person.avatarPhotoDataUrl} params={person.avatarParams} size="sm" />
                   <span className="participant-name">
                     {person.firstName}
                     {person.id === user.id && <span className="you-pill">You</span>}

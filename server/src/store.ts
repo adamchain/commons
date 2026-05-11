@@ -24,8 +24,8 @@ export interface UserRecord {
   avatarSeed: string;
   avatarStyle: AvatarStyle;
   avatarPhotoDataUrl?: string;
-  /** User-picked emoji shown in place of generated/photo avatar when set. */
-  avatarEmoji?: string;
+  /** DiceBear URL overrides query string (e.g. "top=longHair&skinColor=614335"). */
+  avatarParams?: string;
   onboardingComplete: boolean;
   createdAt: string;
   /** One-way network — people added after shared plans. */

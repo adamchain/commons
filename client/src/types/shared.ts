@@ -49,13 +49,61 @@ export type PlanVisibility = "everyone" | "community" | "network";
 
 export type ParticipationState = "interested" | "going";
 
-/** Standard library of single-character emojis users can pick as a "no photo" avatar. */
-export const AVATAR_EMOJIS = [
-  "🌸", "🌻", "🌙", "⭐", "🔥", "🌈",
-  "🎨", "🎵", "🎯", "🎲", "🍕", "☕",
-  "🥑", "🌮", "🐶", "🐱", "🦊", "🐝",
-] as const;
-export type AvatarEmoji = (typeof AVATAR_EMOJIS)[number];
+/**
+ * Bitmoji-style presets. Each entry is a curated set of DiceBear `avataaars`
+ * URL overrides that produces a recognizable look. Stored on the user as a
+ * single query string (avatarParams), appended to the DiceBear request.
+ */
+export interface AvatarPreset {
+  id: string;
+  label: string;
+  /** URL query string fragment WITHOUT leading `?`. */
+  params: string;
+}
+
+export const AVATAR_PRESETS: AvatarPreset[] = [
+  // Dark skin
+  { id: "p01", label: "Dark skin · long curly black hair",
+    params: "top=curly&hairColor=2c1b18&skinColor=614335&clothing=shirtCrewNeck&clothesColor=ff5c5c" },
+  { id: "p02", label: "Dark skin · short curly black hair",
+    params: "top=shortCurly&hairColor=2c1b18&skinColor=614335&clothing=hoodie&clothesColor=3c4f5c" },
+  { id: "p03", label: "Dark skin · dreads",
+    params: "top=dreads&hairColor=2c1b18&skinColor=614335&clothing=shirtCrewNeck&clothesColor=a7ffc4" },
+  { id: "p04", label: "Dark skin · fro",
+    params: "top=fro&hairColor=2c1b18&skinColor=614335&clothing=blazerAndShirt" },
+  // Medium-dark skin
+  { id: "p05", label: "Medium skin · long straight black hair",
+    params: "top=straight01&hairColor=2c1b18&skinColor=ae5d29&clothing=shirtScoopNeck&clothesColor=ffafb9" },
+  { id: "p06", label: "Medium skin · short black hair",
+    params: "top=shortFlat&hairColor=2c1b18&skinColor=ae5d29&clothing=shirtCrewNeck&clothesColor=65c9ff" },
+  { id: "p07", label: "Tan skin · long wavy brown hair",
+    params: "top=curvy&hairColor=4a312c&skinColor=d08b5b&clothing=shirtVNeck&clothesColor=a7ffc4" },
+  { id: "p08", label: "Tan skin · short brown hair",
+    params: "top=shortWaved&hairColor=4a312c&skinColor=d08b5b&clothing=hoodie&clothesColor=929598" },
+  { id: "p09", label: "Medium skin · hijab",
+    params: "top=hijab&hatColor=2c1b18&skinColor=d08b5b&clothing=shirtScoopNeck&clothesColor=ffafb9" },
+  // Light skin
+  { id: "p10", label: "Light skin · long brunette",
+    params: "top=straight02&hairColor=724133&skinColor=edb98a&clothing=shirtScoopNeck&clothesColor=ffafb9" },
+  { id: "p11", label: "Light skin · long blonde",
+    params: "top=straight01&hairColor=b58143&skinColor=edb98a&clothing=blazerAndSweater" },
+  { id: "p12", label: "Light skin · short brunette",
+    params: "top=shortFlat&hairColor=724133&skinColor=edb98a&clothing=shirtCrewNeck&clothesColor=3c4f5c" },
+  { id: "p13", label: "Light skin · short blond",
+    params: "top=shortRound&hairColor=b58143&skinColor=edb98a&clothing=hoodie&clothesColor=ff488e" },
+  // Pale / red
+  { id: "p14", label: "Pale skin · long red hair",
+    params: "top=straightAndStrand&hairColor=c93305&skinColor=ffdbb4&clothing=shirtVNeck&clothesColor=a7ffc4" },
+  { id: "p15", label: "Pale skin · short red hair",
+    params: "top=shortWaved&hairColor=c93305&skinColor=ffdbb4&clothing=shirtCrewNeck&clothesColor=ff5c5c" },
+  // Glasses / facial hair / hat
+  { id: "p16", label: "Glasses · light skin · brown hair",
+    params: "top=shortFlat&hairColor=4a312c&skinColor=edb98a&accessories=prescription02&accessoriesProbability=100&clothing=collarAndSweater" },
+  { id: "p17", label: "Beard · medium skin · short black hair",
+    params: "top=shortFlat&hairColor=2c1b18&skinColor=ae5d29&facialHair=beardMedium&facialHairProbability=100&clothing=shirtCrewNeck&clothesColor=545454" },
+  { id: "p18", label: "Hat · tan skin",
+    params: "top=hat&hatColor=3c4f5c&skinColor=d08b5b&clothing=hoodie&clothesColor=ffdeb5" },
+];
 
 export interface PublicUser {
   id: string;
@@ -64,7 +112,8 @@ export interface PublicUser {
   avatarSeed: string;
   avatarStyle: AvatarStyle;
   avatarPhotoDataUrl?: string;
-  avatarEmoji?: string;
+  /** DiceBear URL overrides string (e.g. "top=longHair&skinColor=614335"). */
+  avatarParams?: string;
 }
 
 export type AvatarStyle = "avataaars" | "big-smile" | "fun-emoji";
@@ -164,7 +213,7 @@ export interface MeDTO {
   avatarSeed: string;
   avatarStyle: AvatarStyle;
   avatarPhotoDataUrl?: string;
-  avatarEmoji?: string;
+  avatarParams?: string;
   onboardingComplete: boolean;
   createdAt: string;
   networkUserIds?: string[];

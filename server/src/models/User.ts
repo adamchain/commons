@@ -21,7 +21,7 @@ const UserSchema = new mongoose.Schema<UserRecord>(
       required: true,
     },
     avatarPhotoDataUrl: { type: String },
-    avatarEmoji: { type: String },
+    avatarParams: { type: String },
     onboardingComplete: { type: Boolean, required: true },
     createdAt: { type: String, required: true },
     networkIds: { type: [String], default: undefined },

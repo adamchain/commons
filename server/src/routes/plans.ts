@@ -52,7 +52,7 @@ export function userToPublic(user: UserRecord): PublicUser {
     avatarSeed: user.avatarSeed,
     avatarStyle: user.avatarStyle,
     avatarPhotoDataUrl: user.avatarPhotoDataUrl,
-    avatarEmoji: user.avatarEmoji,
+    avatarParams: user.avatarParams,
   };
 }
 

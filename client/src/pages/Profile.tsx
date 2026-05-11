@@ -6,7 +6,7 @@ import { LoadingScreen } from "../components/LoadingScreen";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate } from "../lib/format";
 import {
-  AVATAR_EMOJIS,
+  AVATAR_PRESETS,
   HOST_TAG_LABELS,
   INTEREST_LABELS,
   type HostTag,
@@ -80,7 +80,7 @@ export function ProfilePage() {
           seed={profile.user.avatarSeed}
           style={profile.user.avatarStyle}
           photoDataUrl={profile.user.avatarPhotoDataUrl}
-          emoji={profile.user.avatarEmoji}
+          params={profile.user.avatarParams}
           name={profile.user.firstName}
           size="xl"
         />
@@ -197,18 +197,18 @@ export function ProfilePage() {
 function EditPanel({ me, onSaved }: { me: MeDTO; onSaved: (next: MeDTO) => void }) {
   const [firstName, setFirstName] = useState(me.firstName);
   const [photo, setPhoto] = useState<string | null>(me.avatarPhotoDataUrl ?? null);
-  const [emoji, setEmoji] = useState<string | null>(me.avatarEmoji ?? null);
+  const [avatarParams, setAvatarParams] = useState<string | null>(me.avatarParams ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function pickPhoto(dataUrl: string) {
     setPhoto(dataUrl);
-    setEmoji(null);
+    setAvatarParams(null);
   }
-  function pickEmoji(e: string) {
-    setEmoji((cur) => (cur === e ? null : e));
-    if (emoji !== e) setPhoto(null);
+  function pickPreset(params: string) {
+    setAvatarParams((cur) => (cur === params ? null : params));
+    if (avatarParams !== params) setPhoto(null);
   }
 
   async function save() {
@@ -220,7 +220,7 @@ function EditPanel({ me, onSaved }: { me: MeDTO; onSaved: (next: MeDTO) => void 
         body: JSON.stringify({
           firstName: firstName.trim(),
           avatarPhotoDataUrl: photo ?? null,
-          avatarEmoji: emoji ?? null,
+          avatarParams: avatarParams ?? null,
         }),
       });
       onSaved(next);
@@ -247,14 +247,14 @@ function EditPanel({ me, onSaved }: { me: MeDTO; onSaved: (next: MeDTO) => void 
       <label className="form-question" style={{ marginTop: 14 }}>
         Profile image
       </label>
-      <p className="form-help">A photo or pick an emoji — one or the other.</p>
+      <p className="form-help">Upload a photo or pick a character below — one or the other.</p>
 
       <div className="profile-edit-photo-row">
         <Avatar
           seed={me.avatarSeed}
           style={me.avatarStyle}
           photoDataUrl={photo ?? undefined}
-          emoji={emoji ?? undefined}
+          params={avatarParams ?? undefined}
           name={firstName.trim() || undefined}
           size="lg"
         />
@@ -266,13 +266,13 @@ function EditPanel({ me, onSaved }: { me: MeDTO; onSaved: (next: MeDTO) => void 
           >
             {photo ? "Replace photo" : "Upload photo"}
           </button>
-          {(photo || emoji) && (
+          {(photo || avatarParams) && (
             <button
               type="button"
               className="btn-link"
               onClick={() => {
                 setPhoto(null);
-                setEmoji(null);
+                setAvatarParams(null);
               }}
             >
               Remove
@@ -296,17 +296,19 @@ function EditPanel({ me, onSaved }: { me: MeDTO; onSaved: (next: MeDTO) => void 
         </div>
       </div>
 
-      <p className="profile-emoji-label" style={{ marginTop: 12 }}>Or pick an emoji</p>
-      <div className="profile-emoji-grid">
-        {AVATAR_EMOJIS.map((e) => (
+      <p className="profile-emoji-label" style={{ marginTop: 12 }}>Or pick a character</p>
+      <div className="profile-preset-grid">
+        {AVATAR_PRESETS.map((p) => (
           <button
-            key={e}
+            key={p.id}
             type="button"
-            className={`profile-emoji-pick ${emoji === e ? "is-selected" : ""}`}
-            onClick={() => pickEmoji(e)}
-            aria-pressed={emoji === e}
+            className={`profile-preset-pick ${avatarParams === p.params ? "is-selected" : ""}`}
+            onClick={() => pickPreset(p.params)}
+            aria-pressed={avatarParams === p.params}
+            aria-label={p.label}
+            title={p.label}
           >
-            {e}
+            <Avatar seed={me.avatarSeed} style="avataaars" params={p.params} size="md" />
           </button>
         ))}
       </div>

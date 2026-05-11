@@ -6,7 +6,7 @@ import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
 import {
   ALL_INTERESTS,
-  AVATAR_EMOJIS,
+  AVATAR_PRESETS,
   INTEREST_LABELS,
   type AvatarStyle,
   type InterestTag,
@@ -205,13 +205,13 @@ export function OnboardingPage() {
     return (
       <ProfileStep
         me={user}
-        onSave={async (firstName, avatarSeed, avatarStyle, avatarPhotoDataUrl, avatarEmoji) => {
+        onSave={async (firstName, avatarSeed, avatarStyle, avatarPhotoDataUrl, avatarParams) => {
           await patchMe({
             firstName,
             avatarSeed,
             avatarStyle,
             avatarPhotoDataUrl: avatarPhotoDataUrl ?? undefined,
-            avatarEmoji: avatarEmoji ?? undefined,
+            avatarParams: avatarParams ?? undefined,
             onboardingComplete: true,
           });
           await refreshUser();
@@ -558,32 +558,32 @@ function ProfileStep({
     seed: string,
     style: AvatarStyle,
     photoDataUrl: string | null,
-    emoji: string | null,
+    avatarParams: string | null,
   ) => Promise<void>;
 }) {
   const [firstName, setFirstName] = useState(me.firstName);
   const [photo, setPhoto] = useState<string | null>(me.avatarPhotoDataUrl ?? null);
-  const [emoji, setEmoji] = useState<string | null>(me.avatarEmoji ?? null);
+  const [avatarParams, setAvatarParams] = useState<string | null>(me.avatarParams ?? null);
   const [busy, setBusy] = useState(false);
 
-  // Photo and emoji are mutually exclusive — picking one clears the other.
+  // Photo and preset are mutually exclusive — picking one clears the other.
   function pickPhoto(dataUrl: string) {
     setPhoto(dataUrl);
-    setEmoji(null);
+    setAvatarParams(null);
   }
-  function pickEmoji(e: string) {
-    setEmoji((cur) => (cur === e ? null : e));
-    if (emoji !== e) setPhoto(null);
+  function pickPreset(params: string) {
+    setAvatarParams((cur) => (cur === params ? null : params));
+    if (avatarParams !== params) setPhoto(null);
   }
 
   return (
-    <OnboardingShell title="Your profile" subtitle="A photo, an emoji, or just your initials.">
+    <OnboardingShell title="Your profile" subtitle="A photo, a character, or your initials.">
       <div className="profile-avatar-preview">
         <Avatar
           seed={me.avatarSeed}
           style={me.avatarStyle}
           photoDataUrl={photo ?? undefined}
-          emoji={emoji ?? undefined}
+          params={avatarParams ?? undefined}
           name={firstName.trim() || undefined}
           size="xl"
         />
@@ -615,18 +615,20 @@ function ProfileStep({
         />
       </details>
 
-      <div className="profile-emoji-block">
-        <p className="profile-emoji-label">Or pick an emoji</p>
-        <div className="profile-emoji-grid">
-          {AVATAR_EMOJIS.map((e) => (
+      <div className="profile-preset-block">
+        <p className="profile-emoji-label">Or pick a character</p>
+        <div className="profile-preset-grid">
+          {AVATAR_PRESETS.map((p) => (
             <button
-              key={e}
+              key={p.id}
               type="button"
-              className={`profile-emoji-pick ${emoji === e ? "is-selected" : ""}`}
-              onClick={() => pickEmoji(e)}
-              aria-pressed={emoji === e}
+              className={`profile-preset-pick ${avatarParams === p.params ? "is-selected" : ""}`}
+              onClick={() => pickPreset(p.params)}
+              aria-pressed={avatarParams === p.params}
+              aria-label={p.label}
+              title={p.label}
             >
-              {e}
+              <Avatar seed={me.avatarSeed} style="avataaars" params={p.params} size="md" />
             </button>
           ))}
         </div>
@@ -639,7 +641,7 @@ function ProfileStep({
         onClick={async () => {
           setBusy(true);
           try {
-            await onSave(firstName.trim(), me.avatarSeed, me.avatarStyle, photo, emoji);
+            await onSave(firstName.trim(), me.avatarSeed, me.avatarStyle, photo, avatarParams);
           } finally {
             setBusy(false);
           }

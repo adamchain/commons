@@ -1689,15 +1689,6 @@ label {
 .avatar-lg { width: 72px; height: 72px; }
 .avatar-xl { width: 128px; height: 128px; }
 
-.avatar-emoji {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--accent-soft);
-  border-color: rgba(255, 120, 73, 0.35);
-  line-height: 1;
-}
-
 .avatar-initials {
   display: inline-flex;
   align-items: center;
@@ -2036,32 +2027,40 @@ label {
   color: var(--text-muted);
 }
 
-.profile-emoji-grid {
+.profile-preset-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 8px;
+  gap: 10px;
   margin-top: 8px;
 }
-.profile-emoji-pick {
+.profile-preset-pick {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 48px;
-  font-size: 26px;
+  padding: 4px;
   background: var(--surface-2);
-  border: 1px solid transparent;
-  border-radius: 12px;
+  border: 2px solid transparent;
+  border-radius: 14px;
   cursor: pointer;
   transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
-  line-height: 1;
 }
-.profile-emoji-pick:hover {
+.profile-preset-pick:hover {
   border-color: var(--border-strong);
 }
-.profile-emoji-pick.is-selected {
+.profile-preset-pick.is-selected {
   background: var(--accent-soft);
   border-color: var(--accent);
-  transform: scale(1.06);
+  transform: scale(1.04);
+}
+.profile-preset-pick .avatar {
+  border: none;
+  background: transparent;
+}
+
+@media (max-width: 480px) {
+  .profile-preset-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
 .profile-photo-picker {
