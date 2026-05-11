@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
@@ -31,6 +31,8 @@ export function OnboardingPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const lastAutoSubmittedCode = useRef<string | null>(null);
+  const verifyInFlight = useRef(false);
 
   // If logged-in user lands here with onboarding done, send them home.
   useEffect(() => {
@@ -49,6 +51,17 @@ export function OnboardingPage() {
       setPhoneNumber(formatted);
     }
   }, [phoneNumber]);
+
+  useEffect(() => {
+    if (step !== "code" || busy) return;
+    if (code.length !== 6) {
+      lastAutoSubmittedCode.current = null;
+      return;
+    }
+    if (lastAutoSubmittedCode.current === code) return;
+    lastAutoSubmittedCode.current = code;
+    void verifyCode();
+  }, [step, code, busy]);
 
   async function requestCode() {
     setError(null);
@@ -74,6 +87,8 @@ export function OnboardingPage() {
   }
 
   async function verifyCode() {
+    if (verifyInFlight.current) return;
+    verifyInFlight.current = true;
     setError(null);
     setBusy(true);
     try {
@@ -86,6 +101,7 @@ export function OnboardingPage() {
     } catch (e) {
       setError(formatError(e));
     } finally {
+      verifyInFlight.current = false;
       setBusy(false);
     }
   }

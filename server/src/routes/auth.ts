@@ -133,8 +133,30 @@ authRouter.post("/verify-code", async (req, res) => {
     return;
   }
 
-  const existing = await findUserByPhone(phone);
-  const user = existing ?? (await createUser(phone));
+  let user = await findUserByPhone(phone);
+  if (!user) {
+    try {
+      user = await createUser(phone);
+    } catch (err) {
+      // If concurrent verifies race, unique phone index may win in another request.
+      const isDuplicateKey =
+        typeof err === "object" &&
+        err !== null &&
+        "code" in err &&
+        (err as { code?: unknown }).code === 11000;
+      if (isDuplicateKey) {
+        user = await findUserByPhone(phone);
+      } else {
+        console.error("[auth] create user failed", err);
+        res.status(500).json({ error: "Could not finish sign in. Please try again." });
+        return;
+      }
+    }
+  }
+  if (!user) {
+    res.status(500).json({ error: "Could not finish sign in. Please try again." });
+    return;
+  }
   setSessionCookie(res, user.id);
   res.json(meFromUser(user));
 });
