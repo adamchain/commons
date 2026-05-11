@@ -13,6 +13,22 @@ export const authRouter = Router();
 
 const CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
+type TwilioLikeError = {
+  code?: number;
+  status?: number;
+  message?: string;
+};
+
+function parseTwilioError(err: unknown): TwilioLikeError {
+  if (typeof err !== "object" || err === null) return {};
+  const maybe = err as TwilioLikeError;
+  return {
+    code: typeof maybe.code === "number" ? maybe.code : undefined,
+    status: typeof maybe.status === "number" ? maybe.status : undefined,
+    message: typeof maybe.message === "string" ? maybe.message : undefined,
+  };
+}
+
 function setSessionCookie(res: import("express").Response, userId: string): void {
   res.cookie("session", signSessionToken(userId), {
     httpOnly: true,
@@ -93,6 +109,14 @@ authRouter.post("/request-code", async (req, res) => {
       await startPhoneVerification(phone);
     } catch (err) {
       console.error("[auth] Twilio Verify send failed", err);
+      const twilio = parseTwilioError(err);
+      if (twilio.code === 21608) {
+        res.status(403).json({
+          error:
+            "Twilio trial account can only send to verified phone numbers. Verify this number in Twilio or upgrade the account.",
+        });
+        return;
+      }
       res.status(502).json({ error: "Could not send verification text. Try again in a moment." });
       return;
     }
@@ -121,6 +145,15 @@ authRouter.post("/verify-code", async (req, res) => {
       approved = await checkPhoneVerification(phone, code);
     } catch (err) {
       console.error("[auth] Twilio Verify check failed", err);
+      const twilio = parseTwilioError(err);
+      if (twilio.code === 20404 || twilio.code === 60200) {
+        res.status(400).json({ error: "That code or phone number is invalid. Request a new code and try again." });
+        return;
+      }
+      if (twilio.code === 60202) {
+        res.status(429).json({ error: "Too many attempts. Request a new code and try again." });
+        return;
+      }
       res.status(502).json({ error: "Verification failed. Try again." });
       return;
     }

@@ -242,12 +242,24 @@ function pickInitial(user: MeDTO | null): Step {
 function SamplesTeaser({ onContinue }: { onContinue: () => void }) {
   const [plans, setPlans] = useState<PlanDTO[]>([]);
   const [ix, setIx] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
+    setLoading(true);
+    setLoadError(false);
     void fetch(`${API_BASE}/api/plans/preview`)
       .then((r) => r.json() as Promise<PlanDTO[]>)
-      .then(setPlans)
-      .catch(() => setPlans([]));
+      .then((data) => {
+        setPlans(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        setPlans([]);
+        setLoadError(true);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
   const p = plans[ix];
@@ -284,8 +296,12 @@ function SamplesTeaser({ onContinue }: { onContinue: () => void }) {
             </button>
           </div>
         </div>
-      ) : (
+      ) : loading ? (
         <p className="onboarding-fineprint">Loading sample plans…</p>
+      ) : loadError ? (
+        <p className="onboarding-fineprint">Couldn’t load sample plans right now.</p>
+      ) : (
+        <p className="onboarding-fineprint">No sample plans yet — be the first to post one.</p>
       )}
       <button type="button" className="btn-primary btn-block" style={{ marginTop: 16 }} onClick={onContinue}>
         Continue with phone
