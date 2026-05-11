@@ -10,7 +10,7 @@ const UserSchema = new mongoose.Schema<UserRecord>(
       enum: ["verify", "seed"],
       default: "verify",
     },
-    firstName: { type: String, required: true },
+    firstName: { type: String, default: "" },
     neighborhoodId: { type: String, default: null },
     neighborhoodIds: { type: [String], default: [] },
     interests: [{ type: String }],
