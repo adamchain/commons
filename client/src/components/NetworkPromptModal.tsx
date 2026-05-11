@@ -77,7 +77,7 @@ export function NetworkPromptModal({
                   checked={picked.has(o.id)}
                   onChange={() => toggle(o.id)}
                 />
-                <Avatar seed={o.avatarSeed} style={o.avatarStyle} photoDataUrl={o.avatarPhotoDataUrl} name={o.firstName} size="sm" />
+                <Avatar seed={o.avatarSeed} style={o.avatarStyle} photoDataUrl={o.avatarPhotoDataUrl} emoji={o.avatarEmoji} name={o.firstName} size="sm" />
                 <span>{o.firstName}</span>
               </label>
             </li>

@@ -49,6 +49,14 @@ export type PlanVisibility = "everyone" | "community" | "network";
 
 export type ParticipationState = "interested" | "going";
 
+/** Standard library of single-character emojis users can pick as a "no photo" avatar. */
+export const AVATAR_EMOJIS = [
+  "🌸", "🌻", "🌙", "⭐", "🔥", "🌈",
+  "🎨", "🎵", "🎯", "🎲", "🍕", "☕",
+  "🥑", "🌮", "🐶", "🐱", "🦊", "🐝",
+] as const;
+export type AvatarEmoji = (typeof AVATAR_EMOJIS)[number];
+
 export interface PublicUser {
   id: string;
   firstName: string;
@@ -56,6 +64,7 @@ export interface PublicUser {
   avatarSeed: string;
   avatarStyle: AvatarStyle;
   avatarPhotoDataUrl?: string;
+  avatarEmoji?: string;
 }
 
 export type AvatarStyle = "avataaars" | "big-smile" | "fun-emoji";
@@ -155,6 +164,7 @@ export interface MeDTO {
   avatarSeed: string;
   avatarStyle: AvatarStyle;
   avatarPhotoDataUrl?: string;
+  avatarEmoji?: string;
   onboardingComplete: boolean;
   createdAt: string;
   networkUserIds?: string[];

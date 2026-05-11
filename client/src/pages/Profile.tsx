@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
@@ -6,16 +6,22 @@ import { LoadingScreen } from "../components/LoadingScreen";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate } from "../lib/format";
 import {
+  AVATAR_EMOJIS,
   HOST_TAG_LABELS,
+  INTEREST_LABELS,
   type HostTag,
+  type InterestTag,
+  type MeDTO,
   type PlanDTO,
   type PublicUser,
 } from "../types/shared";
 
 interface ProfilePayload {
   user: PublicUser;
+  interests: InterestTag[];
   neighborhood: { id: string; name: string; metro: string } | null;
   tagCounts: Record<HostTag, number>;
+  stats: { hosted: number; joined: number };
   upcoming: PlanDTO[];
   past: Array<{ id: string; title: string; date: string; wentCount: number }>;
   sharedPlanId: string | null;
@@ -28,8 +34,12 @@ export function ProfilePage() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfilePayload | null>(null);
   const [feedPlans, setFeedPlans] = useState<PlanDTO[]>([]);
+  const [editing, setEditing] = useState(false);
   const isSelf = user?.id === userId;
   const showCalendar = Boolean(isSelf && searchParams.get("calendar") === "1");
+
+  const reloadProfile = () =>
+    void api<ProfilePayload>(`/api/profile/${userId}`).then(setProfile).catch(() => setProfile(null));
 
   const signOut = async () => {
     await api("/api/auth/logout", { method: "POST" });
@@ -38,7 +48,7 @@ export function ProfilePage() {
   };
 
   useEffect(() => {
-    void api<ProfilePayload>(`/api/profile/${userId}`).then(setProfile).catch(() => setProfile(null));
+    reloadProfile();
   }, [userId]);
 
   useEffect(() => {
@@ -70,12 +80,35 @@ export function ProfilePage() {
           seed={profile.user.avatarSeed}
           style={profile.user.avatarStyle}
           photoDataUrl={profile.user.avatarPhotoDataUrl}
+          emoji={profile.user.avatarEmoji}
           name={profile.user.firstName}
           size="xl"
         />
-        <div className="profile-name">{profile.user.firstName}</div>
+        <div className="profile-name">{profile.user.firstName || "Unnamed"}</div>
         {profile.neighborhood && (
           <div className="profile-neighborhood">📍 {profile.neighborhood.name}</div>
+        )}
+
+        <div className="profile-stats" aria-label="Profile stats">
+          <div className="profile-stat">
+            <span className="profile-stat-num">{profile.stats.hosted}</span>
+            <span className="profile-stat-label">hosted</span>
+          </div>
+          <div className="profile-stat">
+            <span className="profile-stat-num">{profile.stats.joined}</span>
+            <span className="profile-stat-label">joined</span>
+          </div>
+        </div>
+
+        {isSelf && (
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setEditing((v) => !v)}
+            style={{ marginTop: 14 }}
+          >
+            {editing ? "Done editing" : "Edit profile"}
+          </button>
         )}
 
         {topTags.length > 0 && (
@@ -87,13 +120,35 @@ export function ProfilePage() {
             ))}
           </div>
         )}
-
       </section>
+
+      {isSelf && editing && user && (
+        <EditPanel
+          me={user}
+          onSaved={(me) => {
+            setUser(me);
+            reloadProfile();
+          }}
+        />
+      )}
+
+      {profile.interests.length > 0 && (
+        <section className="profile-block">
+          <h3 className="who-block-heading">Communities</h3>
+          <div className="profile-interests">
+            {profile.interests.map((t) => (
+              <span key={t} className="profile-interest-chip">
+                {INTEREST_LABELS[t]}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
 
       {showCalendar && <MonthCalendar plans={feedPlans} />}
 
       {profile.upcoming.length > 0 && (
-        <>
+        <section className="profile-block">
           <h3 className="who-block-heading">Hosting soon</h3>
           <div className="profile-list">
             {profile.upcoming.map((p) => (
@@ -104,12 +159,12 @@ export function ProfilePage() {
               </Link>
             ))}
           </div>
-        </>
+        </section>
       )}
 
       {profile.past.length > 0 && (
-        <>
-          <h3 className="who-block-heading" style={{ marginTop: 18 }}>Past plans</h3>
+        <section className="profile-block">
+          <h3 className="who-block-heading">Past plans</h3>
           <div className="profile-list">
             {profile.past.map((p) => (
               <Link key={p.id} to={`/plans/${p.id}`} className="profile-list-row">
@@ -120,9 +175,154 @@ export function ProfilePage() {
               </Link>
             ))}
           </div>
-        </>
+        </section>
+      )}
+
+      {profile.upcoming.length === 0 && profile.past.length === 0 && (
+        <section className="profile-block">
+          <p className="empty-state" style={{ marginTop: 8 }}>
+            {isSelf ? "No plans yet — post your first to get the feed rolling." : "No plans yet."}
+          </p>
+          {isSelf && (
+            <Link to="/plans/new" className="btn-primary" style={{ marginTop: 12, display: "inline-block" }}>
+              Post a plan
+            </Link>
+          )}
+        </section>
       )}
     </main>
+  );
+}
+
+function EditPanel({ me, onSaved }: { me: MeDTO; onSaved: (next: MeDTO) => void }) {
+  const [firstName, setFirstName] = useState(me.firstName);
+  const [photo, setPhoto] = useState<string | null>(me.avatarPhotoDataUrl ?? null);
+  const [emoji, setEmoji] = useState<string | null>(me.avatarEmoji ?? null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function pickPhoto(dataUrl: string) {
+    setPhoto(dataUrl);
+    setEmoji(null);
+  }
+  function pickEmoji(e: string) {
+    setEmoji((cur) => (cur === e ? null : e));
+    if (emoji !== e) setPhoto(null);
+  }
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await api<MeDTO>("/api/auth/me", {
+        method: "PATCH",
+        body: JSON.stringify({
+          firstName: firstName.trim(),
+          avatarPhotoDataUrl: photo ?? null,
+          avatarEmoji: emoji ?? null,
+        }),
+      });
+      onSaved(next);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't save");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="profile-edit-panel">
+      <label className="form-question" htmlFor="profile-edit-name">
+        Your name
+      </label>
+      <input
+        id="profile-edit-name"
+        className="onboarding-input"
+        value={firstName}
+        onChange={(e) => setFirstName(e.target.value)}
+        maxLength={40}
+      />
+
+      <label className="form-question" style={{ marginTop: 14 }}>
+        Profile image
+      </label>
+      <p className="form-help">A photo or pick an emoji — one or the other.</p>
+
+      <div className="profile-edit-photo-row">
+        <Avatar
+          seed={me.avatarSeed}
+          style={me.avatarStyle}
+          photoDataUrl={photo ?? undefined}
+          emoji={emoji ?? undefined}
+          name={firstName.trim() || undefined}
+          size="lg"
+        />
+        <div className="profile-edit-photo-actions">
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => fileRef.current?.click()}
+          >
+            {photo ? "Replace photo" : "Upload photo"}
+          </button>
+          {(photo || emoji) && (
+            <button
+              type="button"
+              className="btn-link"
+              onClick={() => {
+                setPhoto(null);
+                setEmoji(null);
+              }}
+            >
+              Remove
+            </button>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              const reader = new FileReader();
+              reader.onload = () => {
+                if (typeof reader.result === "string") pickPhoto(reader.result);
+              };
+              reader.readAsDataURL(f);
+            }}
+          />
+        </div>
+      </div>
+
+      <p className="profile-emoji-label" style={{ marginTop: 12 }}>Or pick an emoji</p>
+      <div className="profile-emoji-grid">
+        {AVATAR_EMOJIS.map((e) => (
+          <button
+            key={e}
+            type="button"
+            className={`profile-emoji-pick ${emoji === e ? "is-selected" : ""}`}
+            onClick={() => pickEmoji(e)}
+            aria-pressed={emoji === e}
+          >
+            {e}
+          </button>
+        ))}
+      </div>
+
+      {error && <p className="onboarding-error" style={{ marginTop: 8 }}>{error}</p>}
+
+      <button
+        type="button"
+        className="btn-primary btn-block"
+        style={{ marginTop: 16 }}
+        disabled={busy || !firstName.trim()}
+        onClick={() => void save()}
+      >
+        {busy ? "Saving…" : "Save changes"}
+      </button>
+    </section>
   );
 }
 

@@ -6,7 +6,9 @@ interface AvatarProps {
   size?: "sm" | "md" | "lg" | "xl";
   backgroundColor?: string;
   photoDataUrl?: string;
-  /** When set (and no photo), show initials instead of illustrated avatar. */
+  /** User-picked emoji shown in a tinted circle. Highest priority when set. */
+  emoji?: string;
+  /** When set (and no photo/emoji), show initials instead of illustrated avatar. */
   name?: string;
 }
 
@@ -30,9 +32,20 @@ export function dicebearUrl(seed: string, style: AvatarStyle = "avataaars", pixe
   return `https://api.dicebear.com/9.x/${style}/svg?${params.toString()}`;
 }
 
-export function Avatar({ seed, style = "avataaars", size = "md", backgroundColor, photoDataUrl, name }: AvatarProps) {
+export function Avatar({ seed, style = "avataaars", size = "md", backgroundColor, photoDataUrl, emoji, name }: AvatarProps) {
   const px = PIXEL_SIZE[size];
   const cls = `avatar avatar-${size}`;
+  if (emoji?.trim()) {
+    return (
+      <span
+        className={`${cls} avatar-emoji`}
+        style={{ width: px, height: px, fontSize: px * 0.58 }}
+        aria-hidden
+      >
+        {emoji}
+      </span>
+    );
+  }
   if (photoDataUrl) {
     return <img src={photoDataUrl} width={px} height={px} className={cls} alt="" loading="lazy" />;
   }

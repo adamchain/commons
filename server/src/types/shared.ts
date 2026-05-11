@@ -55,6 +55,7 @@ export interface PublicUser {
   avatarSeed: string;
   avatarStyle: AvatarStyle;
   avatarPhotoDataUrl?: string;
+  avatarEmoji?: string;
 }
 
 export type AvatarStyle = "avataaars" | "big-smile" | "fun-emoji";
@@ -152,6 +153,7 @@ export interface MeDTO {
   avatarSeed: string;
   avatarStyle: AvatarStyle;
   avatarPhotoDataUrl?: string;
+  avatarEmoji?: string;
   onboardingComplete: boolean;
   createdAt: string;
   /** User ids in this person’s COMMONS network (one-way). */

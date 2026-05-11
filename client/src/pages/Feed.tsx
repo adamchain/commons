@@ -89,6 +89,7 @@ export function FeedPage() {
                 seed={user.avatarSeed}
                 style={user.avatarStyle}
                 photoDataUrl={user.avatarPhotoDataUrl}
+                emoji={user.avatarEmoji}
                 name={user.firstName || undefined}
                 size="sm"
               />

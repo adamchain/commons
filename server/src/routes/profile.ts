@@ -43,10 +43,24 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
   // "Message in current plan" CTA appears only when viewer + target share a current plan as participants.
   const sharedPlanId = findSharedActivePlan(targetId, viewerId);
 
+  // Plans joined as a non-creator (rough "joined" count for the stat strip).
+  const joinedCount = store
+    .listParticipationsForUser(targetId)
+    .filter((p) => p.state === "going")
+    .filter((p) => {
+      const plan = store.findPlanById(p.planId);
+      return plan && plan.creatorId !== targetId;
+    }).length;
+
   res.json({
     user: userToPublic(target),
+    interests: target.interests ?? [],
     neighborhood: neighborhood ? { id: neighborhood.id, name: neighborhood.name, metro: neighborhood.metro } : null,
     tagCounts,
+    stats: {
+      hosted: allPlans.length,
+      joined: joinedCount,
+    },
     upcoming: await Promise.all(upcoming.map((p) => planSummary(p, viewerId))),
     past: past
       .slice(-5)

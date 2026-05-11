@@ -93,6 +93,7 @@ export function ChatPage() {
                       seed={m.sender!.avatarSeed}
                       style={m.sender!.avatarStyle}
                       photoDataUrl={m.sender!.avatarPhotoDataUrl}
+                      emoji={m.sender!.avatarEmoji}
                       size="sm"
                     />
                   )}

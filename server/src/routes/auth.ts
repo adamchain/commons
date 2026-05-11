@@ -85,6 +85,7 @@ function meFromUser(user: UserRecord): MeDTO {
     avatarSeed: user.avatarSeed,
     avatarStyle: user.avatarStyle,
     avatarPhotoDataUrl: user.avatarPhotoDataUrl,
+    avatarEmoji: user.avatarEmoji,
     onboardingComplete: user.onboardingComplete,
     createdAt: user.createdAt,
     networkUserIds: user.networkIds?.length ? user.networkIds : [],
@@ -219,6 +220,8 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
   if (typeof req.body?.avatarStyle === "string") patch.avatarStyle = req.body.avatarStyle;
   if (typeof req.body?.avatarPhotoDataUrl === "string") patch.avatarPhotoDataUrl = req.body.avatarPhotoDataUrl;
   if (req.body?.avatarPhotoDataUrl === null) patch.avatarPhotoDataUrl = undefined;
+  if (typeof req.body?.avatarEmoji === "string") patch.avatarEmoji = req.body.avatarEmoji;
+  if (req.body?.avatarEmoji === null) patch.avatarEmoji = undefined;
   if (typeof req.body?.onboardingComplete === "boolean") patch.onboardingComplete = req.body.onboardingComplete;
   await updateUser(userId, patch);
   const me = await userToMe(userId);

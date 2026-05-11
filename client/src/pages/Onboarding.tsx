@@ -6,6 +6,7 @@ import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
 import {
   ALL_INTERESTS,
+  AVATAR_EMOJIS,
   INTEREST_LABELS,
   type AvatarStyle,
   type InterestTag,
@@ -204,12 +205,13 @@ export function OnboardingPage() {
     return (
       <ProfileStep
         me={user}
-        onSave={async (firstName, avatarSeed, avatarStyle, avatarPhotoDataUrl) => {
+        onSave={async (firstName, avatarSeed, avatarStyle, avatarPhotoDataUrl, avatarEmoji) => {
           await patchMe({
             firstName,
             avatarSeed,
             avatarStyle,
             avatarPhotoDataUrl: avatarPhotoDataUrl ?? undefined,
+            avatarEmoji: avatarEmoji ?? undefined,
             onboardingComplete: true,
           });
           await refreshUser();
@@ -551,47 +553,85 @@ function ProfileStep({
   onSave,
 }: {
   me: MeDTO;
-  onSave: (firstName: string, seed: string, style: AvatarStyle, photoDataUrl: string | null) => Promise<void>;
+  onSave: (
+    firstName: string,
+    seed: string,
+    style: AvatarStyle,
+    photoDataUrl: string | null,
+    emoji: string | null,
+  ) => Promise<void>;
 }) {
   const [firstName, setFirstName] = useState(me.firstName);
   const [photo, setPhoto] = useState<string | null>(me.avatarPhotoDataUrl ?? null);
+  const [emoji, setEmoji] = useState<string | null>(me.avatarEmoji ?? null);
   const [busy, setBusy] = useState(false);
 
+  // Photo and emoji are mutually exclusive — picking one clears the other.
+  function pickPhoto(dataUrl: string) {
+    setPhoto(dataUrl);
+    setEmoji(null);
+  }
+  function pickEmoji(e: string) {
+    setEmoji((cur) => (cur === e ? null : e));
+    if (emoji !== e) setPhoto(null);
+  }
+
   return (
-    <OnboardingShell title="Your profile" subtitle="Photo or initials — whatever feels like you.">
+    <OnboardingShell title="Your profile" subtitle="A photo, an emoji, or just your initials.">
       <div className="profile-avatar-preview">
         <Avatar
           seed={me.avatarSeed}
           style={me.avatarStyle}
           photoDataUrl={photo ?? undefined}
+          emoji={emoji ?? undefined}
           name={firstName.trim() || undefined}
           size="xl"
         />
       </div>
-      <label className="onboarding-fineprint" style={{ display: "block", marginBottom: 8 }}>
-        Add a photo (optional)
-        <input
-          type="file"
-          accept="image/*"
-          className="onboarding-input"
-          style={{ marginTop: 6 }}
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (!f) return;
-            const reader = new FileReader();
-            reader.onload = () => {
-              setPhoto(typeof reader.result === "string" ? reader.result : null);
-            };
-            reader.readAsDataURL(f);
-          }}
-        />
-      </label>
+
       <input
         className="onboarding-input"
         placeholder="First name"
         value={firstName}
         onChange={(e) => setFirstName(e.target.value)}
       />
+
+      <details className="profile-photo-picker">
+        <summary>Upload a photo</summary>
+        <input
+          type="file"
+          accept="image/*"
+          className="onboarding-input"
+          style={{ marginTop: 8 }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+              if (typeof reader.result === "string") pickPhoto(reader.result);
+            };
+            reader.readAsDataURL(f);
+          }}
+        />
+      </details>
+
+      <div className="profile-emoji-block">
+        <p className="profile-emoji-label">Or pick an emoji</p>
+        <div className="profile-emoji-grid">
+          {AVATAR_EMOJIS.map((e) => (
+            <button
+              key={e}
+              type="button"
+              className={`profile-emoji-pick ${emoji === e ? "is-selected" : ""}`}
+              onClick={() => pickEmoji(e)}
+              aria-pressed={emoji === e}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <button
         type="button"
         className="btn-primary btn-block"
@@ -599,7 +639,7 @@ function ProfileStep({
         onClick={async () => {
           setBusy(true);
           try {
-            await onSave(firstName.trim(), me.avatarSeed, me.avatarStyle, photo);
+            await onSave(firstName.trim(), me.avatarSeed, me.avatarStyle, photo, emoji);
           } finally {
             setBusy(false);
           }
