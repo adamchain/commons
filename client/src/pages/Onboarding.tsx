@@ -43,6 +43,13 @@ export function OnboardingPage() {
     }
   }, [user, step]);
 
+  useEffect(() => {
+    const formatted = formatPhoneInput(phoneNumber);
+    if (formatted !== phoneNumber) {
+      setPhoneNumber(formatted);
+    }
+  }, [phoneNumber]);
+
   async function requestCode() {
     setError(null);
     setBusy(true);
@@ -106,7 +113,7 @@ export function OnboardingPage() {
           autoComplete="tel"
           placeholder="(555) 555-0100"
           value={phoneNumber}
-          onChange={(e) => setPhoneNumber(e.target.value)}
+          onChange={(e) => setPhoneNumber(formatPhoneInput(e.target.value))}
         />
         {error && <div className="onboarding-error">{error}</div>}
         <button className="btn-primary btn-block" disabled={busy || !phoneNumber} onClick={requestCode}>
@@ -280,6 +287,31 @@ function formatError(e: unknown): string {
     return e.message;
   }
   return "Something went wrong";
+}
+
+/** Formats US numbers as users type, while still allowing +country input. */
+function formatPhoneInput(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("+")) {
+    let inner = trimmed.slice(1).replace(/\D/g, "").slice(0, 15);
+    // Pretty NANP: +1 (484) 571-2062
+    if (inner.length === 11 && inner.startsWith("1")) {
+      const n = inner.slice(1);
+      if (n.length === 10) {
+        return `+1 (${n.slice(0, 3)}) ${n.slice(3, 6)}-${n.slice(6)}`;
+      }
+    }
+    return `+${inner}`;
+  }
+  let digits = trimmed.replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("1")) {
+    digits = digits.slice(1);
+  }
+  digits = digits.slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
 function OnboardingShell({ title, subtitle, children }: { title: string; subtitle: string; children?: React.ReactNode }) {
