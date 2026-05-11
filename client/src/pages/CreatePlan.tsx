@@ -157,7 +157,7 @@ export function CreatePlanPage() {
             onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
           />
 
-          <label className="form-question">Format</label>
+          <label className="form-question">Confirmed or just exploring?</label>
           <div className="segmented">
             <button
               type="button"
@@ -175,7 +175,7 @@ export function CreatePlanPage() {
             </button>
           </div>
 
-          <label className="form-question">Vibe emoji</label>
+          <label className="form-question">Pick a vibe emoji</label>
           <div className="emoji-row">
             {HOST_EMOJIS.map((e) => (
               <button
@@ -201,7 +201,7 @@ export function CreatePlanPage() {
         </section>
 
         <section className="form-section">
-          <label className="form-question">Where</label>
+          <label className="form-question">Where should we meet?</label>
           <label className="flex-toggle">
             <input
               type="checkbox"
@@ -243,7 +243,7 @@ export function CreatePlanPage() {
         </section>
 
         <section className="form-section">
-          <label className="form-question">When</label>
+          <label className="form-question">When?</label>
           <label className="flex-toggle">
             <input
               type="checkbox"
@@ -277,7 +277,8 @@ export function CreatePlanPage() {
         </section>
 
         <section className="form-section">
-          <label className="form-question">Vibe · pick up to 3</label>
+          <label className="form-question">What&apos;s the vibe?</label>
+          <p className="form-help">Pick up to 3.</p>
           <div className="create-tag-chips">
             {ALL_INTERESTS.map((tag) => {
               const selected = form.tags.includes(tag);

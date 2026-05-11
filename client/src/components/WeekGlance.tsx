@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import type { PlanDTO } from "../types/shared";
-import { Link } from "react-router-dom";
 
 function startOfWeekMonday(d: Date): Date {
   const x = new Date(d);
@@ -25,11 +24,15 @@ function isoDay(d: Date): string {
 export function WeekGlance({
   plans,
   viewerGoingPlanIds,
-  viewerId,
+  selectedDayIso,
+  onSelectDay,
 }: {
   plans: PlanDTO[];
   viewerGoingPlanIds: Set<string>;
-  viewerId?: string;
+  /** Currently-filtered day, or null for "this week". */
+  selectedDayIso: string | null;
+  /** Called when a day is tapped. Passing null clears the filter. */
+  onSelectDay: (iso: string | null) => void;
 }) {
   const week = useMemo(() => {
     const today = new Date();
@@ -58,16 +61,17 @@ export function WeekGlance({
     return map;
   }, [plans]);
 
+  const focusIso = selectedDayIso ?? week.todayIso;
+
   const nudge = useMemo(() => {
-    const todayIso = week.todayIso;
-    const list = byDay.get(todayIso) ?? [];
+    const list = byDay.get(focusIso) ?? [];
     let people = 0;
     for (const p of list) {
       people += p.participants.going.length + p.participants.interested.length;
     }
     const busy = people >= 6;
     const imIn = list.some((p) => viewerGoingPlanIds.has(p.id));
-    const dayName = new Date(todayIso).toLocaleDateString(undefined, { weekday: "long" });
+    const dayName = new Date(focusIso).toLocaleDateString(undefined, { weekday: "long" });
 
     if (busy && imIn) {
       return `${dayName} is busy — ${people} people in your network have plans. You're already in on one.`;
@@ -76,45 +80,51 @@ export function WeekGlance({
       return (
         <>
           {dayName} is busy — {people} people in your network have plans.{" "}
-          <Link to="#feed-plans" className="week-glance-link">
+          <button type="button" className="week-glance-link" onClick={() => onSelectDay(focusIso)}>
             See what&apos;s happening →
-          </Link>
+          </button>
         </>
       );
     }
     const around = people || Math.min(12, plans.length * 3 + 2);
-    return `${dayName} is open — ${around} people around and nothing planned yet. Good time to post something.`;
-  }, [byDay, week.todayIso, viewerGoingPlanIds, plans.length]);
-
-  const daysRow = (
-    <div className="week-glance-days">
-      {week.days.map(({ iso, label, date }) => {
-        const hasPlans = (byDay.get(iso)?.length ?? 0) > 0;
-        const isToday = iso === week.todayIso;
-        return (
-          <div
-            key={iso}
-            className={`week-glance-day ${hasPlans ? "has-plans" : ""} ${isToday ? "is-today" : ""}`}
-            title={date.toLocaleDateString()}
-          >
-            <span className="week-glance-dow">{label}</span>
-            <span className="week-glance-num">{date.getDate()}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
+    return (
+      <>
+        {dayName} is open — {around} people around and nothing planned yet.{" "}
+        <button type="button" className="week-glance-link" onClick={() => onSelectDay(focusIso)}>
+          Good time to post something →
+        </button>
+      </>
+    );
+  }, [byDay, focusIso, viewerGoingPlanIds, plans.length, onSelectDay]);
 
   return (
     <section className="week-glance" aria-label="Week at a glance">
-      {viewerId ? (
-        <Link to={`/profile/${viewerId}?calendar=1`} className="week-glance-calendar-link">
-          {daysRow}
-        </Link>
-      ) : (
-        daysRow
-      )}
+      <div className="week-glance-days">
+        {week.days.map(({ iso, label, date }) => {
+          const hasPlans = (byDay.get(iso)?.length ?? 0) > 0;
+          const isToday = iso === week.todayIso;
+          const isSelected = iso === selectedDayIso;
+          return (
+            <button
+              key={iso}
+              type="button"
+              className={`week-glance-day ${hasPlans ? "has-plans" : ""} ${isToday ? "is-today" : ""} ${isSelected ? "is-selected" : ""}`}
+              title={date.toLocaleDateString()}
+              onClick={() => onSelectDay(isSelected ? null : iso)}
+              aria-pressed={isSelected}
+            >
+              <span className="week-glance-dow">{label}</span>
+              <span className="week-glance-num">{date.getDate()}</span>
+            </button>
+          );
+        })}
+      </div>
       <p className="week-glance-nudge">{nudge}</p>
+      {selectedDayIso && (
+        <button type="button" className="week-glance-clear" onClick={() => onSelectDay(null)}>
+          ← Show the whole week
+        </button>
+      )}
     </section>
   );
 }

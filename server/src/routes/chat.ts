@@ -32,7 +32,25 @@ chatRouter.get("/plans/:planId/conversation", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Join the plan to access chat" });
     return;
   }
+  const existed = store.findGroupConversationByPlan(planId);
+  const alreadyHadUser = existed?.participantIds.includes(userId) ?? false;
   const conv = store.ensureGroupConversation(planId, [plan.creatorId, userId]);
+
+  // First non-creator joiner: drop a one-time welcome so the thread feels alive.
+  if (!alreadyHadUser && userId !== plan.creatorId) {
+    const hasUserMsgs = store.listMessagesForConversation(conv.id).some((m) => m.kind === "user");
+    if (!hasUserMsgs) {
+      const host = await findUserById(plan.creatorId);
+      const hostName = host?.firstName || "the host";
+      const joiner = await findUserById(userId);
+      const joinerName = joiner?.firstName || "Someone";
+      store.createSystemMessage(
+        conv.id,
+        `${joinerName} joined — say hi to the group. ${hostName} is here too.`,
+      );
+    }
+  }
+
   res.json(await toConversationDto(conv, userId));
 });
 

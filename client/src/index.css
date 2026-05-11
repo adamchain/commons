@@ -420,6 +420,7 @@ label {
   margin: 12px 0 0;
   color: var(--text-muted);
   font-size: 14px;
+  font-style: italic;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -2196,6 +2197,13 @@ label {
   border: 1px solid transparent;
   font-size: 12px;
   color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+  transition: background 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+
+.week-glance-day:hover {
+  background: var(--accent-soft);
 }
 
 .week-glance-day.has-plans {
@@ -2207,6 +2215,97 @@ label {
 
 .week-glance-day.is-today {
   box-shadow: 0 0 0 2px var(--accent);
+}
+
+.week-glance-day.is-selected {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.week-glance-day.is-selected .week-glance-num,
+.week-glance-day.is-selected .week-glance-dow {
+  color: #fff;
+}
+
+.week-glance-link {
+  color: var(--accent);
+  font-weight: 600;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+}
+
+.week-glance-clear {
+  margin-top: 8px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.week-glance-clear:hover {
+  color: var(--accent);
+}
+
+.community-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 8px;
+  margin: 12px 0 4px;
+  scrollbar-width: none;
+}
+
+.community-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.community-chip {
+  flex: 0 0 auto;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.community-chip:hover {
+  border-color: var(--border-strong);
+}
+
+.community-chip.is-active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.map-canvas--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.map-empty-hint {
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--surface);
+  padding: 16px 20px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
 }
 
 .week-glance-dow {
@@ -2228,11 +2327,6 @@ label {
   font-size: 14px;
   color: var(--text-muted);
   line-height: 1.45;
-}
-
-.week-glance-link {
-  color: var(--accent);
-  font-weight: 600;
 }
 
 .plan-card {
@@ -2393,6 +2487,12 @@ label {
   display: block;
 }
 
+.form-help {
+  margin: -4px 0 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
 .coordination-banner {
   background: var(--surface-2);
   border: 1px dashed var(--border-strong);
@@ -2435,18 +2535,6 @@ label {
 
 .avatar-initials {
   font-family: inherit;
-}
-
-.week-glance-calendar-link {
-  display: block;
-  text-decoration: none;
-  color: inherit;
-  border-radius: inherit;
-}
-
-.week-glance-calendar-link:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 .plan-card-outer {
