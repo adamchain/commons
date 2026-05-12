@@ -153,6 +153,12 @@ export interface PlanDTO {
   visibility: PlanVisibility;
   /** When visibility is `community`, plan is shown to users who picked this interest. */
   visibilityCommunityTag: InterestTag | null;
+  /**
+   * Reserved for V1.5 real-communities (run clubs, book clubs, etc.). Always
+   * null on current plans — present on every record so future community posts
+   * don't need a migration. Coming Soon.
+   */
+  communityId: string | null;
   isRecurring: boolean;
   /** Host locked venue + time from coordination thread. */
   lockedAt: string | null;

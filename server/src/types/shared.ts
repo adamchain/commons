@@ -93,6 +93,12 @@ export interface PlanDTO {
   planKind: PlanKind;
   visibility: PlanVisibility;
   visibilityCommunityTag: InterestTag | null;
+  /**
+   * Reserved for V1.5 communities (run clubs, book clubs, etc.). Always null on
+   * current plans — present on every record so future community posts don't
+   * need a migration. Coming Soon.
+   */
+  communityId: string | null;
   isRecurring: boolean;
   lockedAt: string | null;
   /** Inline replies on “looking for” plans (feed + detail). */

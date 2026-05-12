@@ -113,6 +113,7 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     planKind,
     visibility,
     visibilityCommunityTag: plan.visibilityCommunityTag ?? null,
+    communityId: plan.communityId ?? null,
     isRecurring: plan.isRecurring ?? false,
     lockedAt: plan.lockedAt ?? null,
     suggestions,
@@ -215,6 +216,14 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   const resolvedLocationName = isFlexibleLocation ? (locationName || "Flexible location") : locationName;
   const resolvedAddress = locationAddress || resolvedLocationName;
 
+  // Accept communityId from the client now so the field round-trips, but real
+  // community records don't exist yet — never validate against anything, just
+  // sanitize to string|null. Coming Soon. The whole feature is gated on a
+  // future Communities model; the rest of the server ignores this field.
+  const rawCommunityId = req.body?.communityId;
+  const communityId =
+    typeof rawCommunityId === "string" && rawCommunityId.trim() ? rawCommunityId.trim() : null;
+
   const plan = store.createPlan({
     creatorId: userId,
     title,
@@ -230,6 +239,7 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     planKind,
     visibility,
     visibilityCommunityTag,
+    communityId,
     isRecurring,
     lockedAt: null,
   });

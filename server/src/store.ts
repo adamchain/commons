@@ -61,6 +61,12 @@ export interface PlanRecord {
   planKind?: PlanKind;
   visibility?: PlanVisibility;
   visibilityCommunityTag?: InterestTag | null;
+  /**
+   * Real-community target. Reserved for the V1.5 communities feature (run clubs,
+   * book clubs, etc.) — the field exists on every plan now so future community
+   * posts don't need a schema migration. Null on every current plan.
+   */
+  communityId?: string | null;
   isRecurring?: boolean;
   lockedAt?: string | null;
   createdAt: string;
@@ -272,6 +278,7 @@ export const store = {
       planKind: "standard",
       visibility: "everyone",
       visibilityCommunityTag: null,
+      communityId: null,
       isRecurring: false,
       lockedAt: null,
       ...input,
