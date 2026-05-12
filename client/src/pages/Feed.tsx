@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/http";
-import { Avatar } from "../components/Avatar";
 import { FeedbackPrompt } from "../components/FeedbackPrompt";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { NetworkPromptModal } from "../components/NetworkPromptModal";
 import { PlanCard } from "../components/PlanCard";
-import { ThemeToggle } from "../components/ThemeToggle";
 import { WeekGlance } from "../components/WeekGlance";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime } from "../lib/format";
@@ -70,33 +68,9 @@ export function FeedPage() {
   }
 
   return (
-    <main className="app-shell app-shell--wide">
-      <header className="app-header">
-        <div>
-          <h1 className="brand">COMMONS</h1>
-          <p className="brand-tagline">
-            {myNeighborhood ? `${myNeighborhood.name} · ${myNeighborhood.metro}` : "Plans, made together"}
-          </p>
-        </div>
-        <div className="app-header-actions">
-          <Link to="/plans/new" className="app-header-cta">
-            + Post a plan
-          </Link>
-          <ThemeToggle />
-          {user && (
-            <Link to={`/profile/${user.id}`} className="user-pill" title="Your profile">
-              <Avatar
-                seed={user.avatarSeed}
-                style={user.avatarStyle}
-                photoDataUrl={user.avatarPhotoDataUrl}
-                params={user.avatarParams}
-                name={user.firstName || undefined}
-                size="sm"
-              />
-              <span>{user.firstName || "Profile"}</span>
-            </Link>
-          )}
-        </div>
+    <main className="app-shell app-shell--wide app-shell--with-nav">
+      <header className="app-header app-header--minimal">
+        <h1 className="brand">COMMONS</h1>
       </header>
 
       <FeedbackPrompt />
@@ -154,10 +128,6 @@ export function FeedPage() {
       )}
       {view === "map" && <MapView plans={filteredPlans} />}
       {view === "calendar" && <CalendarView plans={filteredPlans} />}
-
-      <Link to="/plans/new" className="fab-create">
-        + Post it
-      </Link>
     </main>
   );
 }

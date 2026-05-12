@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { formatPlanDate } from "../lib/format";
 import {
   AVATAR_PRESETS,
@@ -29,14 +31,12 @@ interface ProfilePayload {
 
 export function ProfilePage() {
   const { userId = "" } = useParams();
-  const [searchParams] = useSearchParams();
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfilePayload | null>(null);
   const [feedPlans, setFeedPlans] = useState<PlanDTO[]>([]);
   const [editing, setEditing] = useState(false);
   const isSelf = user?.id === userId;
-  const showCalendar = Boolean(isSelf && searchParams.get("calendar") === "1");
 
   const reloadProfile = () =>
     void api<ProfilePayload>(`/api/profile/${userId}`).then(setProfile).catch(() => setProfile(null));
@@ -52,10 +52,10 @@ export function ProfilePage() {
   }, [userId]);
 
   useEffect(() => {
-    if (showCalendar) {
+    if (isSelf) {
       void api<PlanDTO[]>("/api/plans").then(setFeedPlans).catch(() => setFeedPlans([]));
     }
-  }, [showCalendar]);
+  }, [isSelf]);
 
   if (!profile) return <LoadingScreen tagline="Loading profile" />;
 
@@ -65,14 +65,9 @@ export function ProfilePage() {
     .slice(0, 3);
 
   return (
-    <main className="app-shell">
-      <header className="app-header">
+    <main className="app-shell app-shell--with-nav">
+      <header className="app-header app-header--minimal">
         <Link to="/" className="detail-back">← Back</Link>
-        {isSelf && (
-          <button type="button" className="btn-link" onClick={() => void signOut()}>
-            Sign out
-          </button>
-        )}
       </header>
 
       <section className="profile-hero">
@@ -145,7 +140,9 @@ export function ProfilePage() {
         </section>
       )}
 
-      {showCalendar && <MonthCalendar plans={feedPlans} />}
+      {isSelf && <MonthCalendar plans={feedPlans} />}
+
+      {isSelf && <SettingsPanel onSignOut={() => void signOut()} />}
 
       {profile.upcoming.length > 0 && (
         <section className="profile-block">
@@ -324,6 +321,31 @@ function EditPanel({ me, onSaved }: { me: MeDTO; onSaved: (next: MeDTO) => void 
       >
         {busy ? "Saving…" : "Save changes"}
       </button>
+    </section>
+  );
+}
+
+function SettingsPanel({ onSignOut }: { onSignOut: () => void }) {
+  const { theme } = useTheme();
+  return (
+    <section className="profile-block profile-settings">
+      <h3 className="who-block-heading">Settings</h3>
+      <div className="profile-settings-row">
+        <div>
+          <div className="profile-settings-label">Appearance</div>
+          <div className="profile-settings-sub">{theme === "dark" ? "Dark" : "Light"} mode</div>
+        </div>
+        <ThemeToggle />
+      </div>
+      <div className="profile-settings-row">
+        <div>
+          <div className="profile-settings-label">Account</div>
+          <div className="profile-settings-sub">Sign out of COMMONS</div>
+        </div>
+        <button type="button" className="btn-link" onClick={onSignOut}>
+          Sign out
+        </button>
+      </div>
     </section>
   );
 }

@@ -7,7 +7,6 @@ import { LocationAutocomplete } from "../components/LocationAutocomplete";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { ParticipationButtons } from "../components/ParticipationButtons";
 import { ShareSheet } from "../components/ShareSheet";
-import { ThemeToggle } from "../components/ThemeToggle";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
 import { INTEREST_LABELS, type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
@@ -102,10 +101,9 @@ export function PlanDetailPage() {
   }
 
   return (
-    <main className="app-shell app-shell--wide">
-      <header className="app-header">
+    <main className="app-shell app-shell--wide app-shell--with-nav">
+      <header className="app-header app-header--minimal">
         <Link to="/" className="detail-back">← Back</Link>
-        <ThemeToggle />
       </header>
 
       <section className="plan-hero">
