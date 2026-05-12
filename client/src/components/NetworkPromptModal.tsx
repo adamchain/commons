@@ -4,6 +4,12 @@ import { Avatar } from "./Avatar";
 import { useAuth } from "../context/AuthContext";
 import type { MeDTO, NetworkPromptDTO } from "../types/shared";
 
+/**
+ * Post-plan network seed prompt. Fires after a plan's end time passes for
+ * anyone who RSVP'd. The whole interaction is two taps — one to add the group
+ * to your network, one to skip — no per-person checkboxes or search. The
+ * shared real-world experience is the entire filtering signal.
+ */
 export function NetworkPromptModal({
   prompt,
   onClose,
@@ -15,8 +21,8 @@ export function NetworkPromptModal({
 }) {
   const { setUser } = useAuth();
   const [busy, setBusy] = useState(false);
-  const [picked, setPicked] = useState<Set<string>>(() => new Set(prompt.others.map((o) => o.id)));
 
+  const count = prompt.others.length;
   const names = prompt.others.map((o) => o.firstName).join(", ");
 
   async function addAll() {
@@ -26,7 +32,7 @@ export function NetworkPromptModal({
         method: "POST",
         body: JSON.stringify({
           planId: prompt.planId,
-          userIds: [...picked],
+          userIds: prompt.others.map((o) => o.id),
         }),
       });
       setUser(res.me);
@@ -50,15 +56,6 @@ export function NetworkPromptModal({
     }
   }
 
-  function toggle(id: string) {
-    setPicked((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
   return (
     <div className="network-prompt-overlay" role="dialog" aria-modal="true" aria-labelledby="network-prompt-title">
       <div className="network-prompt-card">
@@ -66,26 +63,22 @@ export function NetworkPromptModal({
           Stay connected?
         </h2>
         <p className="network-prompt-body">
-          You went to <strong>{prompt.planTitle}</strong> with {names} — add them to your network on COMMONS?
+          You went to <strong>{prompt.planTitle}</strong> with {count} {count === 1 ? "person" : "people"}.
+          Want to add them to your network?
         </p>
-        <ul className="network-prompt-list">
+
+        <div className="network-prompt-avatars" aria-label={names}>
           {prompt.others.map((o) => (
-            <li key={o.id}>
-              <label className="network-prompt-row">
-                <input
-                  type="checkbox"
-                  checked={picked.has(o.id)}
-                  onChange={() => toggle(o.id)}
-                />
-                <Avatar seed={o.avatarSeed} style={o.avatarStyle} photoDataUrl={o.avatarPhotoDataUrl} params={o.avatarParams} name={o.firstName} size="sm" />
-                <span>{o.firstName}</span>
-              </label>
-            </li>
+            <span key={o.id} className="network-prompt-avatar" title={o.firstName}>
+              <Avatar seed={o.avatarSeed} style={o.avatarStyle} photoDataUrl={o.avatarPhotoDataUrl} params={o.avatarParams} name={o.firstName} size="lg" />
+              <span className="network-prompt-avatar-name">{o.firstName}</span>
+            </span>
           ))}
-        </ul>
+        </div>
+
         <div className="network-prompt-actions">
-          <button type="button" className="btn-primary btn-block" disabled={busy || picked.size === 0} onClick={() => void addAll()}>
-            {busy ? "Saving…" : "Yes — add to my network"}
+          <button type="button" className="btn-primary btn-block" disabled={busy} onClick={() => void addAll()}>
+            {busy ? "Saving…" : `Add ${count === 1 ? "to" : "all to"} my network`}
           </button>
           <button type="button" className="btn-link btn-block" disabled={busy} onClick={() => void dismiss()}>
             Not now

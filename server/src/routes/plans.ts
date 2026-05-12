@@ -36,7 +36,17 @@ function combinedNeighborhoodScope(me: UserRecord): string[] | null {
 
 function planVisibleToViewer(plan: PlanRecord, me: UserRecord): boolean {
   const v: PlanVisibility = plan.visibility ?? "everyone";
-  if (v === "network") return false;
+  if (v === "network") {
+    // Visible to the creator, anyone in the creator's network, or anyone
+    // already RSVP'd (going or interested) — flipping visibility shouldn't
+    // hide a plan from people who already engaged with it.
+    if (plan.creatorId === me.id) return true;
+    const creator = store.findUserById(plan.creatorId);
+    if (creator?.networkIds?.includes(me.id)) return true;
+    const myPart = store.findParticipation(plan.id, me.id);
+    if (myPart?.state === "going" || myPart?.state === "interested") return true;
+    return false;
+  }
   if (v === "community") {
     const tag = plan.visibilityCommunityTag;
     if (!tag) return true;

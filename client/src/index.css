@@ -2802,21 +2802,25 @@ label {
   line-height: 1.45;
 }
 
-.network-prompt-list {
-  list-style: none;
-  margin: 0 0 16px;
-  padding: 0;
+.network-prompt-avatars {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: center;
+  margin: 0 0 20px;
 }
 
-.network-prompt-row {
+.network-prompt-avatar {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  font-size: 15px;
-  cursor: pointer;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.network-prompt-avatar-name {
+  font-weight: 600;
 }
 
 .network-prompt-actions {
