@@ -6,7 +6,7 @@ interface AvatarProps {
   size?: "sm" | "md" | "lg" | "xl";
   backgroundColor?: string;
   photoDataUrl?: string;
-  /** DiceBear URL overrides ("top=longHair&skinColor=..."). Stamps the generated avatar with the user's preset. */
+  /** DiceBear URL overrides ("top=curly&skinColor=..."). Merged before friendly eyes/mouth so hair/skin stay preset-driven. */
   params?: string;
   /** When set (and no photo), show initials instead of illustrated avatar. */
   name?: string;
@@ -26,6 +26,20 @@ function initialsFrom(name: string): string {
   return one.slice(0, 2).toUpperCase();
 }
 
+/** DiceBear still randomizes expression from `seed` unless we pin friendly features. */
+function friendlyFaceQuery(style: AvatarStyle): string | null {
+  switch (style) {
+    case "avataaars":
+      return "eyes=happy&mouth=smile&eyebrows=defaultNatural";
+    case "big-smile":
+      return "eyes=cheery&mouth=teethSmile";
+    case "fun-emoji":
+      return "eyes=cute&mouth=wideSmile";
+    default:
+      return null;
+  }
+}
+
 export function dicebearUrl(
   seed: string,
   style: AvatarStyle = "avataaars",
@@ -36,9 +50,11 @@ export function dicebearUrl(
   const search = new URLSearchParams({ seed, size: String(pixelSize) });
   if (backgroundColor) search.set("backgroundColor", backgroundColor);
   let url = `https://api.dicebear.com/9.x/${style}/svg?${search.toString()}`;
-  // Append preset overrides verbatim — DiceBear takes the first occurrence,
-  // so caller-provided `top`/`skinColor`/etc. win over the seed's randoms.
+  // Append preset overrides (hair, skin, clothes, …) before expression locks
+  // so presets stay authoritative for everything except mood.
   if (params) url += `&${params}`;
+  const friendly = friendlyFaceQuery(style);
+  if (friendly) url += `&${friendly}`;
   return url;
 }
 
