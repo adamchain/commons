@@ -71,10 +71,20 @@ export function PlanDetailPage() {
   };
 
   const isHosting = plan.creator.id === user.id;
+  const isLookingFor = plan.planKind === "looking_for";
+  const inThread = isHosting || plan.myState === "going" || plan.myState === "interested";
+  // Looking-For lifecycle: anyone in the thread can lock the plan in (spec is
+  // explicit that the original poster isn't privileged). The locker becomes
+  // the host server-side.
+  const canLock = !plan.lockedAt && (isLookingFor ? inThread : isHosting);
+  // Prompt fires when the thread has at least 2 people committing (interested
+  // or going) — that's the signal there's a group.
+  const groupSize = plan.participants.interested.length + plan.participants.going.length;
+  const showGroupPrompt = isLookingFor && !plan.lockedAt && groupSize >= 2;
   const canChat =
     isHosting ||
     plan.myState === "going" ||
-    (plan.planKind === "looking_for" && plan.myState === "interested");
+    (isLookingFor && plan.myState === "interested");
 
   async function lockIn() {
     if (!lockVenue.trim() || !lockDate) return;
@@ -143,9 +153,20 @@ export function PlanDetailPage() {
           </div>
         )}
 
-        {(plan.isFlexibleTime || plan.isFlexibleLocation) && isHosting && (
+        {showGroupPrompt && (
+          <div className="lock-prompt" role="note">
+            <p>Looks like you’ve got a group. Ready to lock something in?</p>
+            <span className="lock-prompt-arrow">↓ Make it a plan</span>
+          </div>
+        )}
+
+        {canLock && (plan.isFlexibleTime || plan.isFlexibleLocation || isLookingFor) && (
           <div className="coordination-banner coordination-banner--expanded" role="note">
-            <p>Still working out the details? Fill in venue &amp; time when you’re ready and lock it in.</p>
+            <p>
+              {isLookingFor
+                ? "Whoever picks the spot becomes the host. Fill in venue and day to make it a plan."
+                : "Still working out the details? Fill in venue & time when you’re ready and lock it in."}
+            </p>
             <label className="form-question">Venue</label>
             <LocationAutocomplete
               name={lockVenue}
@@ -190,7 +211,7 @@ export function PlanDetailPage() {
               </>
             )}
             <button type="button" className="btn-primary btn-block" disabled={lockBusy || !lockVenue.trim() || !lockDate} onClick={() => void lockIn()}>
-              {lockBusy ? "Saving…" : "Lock it in"}
+              {lockBusy ? "Saving…" : isLookingFor ? "Make it a plan" : "Lock it in"}
             </button>
           </div>
         )}

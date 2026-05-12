@@ -2375,6 +2375,19 @@ label {
   border: 1px solid transparent;
 }
 
+/* Looking-For after lock — preserved in the feed as a record of how the plan
+ * formed, but visually distinct from both pending Looking For and Confirmed. */
+.plan-card--plan-created > .plan-card {
+  background: var(--surface);
+  border-style: solid;
+}
+
+.plan-card-kind-pill.is-plan-created {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid rgba(255, 120, 73, 0.25);
+}
+
 .plan-card-kind-pill.is-confirmed::before {
   content: "●";
   font-size: 8px;
@@ -2384,6 +2397,42 @@ label {
   content: "○";
   font-size: 11px;
   line-height: 1;
+}
+
+.plan-card-kind-pill.is-plan-created::before {
+  content: "✓";
+  font-weight: 900;
+  font-size: 10px;
+}
+
+/* "Looks like you've got a group" prompt on Looking-For plan detail */
+
+.lock-prompt {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 16px 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.lock-prompt p {
+  margin: 0;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.lock-prompt-arrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
 }
 
 .plan-card-title {

@@ -55,6 +55,9 @@ export function PlanCard({
       ? formatMiles(haversineMiles(viewerCoords, { lat: plan.location.lat, lng: plan.location.lng }))
       : null;
   const isLooking = plan.planKind === "looking_for";
+  // Once a looking-for plan is locked, its lifecycle resolved into a real plan.
+  // Keep planKind=looking_for as a history marker but render as "Plan created".
+  const isPlanCreated = isLooking && Boolean(plan.lockedAt);
   const suggestions = plan.suggestions ?? [];
   const [reply, setReply] = useState("");
   const [replyBusy, setReplyBusy] = useState(false);
@@ -79,10 +82,22 @@ export function PlanCard({
   }
 
   return (
-    <div className={`plan-card-outer ${isLooking ? "plan-card--looking" : "plan-card--confirmed"}`}>
+    <div
+      className={`plan-card-outer ${
+        isPlanCreated
+          ? "plan-card--plan-created"
+          : isLooking
+            ? "plan-card--looking"
+            : "plan-card--confirmed"
+      }`}
+    >
       <Link to={`/plans/${plan.id}`} className="plan-card plan-card-link">
-        <span className={`plan-card-kind-pill ${isLooking ? "is-looking" : "is-confirmed"}`}>
-          {isLooking ? "Looking for" : "Confirmed plan"}
+        <span
+          className={`plan-card-kind-pill ${
+            isPlanCreated ? "is-plan-created" : isLooking ? "is-looking" : "is-confirmed"
+          }`}
+        >
+          {isPlanCreated ? "Plan created" : isLooking ? "Looking for" : "Confirmed plan"}
         </span>
 
         <h3 className="plan-card-title">{title}</h3>
@@ -133,7 +148,7 @@ export function PlanCard({
         )}
       </Link>
 
-      {isLooking && (
+      {isLooking && !isPlanCreated && (
         <div className="plan-card-suggest" onClick={(e) => e.stopPropagation()}>
           {suggestions.length > 0 && (
             <ul className="plan-card-suggest-list">

@@ -302,8 +302,21 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Plan not found" });
     return;
   }
-  if (plan.creatorId !== userId) {
-    res.status(403).json({ error: "Only the host can lock it in" });
+
+  // Looking For lifecycle: anyone in the thread (original creator, interested,
+  // or going) can lock it in — the spec is explicit that the original poster
+  // isn't privileged. The locker becomes the new host. For confirmed plans
+  // (already locked once), only the current host can re-lock to edit details.
+  const isLookingFor = (plan.planKind ?? "standard") === "looking_for";
+  const myPart = store.findParticipation(planId, userId);
+  const inThread = plan.creatorId === userId || myPart?.state === "going" || myPart?.state === "interested";
+  if (isLookingFor) {
+    if (!inThread) {
+      res.status(403).json({ error: "Only people in the thread can lock this in" });
+      return;
+    }
+  } else if (plan.creatorId !== userId) {
+    res.status(403).json({ error: "Only the host can edit a confirmed plan" });
     return;
   }
 
@@ -321,8 +334,11 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
     return;
   }
 
-  store.updatePlan(planId, {
-    planKind: "standard",
+  // Keep planKind as looking_for after a lock so the card on the feed shows
+  // "Plan created" rather than becoming an indistinguishable confirmed plan —
+  // the lifecycle history is the point. `lockedAt` distinguishes the locked
+  // state.
+  const patch: Parameters<typeof store.updatePlan>[1] = {
     lockedAt: new Date().toISOString(),
     location: {
       name: locationName,
@@ -334,11 +350,18 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
     time: isFlexibleTime ? "" : time,
     isFlexibleTime,
     isFlexibleLocation: false,
-  });
+  };
+  if (isLookingFor && plan.creatorId !== userId) {
+    // Locker becomes the new host. Also mark them as going so the host shows
+    // in the going list of the resulting plan.
+    patch.creatorId = userId;
+    store.upsertParticipation(planId, userId, "going");
+  }
+  store.updatePlan(planId, patch);
 
   const updated = store.findPlanById(planId)!;
   const conv = store.ensureGroupConversation(planId, [updated.creatorId]);
-  const host = await findUserById(userId);
+  const host = await findUserById(updated.creatorId);
   const hostName = host?.firstName ?? "Host";
   const dayLabel = new Date(dateInput).toLocaleDateString(undefined, {
     weekday: "short",
