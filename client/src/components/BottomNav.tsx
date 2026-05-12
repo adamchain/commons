@@ -21,9 +21,14 @@ export function BottomNav() {
 
   return (
     <nav className="bottom-nav" aria-label="Primary">
-      <NavLink to="/explore" className={({ isActive }) => `bottom-nav-item ${isActive ? "is-active" : ""}`}>
+      <NavLink
+        to="/explore"
+        className={({ isActive }) => `bottom-nav-item bottom-nav-item--soon ${isActive ? "is-active" : ""}`}
+      >
         <CompassIcon />
-        <span>Explore</span>
+        <span>
+          Explore<span className="bottom-nav-soon-dot" aria-hidden="true" />
+        </span>
       </NavLink>
 
       <NavLink to="/plans/new" className="bottom-nav-cta" aria-label="Make a plan">
