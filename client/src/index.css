@@ -1792,32 +1792,6 @@ label {
 .interest-emoji { font-size: 28px; }
 .interest-label { font-size: 13px; margin-top: 4px; text-transform: capitalize; }
 
-/* View toggle */
-.view-toggle {
-  display: flex;
-  gap: 4px;
-  margin: 8px 0 16px;
-  background: var(--bg);
-  padding: 4px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  width: fit-content;
-}
-.view-toggle-btn {
-  background: transparent;
-  border: none;
-  padding: 6px 16px;
-  border-radius: 999px;
-  cursor: pointer;
-  color: var(--text-muted);
-  font-weight: 600;
-}
-.view-toggle-btn.is-active {
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
-}
-
 /* Plan card host */
 .plan-card-host {
   display: flex;
@@ -2087,85 +2061,6 @@ label {
 .profile-list-emoji { font-size: 18px; }
 .profile-list-title { flex: 1; font-weight: 500; }
 .profile-list-when { color: var(--text-muted); font-size: 13px; }
-
-/* Map */
-.map-view { display: flex; flex-direction: column; gap: 12px; }
-.map-canvas {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  background: linear-gradient(135deg, #e8f1f3, #f6f3ec);
-  border-radius: 16px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-}
-[data-theme="dark"] .map-canvas {
-  background: linear-gradient(135deg, #2a3338, #303128);
-}
-.map-pin {
-  position: absolute;
-  transform: translate(-50%, -100%);
-  background: var(--surface);
-  border: 2px solid var(--text);
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-}
-.map-pin.is-selected {
-  background: var(--text);
-  color: var(--bg);
-  transform: translate(-50%, -100%) scale(1.15);
-}
-.map-sheet {
-  background: var(--surface);
-  border-radius: 14px;
-  padding: 4px;
-  border: 1px solid var(--border);
-}
-
-/* Calendar */
-.calendar-view {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 8px;
-}
-.calendar-day {
-  background: var(--surface);
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-height: 100px;
-}
-.calendar-day-label {
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.calendar-day-empty { color: var(--text-muted); font-size: 13px; }
-.calendar-event {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  padding: 6px 8px;
-  background: var(--bg);
-  border-radius: 8px;
-  text-decoration: none;
-  color: var(--text);
-  font-size: 13px;
-}
-.calendar-event-title { flex: 1; }
-.calendar-event-time { color: var(--text-muted); font-size: 11px; }
 
 /* Feedback prompt */
 .feedback-prompt {
@@ -2450,26 +2345,6 @@ label {
   border-color: var(--accent);
 }
 
-.map-canvas--empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 320px;
-  background-image:
-    linear-gradient(var(--border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--border) 1px, transparent 1px);
-  background-size: 32px 32px;
-}
-
-.map-empty-hint {
-  text-align: center;
-  color: var(--text-muted);
-  background: var(--surface);
-  padding: 16px 20px;
-  border-radius: 14px;
-  border: 1px solid var(--border);
-}
-
 .week-glance-dow {
   display: block;
   font-size: 10px;
@@ -2508,18 +2383,53 @@ label {
   transform: translateY(-1px);
 }
 
-.plan-card--looking {
-  border-left: 4px solid var(--accent);
+/* Confirmed vs Looking For — visually distinct so the feed shows two card types
+ * at a glance. Confirmed: clean surface, success-tinted pill. Looking For:
+ * accent-tinted background with dashed border to signal "not locked in yet". */
+
+.plan-card--confirmed > .plan-card {
+  background: var(--surface);
 }
 
-.plan-card-looking-pill {
-  display: inline-block;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+.plan-card--looking > .plan-card {
+  background: var(--accent-soft);
+  border-style: dashed;
+}
+
+.plan-card-kind-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--accent);
-  margin-bottom: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-bottom: 10px;
+}
+
+.plan-card-kind-pill.is-confirmed {
+  background: var(--success-bg);
+  color: var(--success);
+  border: 1px solid var(--success-border);
+}
+
+.plan-card-kind-pill.is-looking {
+  background: var(--accent);
+  color: var(--accent-on);
+  border: 1px solid transparent;
+}
+
+.plan-card-kind-pill.is-confirmed::before {
+  content: "●";
+  font-size: 8px;
+}
+
+.plan-card-kind-pill.is-looking::before {
+  content: "○";
+  font-size: 11px;
+  line-height: 1;
 }
 
 .plan-card-title {

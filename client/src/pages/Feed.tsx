@@ -7,18 +7,14 @@ import { NetworkPromptModal } from "../components/NetworkPromptModal";
 import { PlanCard } from "../components/PlanCard";
 import { WeekGlance } from "../components/WeekGlance";
 import { useAuth } from "../context/AuthContext";
-import { formatPlanDate, formatPlanTime } from "../lib/format";
 import type { InterestTag, MeDTO, NeighborhoodDTO, NetworkPromptDTO, PlanDTO } from "../types/shared";
-import { INTEREST_LABELS } from "../types/shared";
-
-type ViewMode = "list" | "map" | "calendar";
+import { ALL_INTERESTS, INTEREST_LABELS } from "../types/shared";
 
 export function FeedPage() {
   const [plans, setPlans] = useState<PlanDTO[] | null>(null);
   const [neighborhoods, setNeighborhoods] = useState<NeighborhoodDTO[]>([]);
-  const [view, setView] = useState<ViewMode>("list");
   const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [selectedTag, setSelectedTag] = useState<InterestTag | null>(null);
   const { user, setUser } = useAuth();
   const [networkPrompt, setNetworkPrompt] = useState<NetworkPromptDTO | null>(null);
 
@@ -46,9 +42,11 @@ export function FeedPage() {
       : undefined;
 
   // Apply chip + day filters to the raw plan list before bucketing/rendering.
+  // No interest cap — selecting a chip narrows; default "For you" leaves all plans
+  // visible so the algorithm ranks but never hides.
   const filteredPlans = useMemo(() => {
     let list = plans ?? [];
-    if (selectedTag) list = list.filter((p) => p.tags.includes(selectedTag as never));
+    if (selectedTag) list = list.filter((p) => p.tags.includes(selectedTag));
     if (selectedDayIso) list = list.filter((p) => p.date.slice(0, 10) === selectedDayIso);
     return list;
   }, [plans, selectedTag, selectedDayIso]);
@@ -104,30 +102,14 @@ export function FeedPage() {
         />
       )}
 
-      <div className="view-toggle">
-        <button className={`view-toggle-btn ${view === "list" ? "is-active" : ""}`} onClick={() => setView("list")}>
-          List
-        </button>
-        <button className={`view-toggle-btn ${view === "map" ? "is-active" : ""}`} onClick={() => setView("map")}>
-          Map
-        </button>
-        <button className={`view-toggle-btn ${view === "calendar" ? "is-active" : ""}`} onClick={() => setView("calendar")}>
-          Calendar
-        </button>
+      <div id="feed-plans">
+        <ListView
+          buckets={buckets}
+          hoodById={hoodById}
+          viewerCoords={viewerCoords}
+          onPlanRefresh={refreshPlans}
+        />
       </div>
-
-      {view === "list" && (
-        <div id="feed-plans">
-          <ListView
-            buckets={buckets}
-            hoodById={hoodById}
-            viewerCoords={viewerCoords}
-            onPlanRefresh={refreshPlans}
-          />
-        </div>
-      )}
-      {view === "map" && <MapView plans={filteredPlans} />}
-      {view === "calendar" && <CalendarView plans={filteredPlans} />}
     </main>
   );
 }
@@ -225,75 +207,23 @@ function Section({
   );
 }
 
-function MapView({ plans }: { plans: PlanDTO[] }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const withCoords = plans.filter((p) => p.location.lat !== undefined && p.location.lng !== undefined);
-
-  // Render the map shell even when empty so the surface is consistent.
-  if (withCoords.length === 0) {
-    return (
-      <div className="map-view">
-        <div className="map-canvas map-canvas--empty" role="img" aria-label="Map of nearby plans (empty)">
-          <div className="map-empty-hint">
-            <p style={{ margin: 0 }}>Nothing on the map yet.</p>
-            <Link to="/plans/new" className="btn-primary" style={{ marginTop: 12, display: "inline-block" }}>
-              Drop the first pin
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const lats = withCoords.map((p) => p.location.lat as number);
-  const lngs = withCoords.map((p) => p.location.lng as number);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
-  const latRange = maxLat - minLat || 0.01;
-  const lngRange = maxLng - minLng || 0.01;
-
-  const selected = withCoords.find((p) => p.id === selectedId);
-
-  return (
-    <div className="map-view">
-      <div className="map-canvas" role="img" aria-label="Map of nearby plans">
-        {withCoords.map((p) => {
-          const left = ((p.location.lng as number) - minLng) / lngRange;
-          const top = 1 - ((p.location.lat as number) - minLat) / latRange;
-          return (
-            <button
-              key={p.id}
-              type="button"
-              className={`map-pin ${selectedId === p.id ? "is-selected" : ""}`}
-              style={{ left: `${left * 92 + 4}%`, top: `${top * 88 + 4}%` }}
-              onClick={() => setSelectedId(p.id)}
-            >
-              {p.hostEmoji}
-            </button>
-          );
-        })}
-      </div>
-      {selected && (
-        <div className="map-sheet">
-          <PlanCard plan={selected} />
-        </div>
-      )}
-    </div>
-  );
-}
-
+// All interests render as filters on every feed — the user's own picks come
+// first so their categories are obvious, but the remaining tags stay visible
+// so the feed is browsable past the personal slice. No 3-interest cap.
 function CommunityChips({
   userInterests,
   selected,
   onSelect,
 }: {
   userInterests: InterestTag[];
-  selected: string | null;
-  onSelect: (tag: string | null) => void;
+  selected: InterestTag | null;
+  onSelect: (tag: InterestTag | null) => void;
 }) {
-  if (userInterests.length === 0) return null;
+  const userSet = new Set(userInterests);
+  const ordered: InterestTag[] = [
+    ...userInterests,
+    ...ALL_INTERESTS.filter((t) => !userSet.has(t)),
+  ];
   return (
     <div className="community-chips" role="tablist" aria-label="Community filter">
       <button
@@ -305,7 +235,7 @@ function CommunityChips({
       >
         For you
       </button>
-      {userInterests.map((tag) => (
+      {ordered.map((tag) => (
         <button
           key={tag}
           type="button"
@@ -317,45 +247,6 @@ function CommunityChips({
           {INTEREST_LABELS[tag]}
         </button>
       ))}
-    </div>
-  );
-}
-
-function CalendarView({ plans }: { plans: PlanDTO[] }) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const days: Date[] = [];
-  for (let i = 0; i < 14; i++) {
-    days.push(new Date(today.getTime() + i * 24 * 60 * 60 * 1000));
-  }
-  const byDate = new Map<string, PlanDTO[]>();
-  for (const p of plans) {
-    const key = new Date(p.date).toISOString().slice(0, 10);
-    if (!byDate.has(key)) byDate.set(key, []);
-    byDate.get(key)!.push(p);
-  }
-  return (
-    <div className="calendar-view">
-      {days.map((d) => {
-        const key = d.toISOString().slice(0, 10);
-        const list = byDate.get(key) ?? [];
-        return (
-          <div key={key} className="calendar-day">
-            <div className="calendar-day-label">{formatPlanDate(d.toISOString())}</div>
-            {list.length === 0 ? (
-              <div className="calendar-day-empty">—</div>
-            ) : (
-              list.map((p) => (
-                <Link key={p.id} to={`/plans/${p.id}`} className="calendar-event">
-                  <span>{p.hostEmoji}</span>
-                  <span className="calendar-event-title">{p.title}</span>
-                  <span className="calendar-event-time">{formatPlanTime(p.time, p.isFlexibleTime)}</span>
-                </Link>
-              ))
-            )}
-          </div>
-        );
-      })}
     </div>
   );
 }

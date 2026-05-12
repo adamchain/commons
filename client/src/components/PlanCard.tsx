@@ -79,9 +79,11 @@ export function PlanCard({
   }
 
   return (
-    <div className={`plan-card-outer ${isLooking ? "plan-card--looking" : ""}`}>
+    <div className={`plan-card-outer ${isLooking ? "plan-card--looking" : "plan-card--confirmed"}`}>
       <Link to={`/plans/${plan.id}`} className="plan-card plan-card-link">
-        {isLooking && <span className="plan-card-looking-pill">Looking for</span>}
+        <span className={`plan-card-kind-pill ${isLooking ? "is-looking" : "is-confirmed"}`}>
+          {isLooking ? "Looking for" : "Confirmed plan"}
+        </span>
 
         <h3 className="plan-card-title">{title}</h3>
 
