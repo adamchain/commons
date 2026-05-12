@@ -46,6 +46,8 @@ export type PlanKind = "standard" | "looking_for";
 
 export type PlanVisibility = "everyone" | "community" | "network";
 
+export type JoinType = "open" | "approve";
+
 export type ParticipationState = "interested" | "going";
 
 export interface PublicUser {
@@ -99,6 +101,10 @@ export interface PlanDTO {
    * need a migration. Coming Soon.
    */
   communityId: string | null;
+  /** Total spots including host. Null means open / no cap. */
+  capacity: number | null;
+  /** How RSVPs are accepted when capacity is set. */
+  joinType: JoinType;
   isRecurring: boolean;
   lockedAt: string | null;
   /** Inline replies on “looking for” plans (feed + detail). */

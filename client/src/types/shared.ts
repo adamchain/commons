@@ -43,9 +43,38 @@ export const ALL_INTERESTS: InterestTag[] = [
 /** Same set as interests — used in create-plan vibe picker. */
 export const VIBE_TAGS = ALL_INTERESTS;
 
+/**
+ * Curated 8-emoji vibe picker for post-time. Each option resolves to one of the
+ * underlying InterestTag values so the feed/algorithm still operates on the
+ * existing tag set. Multiple emojis can collapse to the same tag (Martini and
+ * Burger both → food_drinks); the resolved tag list de-duplicates.
+ */
+export type VibeIcon = "coffee" | "martini" | "burger" | "music" | "book" | "paint" | "dice" | "disco";
+
+export interface VibeOption {
+  id: VibeIcon;
+  emoji: string;
+  label: string;
+  tag: InterestTag;
+}
+
+export const VIBE_OPTIONS: VibeOption[] = [
+  { id: "coffee",  emoji: "☕", label: "Coffee",  tag: "coffee_cowork" },
+  { id: "martini", emoji: "🍸", label: "Drinks",  tag: "food_drinks" },
+  { id: "burger",  emoji: "🍔", label: "Food",    tag: "food_drinks" },
+  { id: "music",   emoji: "🎵", label: "Music",   tag: "music_nightlife" },
+  { id: "book",    emoji: "📖", label: "Book",    tag: "arts_culture" },
+  { id: "paint",   emoji: "🎨", label: "Paint",   tag: "arts_culture" },
+  { id: "dice",    emoji: "🎲", label: "Dice",    tag: "local_events" },
+  { id: "disco",   emoji: "💃", label: "Disco",   tag: "music_nightlife" },
+];
+
 export type PlanKind = "standard" | "looking_for";
 
 export type PlanVisibility = "everyone" | "community" | "network";
+
+/** How RSVPs work when capacity is set. `open` is first-come; `approve` is one-tap host confirmation. */
+export type JoinType = "open" | "approve";
 
 export type ParticipationState = "interested" | "going";
 
@@ -159,6 +188,10 @@ export interface PlanDTO {
    * don't need a migration. Coming Soon.
    */
   communityId: string | null;
+  /** Total spots including host. Null means open / no cap. */
+  capacity: number | null;
+  /** How RSVPs are accepted when capacity is set. */
+  joinType: JoinType;
   isRecurring: boolean;
   /** Host locked venue + time from coordination thread. */
   lockedAt: string | null;

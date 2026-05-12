@@ -5,6 +5,7 @@ import type {
   AvatarStyle,
   HostTag,
   InterestTag,
+  JoinType,
   ParticipationState,
   PlanKind,
   PlanVisibility,
@@ -67,6 +68,10 @@ export interface PlanRecord {
    * posts don't need a schema migration. Null on every current plan.
    */
   communityId?: string | null;
+  /** Total spots including host. Null/undefined means open / no cap. */
+  capacity?: number | null;
+  /** How RSVPs are accepted; defaults to "open" if absent. */
+  joinType?: JoinType;
   isRecurring?: boolean;
   lockedAt?: string | null;
   createdAt: string;
@@ -279,6 +284,8 @@ export const store = {
       visibility: "everyone",
       visibilityCommunityTag: null,
       communityId: null,
+      capacity: null,
+      joinType: "open",
       isRecurring: false,
       lockedAt: null,
       ...input,

@@ -6,6 +6,7 @@ import { rankPlansForUser } from "../lib/recommend.js";
 import {
   ALL_INTERESTS,
   type InterestTag,
+  type JoinType,
   type ParticipationState,
   type PlanDTO,
   type PlanKind,
@@ -114,6 +115,8 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     visibility,
     visibilityCommunityTag: plan.visibilityCommunityTag ?? null,
     communityId: plan.communityId ?? null,
+    capacity: plan.capacity ?? null,
+    joinType: plan.joinType ?? "open",
     isRecurring: plan.isRecurring ?? false,
     lockedAt: plan.lockedAt ?? null,
     suggestions,
@@ -178,11 +181,17 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   const visibility = (["everyone", "community", "network"].includes(rawVis) ? rawVis : "everyone") as PlanVisibility;
   const isRecurring = Boolean(req.body?.isRecurring);
 
+  // No hard cap — the algorithm weights ranking by selection frequency (see
+  // Feed v2 brief). De-dupe so collapsing emoji vibes (Martini+Burger →
+  // food_drinks) doesn't leave duplicate tags.
   const tagsInput = Array.isArray(req.body?.tags) ? (req.body.tags as unknown[]) : [];
-  const tags = tagsInput
-    .map((t) => String(t))
-    .filter((t): t is InterestTag => ALL_INTERESTS.includes(t as InterestTag))
-    .slice(0, 3);
+  const tags = Array.from(
+    new Set(
+      tagsInput
+        .map((t) => String(t))
+        .filter((t): t is InterestTag => ALL_INTERESTS.includes(t as InterestTag)),
+    ),
+  );
 
   let visibilityCommunityTag: InterestTag | null = null;
   if (visibility === "community") {
@@ -208,11 +217,10 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     res.status(400).json({ error: "Unknown neighborhood" });
     return;
   }
-  if (visibility === "network") {
-    res.status(400).json({ error: "Network visibility is coming soon — choose Everyone or A community" });
-    return;
-  }
-
+  // "Your Network" visibility ships in V1.5 — accept the value so the toggle
+  // works end-to-end and the field persists, but treat it like everyone-visible
+  // for now (no network ACL exists yet). The real network filter lands with
+  // Track 6 once we seed user networks.
   const resolvedLocationName = isFlexibleLocation ? (locationName || "Flexible location") : locationName;
   const resolvedAddress = locationAddress || resolvedLocationName;
 
@@ -223,6 +231,14 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   const rawCommunityId = req.body?.communityId;
   const communityId =
     typeof rawCommunityId === "string" && rawCommunityId.trim() ? rawCommunityId.trim() : null;
+
+  const rawCapacity = req.body?.capacity;
+  let capacity: number | null = null;
+  if (typeof rawCapacity === "number" && Number.isFinite(rawCapacity) && rawCapacity > 0) {
+    capacity = Math.floor(rawCapacity);
+  }
+  const rawJoinType = String(req.body?.joinType ?? "open");
+  const joinType: JoinType = rawJoinType === "approve" ? "approve" : "open";
 
   const plan = store.createPlan({
     creatorId: userId,
@@ -240,6 +256,8 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     visibility,
     visibilityCommunityTag,
     communityId,
+    capacity,
+    joinType,
     isRecurring,
     lockedAt: null,
   });

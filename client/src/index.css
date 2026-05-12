@@ -1268,35 +1268,6 @@ label {
 
 /* ---------- Create plan form ---------- */
 
-.create-tag-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.create-tag-chip {
-  padding: 8px 14px;
-  border-radius: 999px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 600;
-  text-transform: capitalize;
-  transition: all 120ms ease;
-}
-
-.create-tag-chip.is-selected {
-  background: var(--accent);
-  color: var(--accent-on);
-  border-color: var(--accent);
-}
-
-.create-tag-chip:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 .flex-toggle {
   display: flex;
   align-items: center;
@@ -2175,23 +2146,6 @@ label {
   font-size: 15px;
 }
 
-/* Create plan emoji row */
-.emoji-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
-.emoji-pill {
-  font-size: 20px;
-  width: 38px;
-  height: 38px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  cursor: pointer;
-}
-.emoji-pill.is-active {
-  background: var(--text);
-  border-color: var(--text);
-  transform: scale(1.05);
-}
-
 /* v2 onboarding additions */
 .onboarding-fineprint {
   font-size: 12px;
@@ -2549,6 +2503,74 @@ label {
 .segmented button.is-active {
   border-color: var(--accent);
   background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.segmented button.is-soon {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.segmented-kind button.is-active,
+.segmented-visibility button.is-active {
+  font-weight: 700;
+}
+
+/* Curated 8-emoji vibe picker (Track 4). Tile grid, multi-select, no cap. */
+
+.vibe-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 6px;
+}
+
+@media (max-width: 420px) {
+  .vibe-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+}
+
+.vibe-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 6px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+
+.vibe-tile:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.vibe-tile.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.vibe-tile-emoji {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.vibe-tile-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.vibe-tile.is-selected .vibe-tile-label {
   color: var(--accent);
 }
 

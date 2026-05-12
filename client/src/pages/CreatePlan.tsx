@@ -1,20 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { LocationAutocomplete } from "../components/LocationAutocomplete";
-import { ThemeToggle } from "../components/ThemeToggle";
 import { useAuth } from "../context/AuthContext";
 import {
-  ALL_INTERESTS,
-  INTEREST_LABELS,
+  VIBE_OPTIONS,
   type InterestTag,
+  type JoinType,
   type NeighborhoodDTO,
   type PlanKind,
   type PlanVisibility,
+  type VibeIcon,
 } from "../types/shared";
-
-const HOST_EMOJIS = ["✨", "🧘", "🏃", "☕", "🍻", "🎶", "🎨", "🥞", "🚴", "🥾", "🎲", "📚", "🏋️"];
 
 const today = (): string => {
   const d = new Date();
@@ -36,12 +34,12 @@ export function CreatePlanPage() {
     isFlexibleTime: false,
     isFlexibleLocation: false,
     isFlexibleDate: false,
-    tags: [] as InterestTag[],
+    vibes: [] as VibeIcon[],
     description: "",
-    hostEmoji: "✨",
     planKind: "standard" as PlanKind,
     visibility: "everyone" as PlanVisibility,
-    visibilityCommunityTag: "" as InterestTag | "",
+    capacity: "" as string, // text input — blank = open
+    joinType: "open" as JoinType,
     isRecurring: false,
   });
   const [submitting, setSubmitting] = useState(false);
@@ -58,6 +56,19 @@ export function CreatePlanPage() {
       setForm((f) => ({ ...f, neighborhoodId: first }));
     }
   }, [user, form.neighborhoodId]);
+
+  const isLooking = form.planKind === "looking_for";
+
+  // Vibes resolve to underlying InterestTag values for the feed/algorithm.
+  // Multiple emojis can collapse to the same tag — de-dupe before send.
+  const resolvedTags = useMemo<InterestTag[]>(() => {
+    const set = new Set<InterestTag>();
+    for (const id of form.vibes) {
+      const opt = VIBE_OPTIONS.find((o) => o.id === id);
+      if (opt) set.add(opt.tag);
+    }
+    return Array.from(set);
+  }, [form.vibes]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -78,14 +89,16 @@ export function CreatePlanPage() {
       setError("Add a spot or toggle flexible location.");
       return;
     }
-    if (form.visibility === "community" && !form.visibilityCommunityTag && form.tags.length === 0) {
-      setError("Pick a vibe tag for community visibility.");
+
+    const capacityNum = form.capacity.trim() === "" ? null : Number(form.capacity);
+    if (capacityNum !== null && (!Number.isFinite(capacityNum) || capacityNum < 1)) {
+      setError("Spots must be a positive number, or leave blank for open.");
       return;
     }
 
     setSubmitting(true);
     try {
-      const created = await api<{ id: string }>("/api/plans", {
+      await api<{ id: string }>("/api/plans", {
         method: "POST",
         body: JSON.stringify({
           title: form.title.trim(),
@@ -100,19 +113,19 @@ export function CreatePlanPage() {
           time: form.isFlexibleTime ? "" : form.time,
           isFlexibleTime: form.isFlexibleTime || form.isFlexibleDate,
           isFlexibleLocation: form.isFlexibleLocation,
-          tags: form.tags,
+          tags: resolvedTags,
           description: form.description.trim() || undefined,
-          hostEmoji: form.hostEmoji,
+          hostEmoji: VIBE_OPTIONS.find((o) => o.id === form.vibes[0])?.emoji ?? "✨",
           planKind: form.planKind,
           visibility: form.visibility,
-          visibilityCommunityTag:
-            form.visibility === "community"
-              ? form.visibilityCommunityTag || form.tags[0]
-              : undefined,
+          capacity: capacityNum,
+          joinType: form.joinType,
           isRecurring: form.isRecurring,
         }),
       });
-      navigate(`/plans/${created.id}`);
+      // Direct to feed — the new plan card is the confirmation. No separate
+      // confirm screen.
+      navigate("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't post");
     } finally {
@@ -120,23 +133,19 @@ export function CreatePlanPage() {
     }
   };
 
-  const toggleTag = (tag: InterestTag) => {
-    setForm((prev) => {
-      if (prev.tags.includes(tag)) return { ...prev, tags: prev.tags.filter((t) => t !== tag) };
-      if (prev.tags.length >= 3) return prev;
-      return { ...prev, tags: [...prev.tags, tag] };
-    });
+  const toggleVibe = (id: VibeIcon) => {
+    setForm((prev) => ({
+      ...prev,
+      vibes: prev.vibes.includes(id) ? prev.vibes.filter((v) => v !== id) : [...prev.vibes, id],
+    }));
   };
-
-  const tagsAtMax = form.tags.length >= 3;
 
   return (
     <main className="app-shell app-shell--mid">
-      <header className="app-header">
+      <header className="app-header app-header--minimal">
         <Link to="/" className="detail-back">
           ← Back
         </Link>
-        <ThemeToggle />
       </header>
       <h1 className="brand" style={{ marginBottom: 8 }}>
         What&apos;s the plan?
@@ -147,18 +156,8 @@ export function CreatePlanPage() {
 
       <form onSubmit={(event) => void submit(event)} className="form-card">
         <section className="form-section">
-          <label className="form-question" htmlFor="title">
-            What&apos;s the plan?
-          </label>
-          <input
-            id="title"
-            placeholder="Trivia at National Mechanics"
-            value={form.title}
-            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-          />
-
-          <label className="form-question">Confirmed or just exploring?</label>
-          <div className="segmented">
+          <label className="form-question">Path</label>
+          <div className="segmented segmented-kind">
             <button
               type="button"
               className={form.planKind === "standard" ? "is-active" : ""}
@@ -169,25 +168,36 @@ export function CreatePlanPage() {
             <button
               type="button"
               className={form.planKind === "looking_for" ? "is-active" : ""}
-              onClick={() => setForm((f) => ({ ...f, planKind: "looking_for" }))}
+              onClick={() =>
+                setForm((f) => ({
+                  ...f,
+                  planKind: "looking_for",
+                  // Looking For posts leave date/time/location flexible by default —
+                  // user can lock in any of the three individually.
+                  isFlexibleDate: true,
+                  isFlexibleTime: true,
+                  isFlexibleLocation: true,
+                }))
+              }
             >
               Looking for…
             </button>
           </div>
+          <p className="form-help">
+            {isLooking
+              ? "Floating an idea — leave date, time, and location flexible (any combination)."
+              : "Locked in — pick when and where."}
+          </p>
 
-          <label className="form-question">Pick a vibe emoji</label>
-          <div className="emoji-row">
-            {HOST_EMOJIS.map((e) => (
-              <button
-                key={e}
-                type="button"
-                className={`emoji-pill ${form.hostEmoji === e ? "is-active" : ""}`}
-                onClick={() => setForm((f) => ({ ...f, hostEmoji: e }))}
-              >
-                {e}
-              </button>
-            ))}
-          </div>
+          <label className="form-question" htmlFor="title">
+            What&apos;s the plan?
+          </label>
+          <input
+            id="title"
+            placeholder={isLooking ? "Anyone want to play pickleball?" : "Trivia at National Mechanics"}
+            value={form.title}
+            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+          />
 
           <label className="form-question" htmlFor="description">
             Anything else?
@@ -274,23 +284,62 @@ export function CreatePlanPage() {
             />
             Repeats weekly (same dot on your calendar)
           </label>
+
+          <label className="form-question" htmlFor="capacity" style={{ marginTop: 14 }}>
+            Spots available?
+          </label>
+          <p className="form-help">Leave blank for open.</p>
+          <input
+            id="capacity"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            placeholder="e.g. 6"
+            value={form.capacity}
+            onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))}
+          />
+
+          {form.capacity.trim() !== "" && (
+            <>
+              <label className="form-question" style={{ marginTop: 12 }}>
+                Join type
+              </label>
+              <div className="segmented">
+                <button
+                  type="button"
+                  className={form.joinType === "open" ? "is-active" : ""}
+                  onClick={() => setForm((f) => ({ ...f, joinType: "open" }))}
+                >
+                  Open · first come
+                </button>
+                <button
+                  type="button"
+                  className={form.joinType === "approve" ? "is-active" : ""}
+                  onClick={() => setForm((f) => ({ ...f, joinType: "approve" }))}
+                >
+                  Approve each
+                </button>
+              </div>
+            </>
+          )}
         </section>
 
         <section className="form-section">
-          <label className="form-question">What&apos;s the vibe?</label>
-          <p className="form-help">Pick up to 3.</p>
-          <div className="create-tag-chips">
-            {ALL_INTERESTS.map((tag) => {
-              const selected = form.tags.includes(tag);
+          <label className="form-question">Interests</label>
+          <p className="form-help">This helps get your plan on the right feeds.</p>
+          <div className="vibe-grid">
+            {VIBE_OPTIONS.map((opt) => {
+              const selected = form.vibes.includes(opt.id);
               return (
                 <button
-                  key={tag}
+                  key={opt.id}
                   type="button"
-                  className={`create-tag-chip ${selected ? "is-selected" : ""}`}
-                  onClick={() => toggleTag(tag)}
-                  disabled={!selected && tagsAtMax}
+                  className={`vibe-tile ${selected ? "is-selected" : ""}`}
+                  onClick={() => toggleVibe(opt.id)}
+                  aria-pressed={selected}
                 >
-                  {INTEREST_LABELS[tag]}
+                  <span className="vibe-tile-emoji" aria-hidden="true">{opt.emoji}</span>
+                  <span className="vibe-tile-label">{opt.label}</span>
                 </button>
               );
             })}
@@ -299,39 +348,30 @@ export function CreatePlanPage() {
 
         <section className="form-section">
           <label className="form-question">Who sees this?</label>
-          <select
-            value={form.visibility}
-            onChange={(e) =>
-              setForm((f) => ({
-                ...f,
-                visibility: e.target.value as PlanVisibility,
-              }))
-            }
-          >
-            <option value="everyone">Everyone on COMMONS</option>
-            <option value="community">A community (matches one of your vibe tags)</option>
-            <option value="network" disabled>
-              Your network — coming soon
-            </option>
-          </select>
-          {form.visibility === "community" && (
-            <select
-              value={form.visibilityCommunityTag}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  visibilityCommunityTag: e.target.value as InterestTag,
-                }))
-              }
+          <div className="segmented segmented-visibility">
+            <button
+              type="button"
+              className={form.visibility === "everyone" ? "is-active" : ""}
+              onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
             >
-              <option value="">Match tag…</option>
-              {form.tags.map((t) => (
-                <option key={t} value={t}>
-                  {INTEREST_LABELS[t]}
-                </option>
-              ))}
-            </select>
-          )}
+              Everyone on COMMONS
+            </button>
+            <button
+              type="button"
+              className={form.visibility === "network" ? "is-active" : ""}
+              onClick={() => setForm((f) => ({ ...f, visibility: "network" }))}
+            >
+              Your Network
+            </button>
+            <button
+              type="button"
+              className="is-soon"
+              disabled
+              title="Communities — coming soon"
+            >
+              Communities · Coming Soon
+            </button>
+          </div>
         </section>
 
         {error && <p className="error-text">{error}</p>}
