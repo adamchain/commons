@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import { connectMongo } from "./lib/db.js";
+import { adminRouter } from "./routes/admin.js";
 import { authRouter } from "./routes/auth.js";
 import { chatRouter } from "./routes/chat.js";
 import { feedbackRouter } from "./routes/feedback.js";
@@ -33,6 +34,7 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+app.use("/api/admin", adminRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/plans", plansRouter);
 app.use("/api/places", placesRouter);

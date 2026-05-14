@@ -9,6 +9,7 @@ import { ExplorePage } from "./pages/Explore";
 import { FeedPage } from "./pages/Feed";
 import { OnboardingPage } from "./pages/Onboarding";
 import { PlanDetailPage } from "./pages/PlanDetail";
+import { AdminPage } from "./pages/Admin";
 import { ProfilePage } from "./pages/Profile";
 
 function Protected({
@@ -30,6 +31,7 @@ export default function App() {
     <>
       <Routes>
         <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route path="/admin" element={<AdminPage />} />
         <Route path="/login" element={<Navigate to="/onboarding" replace />} />
 
         <Route path="/" element={<Protected><FeedPage /></Protected>} />

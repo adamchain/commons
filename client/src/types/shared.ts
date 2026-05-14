@@ -256,6 +256,8 @@ export interface MeDTO {
   onboardingComplete: boolean;
   createdAt: string;
   networkUserIds?: string[];
+  /** True when this verified phone may use `/api/admin` and `/admin`. */
+  canAccessAdmin?: boolean;
 }
 
 export interface NetworkPromptDTO {

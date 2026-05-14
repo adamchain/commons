@@ -13,7 +13,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(body || "Request failed");
+    throw new Error(`${response.status}: ${body || response.statusText}`);
   }
 
   return response.json() as Promise<T>;

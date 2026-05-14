@@ -14,7 +14,7 @@ import {
   type NeighborhoodDTO,
 } from "../types/shared";
 
-type Step = "phone" | "code" | "location" | "interests" | "profile";
+type Step = "phone" | "code" | "admin_choice" | "location" | "interests" | "profile";
 
 export function OnboardingPage() {
   const { user, refreshUser, setUser } = useAuth();
@@ -37,9 +37,13 @@ export function OnboardingPage() {
   }, [user, navigate]);
 
   useEffect(() => {
-    if (user && (step === "phone" || step === "code")) {
-      setStep(pickInitial(user));
+    if (!user) return;
+    if (step !== "phone" && step !== "code") return;
+    if (user.canAccessAdmin && sessionStorage.getItem("commons_pending_admin_choice") === "1") {
+      setStep("admin_choice");
+      return;
     }
+    setStep(pickInitial(user));
   }, [user, step]);
 
   useEffect(() => {
@@ -94,7 +98,12 @@ export function OnboardingPage() {
         body: JSON.stringify({ phoneNumber, code }),
       });
       setUser(me);
-      setStep(pickInitial(me));
+      if (me.canAccessAdmin) {
+        sessionStorage.setItem("commons_pending_admin_choice", "1");
+        setStep("admin_choice");
+      } else {
+        setStep(pickInitial(me));
+      }
     } catch (e) {
       setError(formatError(e));
     } finally {
@@ -167,6 +176,36 @@ export function OnboardingPage() {
         </button>
         <button className="btn-link" onClick={() => setStep("phone")} type="button">
           Wrong number?
+        </button>
+      </OnboardingShell>
+    );
+  }
+  if (step === "admin_choice" && user?.canAccessAdmin) {
+    return (
+      <OnboardingShell title="Admin access" subtitle="You signed in with a number that can open the Commons admin dashboard.">
+        <p className="onboarding-fineprint" style={{ textAlign: "center", marginBottom: "1rem" }}>
+          Use <strong>Commons as a member</strong> for plans and chat, or <strong>Admin</strong> for metrics and user tools.
+        </p>
+        <button
+          className="btn-primary btn-block"
+          type="button"
+          onClick={() => {
+            sessionStorage.removeItem("commons_pending_admin_choice");
+            setStep(pickInitial(user));
+          }}
+        >
+          Continue as member
+        </button>
+        <button
+          className="btn-secondary btn-block"
+          type="button"
+          style={{ marginTop: "0.75rem" }}
+          onClick={() => {
+            sessionStorage.removeItem("commons_pending_admin_choice");
+            navigate("/admin", { replace: true });
+          }}
+        >
+          Open admin dashboard
         </button>
       </OnboardingShell>
     );
@@ -249,7 +288,7 @@ function formatPhoneInput(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return "";
   if (trimmed.startsWith("+")) {
-    let inner = trimmed.slice(1).replace(/\D/g, "").slice(0, 15);
+    const inner = trimmed.slice(1).replace(/\D/g, "").slice(0, 15);
     // Pretty NANP: +1 (484) 571-2062
     if (inner.length === 11 && inner.startsWith("1")) {
       const n = inner.slice(1);

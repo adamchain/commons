@@ -11,6 +11,7 @@ export function BottomNav() {
   const { pathname } = useLocation();
 
   const hide =
+    pathname.startsWith("/admin") ||
     pathname.startsWith("/onboarding") ||
     pathname.startsWith("/login") ||
     pathname === "/plans/new" ||

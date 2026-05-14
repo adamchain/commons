@@ -323,6 +323,26 @@ export const store = {
   },
 
   // Participations
+  listAllParticipations(): ParticipationRecord[] {
+    return [...snapshot.participations];
+  },
+  listAllMessages(): MessageRecord[] {
+    return [...snapshot.messages];
+  },
+  listAllConversations(): ConversationRecord[] {
+    return [...snapshot.conversations];
+  },
+  listAllFeedback(): FeedbackRecord[] {
+    return [...snapshot.feedback];
+  },
+  listAllPlanSuggestions(): PlanSuggestionRecord[] {
+    return [...snapshot.planSuggestions];
+  },
+  listLogsRecent(limit: number): LogRecord[] {
+    return [...snapshot.logs]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, Math.max(0, limit));
+  },
   listParticipationsForPlan(planId: string): ParticipationRecord[] {
     return snapshot.participations.filter((p) => p.planId === planId);
   },
@@ -479,6 +499,9 @@ export const store = {
   },
   recentDeclinesForUser(userId: string, sinceIso: string): DeclineRecord[] {
     return snapshot.declines.filter((d) => d.userId === userId && d.createdAt >= sinceIso);
+  },
+  listAllDeclines(): DeclineRecord[] {
+    return [...snapshot.declines];
   },
 
   // SMS codes (mock Twilio)

@@ -42,6 +42,7 @@ export function ProfilePage() {
     void api<ProfilePayload>(`/api/profile/${userId}`).then(setProfile).catch(() => setProfile(null));
 
   const signOut = async () => {
+    sessionStorage.removeItem("commons_pending_admin_choice");
     await api("/api/auth/logout", { method: "POST" });
     setUser(null);
     navigate("/onboarding", { replace: true });
@@ -141,6 +142,14 @@ export function ProfilePage() {
       )}
 
       {isSelf && <MonthCalendar plans={feedPlans} />}
+
+      {isSelf && user?.canAccessAdmin && (
+        <section className="profile-block">
+          <Link to="/admin" className="btn-secondary btn-block" style={{ textAlign: "center", display: "block" }}>
+            Admin dashboard
+          </Link>
+        </section>
+      )}
 
       {isSelf && <SettingsPanel onSignOut={() => void signOut()} />}
 

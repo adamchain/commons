@@ -170,6 +170,8 @@ export interface MeDTO {
   createdAt: string;
   /** User ids in this person’s COMMONS network (one-way). */
   networkUserIds?: string[];
+  /** True when this verified phone may use `/api/admin` and `/admin`. */
+  canAccessAdmin?: boolean;
 }
 
 export interface NetworkPromptDTO {

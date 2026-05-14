@@ -43,6 +43,14 @@ export async function findUserByPhone(phoneNumber: string): Promise<UserRecord |
   return store.findUserByPhone(phoneNumber);
 }
 
+export async function listAllUsers(): Promise<UserRecord[]> {
+  if (isMongoConnected()) {
+    const docs = await UserModel.find({}).sort({ createdAt: -1 }).lean();
+    return docs;
+  }
+  return store.listUsers().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
 export async function findUsersByIds(ids: string[]): Promise<Map<string, UserRecord>> {
   const unique = [...new Set(ids)];
   const map = new Map<string, UserRecord>();

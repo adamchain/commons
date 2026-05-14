@@ -1,5 +1,7 @@
 import { Router } from "express";
+import { isAdminPhone } from "../lib/adminPhones.js";
 import { signSessionToken } from "../lib/jwt.js";
+import { normalizePhone } from "../lib/phone.js";
 import { checkPhoneVerification, isTwilioVerifyConfigured, startPhoneVerification } from "../lib/verify.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { store } from "../store.js";
@@ -38,32 +40,6 @@ function setSessionCookie(res: import("express").Response, userId: string): void
   });
 }
 
-function normalizePhone(raw: string): string | null {
-  const digits = raw.replace(/\D/g, "");
-  if (!digits) return null;
-  // NANP (US/CA): 10 digits, or 11 with leading country code 1.
-  // Reject impossible NANP numbers early so Twilio doesn't return generic 400s.
-  const isNanp10 = (n: string): boolean => /^[2-9]\d{2}[2-9]\d{6}$/.test(n);
-  if (/^1\d{10}$/.test(digits)) {
-    const national = digits.slice(1);
-    if (!isNanp10(national)) return null;
-    return `+${digits}`;
-  }
-  if (/^\d{10}$/.test(digits)) {
-    if (!isNanp10(digits)) return null;
-    return `+1${digits}`;
-  }
-  const compact = raw.replace(/\s/g, "").trim();
-  if (compact.startsWith("+")) {
-    const rest = compact.slice(1).replace(/\D/g, "");
-    if (/^\d{6,14}$/.test(rest)) {
-      if (rest.startsWith("1") && rest.length === 11 && !isNanp10(rest.slice(1))) return null;
-      return `+${rest}`;
-    }
-  }
-  return null;
-}
-
 function generateCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
@@ -89,6 +65,7 @@ function meFromUser(user: UserRecord): MeDTO {
     onboardingComplete: user.onboardingComplete,
     createdAt: user.createdAt,
     networkUserIds: user.networkIds?.length ? user.networkIds : [],
+    canAccessAdmin: isAdminPhone(user.phoneNumber),
   };
 }
 
