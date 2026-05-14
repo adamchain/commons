@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { mongoMirror } from "./mongoMirror.js";
 import type {
   AvatarStyle,
   HostTag,
@@ -200,9 +201,25 @@ function persist(): void {
 }
 
 export const store = {
-  reset(next: Snapshot): void {
+  /**
+   * Replace the snapshot WITHOUT persisting or mirroring. Used exclusively by
+   * `hydrateSnapshotFromMongo` — Mongo already holds this state, so writing
+   * data.json or re-mirroring would be wasted IO / writeback noise.
+   */
+  resetLocalOnly(next: Snapshot): void {
     snapshot = next;
+  },
+
+  /**
+   * Idempotent neighborhood bootstrap. Called from the seed when the static
+   * neighborhood list isn't yet present. Replaces only the neighborhoods
+   * collection — never touches users/plans/etc., so seeding on a partially
+   * populated Mongo doesn't wipe real data.
+   */
+  seedNeighborhoods(list: NeighborhoodRecord[]): void {
+    snapshot.neighborhoods = list;
     persist();
+    mongoMirror.replaceAllNeighborhoods(list);
   },
 
   isEmpty(): boolean {
@@ -241,6 +258,7 @@ export const store = {
     };
     snapshot.users.push(user);
     persist();
+    mongoMirror.upsertUser(user);
     return user;
   },
   updateUser(id: string, patch: Partial<Omit<UserRecord, "id" | "createdAt">>): UserRecord | undefined {
@@ -248,6 +266,7 @@ export const store = {
     if (!user) return undefined;
     Object.assign(user, patch);
     persist();
+    mongoMirror.upsertUser(user);
     return user;
   },
 
@@ -296,6 +315,7 @@ export const store = {
     };
     snapshot.plans.push(plan);
     persist();
+    mongoMirror.upsertPlan(plan);
     return plan;
   },
 
@@ -304,6 +324,7 @@ export const store = {
     if (!plan) return undefined;
     Object.assign(plan, patch);
     persist();
+    mongoMirror.upsertPlan(plan);
     return plan;
   },
 
@@ -321,6 +342,7 @@ export const store = {
     };
     snapshot.planSuggestions.push(row);
     persist();
+    mongoMirror.upsertPlanSuggestion(row);
     return row;
   },
 
@@ -360,6 +382,7 @@ export const store = {
       existing.state = state;
       existing.updatedAt = new Date().toISOString();
       persist();
+      mongoMirror.upsertParticipation(existing);
       return existing;
     }
     const record: ParticipationRecord = {
@@ -371,6 +394,7 @@ export const store = {
     };
     snapshot.participations.push(record);
     persist();
+    mongoMirror.upsertParticipation(record);
     return record;
   },
   deleteParticipation(planId: string, userId: string): void {
@@ -378,6 +402,7 @@ export const store = {
       (p) => !(p.planId === planId && p.userId === userId)
     );
     persist();
+    mongoMirror.deleteParticipation(planId, userId);
   },
 
   // Conversations + Messages
@@ -400,6 +425,7 @@ export const store = {
       // make sure participants are up to date
       existing.participantIds = Array.from(new Set([...existing.participantIds, ...participantIds]));
       persist();
+      mongoMirror.upsertConversation(existing);
       return existing;
     }
     const conv: ConversationRecord = {
@@ -412,6 +438,7 @@ export const store = {
     };
     snapshot.conversations.push(conv);
     persist();
+    mongoMirror.upsertConversation(conv);
     return conv;
   },
   createDm(planId: string, a: string, b: string): ConversationRecord {
@@ -427,6 +454,7 @@ export const store = {
     };
     snapshot.conversations.push(conv);
     persist();
+    mongoMirror.upsertConversation(conv);
     return conv;
   },
   findConversationById(id: string): ConversationRecord | undefined {
@@ -451,6 +479,8 @@ export const store = {
     const conv = snapshot.conversations.find((c) => c.id === conversationId);
     if (conv) conv.lastMessageAt = message.createdAt;
     persist();
+    mongoMirror.upsertMessage(message);
+    if (conv) mongoMirror.upsertConversation(conv);
     return message;
   },
 
@@ -468,6 +498,8 @@ export const store = {
     const conv = snapshot.conversations.find((c) => c.id === conversationId);
     if (conv) conv.lastMessageAt = message.createdAt;
     persist();
+    mongoMirror.upsertMessage(message);
+    if (conv) mongoMirror.upsertConversation(conv);
     return message;
   },
 
@@ -480,6 +512,7 @@ export const store = {
     };
     snapshot.feedback.push(record);
     persist();
+    mongoMirror.upsertFeedback(record);
     return record;
   },
   listFeedbackForHost(hostId: string): FeedbackRecord[] {
@@ -491,13 +524,15 @@ export const store = {
 
   // Declines (used by recommendation algo)
   recordDecline(userId: string, planId: string): void {
-    snapshot.declines.push({
+    const record: DeclineRecord = {
       id: randomUUID(),
       userId,
       planId,
       createdAt: new Date().toISOString(),
-    });
+    };
+    snapshot.declines.push(record);
     persist();
+    mongoMirror.upsertDecline(record);
   },
   recentDeclinesForUser(userId: string, sinceIso: string): DeclineRecord[] {
     return snapshot.declines.filter((d) => d.userId === userId && d.createdAt >= sinceIso);
@@ -533,12 +568,14 @@ export const store = {
 
   // Logs
   log(event: string, payload: unknown): void {
-    snapshot.logs.push({
+    const entry: LogRecord = {
       id: randomUUID(),
       event,
       payload,
       createdAt: new Date().toISOString(),
-    });
+    };
+    snapshot.logs.push(entry);
     persist();
+    mongoMirror.upsertLog(entry);
   },
 };

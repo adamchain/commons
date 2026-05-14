@@ -1,13 +1,12 @@
-import { randomUUID } from "node:crypto";
 import mongoose from "mongoose";
-import { isMongoConnected } from "./lib/db.js";
-import { UserModel } from "./models/User.js";
 import { store, type UserRecord } from "./store.js";
 
-// A patch value of `null` for an optional field is treated as "clear it"
-// (Mongo $unset, in-memory delete) — distinct from `undefined`, which means
-// "leave it alone." We need this so toggling between photo and preset avatars
-// actually removes the previous value.
+// A patch value of `null` for an optional field is treated as "clear it" —
+// distinct from `undefined`, which means "leave it alone." Toggling between
+// photo and preset avatars relies on this.
+//
+// We persist `null` in both the snapshot and Mongo (rather than $unset). All
+// readers check `if (photoDataUrl)` so null and missing behave identically.
 export type UserPatch = Partial<Omit<UserRecord, "id" | "createdAt" | "avatarPhotoDataUrl" | "avatarParams">> & {
   avatarPhotoDataUrl?: string | null;
   avatarParams?: string | null;
@@ -15,61 +14,26 @@ export type UserPatch = Partial<Omit<UserRecord, "id" | "createdAt" | "avatarPho
 
 export type CreateUserOptions = { accountSource?: "verify" | "seed" };
 
-function newUserRecord(phoneNumber: string, opts?: CreateUserOptions): UserRecord {
-  return {
-    id: randomUUID(),
-    phoneNumber,
-    accountSource: opts?.accountSource ?? "verify",
-    firstName: "",
-    neighborhoodId: null,
-    neighborhoodIds: [],
-    interests: [],
-    avatarSeed: randomUUID(),
-    avatarStyle: "avataaars",
-    avatarPhotoDataUrl: undefined,
-    onboardingComplete: false,
-    createdAt: new Date().toISOString(),
-    networkIds: [],
-    dismissedNetworkPromptPlanIds: [],
-  };
-}
+// All user reads/writes go through the in-memory `store` snapshot. The store
+// mirrors writes to Mongo via `mongoMirror`, and `hydrateSnapshotFromMongo`
+// loads users back from Mongo on cold start. One source of truth for reads
+// (snapshot), one for durable persistence (Mongo).
 
 export async function findUserById(id: string): Promise<UserRecord | undefined> {
-  if (isMongoConnected()) {
-    const doc = await UserModel.findOne({ id }).lean();
-    return doc ?? undefined;
-  }
   return store.findUserById(id);
 }
 
 export async function findUserByPhone(phoneNumber: string): Promise<UserRecord | undefined> {
-  if (isMongoConnected()) {
-    const doc = await UserModel.findOne({ phoneNumber }).lean();
-    return doc ?? undefined;
-  }
   return store.findUserByPhone(phoneNumber);
 }
 
 export async function listAllUsers(): Promise<UserRecord[]> {
-  if (isMongoConnected()) {
-    const docs = await UserModel.find({}).sort({ createdAt: -1 }).lean();
-    return docs;
-  }
   return store.listUsers().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function findUsersByIds(ids: string[]): Promise<Map<string, UserRecord>> {
   const unique = [...new Set(ids)];
   const map = new Map<string, UserRecord>();
-  if (unique.length === 0) return map;
-
-  if (isMongoConnected()) {
-    const docs = await UserModel.find({ id: { $in: unique } }).lean();
-    for (const doc of docs) {
-      map.set(doc.id, doc);
-    }
-    return map;
-  }
   for (const id of unique) {
     const u = store.findUserById(id);
     if (u) map.set(id, u);
@@ -81,37 +45,16 @@ export async function createUser(
   phoneNumber: string,
   opts?: CreateUserOptions,
 ): Promise<UserRecord> {
-  const user = newUserRecord(phoneNumber, opts);
-  if (isMongoConnected()) {
-    await UserModel.create(user);
-    return user;
-  }
   return store.createUser(phoneNumber, opts);
 }
 
 export async function updateUser(id: string, patch: UserPatch): Promise<UserRecord | undefined> {
-  if (isMongoConnected()) {
-    const setFields: Record<string, unknown> = {};
-    const unsetFields: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(patch)) {
-      if (v === undefined) continue;
-      if (v === null) unsetFields[k] = "";
-      else setFields[k] = v;
-    }
-    const update: Record<string, unknown> = {};
-    if (Object.keys(setFields).length > 0) update.$set = setFields;
-    if (Object.keys(unsetFields).length > 0) update.$unset = unsetFields;
-    const updated = await UserModel.findOneAndUpdate({ id }, update, {
-      new: true,
-      runValidators: true,
-    }).lean();
-    return updated ?? undefined;
-  }
-  // In-memory: null means clear the field outright.
+  // Strip undefined (don't touch). Pass null through — store + mongoMirror
+  // both store it as null, which all readers treat as falsy.
   const cleaned: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(patch)) {
     if (v === undefined) continue;
-    cleaned[k] = v === null ? undefined : v;
+    cleaned[k] = v;
   }
   return store.updateUser(id, cleaned as Partial<Omit<UserRecord, "id" | "createdAt">>);
 }

@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import { connectMongo } from "./lib/db.js";
+import { hydrateSnapshotFromMongo } from "./hydrate.js";
 import { adminRouter } from "./routes/admin.js";
 import { authRouter } from "./routes/auth.js";
 import { chatRouter } from "./routes/chat.js";
@@ -57,6 +58,11 @@ if (isProduction) {
 
 async function bootstrap(): Promise<void> {
   await connectMongo();
+  // Mongo is the source of truth. After connecting, pull everything into the
+  // in-memory snapshot so sync reads in `store` see prod data on a cold
+  // container start. If Mongo isn't connected (no MONGODB_URI), the snapshot
+  // keeps whatever it loaded from data.json (local dev).
+  await hydrateSnapshotFromMongo();
   await seedIfEmpty();
   startNudgeSchedulers();
 

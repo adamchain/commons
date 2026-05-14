@@ -444,19 +444,7 @@ export async function seedIfEmpty(): Promise<void> {
         .map((k) => neighborhoodIdByKey.get(k))
         .filter((id): id is string => Boolean(id));
     }
-    store.reset({
-      users: [],
-      neighborhoods: Array.from(recordsByKey.values()),
-      plans: [],
-      participations: [],
-      conversations: [],
-      messages: [],
-      feedback: [],
-      declines: [],
-      smsCodes: [],
-      logs: [],
-      planSuggestions: [],
-    });
+    store.seedNeighborhoods(Array.from(recordsByKey.values()));
   } else {
     // Map existing neighborhoods back to keys by name so demo seeding works on restart.
     const nameToKey = new Map(PHILLY_NEIGHBORHOODS.map((n) => [n.name, n.key]));
