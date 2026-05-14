@@ -52,8 +52,9 @@
 
   /* layout + community tints (single :root; see bottom-nav) */
   --nav-height: 72px;
-  --community-pink: #7a3d4f;
-  --community-pink-soft: color-mix(in srgb, var(--brand-pink) 32%, transparent);
+  --community-pink: #f0dde1;
+  --community-pink-soft: rgba(239, 213, 214, 0.12);
+  --community-pink-border: rgba(239, 213, 214, 0.28);
 }
 
 [data-theme="light"] {
@@ -82,7 +83,8 @@
   --shadow-nav: 0 -1px 0 rgba(12, 10, 30, 0.08);
 
   --community-pink: #6b2f42;
-  --community-pink-soft: color-mix(in srgb, var(--brand-pink) 55%, #ffffff 45%);
+  --community-pink-soft: rgba(239, 213, 214, 0.45);
+  --community-pink-border: rgba(107, 47, 66, 0.22);
 
   color-scheme: light;
 }
@@ -1991,7 +1993,7 @@ label {
   color: var(--community-pink);
   font-size: 13px;
   font-weight: 600;
-  border: 1px solid color-mix(in srgb, var(--community-pink) 28%, transparent);
+  border: 1px solid var(--community-pink-border);
 }
 
 .profile-edit-panel {

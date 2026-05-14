@@ -207,7 +207,7 @@ export function ProfilePage() {
       {profile.upcoming.length === 0 && profile.past.length === 0 && (
         <section className="profile-block">
           <p className="empty-state" style={{ marginTop: 8 }}>
-            {isSelf ? "No plans yet — post your first to get the feed rolling." : "No plans yet."}
+            {isSelf ? "Post a plan from your profile." : "No plans yet."}
           </p>
           {isSelf && (
             <Link to="/plans/new" className="btn-primary" style={{ marginTop: 12, display: "inline-block" }}>
