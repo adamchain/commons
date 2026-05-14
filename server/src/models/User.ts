@@ -26,6 +26,7 @@ const UserSchema = new mongoose.Schema<UserRecord>(
     createdAt: { type: String, required: true },
     networkIds: { type: [String], default: undefined },
     dismissedNetworkPromptPlanIds: { type: [String], default: undefined },
+    socialLinks: { type: { instagram: { type: String } }, default: undefined },
   },
   { collection: "users" },
 );

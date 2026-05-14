@@ -240,6 +240,10 @@ export const HOST_TAG_LABELS: Record<HostTag, string> = {
   made_me_feel_welcome: "🤝 made me feel welcome",
 };
 
+export interface SocialLinks {
+  instagram?: string;
+}
+
 export interface MeDTO {
   id: string;
   phoneNumber: string;
@@ -256,6 +260,7 @@ export interface MeDTO {
   onboardingComplete: boolean;
   createdAt: string;
   networkUserIds?: string[];
+  socialLinks?: SocialLinks;
   /** True when this verified phone may use `/api/admin` and `/admin`. */
   canAccessAdmin?: boolean;
 }

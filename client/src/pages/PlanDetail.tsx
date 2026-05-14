@@ -66,7 +66,14 @@ export function PlanDetailPage() {
       const interestedFiltered = prev.participants.interested.filter((u) => u.id !== user.id);
       const going = next === "going" ? [...goingFiltered, me] : goingFiltered;
       const interested = next === "interested" ? [...interestedFiltered, me] : interestedFiltered;
-      return { ...prev, myState: next, participants: { going, interested } };
+      const updated = { ...prev, myState: next, participants: { going, interested } };
+      // Looking-For lifecycle: tapping Interested drops you into the group
+      // chat — that's where coordination happens before anyone locks in.
+      if (next === "interested" && prev.planKind === "looking_for" && prev.creator.id !== user.id) {
+        // Defer navigation so the state update flushes first.
+        setTimeout(() => navigate(`/plans/${prev.id}/chat`), 200);
+      }
+      return updated;
     });
   };
 
@@ -221,6 +228,10 @@ export function PlanDetailPage() {
           initialState={plan.myState}
           onChange={onStateChange}
           planKind={plan.planKind}
+          capacity={plan.capacity}
+          goingCount={plan.participants.going.length}
+          joinType={plan.joinType}
+          isHosting={isHosting}
         />
 
         <div className="plan-actions-row">
@@ -257,17 +268,38 @@ export function PlanDetailPage() {
         {plan.participants.interested.length > 0 && (
           <>
             <h3 className="who-block-heading" style={{ marginTop: 18 }}>
-              Interested · {plan.participants.interested.length}
+              {plan.joinType === "approve" && isHosting ? "Applications" : "Interested"} · {plan.participants.interested.length}
             </h3>
             <div className="participant-list-interested">
               {plan.participants.interested.map((person) => (
-                <Link key={person.id} to={`/profile/${person.id}`} className="participant-row">
-                  <Avatar seed={person.avatarSeed} style={person.avatarStyle} photoDataUrl={person.avatarPhotoDataUrl} params={person.avatarParams} size="sm" />
-                  <span className="participant-name">
-                    {person.firstName}
-                    {person.id === user.id && <span className="you-pill">You</span>}
-                  </span>
-                </Link>
+                <div key={person.id} className="participant-row participant-row--with-action">
+                  <Link to={`/profile/${person.id}`} className="participant-row-link">
+                    <Avatar seed={person.avatarSeed} style={person.avatarStyle} photoDataUrl={person.avatarPhotoDataUrl} params={person.avatarParams} size="sm" />
+                    <span className="participant-name">
+                      {person.firstName}
+                      {person.id === user.id && <span className="you-pill">You</span>}
+                    </span>
+                  </Link>
+                  {plan.joinType === "approve" && isHosting && person.id !== user.id && (
+                    <button
+                      type="button"
+                      className="btn-secondary participant-approve-btn"
+                      onClick={async () => {
+                        try {
+                          await api(`/api/plans/${plan.id}/approve`, {
+                            method: "POST",
+                            body: JSON.stringify({ userId: person.id }),
+                          });
+                          await load();
+                        } catch {
+                          /* swallow */
+                        }
+                      }}
+                    >
+                      Let them in
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           </>

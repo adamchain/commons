@@ -25,6 +25,7 @@ interface SeedPlan {
   going: string[];
   interested: string[];
   messages: Array<{ senderPhone: string; body: string; minutesAgo: number }>;
+  planKind?: "standard" | "looking_for";
 }
 
 interface SeedNeighborhood {
@@ -63,7 +64,53 @@ const SEED_USERS: SeedUser[] = [
   { phoneNumber: "+15555550109", firstName: "Mar", neighborhoodKey: "west_philly", interests: ["thrifting", "music_nightlife", "arts_culture"], avatarSeed: "mar-seed" },
   { phoneNumber: "+15555550110", firstName: "Theo", neighborhoodKey: "manayunk", interests: ["fitness_outdoors", "running", "dog_owners"], avatarSeed: "theo-seed" },
   { phoneNumber: "+15555550111", firstName: "Ren", neighborhoodKey: "fairmount", interests: ["arts_culture", "local_events", "wellness"], avatarSeed: "ren-seed" },
+  ...generateExtraUsers(),
 ];
+
+// Procedurally expand the seed dataset to ~50 users + ~50 plans so the feed
+// feels alive on day one. Names + interest combos rotate against the
+// neighborhood graph; phone numbers stay in the 555-01xx range. Idempotent —
+// re-seeding with the same numbers updates the existing rows.
+function generateExtraUsers(): SeedUser[] {
+  const names = [
+    "Avery", "Blair", "Casey", "Drew", "Emerson", "Frankie", "Gray", "Harper",
+    "Indigo", "Jules", "Kai", "Logan", "Morgan", "Nico", "Owen", "Parker",
+    "Quinn", "Reese", "Sage", "Taylor", "Umi", "Val", "Wren", "Xio",
+    "Yael", "Zane", "Ari", "Bren", "Cody", "Dana", "Eli", "Fia",
+    "Gio", "Hana", "Ivo", "Joss", "Kira", "Luca",
+  ];
+  const hoods: string[] = [
+    "center_city", "rittenhouse", "old_city", "northern_liberties",
+    "fishtown", "south_philly", "west_philly", "manayunk", "fairmount",
+    "graduate_hospital",
+  ];
+  const interestPalette: InterestTag[][] = [
+    ["coffee_cowork", "running", "wellness"],
+    ["food_drinks", "music_nightlife", "local_events"],
+    ["arts_culture", "thrifting", "coffee_cowork"],
+    ["fitness_outdoors", "dog_owners", "running"],
+    ["wellness", "arts_culture", "food_drinks"],
+    ["music_nightlife", "local_events", "thrifting"],
+    ["coffee_cowork", "arts_culture", "local_events"],
+    ["fitness_outdoors", "wellness", "running"],
+    ["food_drinks", "coffee_cowork", "wellness"],
+    ["dog_owners", "fitness_outdoors", "arts_culture"],
+  ];
+  const users: SeedUser[] = [];
+  for (let i = 0; i < names.length; i++) {
+    const name = names[i]!;
+    const num = 200 + i; // phone tail starts at 200 so it doesn't collide with the curated 100-111 block.
+    const phoneNumber = `+1555555${String(num).padStart(4, "0")}`;
+    users.push({
+      phoneNumber,
+      firstName: name,
+      neighborhoodKey: hoods[i % hoods.length]!,
+      interests: interestPalette[i % interestPalette.length]!,
+      avatarSeed: `${name.toLowerCase()}-seed-${i}`,
+    });
+  }
+  return users;
+}
 
 const SEED_PLANS: SeedPlan[] = [
   {
@@ -243,7 +290,113 @@ const SEED_PLANS: SeedPlan[] = [
     interested: ["+15555550100"],
     messages: [],
   },
+  ...generateExtraPlans(),
 ];
+
+function generateExtraPlans(): SeedPlan[] {
+  // Build varied plans across all generated users + the curated names.
+  const templates: Array<{
+    title: string;
+    location: SeedPlan["location"];
+    neighborhoodKey: string;
+    tags: InterestTag[];
+    hostEmoji: string;
+    time: string;
+    isFlexibleTime: boolean;
+    description: string;
+  }> = [
+    { title: "Pickleball at the rec center", neighborhoodKey: "south_philly", location: { name: "Palumbo Rec Center", address: "700 Bainbridge St" }, tags: ["fitness_outdoors", "local_events"], hostEmoji: "🏓", time: "18:00", isFlexibleTime: false, description: "Open play — bring a paddle if you have one." },
+    { title: "Wine and cheese on the porch", neighborhoodKey: "graduate_hospital", location: { name: "Front porch · S 23rd", address: "South 23rd Street" }, tags: ["food_drinks", "wellness"], hostEmoji: "🍷", time: "19:30", isFlexibleTime: false, description: "Bring a bottle, I've got the spread." },
+    { title: "Sketch crawl — Italian Market", neighborhoodKey: "south_philly", location: { name: "9th Street Italian Market", address: "919 S 9th St" }, tags: ["arts_culture", "thrifting"], hostEmoji: "✏️", time: "11:00", isFlexibleTime: true, description: "Pen + paper. Coffee stop midway." },
+    { title: "Friday trivia at Bards", neighborhoodKey: "rittenhouse", location: { name: "The Bards", address: "2013 Walnut St" }, tags: ["local_events", "food_drinks"], hostEmoji: "🎲", time: "20:00", isFlexibleTime: false, description: "Need 2 more for the team. Decent at music + history." },
+    { title: "Morning bike along MLK Dr.", neighborhoodKey: "fairmount", location: { name: "Lloyd Hall trailhead", address: "1 Boathouse Row" }, tags: ["fitness_outdoors", "running"], hostEmoji: "🚲", time: "08:00", isFlexibleTime: false, description: "Closed to cars — easy 10mi out and back." },
+    { title: "Live jazz at Chris' Jazz Café", neighborhoodKey: "center_city", location: { name: "Chris' Jazz Café", address: "1421 Sansom St" }, tags: ["music_nightlife", "arts_culture"], hostEmoji: "🎷", time: "21:00", isFlexibleTime: false, description: "Late set, cover at the door." },
+    { title: "Dog meetup at Schuylkill River Park", neighborhoodKey: "rittenhouse", location: { name: "Schuylkill River Dog Park", address: "300 S 25th St" }, tags: ["dog_owners", "fitness_outdoors"], hostEmoji: "🐶", time: "16:00", isFlexibleTime: true, description: "My pup needs friends. Bring yours!" },
+    { title: "Looking for — running buddy", neighborhoodKey: "west_philly", location: { name: "", address: "" }, tags: ["running", "fitness_outdoors"], hostEmoji: "🏃", time: "Flexible", isFlexibleTime: true, description: "Building up to a 10k. 9-10 min/mi pace." },
+    { title: "Vinyl listening night", neighborhoodKey: "northern_liberties", location: { name: "Liberty Lands park", address: "913 N 3rd St" }, tags: ["music_nightlife", "arts_culture"], hostEmoji: "💿", time: "19:00", isFlexibleTime: false, description: "Bring an album you want to play start to finish." },
+    { title: "Sunday morning farmer's market", neighborhoodKey: "south_philly", location: { name: "Headhouse Farmers Market", address: "2nd & Lombard St" }, tags: ["food_drinks", "wellness"], hostEmoji: "🥕", time: "10:00", isFlexibleTime: true, description: "Want to hit the early vendors before the rush." },
+    { title: "Pottery throw-in", neighborhoodKey: "fishtown", location: { name: "The Clay Studio", address: "1425 N American St" }, tags: ["arts_culture", "wellness"], hostEmoji: "🏺", time: "18:30", isFlexibleTime: false, description: "Drop-in session — first time okay." },
+    { title: "Looking for — concert buddy on Friday", neighborhoodKey: "fishtown", location: { name: "", address: "" }, tags: ["music_nightlife"], hostEmoji: "🎟️", time: "Flexible", isFlexibleTime: true, description: "Extra ticket to the show at Union Transfer — say hi if you'd be down." },
+    { title: "Co-work morning at Ultimo", neighborhoodKey: "graduate_hospital", location: { name: "Ultimo Coffee", address: "1900 S 15th St" }, tags: ["coffee_cowork"], hostEmoji: "💻", time: "09:30", isFlexibleTime: false, description: "Heads down for two hours, lunch after if anyone wants." },
+    { title: "Run group — easy 5k", neighborhoodKey: "fairmount", location: { name: "Eakins Oval", address: "2451 Benjamin Franklin Pkwy" }, tags: ["running", "fitness_outdoors"], hostEmoji: "👟", time: "07:30", isFlexibleTime: false, description: "Conversational pace. Coffee after." },
+    { title: "Movie night — Bryant Park outdoor screening", neighborhoodKey: "center_city", location: { name: "Logan Square", address: "Logan Square, Philadelphia, PA" }, tags: ["local_events", "arts_culture"], hostEmoji: "🎬", time: "20:30", isFlexibleTime: false, description: "BYO blanket and snacks." },
+    { title: "Brunch at Sabrina's", neighborhoodKey: "south_philly", location: { name: "Sabrina's Café", address: "910 Christian St" }, tags: ["food_drinks", "coffee_cowork"], hostEmoji: "🥞", time: "11:30", isFlexibleTime: false, description: "Always a wait, more fun together." },
+    { title: "Looking for — gallery night company", neighborhoodKey: "old_city", location: { name: "", address: "" }, tags: ["arts_culture", "local_events"], hostEmoji: "🖼️", time: "Flexible", isFlexibleTime: true, description: "First Friday is too good to do solo." },
+    { title: "Climbing at Reach", neighborhoodKey: "fishtown", location: { name: "Reach Climbing", address: "Bridgeport, PA" }, tags: ["fitness_outdoors"], hostEmoji: "🧗", time: "18:00", isFlexibleTime: false, description: "Top rope partner welcome. Day pass works." },
+    { title: "Cold plunge + breakfast", neighborhoodKey: "rittenhouse", location: { name: "Greater Phila YMCA", address: "1425 Arch St" }, tags: ["wellness", "fitness_outdoors"], hostEmoji: "🧊", time: "07:00", isFlexibleTime: false, description: "Don't think, just plunge." },
+    { title: "Thrifting Saturday — Frankford Ave", neighborhoodKey: "fishtown", location: { name: "Jinxed Fishtown", address: "1331 Frankford Ave" }, tags: ["thrifting", "arts_culture"], hostEmoji: "🧥", time: "13:00", isFlexibleTime: false, description: "Three shops, slow morning." },
+    { title: "Looking for — board game night?", neighborhoodKey: "west_philly", location: { name: "", address: "" }, tags: ["local_events", "arts_culture"], hostEmoji: "🎲", time: "Flexible", isFlexibleTime: true, description: "Have Catan, Wingspan, Codenames. Looking for 2-4 players." },
+    { title: "Sunset walk · Penn Treaty Park", neighborhoodKey: "fishtown", location: { name: "Penn Treaty Park", address: "1199 N Delaware Ave" }, tags: ["wellness", "fitness_outdoors"], hostEmoji: "🌅", time: "19:00", isFlexibleTime: false, description: "Best skyline view in the city, easy 30min walk." },
+    { title: "Beer garden — Frankford Hall", neighborhoodKey: "fishtown", location: { name: "Frankford Hall", address: "1210 Frankford Ave" }, tags: ["food_drinks", "music_nightlife"], hostEmoji: "🍻", time: "17:00", isFlexibleTime: false, description: "Big tables — easy to merge with friends-of-friends." },
+    { title: "Art crawl + happy hour", neighborhoodKey: "old_city", location: { name: "Old City galleries", address: "N 3rd St" }, tags: ["arts_culture", "food_drinks"], hostEmoji: "🍸", time: "18:00", isFlexibleTime: false, description: "Three galleries then drinks at the corner spot." },
+    { title: "Sunday yoga · Race Street Pier", neighborhoodKey: "old_city", location: { name: "Race Street Pier", address: "N Christopher Columbus Blvd" }, tags: ["wellness", "fitness_outdoors"], hostEmoji: "🧘", time: "09:00", isFlexibleTime: false, description: "Free outdoor flow. Bring a mat." },
+    { title: "Looking for — coffee + co-work", neighborhoodKey: "rittenhouse", location: { name: "", address: "" }, tags: ["coffee_cowork"], hostEmoji: "☕", time: "Flexible", isFlexibleTime: true, description: "Working remote and would love some company." },
+    { title: "Manayunk towpath ride", neighborhoodKey: "manayunk", location: { name: "Manayunk Tow Path", address: "Manayunk, Philadelphia, PA" }, tags: ["fitness_outdoors", "running"], hostEmoji: "🚴", time: "10:00", isFlexibleTime: false, description: "Easy out and back to Conshy." },
+    { title: "Bar trivia at Fado", neighborhoodKey: "center_city", location: { name: "Fado Irish Pub", address: "1500 Locust St" }, tags: ["local_events", "food_drinks"], hostEmoji: "🍀", time: "19:30", isFlexibleTime: false, description: "Need a fourth — pop culture-heavy." },
+    { title: "Comedy show at Helium", neighborhoodKey: "center_city", location: { name: "Helium Comedy Club", address: "2031 Sansom St" }, tags: ["arts_culture", "local_events", "music_nightlife"], hostEmoji: "🎤", time: "20:00", isFlexibleTime: false, description: "Friday late show — never disappoints." },
+    { title: "Looking for — beach day Saturday", neighborhoodKey: "south_philly", location: { name: "", address: "" }, tags: ["fitness_outdoors", "local_events"], hostEmoji: "🏖️", time: "Flexible", isFlexibleTime: true, description: "Driving to Cape May. Two seats open." },
+    { title: "Run + coffee — Saturday", neighborhoodKey: "graduate_hospital", location: { name: "Rival Bros Coffee Bar", address: "2400 Lombard St" }, tags: ["running", "coffee_cowork"], hostEmoji: "☕", time: "08:00", isFlexibleTime: false, description: "Easy 3 miles then a long coffee." },
+    { title: "Bike polo · FDR Park", neighborhoodKey: "south_philly", location: { name: "FDR Park", address: "FDR Park, Philadelphia, PA" }, tags: ["fitness_outdoors", "local_events"], hostEmoji: "🚲", time: "16:00", isFlexibleTime: false, description: "Total beginners encouraged. Loaner bikes." },
+    { title: "Sunset drinks · Cira Green", neighborhoodKey: "west_philly", location: { name: "Cira Green Rooftop", address: "129 S 30th St" }, tags: ["food_drinks", "music_nightlife"], hostEmoji: "🍹", time: "18:30", isFlexibleTime: false, description: "Rooftop park with city views. BYO welcome." },
+    { title: "Reading at Big Blue Marble", neighborhoodKey: "west_philly", location: { name: "Big Blue Marble Bookstore", address: "551 Carpenter Ln" }, tags: ["arts_culture", "local_events"], hostEmoji: "📖", time: "19:00", isFlexibleTime: false, description: "Local author reading + Q&A." },
+    { title: "Looking for — soccer pickup", neighborhoodKey: "fairmount", location: { name: "", address: "" }, tags: ["fitness_outdoors", "local_events"], hostEmoji: "⚽", time: "Flexible", isFlexibleTime: true, description: "Have 6, need 4 more for a real game." },
+    { title: "Pottery + drinks", neighborhoodKey: "northern_liberties", location: { name: "Bourbon & Branch", address: "705 N 2nd St" }, tags: ["arts_culture", "food_drinks"], hostEmoji: "🏺", time: "19:00", isFlexibleTime: false, description: "Paint your own pottery night — drinks included." },
+    { title: "Looking for — board game host (2-4 players)", neighborhoodKey: "south_philly", location: { name: "", address: "" }, tags: ["local_events"], hostEmoji: "🎯", time: "Flexible", isFlexibleTime: true, description: "I'll bring the games, someone bring the apartment." },
+    { title: "Coffee tasting at Elixr", neighborhoodKey: "rittenhouse", location: { name: "Elixr Coffee", address: "207 S Sydenham St" }, tags: ["coffee_cowork", "food_drinks"], hostEmoji: "☕", time: "10:30", isFlexibleTime: false, description: "Pour-over flight + chat about beans." },
+    { title: "Volunteer · river cleanup", neighborhoodKey: "fairmount", location: { name: "Schuylkill Banks", address: "Schuylkill Banks Trailhead" }, tags: ["local_events", "fitness_outdoors"], hostEmoji: "🌱", time: "09:00", isFlexibleTime: false, description: "Gloves + bags provided. Coffee after at Sip-n-Glo." },
+  ];
+  const userPhones: string[] = [];
+  for (let i = 0; i < 38; i++) {
+    userPhones.push(`+1555555${String(200 + i).padStart(4, "0")}`);
+  }
+  const curatedPhones = [
+    "+15555550100", "+15555550101", "+15555550102", "+15555550103",
+    "+15555550104", "+15555550105", "+15555550106", "+15555550107",
+    "+15555550108", "+15555550109", "+15555550110", "+15555550111",
+  ];
+  const allPhones = [...curatedPhones, ...userPhones];
+  const plans: SeedPlan[] = [];
+  for (let i = 0; i < templates.length; i++) {
+    const t = templates[i]!;
+    const creatorPhone = allPhones[i % allPhones.length]!;
+    // Days from now: distribute across past 3 days through next 21 days for variety.
+    const daysFromNow = (i % 24) - 2;
+    // Going list = 2-4 random users including creator. Interested = 1-3.
+    const going = [creatorPhone];
+    const interested: string[] = [];
+    for (let g = 0; g < 2 + (i % 3); g++) {
+      const idx = (i * 7 + g * 13) % allPhones.length;
+      const phone = allPhones[idx]!;
+      if (phone !== creatorPhone && !going.includes(phone)) going.push(phone);
+    }
+    for (let s = 0; s < 1 + (i % 3); s++) {
+      const idx = (i * 11 + s * 17 + 5) % allPhones.length;
+      const phone = allPhones[idx]!;
+      if (phone !== creatorPhone && !going.includes(phone) && !interested.includes(phone)) {
+        interested.push(phone);
+      }
+    }
+    const isLooking = t.title.toLowerCase().startsWith("looking for");
+    plans.push({
+      creatorPhone,
+      title: t.title,
+      neighborhoodKey: t.neighborhoodKey,
+      location: t.location,
+      daysFromNow,
+      time: t.time,
+      isFlexibleTime: t.isFlexibleTime,
+      endHoursAfterStart: t.isFlexibleTime ? undefined : 2,
+      tags: t.tags,
+      description: t.description,
+      hostEmoji: t.hostEmoji,
+      going,
+      interested,
+      messages: [],
+      planKind: isLooking ? "looking_for" : "standard",
+    });
+  }
+  return plans;
+}
 
 function dateForOffset(days: number): string {
   const d = new Date();
@@ -348,20 +501,24 @@ export async function seedIfEmpty(): Promise<void> {
     if (alreadySeeded) continue;
 
     const date = dateForOffset(seed.daysFromNow);
+    const planKind = seed.planKind ?? "standard";
+    const isLookingFor = planKind === "looking_for";
     const plan = store.createPlan({
       creatorId,
       title: seed.title,
       neighborhoodId,
-      location: seed.location,
+      location: seed.location.name
+        ? seed.location
+        : { name: "Flexible location", address: "Flexible location" },
       date,
-      time: seed.time,
+      time: seed.isFlexibleTime ? "" : seed.time,
       isFlexibleTime: seed.isFlexibleTime,
-      isFlexibleLocation: false,
+      isFlexibleLocation: isLookingFor && !seed.location.name,
       endTime: isoEndForPlan(date, seed.time, seed.endHoursAfterStart),
       tags: seed.tags,
       description: seed.description,
       hostEmoji: seed.hostEmoji,
-      planKind: "standard",
+      planKind,
       visibility: "everyone",
       visibilityCommunityTag: null,
       isRecurring: false,

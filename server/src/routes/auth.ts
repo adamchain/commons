@@ -65,6 +65,9 @@ function meFromUser(user: UserRecord): MeDTO {
     onboardingComplete: user.onboardingComplete,
     createdAt: user.createdAt,
     networkUserIds: user.networkIds?.length ? user.networkIds : [],
+    // Self always sees own social links — visibility check applies only to
+    // other-viewer profile reads (see /api/profile).
+    socialLinks: user.socialLinks,
     canAccessAdmin: isAdminPhone(user.phoneNumber),
   };
 }
@@ -192,13 +195,13 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
       patch.neighborhoodId = patch.neighborhoodIds[0]!;
     }
   }
-  if (Array.isArray(req.body?.interests)) patch.interests = req.body.interests.slice(0, 3);
+  if (Array.isArray(req.body?.interests)) patch.interests = req.body.interests;
   if (typeof req.body?.avatarSeed === "string") patch.avatarSeed = req.body.avatarSeed;
   if (typeof req.body?.avatarStyle === "string") patch.avatarStyle = req.body.avatarStyle;
   if (typeof req.body?.avatarPhotoDataUrl === "string") patch.avatarPhotoDataUrl = req.body.avatarPhotoDataUrl;
-  if (req.body?.avatarPhotoDataUrl === null) patch.avatarPhotoDataUrl = undefined;
+  if (req.body?.avatarPhotoDataUrl === null) patch.avatarPhotoDataUrl = null;
   if (typeof req.body?.avatarParams === "string") patch.avatarParams = req.body.avatarParams;
-  if (req.body?.avatarParams === null) patch.avatarParams = undefined;
+  if (req.body?.avatarParams === null) patch.avatarParams = null;
   if (typeof req.body?.onboardingComplete === "boolean") patch.onboardingComplete = req.body.onboardingComplete;
   await updateUser(userId, patch);
   const me = await userToMe(userId);

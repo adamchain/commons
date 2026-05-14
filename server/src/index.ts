@@ -27,7 +27,9 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
+// Lift the default 100KB cap so resized avatar data URLs and richer plan
+// payloads fit; resized 512px JPEGs are usually < 100KB but headroom matters.
+app.use(express.json({ limit: "2mb" }));
 app.use(cookieParser());
 
 app.get("/api/health", (_req, res) => {

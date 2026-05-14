@@ -36,6 +36,7 @@ export function PlanCard({
   neighborhoodName,
   viewerCoords,
   onPlanRefresh,
+  highlight = false,
 }: {
   plan: PlanDTO;
   /** Area label for host line (e.g. Rittenhouse) */
@@ -43,6 +44,8 @@ export function PlanCard({
   /** Viewer's reference point for distance — typically their primary neighborhood centroid. */
   viewerCoords?: { lat: number; lng: number };
   onPlanRefresh?: () => void;
+  /** Pin highlight after the user just posted this plan. */
+  highlight?: boolean;
 }) {
   const going = plan.participants.going;
   const goingCount = going.length;
@@ -83,14 +86,16 @@ export function PlanCard({
 
   return (
     <div
+      data-plan-id={plan.id}
       className={`plan-card-outer ${
         isPlanCreated
           ? "plan-card--plan-created"
           : isLooking
             ? "plan-card--looking"
             : "plan-card--confirmed"
-      }`}
+      } ${highlight ? "plan-card--just-posted" : ""}`}
     >
+      {highlight && <div className="plan-card-just-posted-banner">Just posted · Live on the feed</div>}
       <Link to={`/plans/${plan.id}`} className="plan-card plan-card-link">
         <span
           className={`plan-card-kind-pill ${

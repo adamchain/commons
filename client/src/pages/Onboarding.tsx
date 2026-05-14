@@ -4,6 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
+import { fileToResizedDataUrl } from "../lib/imageResize";
 import {
   ALL_INTERESTS,
   AVATAR_PRESETS,
@@ -547,27 +548,24 @@ function LocationStep({
 function InterestsStep({ me, onSave }: { me: MeDTO; onSave: (interests: InterestTag[]) => Promise<void> }) {
   const [picked, setPicked] = useState<InterestTag[]>(me.interests);
   const [busy, setBusy] = useState(false);
-  const max = 3;
 
   function toggle(t: InterestTag) {
     if (picked.includes(t)) {
       setPicked(picked.filter((x) => x !== t));
-    } else if (picked.length < max) {
+    } else {
       setPicked([...picked, t]);
     }
   }
 
   return (
-    <OnboardingShell title="What are you into?" subtitle="Pick 2–3 communities — we’ll tune your feed from day one.">
+    <OnboardingShell title="What are you into?" subtitle="Pick as many as you like — we’ll tune your feed from day one.">
       <div className="interest-grid">
         {ALL_INTERESTS.map((t) => {
           const isPicked = picked.includes(t);
-          const disabled = !isPicked && picked.length >= max;
           return (
             <button
               key={t}
               type="button"
-              disabled={disabled}
               className={`interest-tile ${isPicked ? "is-picked" : ""}`}
               onClick={() => toggle(t)}
             >
@@ -578,7 +576,7 @@ function InterestsStep({ me, onSave }: { me: MeDTO; onSave: (interests: Interest
       </div>
       <button
         className="btn-primary btn-block"
-        disabled={busy || picked.length < 2 || picked.length > max}
+        disabled={busy || picked.length < 2}
         onClick={async () => { setBusy(true); await onSave(picked); }}
       >
         Next · {picked.length} picked
@@ -645,11 +643,8 @@ function ProfileStep({
           onChange={(e) => {
             const f = e.target.files?.[0];
             if (!f) return;
-            const reader = new FileReader();
-            reader.onload = () => {
-              if (typeof reader.result === "string") pickPhoto(reader.result);
-            };
-            reader.readAsDataURL(f);
+            void fileToResizedDataUrl(f).then(pickPhoto).catch(() => undefined);
+            e.target.value = "";
           }}
         />
       </details>

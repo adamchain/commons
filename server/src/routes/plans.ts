@@ -415,6 +415,23 @@ plansRouter.put("/:id/participation", requireAuth, (req, res) => {
     return;
   }
   const existing = store.findParticipation(planId, userId);
+  // Enforce capacity for "going" RSVPs. Approve-mode plans never let a
+  // non-host go directly — they must apply (be interested) until the host
+  // promotes them. FCFS plans cap at `capacity` slots.
+  if (state === "going" && plan.creatorId !== userId && existing?.state !== "going") {
+    const goingCount = store
+      .listParticipationsForPlan(planId)
+      .filter((p) => p.state === "going").length;
+    const joinType = plan.joinType ?? "open";
+    if (joinType === "approve") {
+      res.status(403).json({ error: "This plan is invite-only — request to join instead." });
+      return;
+    }
+    if (plan.capacity && goingCount >= plan.capacity) {
+      res.status(409).json({ error: "This plan is full." });
+      return;
+    }
+  }
   store.upsertParticipation(planId, userId, state);
   if (state === "going") {
     store.ensureGroupConversation(planId, [plan.creatorId, userId]);
@@ -428,6 +445,41 @@ plansRouter.put("/:id/participation", requireAuth, (req, res) => {
     to: state,
   });
   res.json({ ok: true });
+});
+
+// Approve-mode host control: promote an "interested" applicant to "going".
+// Only the host can call this. Rejects when the plan is full.
+plansRouter.post("/:id/approve", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const planId = String(req.params.id);
+  const targetId = String(req.body?.userId ?? "");
+  const plan = store.findPlanById(planId);
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  if (plan.creatorId !== userId) {
+    res.status(403).json({ error: "Only the host can approve" });
+    return;
+  }
+  const target = store.findParticipation(planId, targetId);
+  if (!target || target.state !== "interested") {
+    res.status(400).json({ error: "That user hasn't applied" });
+    return;
+  }
+  if (plan.capacity) {
+    const goingCount = store
+      .listParticipationsForPlan(planId)
+      .filter((p) => p.state === "going").length;
+    if (goingCount >= plan.capacity) {
+      res.status(409).json({ error: "Plan is full" });
+      return;
+    }
+  }
+  store.upsertParticipation(planId, targetId, "going");
+  store.ensureGroupConversation(planId, [plan.creatorId, targetId]);
+  store.log("plan_approved", { planId, userId: targetId, by: userId });
+  res.json(await planSummary(plan, userId));
 });
 
 plansRouter.delete("/:id/participation", requireAuth, (req, res) => {

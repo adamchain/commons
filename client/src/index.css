@@ -655,6 +655,22 @@ label {
   border-top: 1px solid var(--border);
 }
 
+.participant-row--with-action {
+  justify-content: space-between;
+}
+.participant-row-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  text-decoration: none;
+  color: inherit;
+}
+.participant-approve-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
 .participant-name {
   font-weight: 600;
   font-size: 15px;
@@ -2187,26 +2203,30 @@ label {
 /* ---------- Feed revamp (sentence-case cards, week strip) ---------- */
 
 .week-glance {
-  margin: 12px 0 20px;
-  padding: 14px 16px;
+  margin: 8px 0 14px;
+  padding: 8px 10px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
 }
 
+/* ClassPass-style compact horizontal day strip. */
 .week-glance-days {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
   text-align: center;
 }
+.week-glance-days::-webkit-scrollbar { display: none; }
 
 .week-glance-day {
-  padding: 8px 4px;
-  border-radius: 12px;
+  flex: 1 0 44px;
+  padding: 6px 2px;
+  border-radius: 10px;
   border: 1px solid transparent;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
   background: transparent;
   cursor: pointer;
@@ -2266,10 +2286,25 @@ label {
 .community-chips {
   display: flex;
   gap: 8px;
+  align-items: center;
   overflow-x: auto;
   padding: 4px 0 8px;
   margin: 12px 0 4px;
   scrollbar-width: none;
+}
+
+.community-chips--neighborhoods {
+  margin-top: 16px;
+}
+
+.community-chips-label {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding-right: 4px;
 }
 
 .community-chips::-webkit-scrollbar {
@@ -2308,16 +2343,16 @@ label {
 
 .week-glance-num {
   display: block;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text);
 }
 
 .week-glance-nudge {
-  margin: 12px 0 0;
-  font-size: 14px;
+  margin: 8px 0 0;
+  font-size: 12px;
   color: var(--text-muted);
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
 .plan-card {
@@ -2403,6 +2438,30 @@ label {
   content: "✓";
   font-weight: 900;
   font-size: 10px;
+}
+
+.plan-card--just-posted {
+  position: relative;
+  animation: just-posted-pulse 1.4s ease-out 2;
+}
+.plan-card--just-posted > .plan-card {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 120, 73, 0.18);
+}
+.plan-card-just-posted-banner {
+  background: var(--accent);
+  color: #fff;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 6px 8px;
+  border-radius: 10px 10px 0 0;
+}
+@keyframes just-posted-pulse {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
 }
 
 /* "Looks like you've got a group" prompt on Looking-For plan detail */
@@ -2930,10 +2989,10 @@ label {
 }
 
 .month-cal-cell {
-  min-height: 72px;
+  min-height: 42px;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 6px;
+  border-radius: 8px;
+  padding: 4px;
   background: var(--surface);
 }
 
@@ -3216,4 +3275,88 @@ label {
   font-size: 24px;
   line-height: 1;
   flex-shrink: 0;
+}
+
+.regulars-nudge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  margin: 8px 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  box-shadow: var(--shadow-card);
+}
+.regulars-nudge:hover {
+  border-color: var(--accent);
+}
+.regulars-nudge-emoji {
+  font-size: 22px;
+  line-height: 1;
+}
+.regulars-nudge-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.regulars-nudge-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+.regulars-nudge-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.regulars-nudge-arrow {
+  color: var(--accent);
+  font-size: 18px;
+}
+
+.segmented-explore {
+  margin: 8px 0 14px;
+}
+
+.explore-communities-card {
+  margin-top: 24px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  max-width: 420px;
+}
+
+.explore-communities-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.explore-communities-tag {
+  align-self: flex-start;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid rgba(255, 120, 73, 0.25);
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.explore-communities-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.explore-communities-body {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 12px;
 }

@@ -33,6 +33,8 @@ export interface UserRecord {
   networkIds?: string[];
   /** Plan ids where the user dismissed the post-event network prompt. */
   dismissedNetworkPromptPlanIds?: string[];
+  /** Social links — only surfaced to viewers who share a past plan or DM. */
+  socialLinks?: { instagram?: string };
 }
 
 export interface NeighborhoodRecord {

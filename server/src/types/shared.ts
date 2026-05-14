@@ -155,6 +155,11 @@ export const HOST_TAG_LABELS: Record<HostTag, string> = {
   made_me_feel_welcome: "🤝 made me feel welcome",
 };
 
+export interface SocialLinks {
+  /** Instagram handle without the @, e.g. "jamie.philly" */
+  instagram?: string;
+}
+
 export interface MeDTO {
   id: string;
   phoneNumber: string;
@@ -170,6 +175,8 @@ export interface MeDTO {
   createdAt: string;
   /** User ids in this person’s COMMONS network (one-way). */
   networkUserIds?: string[];
+  /** Always present to self; only sent to others when visibility check passes. */
+  socialLinks?: SocialLinks;
   /** True when this verified phone may use `/api/admin` and `/admin`. */
   canAccessAdmin?: boolean;
 }

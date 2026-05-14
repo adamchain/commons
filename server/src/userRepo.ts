@@ -4,7 +4,14 @@ import { isMongoConnected } from "./lib/db.js";
 import { UserModel } from "./models/User.js";
 import { store, type UserRecord } from "./store.js";
 
-export type UserPatch = Partial<Omit<UserRecord, "id" | "createdAt">>;
+// A patch value of `null` for an optional field is treated as "clear it"
+// (Mongo $unset, in-memory delete) — distinct from `undefined`, which means
+// "leave it alone." We need this so toggling between photo and preset avatars
+// actually removes the previous value.
+export type UserPatch = Partial<Omit<UserRecord, "id" | "createdAt" | "avatarPhotoDataUrl" | "avatarParams">> & {
+  avatarPhotoDataUrl?: string | null;
+  avatarParams?: string | null;
+};
 
 export type CreateUserOptions = { accountSource?: "verify" | "seed" };
 
@@ -84,16 +91,29 @@ export async function createUser(
 
 export async function updateUser(id: string, patch: UserPatch): Promise<UserRecord | undefined> {
   if (isMongoConnected()) {
-    const allowed = Object.fromEntries(
-      Object.entries(patch).filter(([, v]) => v !== undefined),
-    ) as Record<string, unknown>;
-    const updated = await UserModel.findOneAndUpdate({ id }, { $set: allowed }, {
+    const setFields: Record<string, unknown> = {};
+    const unsetFields: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === undefined) continue;
+      if (v === null) unsetFields[k] = "";
+      else setFields[k] = v;
+    }
+    const update: Record<string, unknown> = {};
+    if (Object.keys(setFields).length > 0) update.$set = setFields;
+    if (Object.keys(unsetFields).length > 0) update.$unset = unsetFields;
+    const updated = await UserModel.findOneAndUpdate({ id }, update, {
       new: true,
       runValidators: true,
     }).lean();
     return updated ?? undefined;
   }
-  return store.updateUser(id, patch);
+  // In-memory: null means clear the field outright.
+  const cleaned: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined) continue;
+    cleaned[k] = v === null ? undefined : v;
+  }
+  return store.updateUser(id, cleaned as Partial<Omit<UserRecord, "id" | "createdAt">>);
 }
 
 /** Used when shutting down tests or scripts (optional). */

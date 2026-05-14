@@ -7,6 +7,7 @@ import { ThemeToggle } from "../components/ThemeToggle";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { formatPlanDate } from "../lib/format";
+import { fileToResizedDataUrl } from "../lib/imageResize";
 import {
   AVATAR_PRESETS,
   HOST_TAG_LABELS,
@@ -292,11 +293,10 @@ function EditPanel({ me, onSaved }: { me: MeDTO; onSaved: (next: MeDTO) => void 
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (!f) return;
-              const reader = new FileReader();
-              reader.onload = () => {
-                if (typeof reader.result === "string") pickPhoto(reader.result);
-              };
-              reader.readAsDataURL(f);
+              fileToResizedDataUrl(f)
+                .then(pickPhoto)
+                .catch(() => setError("Couldn't read that image. Try another."));
+              if (fileRef.current) fileRef.current.value = "";
             }}
           />
         </div>

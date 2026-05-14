@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { FeedbackPrompt } from "../components/FeedbackPrompt";
 import { LoadingScreen } from "../components/LoadingScreen";
@@ -15,8 +15,16 @@ export function FeedPage() {
   const [neighborhoods, setNeighborhoods] = useState<NeighborhoodDTO[]>([]);
   const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState<InterestTag | null>(null);
+  const [selectedHoodId, setSelectedHoodId] = useState<string | null>(null);
   const { user, setUser } = useAuth();
   const [networkPrompt, setNetworkPrompt] = useState<NetworkPromptDTO | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  // When the user lands here right after posting a plan, float that plan to
+  // the top of the list as confirmation. One-shot — cleared on next render.
+  const [justPostedId, setJustPostedId] = useState<string | null>(
+    (location.state as { justPostedId?: string } | null)?.justPostedId ?? null,
+  );
 
   const refreshPlans = () => void api<PlanDTO[]>("/api/plans").then(setPlans).catch(() => setPlans([]));
 
@@ -24,6 +32,22 @@ export function FeedPage() {
     refreshPlans();
     void api<NeighborhoodDTO[]>("/api/neighborhoods").then(setNeighborhoods).catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (justPostedId && location.state) {
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [justPostedId, location.pathname, location.state, navigate]);
+
+  // After plans load, scroll the just-posted card into view; clear the banner
+  // after a few seconds so the feed returns to normal once acknowledged.
+  useEffect(() => {
+    if (!justPostedId || plans === null) return;
+    const el = document.querySelector(`[data-plan-id="${justPostedId}"]`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const t = setTimeout(() => setJustPostedId(null), 4500);
+    return () => clearTimeout(t);
+  }, [justPostedId, plans]);
 
   useEffect(() => {
     void api<{ prompt: NetworkPromptDTO | null }>("/api/auth/network-prompt")
@@ -41,15 +65,20 @@ export function FeedPage() {
       ? { lat: myNeighborhood.lat, lng: myNeighborhood.lng }
       : undefined;
 
-  // Apply chip + day filters to the raw plan list before bucketing/rendering.
-  // No interest cap — selecting a chip narrows; default "For you" leaves all plans
-  // visible so the algorithm ranks but never hides.
+  // Two main filter groups per spec: Neighborhoods and Interests. Both are
+  // additive narrowers — default leaves everything visible (everyone sees all
+  // plans), but selecting a chip restricts the list.
   const filteredPlans = useMemo(() => {
     let list = plans ?? [];
     if (selectedTag) list = list.filter((p) => p.tags.includes(selectedTag));
+    if (selectedHoodId) list = list.filter((p) => p.neighborhoodId === selectedHoodId);
     if (selectedDayIso) list = list.filter((p) => p.date.slice(0, 10) === selectedDayIso);
+    if (justPostedId) {
+      const pinned = list.find((p) => p.id === justPostedId);
+      if (pinned) list = [pinned, ...list.filter((p) => p.id !== justPostedId)];
+    }
     return list;
-  }, [plans, selectedTag, selectedDayIso]);
+  }, [plans, selectedTag, selectedHoodId, selectedDayIso, justPostedId]);
 
   const buckets = useMemo(() => bucketByWhen(filteredPlans), [filteredPlans]);
 
@@ -88,6 +117,14 @@ export function FeedPage() {
         }}
       />
 
+      <RegularsNudge plans={plans ?? []} userId={user?.id ?? ""} />
+
+      <NeighborhoodChips
+        neighborhoods={neighborhoods}
+        userHoodIds={user?.neighborhoodIds ?? (user?.neighborhoodId ? [user.neighborhoodId] : [])}
+        selected={selectedHoodId}
+        onSelect={setSelectedHoodId}
+      />
       <CommunityChips
         userInterests={user?.interests ?? []}
         selected={selectedTag}
@@ -108,6 +145,7 @@ export function FeedPage() {
           hoodById={hoodById}
           viewerCoords={viewerCoords}
           onPlanRefresh={refreshPlans}
+          highlightId={justPostedId}
         />
       </div>
     </main>
@@ -144,11 +182,13 @@ function ListView({
   hoodById,
   viewerCoords,
   onPlanRefresh,
+  highlightId,
 }: {
   buckets: Buckets;
   hoodById: Map<string, string>;
   viewerCoords?: { lat: number; lng: number };
   onPlanRefresh: () => void;
+  highlightId?: string | null;
 }) {
   const total = buckets.happeningNow.length + buckets.thisWeek.length + buckets.later.length;
   if (total === 0) {
@@ -164,13 +204,13 @@ function ListView({
   return (
     <>
       {buckets.happeningNow.length > 0 && (
-        <Section title="Happening today" plans={buckets.happeningNow} hoodById={hoodById} viewerCoords={viewerCoords} onPlanRefresh={onPlanRefresh} />
+        <Section title="Happening today" plans={buckets.happeningNow} hoodById={hoodById} viewerCoords={viewerCoords} onPlanRefresh={onPlanRefresh} highlightId={highlightId} />
       )}
       {buckets.thisWeek.length > 0 && (
-        <Section title="This week" plans={buckets.thisWeek} hoodById={hoodById} viewerCoords={viewerCoords} onPlanRefresh={onPlanRefresh} />
+        <Section title="This week" plans={buckets.thisWeek} hoodById={hoodById} viewerCoords={viewerCoords} onPlanRefresh={onPlanRefresh} highlightId={highlightId} />
       )}
       {buckets.later.length > 0 && (
-        <Section title="Later" plans={buckets.later} hoodById={hoodById} viewerCoords={viewerCoords} onPlanRefresh={onPlanRefresh} />
+        <Section title="Later" plans={buckets.later} hoodById={hoodById} viewerCoords={viewerCoords} onPlanRefresh={onPlanRefresh} highlightId={highlightId} />
       )}
     </>
   );
@@ -182,12 +222,14 @@ function Section({
   hoodById,
   viewerCoords,
   onPlanRefresh,
+  highlightId,
 }: {
   title: string;
   plans: PlanDTO[];
   hoodById: Map<string, string>;
   viewerCoords?: { lat: number; lng: number };
   onPlanRefresh: () => void;
+  highlightId?: string | null;
 }) {
   return (
     <>
@@ -200,10 +242,98 @@ function Section({
             neighborhoodName={hoodById.get(plan.neighborhoodId)}
             viewerCoords={viewerCoords}
             onPlanRefresh={onPlanRefresh}
+            highlight={highlightId === plan.id}
           />
         ))}
       </div>
     </>
+  );
+}
+
+/**
+ * "Order from here again" — Uber Eats-style nudge. Scans past plans the user
+ * has joined or hosted, picks the most-recent recurring venue, and offers a
+ * one-tap "Make a plan here again?" card that prefills CreatePlan.
+ */
+function RegularsNudge({ plans, userId }: { plans: PlanDTO[]; userId: string }) {
+  const pick = useMemo(() => {
+    if (!userId) return null;
+    const now = Date.now();
+    const mine = plans.filter((p) => {
+      const ended = new Date(p.date).getTime() < now - 24 * 60 * 60 * 1000;
+      const meWent = p.myState === "going" || p.creator.id === userId;
+      return ended && meWent && p.location?.name && p.location.name !== "Flexible location";
+    });
+    if (mine.length === 0) return null;
+    // Most-recent venue wins — simple, no scoring needed for the nudge.
+    mine.sort((a, b) => b.date.localeCompare(a.date));
+    return mine[0] ?? null;
+  }, [plans, userId]);
+
+  if (!pick) return null;
+
+  const search = new URLSearchParams();
+  search.set("name", pick.location.name);
+  if (pick.location.address) search.set("address", pick.location.address);
+  if (pick.tags[0]) search.set("tag", pick.tags[0]);
+
+  return (
+    <Link to={`/plans/new?${search.toString()}`} className="regulars-nudge">
+      <span className="regulars-nudge-emoji" aria-hidden="true">{pick.hostEmoji || "📍"}</span>
+      <div className="regulars-nudge-body">
+        <div className="regulars-nudge-title">Plan something at {pick.location.name} again?</div>
+        <div className="regulars-nudge-sub">You went last time — tap to set it up.</div>
+      </div>
+      <span className="regulars-nudge-arrow" aria-hidden="true">→</span>
+    </Link>
+  );
+}
+
+// Neighborhood filter — user's own neighborhoods come first, rest follow
+// alphabetically. Selecting one restricts the feed to plans in that area.
+function NeighborhoodChips({
+  neighborhoods,
+  userHoodIds,
+  selected,
+  onSelect,
+}: {
+  neighborhoods: NeighborhoodDTO[];
+  userHoodIds: string[];
+  selected: string | null;
+  onSelect: (id: string | null) => void;
+}) {
+  if (neighborhoods.length === 0) return null;
+  const mineSet = new Set(userHoodIds);
+  const mine = neighborhoods.filter((n) => mineSet.has(n.id));
+  const others = neighborhoods
+    .filter((n) => !mineSet.has(n.id))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const ordered = [...mine, ...others];
+  return (
+    <div className="community-chips community-chips--neighborhoods" role="tablist" aria-label="Neighborhood filter">
+      <span className="community-chips-label">Neighborhoods</span>
+      <button
+        type="button"
+        className={`community-chip ${selected === null ? "is-active" : ""}`}
+        onClick={() => onSelect(null)}
+        role="tab"
+        aria-selected={selected === null}
+      >
+        All areas
+      </button>
+      {ordered.map((n) => (
+        <button
+          key={n.id}
+          type="button"
+          className={`community-chip ${selected === n.id ? "is-active" : ""}`}
+          onClick={() => onSelect(selected === n.id ? null : n.id)}
+          role="tab"
+          aria-selected={selected === n.id}
+        >
+          {n.name}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -225,7 +355,8 @@ function CommunityChips({
     ...ALL_INTERESTS.filter((t) => !userSet.has(t)),
   ];
   return (
-    <div className="community-chips" role="tablist" aria-label="Community filter">
+    <div className="community-chips community-chips--interests" role="tablist" aria-label="Interest filter">
+      <span className="community-chips-label">Interests</span>
       <button
         type="button"
         className={`community-chip ${selected === null ? "is-active" : ""}`}

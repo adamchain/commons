@@ -1,20 +1,32 @@
 import { useState } from "react";
 import { api } from "../api/http";
-import type { ParticipationState, PlanKind } from "../types/shared";
+import type { JoinType, ParticipationState, PlanKind } from "../types/shared";
 
 export function ParticipationButtons({
   planId,
   initialState,
   onChange,
   planKind = "standard",
+  capacity = null,
+  goingCount = 0,
+  joinType = "open",
+  isHosting = false,
 }: {
   planId: string;
   initialState: ParticipationState | null;
   onChange: (next: ParticipationState | null) => void;
   planKind?: PlanKind;
+  /** Capacity caps the "going" list. Null = unlimited. */
+  capacity?: number | null;
+  /** Current count of "going" participants (for full/approve display). */
+  goingCount?: number;
+  joinType?: JoinType;
+  /** Host bypasses capacity and approve gates. */
+  isHosting?: boolean;
 }) {
   const [state, setState] = useState<ParticipationState | null>(initialState);
   const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const toggleState = async (target: ParticipationState) => {
     if (pending) return;
@@ -23,6 +35,7 @@ export function ParticipationButtons({
     setState(next);
     onChange(next);
     setPending(true);
+    setError(null);
     try {
       if (next) {
         await api(`/api/plans/${planId}/participation`, {
@@ -32,9 +45,10 @@ export function ParticipationButtons({
       } else {
         await api(`/api/plans/${planId}/participation`, { method: "DELETE" });
       }
-    } catch {
+    } catch (err) {
       setState(prev);
       onChange(prev);
+      setError(err instanceof Error ? err.message : "Couldn't update");
     } finally {
       setPending(false);
     }
@@ -43,19 +57,35 @@ export function ParticipationButtons({
   const goingActive = state === "going";
   const interestedActive = state === "interested";
   const loose = planKind === "looking_for";
+  const isFull = !isHosting && capacity !== null && goingCount >= capacity && !goingActive;
+  const isApproveOnly = !isHosting && joinType === "approve" && !goingActive;
 
   return (
     <div className={`participation ${loose ? "participation--loose" : ""}`}>
       <p className="participation-hint">
-        {loose ? "Loose idea — tap if you’re tentatively interested." : "Committed vs tentative — pick what fits."}
+        {loose
+          ? "Loose idea — tap if you’re tentatively interested."
+          : isApproveOnly
+            ? "Application-only — tap interested to request a spot."
+            : isFull
+              ? "This plan is full."
+              : capacity !== null
+                ? `${goingCount}/${capacity} spots taken — first come, first serve.`
+                : "Committed vs tentative — pick what fits."}
       </p>
       <button
         type="button"
         className={`btn-going ${goingActive ? "is-active" : ""}`}
         onClick={() => void toggleState("going")}
-        disabled={pending}
+        disabled={pending || isFull || isApproveOnly}
       >
-        {goingActive ? "✓ You're in" : "I'm in"}
+        {goingActive
+          ? "✓ You're in"
+          : isFull
+            ? "Full"
+            : isApproveOnly
+              ? "Application-only"
+              : "I'm in"}
       </button>
       <button
         type="button"
@@ -63,8 +93,19 @@ export function ParticipationButtons({
         onClick={() => void toggleState("interested")}
         disabled={pending}
       >
-        {interestedActive ? (loose ? "You're down" : "You're interested") : loose ? "I'm down" : "Interested"}
+        {interestedActive
+          ? loose
+            ? "You're down"
+            : isApproveOnly
+              ? "Applied"
+              : "You're interested"
+          : loose
+            ? "I'm down"
+            : isApproveOnly
+              ? "Apply"
+              : "Interested"}
       </button>
+      {error && <p className="onboarding-error" style={{ marginTop: 8 }}>{error}</p>}
     </div>
   );
 }

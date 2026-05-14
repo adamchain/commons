@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/http";
 import { LocationAutocomplete } from "../components/LocationAutocomplete";
 import { useAuth } from "../context/AuthContext";
@@ -21,11 +21,21 @@ const today = (): string => {
 
 export function CreatePlanPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [neighborhoods, setNeighborhoods] = useState<NeighborhoodDTO[]>([]);
+  // Prefill from the "Plan again" / "Order from here again" nudge on the feed.
+  const prefillName = searchParams.get("name") ?? "";
+  const prefillAddress = searchParams.get("address") ?? "";
+  const prefillTagParam = searchParams.get("tag");
+  const prefillVibe: VibeIcon | null = useMemo(() => {
+    if (!prefillTagParam) return null;
+    const opt = VIBE_OPTIONS.find((o) => o.tag === prefillTagParam);
+    return opt?.id ?? null;
+  }, [prefillTagParam]);
   const [form, setForm] = useState({
     title: "",
-    locationName: "",
-    locationAddress: "",
+    locationName: prefillName,
+    locationAddress: prefillAddress,
     locationLat: undefined as number | undefined,
     locationLng: undefined as number | undefined,
     neighborhoodId: user?.neighborhoodIds?.[0] ?? user?.neighborhoodId ?? "",
@@ -34,7 +44,7 @@ export function CreatePlanPage() {
     isFlexibleTime: false,
     isFlexibleLocation: false,
     isFlexibleDate: false,
-    vibes: [] as VibeIcon[],
+    vibes: (prefillVibe ? [prefillVibe] : []) as VibeIcon[],
     description: "",
     planKind: "standard" as PlanKind,
     visibility: "everyone" as PlanVisibility,
@@ -98,7 +108,7 @@ export function CreatePlanPage() {
 
     setSubmitting(true);
     try {
-      await api<{ id: string }>("/api/plans", {
+      const created = await api<{ id: string }>("/api/plans", {
         method: "POST",
         body: JSON.stringify({
           title: form.title.trim(),
@@ -123,9 +133,9 @@ export function CreatePlanPage() {
           isRecurring: form.isRecurring,
         }),
       });
-      // Direct to feed — the new plan card is the confirmation. No separate
-      // confirm screen.
-      navigate("/");
+      // Direct to feed and float the just-posted plan to the top so it's the
+      // first thing the user sees as confirmation.
+      navigate("/", { state: { justPostedId: created.id } });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't post");
     } finally {
@@ -302,7 +312,7 @@ export function CreatePlanPage() {
           {form.capacity.trim() !== "" && (
             <>
               <label className="form-question" style={{ marginTop: 12 }}>
-                Join type
+                How do people get in?
               </label>
               <div className="segmented">
                 <button
@@ -310,16 +320,21 @@ export function CreatePlanPage() {
                   className={form.joinType === "open" ? "is-active" : ""}
                   onClick={() => setForm((f) => ({ ...f, joinType: "open" }))}
                 >
-                  Open · first come
+                  First come, first serve
                 </button>
                 <button
                   type="button"
                   className={form.joinType === "approve" ? "is-active" : ""}
                   onClick={() => setForm((f) => ({ ...f, joinType: "approve" }))}
                 >
-                  Approve each
+                  Select from applications
                 </button>
               </div>
+              <p className="form-help">
+                {form.joinType === "open"
+                  ? "Spots fill up as people tap 'I'm in' — like a sports ticket."
+                  : "People request to join. You pick who gets in."}
+              </p>
             </>
           )}
         </section>
@@ -348,20 +363,22 @@ export function CreatePlanPage() {
 
         <section className="form-section">
           <label className="form-question">Who sees this?</label>
+          <p className="form-help">Defaults to everyone. Network and Communities are coming soon.</p>
           <div className="segmented segmented-visibility">
             <button
               type="button"
               className={form.visibility === "everyone" ? "is-active" : ""}
               onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
             >
-              Everyone on COMMONS
+              Everyone
             </button>
             <button
               type="button"
-              className={form.visibility === "network" ? "is-active" : ""}
-              onClick={() => setForm((f) => ({ ...f, visibility: "network" }))}
+              className="is-soon"
+              disabled
+              title="Your network — coming soon"
             >
-              Your Network
+              Your network · Soon
             </button>
             <button
               type="button"
@@ -369,7 +386,7 @@ export function CreatePlanPage() {
               disabled
               title="Communities — coming soon"
             >
-              Communities · Coming Soon
+              Communities · Soon
             </button>
           </div>
         </section>
