@@ -28,6 +28,8 @@ interface ProfilePayload {
   upcoming: PlanDTO[];
   past: Array<{ id: string; title: string; date: string; wentCount: number }>;
   sharedPlanId: string | null;
+  /** Null until viewer earns visibility (shared completed plan or in network). */
+  socialLinks: { instagram?: string } | null;
 }
 
 export function ProfilePage() {
@@ -85,6 +87,21 @@ export function ProfilePage() {
         {profile.neighborhood && (
           <div className="profile-neighborhood">📍 {profile.neighborhood.name}</div>
         )}
+        {profile.socialLinks?.instagram && (
+          <a
+            className="profile-social-link"
+            href={`https://instagram.com/${profile.socialLinks.instagram}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            @{profile.socialLinks.instagram} on Instagram
+          </a>
+        )}
+        {!isSelf && profile.socialLinks === null && (
+          <p className="profile-social-locked">
+            Socials unlock after you go to a plan together.
+          </p>
+        )}
 
         <div className="profile-stats" aria-label="Profile stats">
           <div className="profile-stat">
@@ -141,6 +158,8 @@ export function ProfilePage() {
           </div>
         </section>
       )}
+
+      {isSelf && <InviteCard firstName={user?.firstName ?? "a friend"} />}
 
       {isSelf && <MonthCalendar plans={feedPlans} />}
 
@@ -205,6 +224,7 @@ function EditPanel({ me, onSaved }: { me: MeDTO; onSaved: (next: MeDTO) => void 
   const [firstName, setFirstName] = useState(me.firstName);
   const [photo, setPhoto] = useState<string | null>(me.avatarPhotoDataUrl ?? null);
   const [avatarParams, setAvatarParams] = useState<string | null>(me.avatarParams ?? null);
+  const [instagram, setInstagram] = useState(me.socialLinks?.instagram ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -228,6 +248,7 @@ function EditPanel({ me, onSaved }: { me: MeDTO; onSaved: (next: MeDTO) => void 
           firstName: firstName.trim(),
           avatarPhotoDataUrl: photo ?? null,
           avatarParams: avatarParams ?? null,
+          socialLinks: { instagram: instagram.trim().replace(/^@/, "") },
         }),
       });
       onSaved(next);
@@ -319,6 +340,22 @@ function EditPanel({ me, onSaved }: { me: MeDTO; onSaved: (next: MeDTO) => void 
         ))}
       </div>
 
+      <label className="form-question" htmlFor="profile-edit-ig" style={{ marginTop: 14 }}>
+        Instagram
+      </label>
+      <p className="form-help">
+        Only visible to people you’ve actually shown up for — others have to share
+        a completed plan with you first.
+      </p>
+      <input
+        id="profile-edit-ig"
+        className="onboarding-input"
+        value={instagram}
+        placeholder="@yourhandle"
+        onChange={(e) => setInstagram(e.target.value)}
+        maxLength={40}
+      />
+
       {error && <p className="onboarding-error" style={{ marginTop: 8 }}>{error}</p>}
 
       <button
@@ -329,6 +366,46 @@ function EditPanel({ me, onSaved }: { me: MeDTO; onSaved: (next: MeDTO) => void 
         onClick={() => void save()}
       >
         {busy ? "Saving…" : "Save changes"}
+      </button>
+    </section>
+  );
+}
+
+/**
+ * Light-layer friend invite — opens the OS share sheet (native share) or
+ * falls back to a prefilled SMS deep link. No server invite tracking yet —
+ * the link just points at the public landing, and after the friend signs up
+ * the post-event network prompt is the path to add each other in-app.
+ */
+function InviteCard({ firstName }: { firstName: string }) {
+  const inviteUrl = `${window.location.origin}/`;
+  const body = `${firstName} invited you to Commons — neighborhood plans, no pressure. ${inviteUrl}`;
+
+  async function share() {
+    const data = { title: "Join me on Commons", text: body, url: inviteUrl };
+    const nav = navigator as Navigator & {
+      share?: (data: { title?: string; text?: string; url?: string }) => Promise<void>;
+    };
+    if (typeof nav.share === "function") {
+      try {
+        await nav.share(data);
+        return;
+      } catch {
+        // user canceled — silently fall through
+      }
+    }
+    window.location.href = `sms:?&body=${encodeURIComponent(body)}`;
+  }
+
+  return (
+    <section className="profile-block profile-invite-card">
+      <h3 className="who-block-heading">Bring your people</h3>
+      <p className="profile-invite-body">
+        Want to plan something with a friend who isn’t here yet? Send them an
+        invite — once they’re on, you can add each other to your network.
+      </p>
+      <button type="button" className="btn-secondary btn-block" onClick={() => void share()}>
+        Invite a friend by text
       </button>
     </section>
   );

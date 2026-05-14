@@ -52,6 +52,15 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
       return plan && plan.creatorId !== targetId;
     }).length;
 
+  // Social links visibility: only show when the viewer has earned the connection.
+  // Earn = (a) self, (b) in target's network, (c) shared a completed plan
+  // with target (both went).
+  const isSelf = viewerId === targetId;
+  const inNetwork = (target.networkIds ?? []).includes(viewerId);
+  const sharedCompleted = hasSharedCompletedPlan(targetId, viewerId);
+  const showSocial = isSelf || inNetwork || sharedCompleted;
+  const socialLinks = showSocial ? target.socialLinks ?? null : null;
+
   res.json({
     user: userToPublic(target),
     interests: target.interests ?? [],
@@ -72,8 +81,20 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
         wentCount: store.listParticipationsForPlan(p.id).filter((q) => q.state === "going").length,
       })),
     sharedPlanId,
+    socialLinks,
   });
 });
+
+function hasSharedCompletedPlan(a: string, b: string): boolean {
+  const now = Date.now();
+  for (const p of store.listPlans()) {
+    if (new Date(p.date).getTime() >= now) continue;
+    const aWent = store.findParticipation(p.id, a)?.state === "going" || p.creatorId === a;
+    const bWent = store.findParticipation(p.id, b)?.state === "going" || p.creatorId === b;
+    if (aWent && bWent) return true;
+  }
+  return false;
+}
 
 function findSharedActivePlan(a: string, b: string): string | null {
   const today = new Date();

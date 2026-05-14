@@ -203,6 +203,10 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
   if (typeof req.body?.avatarParams === "string") patch.avatarParams = req.body.avatarParams;
   if (req.body?.avatarParams === null) patch.avatarParams = null;
   if (typeof req.body?.onboardingComplete === "boolean") patch.onboardingComplete = req.body.onboardingComplete;
+  if (req.body?.socialLinks && typeof req.body.socialLinks === "object") {
+    const ig = String(req.body.socialLinks.instagram ?? "").replace(/^@/, "").trim();
+    patch.socialLinks = ig ? { instagram: ig } : undefined;
+  }
   await updateUser(userId, patch);
   const me = await userToMe(userId);
   if (!me) {
