@@ -29,6 +29,8 @@ interface SeedPlan {
 }
 
 interface SeedNeighborhood {
+  /** Stable UUID — pinned so re-running the seed doesn't orphan existing user.neighborhoodIds. */
+  id: string;
   key: string;
   name: string;
   metro: string;
@@ -37,18 +39,25 @@ interface SeedNeighborhood {
   lng: number;
 }
 
-/** COMMONS-seeded Philly neighborhoods — adjacent graph is approximate for proximity ranking. */
+/**
+ * COMMONS-seeded Philly neighborhoods. IDs are hard-pinned. Adjacent graph is
+ * approximate for proximity ranking.
+ *
+ * Do NOT regenerate these UUIDs — they are referenced by existing users'
+ * `neighborhoodIds` arrays in prod Mongo. If you must add or rename one, give
+ * it a freshly-generated UUID; never change one in-place.
+ */
 const PHILLY_NEIGHBORHOODS: SeedNeighborhood[] = [
-  { key: "center_city", name: "Center City", metro: "Philadelphia", adjacentKeys: ["rittenhouse", "old_city", "graduate_hospital"], lat: 39.9526, lng: -75.1652 },
-  { key: "rittenhouse", name: "Rittenhouse", metro: "Philadelphia", adjacentKeys: ["center_city", "fairmount", "graduate_hospital"], lat: 39.949, lng: -75.171 },
-  { key: "old_city", name: "Old City", metro: "Philadelphia", adjacentKeys: ["center_city", "northern_liberties"], lat: 39.9522, lng: -75.1438 },
-  { key: "northern_liberties", name: "Northern Liberties", metro: "Philadelphia", adjacentKeys: ["old_city", "fishtown"], lat: 39.9625, lng: -75.139 },
-  { key: "fishtown", name: "Fishtown", metro: "Philadelphia", adjacentKeys: ["northern_liberties"], lat: 39.9707, lng: -75.1297 },
-  { key: "south_philly", name: "South Philly", metro: "Philadelphia", adjacentKeys: ["center_city"], lat: 39.9279, lng: -75.159 },
-  { key: "west_philly", name: "West Philly", metro: "Philadelphia", adjacentKeys: ["center_city", "fairmount"], lat: 39.9526, lng: -75.2125 },
-  { key: "manayunk", name: "Manayunk", metro: "Philadelphia", adjacentKeys: ["fairmount"], lat: 40.0253, lng: -75.2214 },
-  { key: "fairmount", name: "Fairmount", metro: "Philadelphia", adjacentKeys: ["rittenhouse", "center_city", "manayunk"], lat: 39.9673, lng: -75.179 },
-  { key: "graduate_hospital", name: "Graduate Hospital", metro: "Philadelphia", adjacentKeys: ["rittenhouse", "center_city"], lat: 39.942, lng: -75.175 },
+  { id: "da9fed31-c42f-4f09-852b-d08eca81ea4a", key: "center_city", name: "Center City", metro: "Philadelphia", adjacentKeys: ["rittenhouse", "old_city", "graduate_hospital"], lat: 39.9526, lng: -75.1652 },
+  { id: "6b6941f6-a1d3-4d23-85ba-3d61d6e9a869", key: "rittenhouse", name: "Rittenhouse", metro: "Philadelphia", adjacentKeys: ["center_city", "fairmount", "graduate_hospital"], lat: 39.949, lng: -75.171 },
+  { id: "d6e534cd-92ca-43ce-b959-68ea0be77f24", key: "old_city", name: "Old City", metro: "Philadelphia", adjacentKeys: ["center_city", "northern_liberties"], lat: 39.9522, lng: -75.1438 },
+  { id: "f79f919c-ce4b-43a6-9541-904559023f9f", key: "northern_liberties", name: "Northern Liberties", metro: "Philadelphia", adjacentKeys: ["old_city", "fishtown"], lat: 39.9625, lng: -75.139 },
+  { id: "4b108a5e-929e-4cf6-ba60-9faef931cb56", key: "fishtown", name: "Fishtown", metro: "Philadelphia", adjacentKeys: ["northern_liberties"], lat: 39.9707, lng: -75.1297 },
+  { id: "6c96284f-52b7-4ff3-8345-966350592071", key: "south_philly", name: "South Philly", metro: "Philadelphia", adjacentKeys: ["center_city"], lat: 39.9279, lng: -75.159 },
+  { id: "dde7755e-0981-41fd-9d92-27d9a4313797", key: "west_philly", name: "West Philly", metro: "Philadelphia", adjacentKeys: ["center_city", "fairmount"], lat: 39.9526, lng: -75.2125 },
+  { id: "00c322de-3499-4f91-98a5-2cb567f1d5e1", key: "manayunk", name: "Manayunk", metro: "Philadelphia", adjacentKeys: ["fairmount"], lat: 40.0253, lng: -75.2214 },
+  { id: "816c1ec3-a349-47d4-88b2-2dfb9d131967", key: "fairmount", name: "Fairmount", metro: "Philadelphia", adjacentKeys: ["rittenhouse", "center_city", "manayunk"], lat: 39.9673, lng: -75.179 },
+  { id: "070c4c34-0616-400e-9614-0bcab62b3f94", key: "graduate_hospital", name: "Graduate Hospital", metro: "Philadelphia", adjacentKeys: ["rittenhouse", "center_city"], lat: 39.942, lng: -75.175 },
 ];
 
 const SEED_USERS: SeedUser[] = [
@@ -539,16 +548,14 @@ export async function seedIfEmpty(): Promise<void> {
 }
 
 function seedNeighborhood(seed: SeedNeighborhood) {
+  // Pinned id from SeedNeighborhood — never randomize. See note on
+  // PHILLY_NEIGHBORHOODS for why.
   return {
-    id: cryptoUuid(),
+    id: seed.id,
     name: seed.name,
     metro: seed.metro,
     adjacent: [] as string[],
     lat: seed.lat,
     lng: seed.lng,
   };
-}
-
-function cryptoUuid(): string {
-  return globalThis.crypto.randomUUID();
 }
