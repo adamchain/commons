@@ -13,9 +13,7 @@ function canAccessPlanGroupChat(planId: string, userId: string): boolean {
   if (plan.creatorId === userId) return true;
   const part = store.findParticipation(planId, userId);
   if (part?.state === "going") return true;
-  if (part?.state === "interested" && (plan.planKind ?? "standard") === "looking_for") {
-    return true;
-  }
+  if (part?.state === "interested") return true;
   return false;
 }
 

@@ -89,9 +89,7 @@ export function PlanDetailPage() {
   const groupSize = plan.participants.interested.length + plan.participants.going.length;
   const showGroupPrompt = isLookingFor && !plan.lockedAt && groupSize >= 2;
   const canChat =
-    isHosting ||
-    plan.myState === "going" ||
-    (isLookingFor && plan.myState === "interested");
+    isHosting || plan.myState === "going" || plan.myState === "interested";
 
   async function lockIn() {
     if (!lockVenue.trim() || !lockDate) return;

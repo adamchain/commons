@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/http";
+import { useAuth } from "../context/AuthContext";
 import type { PlanDTO } from "../types/shared";
 import { INTEREST_LABELS } from "../types/shared";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
@@ -64,6 +65,10 @@ export function PlanCard({
   const suggestions = plan.suggestions ?? [];
   const [reply, setReply] = useState("");
   const [replyBusy, setReplyBusy] = useState(false);
+  const { user } = useAuth();
+  const canChat =
+    !!user &&
+    (plan.creator.id === user.id || plan.myState === "going" || plan.myState === "interested");
 
   async function sendReply(e: FormEvent) {
     e.preventDefault();
@@ -152,6 +157,16 @@ export function PlanCard({
           </div>
         )}
       </Link>
+
+      {canChat && (
+        <Link
+          to={`/plans/${plan.id}/chat`}
+          className="plan-card-chat-link"
+          onClick={(e) => e.stopPropagation()}
+        >
+          💬 Group chat
+        </Link>
+      )}
 
       {isLooking && !isPlanCreated && (
         <div className="plan-card-suggest" onClick={(e) => e.stopPropagation()}>

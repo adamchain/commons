@@ -2788,6 +2788,26 @@ label {
   border-radius: 0;
 }
 
+.plan-card-chat-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.plan-card-chat-link:hover {
+  background: var(--surface-hover);
+  color: var(--accent-hover);
+}
+
 .plan-card-suggest {
   padding: 12px 14px 14px;
   border-top: 1px solid var(--border);
