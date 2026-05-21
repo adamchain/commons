@@ -129,6 +129,7 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     joinType: plan.joinType ?? "open",
     isRecurring: plan.isRecurring ?? false,
     lockedAt: plan.lockedAt ?? null,
+    flyerDataUrl: plan.flyerDataUrl,
     suggestions,
     participants: {
       going: going.map((p) => pu(p.userId)),
@@ -250,6 +251,12 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   const rawJoinType = String(req.body?.joinType ?? "open");
   const joinType: JoinType = rawJoinType === "approve" ? "approve" : "open";
 
+  // Optional flyer upload — guard size so a runaway base64 string doesn't blow
+  // up the JSON store. ~1.5MB data URL is plenty for a flyer screenshot.
+  const rawFlyer = typeof req.body?.flyerDataUrl === "string" ? req.body.flyerDataUrl : "";
+  const flyerDataUrl =
+    rawFlyer.startsWith("data:image/") && rawFlyer.length < 1_600_000 ? rawFlyer : undefined;
+
   const plan = store.createPlan({
     creatorId: userId,
     title,
@@ -270,6 +277,7 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     joinType,
     isRecurring,
     lockedAt: null,
+    flyerDataUrl,
   });
 
   store.upsertParticipation(plan.id, userId, "going");
@@ -278,6 +286,43 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   void onPlanCreatedVenueNudge(plan).catch((err) => console.error("[nudge] venue", err));
 
   res.status(201).json(await planSummary(plan, userId));
+});
+
+/**
+ * Invite picked users to a plan. Adds them to the group conversation and
+ * marks them as "interested" so the plan shows up in their notifications.
+ * No-op for users who are already going/interested.
+ */
+plansRouter.post("/:id/invite", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const planId = String(req.params.id);
+  const userIds: string[] = Array.isArray(req.body?.userIds)
+    ? (req.body.userIds as unknown[]).map(String)
+    : [];
+  if (userIds.length === 0) {
+    res.status(400).json({ error: "userIds required" });
+    return;
+  }
+  const plan = store.findPlanById(planId);
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  const me = await findUserById(userId);
+  if (!me || !planVisibleToViewer(plan, me)) {
+    res.status(403).json({ error: "You can't invite to this plan" });
+    return;
+  }
+  let invited = 0;
+  for (const id of userIds) {
+    if (id === userId) continue;
+    const existing = store.findParticipation(planId, id);
+    if (existing) continue;
+    store.upsertParticipation(planId, id, "interested");
+    invited++;
+  }
+  store.ensureGroupConversation(planId, [plan.creatorId, ...userIds]);
+  res.json({ ok: true, invited });
 });
 
 plansRouter.post("/:id/suggestions", requireAuth, async (req, res) => {

@@ -107,6 +107,8 @@ export interface PlanDTO {
   joinType: JoinType;
   isRecurring: boolean;
   lockedAt: string | null;
+  /** Optional flyer image stored as data URL. */
+  flyerDataUrl?: string;
   /** Inline replies on “looking for” plans (feed + detail). */
   suggestions: PlanSuggestionDTO[];
   participants: {

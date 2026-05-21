@@ -1,15 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/http";
 import { LocationAutocomplete } from "../components/LocationAutocomplete";
 import { useAuth } from "../context/AuthContext";
+import { fileToResizedDataUrl } from "../lib/imageResize";
 import {
   VIBE_OPTIONS,
   type InterestTag,
   type JoinType,
   type NeighborhoodDTO,
-  type PlanKind,
   type PlanVisibility,
   type VibeIcon,
 } from "../types/shared";
@@ -23,7 +23,6 @@ export function CreatePlanPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [neighborhoods, setNeighborhoods] = useState<NeighborhoodDTO[]>([]);
-  // Prefill from the "Plan again" / "Order from here again" nudge on the feed.
   const prefillName = searchParams.get("name") ?? "";
   const prefillAddress = searchParams.get("address") ?? "";
   const prefillTagParam = searchParams.get("tag");
@@ -32,6 +31,15 @@ export function CreatePlanPage() {
     const opt = VIBE_OPTIONS.find((o) => o.tag === prefillTagParam);
     return opt?.id ?? null;
   }, [prefillTagParam]);
+
+  // Default vibes to the user's onboarding interests so the feed map starts
+  // pointed at the right communities.
+  const defaultVibes = useMemo<VibeIcon[]>(() => {
+    if (prefillVibe) return [prefillVibe];
+    const userInterests = new Set(user?.interests ?? []);
+    return VIBE_OPTIONS.filter((o) => userInterests.has(o.tag)).map((o) => o.id);
+  }, [prefillVibe, user?.interests]);
+
   const [form, setForm] = useState({
     title: "",
     locationName: prefillName,
@@ -44,17 +52,19 @@ export function CreatePlanPage() {
     isFlexibleTime: false,
     isFlexibleLocation: false,
     isFlexibleDate: false,
-    vibes: (prefillVibe ? [prefillVibe] : []) as VibeIcon[],
+    vibes: defaultVibes,
     description: "",
-    planKind: "standard" as PlanKind,
     visibility: "everyone" as PlanVisibility,
-    capacity: "" as string, // text input — blank = open
+    capacityOn: false,
+    capacity: "6",
     joinType: "open" as JoinType,
     isRecurring: false,
+    flyerDataUrl: null as string | null,
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const flyerRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void api<NeighborhoodDTO[]>("/api/neighborhoods").then(setNeighborhoods).catch(() => undefined);
@@ -67,10 +77,6 @@ export function CreatePlanPage() {
     }
   }, [user, form.neighborhoodId]);
 
-  const isLooking = form.planKind === "looking_for";
-
-  // Vibes resolve to underlying InterestTag values for the feed/algorithm.
-  // Multiple emojis can collapse to the same tag — de-dupe before send.
   const resolvedTags = useMemo<InterestTag[]>(() => {
     const set = new Set<InterestTag>();
     for (const id of form.vibes) {
@@ -80,11 +86,17 @@ export function CreatePlanPage() {
     return Array.from(set);
   }, [form.vibes]);
 
+  // A "looking for" plan = at least one of date/time/location is flexible.
+  // We derive planKind from the flex toggles rather than asking up-front.
+  const planKind = form.isFlexibleDate || form.isFlexibleTime || form.isFlexibleLocation
+    ? "looking_for"
+    : "standard";
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
     if (!form.title.trim()) {
-      setError("What's the plan?");
+      setError("Give your plan a title.");
       return;
     }
     if (!form.neighborhoodId) {
@@ -92,17 +104,17 @@ export function CreatePlanPage() {
       return;
     }
     if (!form.isFlexibleDate && !form.date) {
-      setError("Pick a day or mark date flexible.");
+      setError("Pick a day or toggle date flexible.");
       return;
     }
     if (!form.isFlexibleLocation && !form.locationName.trim()) {
-      setError("Add a spot or toggle flexible location.");
+      setError("Add a spot or toggle location flexible.");
       return;
     }
 
-    const capacityNum = form.capacity.trim() === "" ? null : Number(form.capacity);
+    const capacityNum = form.capacityOn ? Number(form.capacity) : null;
     if (capacityNum !== null && (!Number.isFinite(capacityNum) || capacityNum < 1)) {
-      setError("Spots must be a positive number, or leave blank for open.");
+      setError("Spots must be a positive number, or leave open.");
       return;
     }
 
@@ -126,16 +138,15 @@ export function CreatePlanPage() {
           tags: resolvedTags,
           description: form.description.trim() || undefined,
           hostEmoji: VIBE_OPTIONS.find((o) => o.id === form.vibes[0])?.emoji ?? "✨",
-          planKind: form.planKind,
+          planKind,
           visibility: form.visibility,
           capacity: capacityNum,
           joinType: form.joinType,
           isRecurring: form.isRecurring,
+          flyerDataUrl: form.flyerDataUrl ?? undefined,
         }),
       });
-      // Direct to feed and float the just-posted plan to the top so it's the
-      // first thing the user sees as confirmation.
-      navigate("/", { state: { justPostedId: created.id } });
+      navigate("/", { state: { justPostedId: created.id, openInviteForPlanId: created.id } });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't post");
     } finally {
@@ -150,6 +161,12 @@ export function CreatePlanPage() {
     }));
   };
 
+  const onFlyerPick = (file: File) => {
+    fileToResizedDataUrl(file)
+      .then((dataUrl) => setForm((f) => ({ ...f, flyerDataUrl: dataUrl })))
+      .catch(() => setError("Couldn't read that image. Try another."));
+  };
+
   return (
     <main className="app-shell app-shell--mid">
       <header className="app-header app-header--minimal">
@@ -158,190 +175,17 @@ export function CreatePlanPage() {
         </Link>
       </header>
       <h1 className="brand" style={{ marginBottom: 8 }}>
-        What&apos;s the plan?
+        New plan
       </h1>
       <p className="brand-tagline" style={{ marginBottom: 24 }}>
-        Like texting a friend — fill what you know, skip what you don&apos;t.
+        Fill what you know · toggle what's flexible
       </p>
 
       <form onSubmit={(event) => void submit(event)} className="form-card">
-        <section className="form-section">
-          <label className="form-question">Path</label>
-          <div className="segmented segmented-kind">
-            <button
-              type="button"
-              className={form.planKind === "standard" ? "is-active" : ""}
-              onClick={() => setForm((f) => ({ ...f, planKind: "standard" }))}
-            >
-              Confirmed plan
-            </button>
-            <button
-              type="button"
-              className={form.planKind === "looking_for" ? "is-active" : ""}
-              onClick={() =>
-                setForm((f) => ({
-                  ...f,
-                  planKind: "looking_for",
-                  // Looking For posts leave date/time/location flexible by default —
-                  // user can lock in any of the three individually.
-                  isFlexibleDate: true,
-                  isFlexibleTime: true,
-                  isFlexibleLocation: true,
-                }))
-              }
-            >
-              Looking for…
-            </button>
-          </div>
-          <p className="form-help">
-            {isLooking
-              ? "Floating an idea — leave date, time, and location flexible (any combination)."
-              : "Locked in — pick when and where."}
-          </p>
-
-          <label className="form-question" htmlFor="title">
-            What&apos;s the plan?
-          </label>
-          <input
-            id="title"
-            placeholder={isLooking ? "Anyone want to play pickleball?" : "Trivia at National Mechanics"}
-            value={form.title}
-            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-          />
-
-          <label className="form-question" htmlFor="description">
-            Anything else?
-          </label>
-          <textarea
-            id="description"
-            placeholder="Sounds better when it sounds like you"
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-          />
-        </section>
-
-        <section className="form-section">
-          <label className="form-question">Where should we meet?</label>
-          <label className="flex-toggle">
-            <input
-              type="checkbox"
-              checked={form.isFlexibleLocation}
-              onChange={(e) => setForm((f) => ({ ...f, isFlexibleLocation: e.target.checked }))}
-            />
-            Flexible location — we&apos;ll figure it out
-          </label>
-          {!form.isFlexibleLocation && (
-            <LocationAutocomplete
-              name={form.locationName}
-              address={form.locationAddress}
-              onChange={({ name, address, lat, lng }) =>
-                setForm((f) => ({
-                  ...f,
-                  locationName: name,
-                  locationAddress: address,
-                  locationLat: lat,
-                  locationLng: lng,
-                }))
-              }
-            />
-          )}
-          <label className="form-question" htmlFor="neighborhood">
-            Neighborhood
-          </label>
-          <select
-            id="neighborhood"
-            value={form.neighborhoodId}
-            onChange={(e) => setForm((f) => ({ ...f, neighborhoodId: e.target.value }))}
-          >
-            <option value="">Whereabouts…</option>
-            {neighborhoods.map((n) => (
-              <option key={n.id} value={n.id}>
-                {n.name}
-              </option>
-            ))}
-          </select>
-        </section>
-
-        <section className="form-section">
-          <label className="form-question">When?</label>
-          <label className="flex-toggle">
-            <input
-              type="checkbox"
-              checked={form.isFlexibleDate}
-              onChange={(e) => setForm((f) => ({ ...f, isFlexibleDate: e.target.checked }))}
-            />
-            Flexible date
-          </label>
-          {!form.isFlexibleDate && (
-            <input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
-          )}
-          <label className="flex-toggle">
-            <input
-              type="checkbox"
-              checked={form.isFlexibleTime}
-              onChange={(e) => setForm((f) => ({ ...f, isFlexibleTime: e.target.checked }))}
-            />
-            Flexible time
-          </label>
-          {!form.isFlexibleTime && (
-            <input type="time" value={form.time} onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))} />
-          )}
-          <label className="flex-toggle">
-            <input
-              type="checkbox"
-              checked={form.isRecurring}
-              onChange={(e) => setForm((f) => ({ ...f, isRecurring: e.target.checked }))}
-            />
-            Repeats weekly (same dot on your calendar)
-          </label>
-
-          <label className="form-question" htmlFor="capacity" style={{ marginTop: 14 }}>
-            Spots available?
-          </label>
-          <p className="form-help">Leave blank for open.</p>
-          <input
-            id="capacity"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            placeholder="e.g. 6"
-            value={form.capacity}
-            onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))}
-          />
-
-          {form.capacity.trim() !== "" && (
-            <>
-              <label className="form-question" style={{ marginTop: 12 }}>
-                How do people get in?
-              </label>
-              <div className="segmented">
-                <button
-                  type="button"
-                  className={form.joinType === "open" ? "is-active" : ""}
-                  onClick={() => setForm((f) => ({ ...f, joinType: "open" }))}
-                >
-                  First come, first serve
-                </button>
-                <button
-                  type="button"
-                  className={form.joinType === "approve" ? "is-active" : ""}
-                  onClick={() => setForm((f) => ({ ...f, joinType: "approve" }))}
-                >
-                  Select from applications
-                </button>
-              </div>
-              <p className="form-help">
-                {form.joinType === "open"
-                  ? "Spots fill up as people tap 'I'm in' — like a sports ticket."
-                  : "People request to join. You pick who gets in."}
-              </p>
-            </>
-          )}
-        </section>
-
+        {/* Interests at top — defaults to user's selected interests so the feed map points there. */}
         <section className="form-section">
           <label className="form-question">Interests</label>
-          <p className="form-help">This helps get your plan on the right feeds.</p>
+          <p className="form-help">Pre-selected from your interests. Add or remove anytime.</p>
           <div className="vibe-grid">
             {VIBE_OPTIONS.map((opt) => {
               const selected = form.vibes.includes(opt.id);
@@ -362,32 +206,220 @@ export function CreatePlanPage() {
         </section>
 
         <section className="form-section">
-          <label className="form-question">Who sees this?</label>
-          <p className="form-help">Defaults to everyone. Network and Communities are coming soon.</p>
-          <div className="segmented segmented-visibility">
-            <button
-              type="button"
-              className={form.visibility === "everyone" ? "is-active" : ""}
-              onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
-            >
-              Everyone
-            </button>
-            <button
-              type="button"
-              className="is-soon"
-              disabled
-              title="Your network — coming soon"
-            >
-              Your network · Soon
-            </button>
-            <button
-              type="button"
-              className="is-soon"
-              disabled
-              title="Communities — coming soon"
-            >
-              Communities · Soon
-            </button>
+          <label className="form-question" htmlFor="title">
+            Title
+          </label>
+          <input
+            id="title"
+            placeholder="Trivia at National Mechanics"
+            value={form.title}
+            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+          />
+
+          <label className="form-question" htmlFor="description">
+            Details
+          </label>
+          <textarea
+            id="description"
+            placeholder="Anything else — vibes, dress code, who else is invited…"
+            value={form.description}
+            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+          />
+        </section>
+
+        {/* Date + flex toggle inline */}
+        <section className="form-section">
+          <div className="form-row-flex">
+            <div className="form-row-flex-main">
+              <label className="form-question" htmlFor="date">
+                Date
+              </label>
+              {!form.isFlexibleDate ? (
+                <input
+                  id="date"
+                  type="date"
+                  value={form.date}
+                  onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                />
+              ) : (
+                <div className="form-flex-placeholder">Flexible — anyone can suggest a day</div>
+              )}
+            </div>
+            <FlexToggle
+              active={form.isFlexibleDate}
+              onClick={() => setForm((f) => ({ ...f, isFlexibleDate: !f.isFlexibleDate }))}
+              label="Flexible"
+            />
+          </div>
+
+          {/* Time + flex toggle inline */}
+          <div className="form-row-flex">
+            <div className="form-row-flex-main">
+              <label className="form-question" htmlFor="time">
+                Time
+              </label>
+              {!form.isFlexibleTime ? (
+                <input
+                  id="time"
+                  type="time"
+                  value={form.time}
+                  onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
+                />
+              ) : (
+                <div className="form-flex-placeholder">Flexible — pick a time later</div>
+              )}
+            </div>
+            <FlexToggle
+              active={form.isFlexibleTime}
+              onClick={() => setForm((f) => ({ ...f, isFlexibleTime: !f.isFlexibleTime }))}
+              label="Flexible"
+            />
+          </div>
+
+          <label className="flex-toggle">
+            <input
+              type="checkbox"
+              checked={form.isRecurring}
+              onChange={(e) => setForm((f) => ({ ...f, isRecurring: e.target.checked }))}
+            />
+            Repeats weekly
+          </label>
+        </section>
+
+        {/* Location + flex toggle inline */}
+        <section className="form-section">
+          <div className="form-row-flex">
+            <div className="form-row-flex-main">
+              <label className="form-question">Where</label>
+              {!form.isFlexibleLocation ? (
+                <LocationAutocomplete
+                  name={form.locationName}
+                  address={form.locationAddress}
+                  onChange={({ name, address, lat, lng }) =>
+                    setForm((f) => ({
+                      ...f,
+                      locationName: name,
+                      locationAddress: address,
+                      locationLat: lat,
+                      locationLng: lng,
+                    }))
+                  }
+                />
+              ) : (
+                <div className="form-flex-placeholder">Flexible — we'll figure it out</div>
+              )}
+            </div>
+            <FlexToggle
+              active={form.isFlexibleLocation}
+              onClick={() => setForm((f) => ({ ...f, isFlexibleLocation: !f.isFlexibleLocation }))}
+              label="Flexible"
+            />
+          </div>
+          <label className="form-question" htmlFor="neighborhood" style={{ marginTop: 8 }}>
+            Neighborhood
+          </label>
+          <select
+            id="neighborhood"
+            value={form.neighborhoodId}
+            onChange={(e) => setForm((f) => ({ ...f, neighborhoodId: e.target.value }))}
+          >
+            <option value="">Whereabouts…</option>
+            {neighborhoods.map((n) => (
+              <option key={n.id} value={n.id}>
+                {n.name}
+              </option>
+            ))}
+          </select>
+        </section>
+
+        {/* Spots — toggle for open vs capped */}
+        <section className="form-section">
+          <div className="form-row-flex">
+            <div className="form-row-flex-main">
+              <label className="form-question">Spots available</label>
+              {!form.capacityOn ? (
+                <p className="form-help" style={{ marginTop: 4 }}>
+                  Open — no cap on who can join
+                </p>
+              ) : (
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  placeholder="e.g. 6"
+                  value={form.capacity}
+                  onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))}
+                />
+              )}
+            </div>
+            <FlexToggle
+              active={form.capacityOn}
+              onClick={() => setForm((f) => ({ ...f, capacityOn: !f.capacityOn }))}
+              label="Set cap"
+            />
+          </div>
+
+          {form.capacityOn && (
+            <>
+              <label className="form-question" style={{ marginTop: 12 }}>
+                How do people get in?
+              </label>
+              <div className="segmented">
+                <button
+                  type="button"
+                  className={form.joinType === "open" ? "is-active" : ""}
+                  onClick={() => setForm((f) => ({ ...f, joinType: "open" }))}
+                >
+                  First come
+                </button>
+                <button
+                  type="button"
+                  className={form.joinType === "approve" ? "is-active" : ""}
+                  onClick={() => setForm((f) => ({ ...f, joinType: "approve" }))}
+                >
+                  Pick from applicants
+                </button>
+              </div>
+            </>
+          )}
+        </section>
+
+        {/* Flyer upload */}
+        <section className="form-section">
+          <label className="form-question">Flyer (optional)</label>
+          <p className="form-help">Got a flyer? Screenshot or upload — it'll show on the card.</p>
+          <div className="flyer-uploader">
+            {form.flyerDataUrl ? (
+              <div className="flyer-preview">
+                <img src={form.flyerDataUrl} alt="" />
+                <button
+                  type="button"
+                  className="btn-link"
+                  onClick={() => setForm((f) => ({ ...f, flyerDataUrl: null }))}
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="btn-secondary btn-block"
+                onClick={() => flyerRef.current?.click()}
+              >
+                Upload flyer
+              </button>
+            )}
+            <input
+              ref={flyerRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) onFlyerPick(f);
+                if (flyerRef.current) flyerRef.current.value = "";
+              }}
+            />
           </div>
         </section>
 
@@ -398,5 +430,38 @@ export function CreatePlanPage() {
         </button>
       </form>
     </main>
+  );
+}
+
+function FlexToggle({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      className={`flex-toggle-btn ${active ? "is-active" : ""}`}
+      onClick={onClick}
+      aria-pressed={active}
+      title={label}
+    >
+      <FlexIcon />
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function FlexIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 12h14" />
+      <path d="m12 5 7 7-7 7" />
+      <path d="M19 5l-7 7 7 7" />
+    </svg>
   );
 }

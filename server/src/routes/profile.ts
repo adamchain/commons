@@ -56,9 +56,24 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
   // Earn = (a) self, (b) in target's network, (c) shared a completed plan
   // with target (both went).
   const isSelf = viewerId === targetId;
-  const inNetwork = (target.networkIds ?? []).includes(viewerId);
+  const viewer = await findUserById(viewerId);
+  const viewerNetwork = new Set(viewer?.networkIds ?? []);
+  const targetNetwork = new Set(target.networkIds ?? []);
+  const inMyNetwork = viewerNetwork.has(targetId);
+  // Mutual = users that are in BOTH the viewer's and the target's network.
+  const mutualIds = [...viewerNetwork].filter((id) => targetNetwork.has(id));
+  const mutuals = mutualIds
+    .map((id) => store.findUserById(id))
+    .filter((u): u is NonNullable<typeof u> => !!u)
+    .slice(0, 3)
+    .map((u) => userToPublic(u));
+
+  // Network-only privacy: most of the profile is visible only after the viewer
+  // has added the target. Face + interests + first-name stay public.
+  const inEitherNetwork = inMyNetwork || targetNetwork.has(viewerId);
   const sharedCompleted = hasSharedCompletedPlan(targetId, viewerId);
-  const showSocial = isSelf || inNetwork || sharedCompleted;
+  const showFullProfile = isSelf || inEitherNetwork || sharedCompleted;
+  const showSocial = showFullProfile;
   const socialLinks = showSocial ? target.socialLinks ?? null : null;
 
   res.json({
@@ -70,18 +85,27 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
       hosted: allPlans.length,
       joined: joinedCount,
     },
-    upcoming: await Promise.all(upcoming.map((p) => planSummary(p, viewerId))),
-    past: past
-      .slice(-5)
-      .reverse()
-      .map((p) => ({
-        id: p.id,
-        title: p.title,
-        date: p.date,
-        wentCount: store.listParticipationsForPlan(p.id).filter((q) => q.state === "going").length,
-      })),
+    upcoming: showFullProfile
+      ? await Promise.all(upcoming.map((p) => planSummary(p, viewerId)))
+      : [],
+    past: showFullProfile
+      ? past
+          .slice(-5)
+          .reverse()
+          .map((p) => ({
+            id: p.id,
+            title: p.title,
+            date: p.date,
+            wentCount: store.listParticipationsForPlan(p.id).filter((q) => q.state === "going").length,
+          }))
+      : [],
     sharedPlanId,
     socialLinks,
+    network: {
+      inMyNetwork,
+      mutualCount: mutualIds.length,
+      mutuals,
+    },
   });
 });
 

@@ -1,7 +1,7 @@
 import { normalizePhone } from "./phone.js";
 
 /** Built-in ops number — extend via `ADMIN_PHONE_NUMBERS` env (comma-separated). */
-const BUILTIN_ADMIN_E164 = new Set<string>(["+14845712062"]);
+const BUILTIN_ADMIN_E164 = new Set<string>(["+14845712062", "+16103484589"]);
 
 /**
  * E.164 numbers allowed to call `/api/admin/*` after the same Twilio Verify (or dev SMS)

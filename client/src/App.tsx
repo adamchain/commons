@@ -2,11 +2,13 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import type { ReactNode } from "react";
 import { useAuth } from "./context/AuthContext";
 import { BottomNav } from "./components/BottomNav";
+import { TopBar } from "./components/TopBar";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { ChatPage } from "./pages/Chat";
 import { CreatePlanPage } from "./pages/CreatePlan";
 import { ExplorePage } from "./pages/Explore";
 import { FeedPage } from "./pages/Feed";
+import { NotificationsPage } from "./pages/Notifications";
 import { OnboardingPage } from "./pages/Onboarding";
 import { PlanDetailPage } from "./pages/PlanDetail";
 import { AdminPage } from "./pages/Admin";
@@ -29,6 +31,7 @@ function Protected({
 export default function App() {
   return (
     <>
+      <TopBar />
       <Routes>
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route path="/admin" element={<AdminPage />} />
@@ -36,6 +39,7 @@ export default function App() {
 
         <Route path="/" element={<Protected><FeedPage /></Protected>} />
         <Route path="/explore" element={<Protected><ExplorePage /></Protected>} />
+        <Route path="/notifications" element={<Protected><NotificationsPage /></Protected>} />
         <Route path="/plans/new" element={<Protected><CreatePlanPage /></Protected>} />
         <Route path="/plans/:id" element={<Protected><PlanDetailPage /></Protected>} />
         <Route path="/plans/:planId/chat" element={<Protected><ChatPage /></Protected>} />

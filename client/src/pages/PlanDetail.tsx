@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { GetThereSheet } from "../components/GetThereSheet";
+import { InviteSheet } from "../components/InviteSheet";
 import { LocationAutocomplete } from "../components/LocationAutocomplete";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { ParticipationButtons } from "../components/ParticipationButtons";
@@ -18,6 +19,7 @@ export function PlanDetailPage() {
   const [plan, setPlan] = useState<PlanDTO | null>(null);
   const [showShare, setShowShare] = useState(false);
   const [showGetThere, setShowGetThere] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
   const [lockVenue, setLockVenue] = useState("");
   const [lockVenueAddr, setLockVenueAddr] = useState("");
   const [lockLat, setLockLat] = useState<number | undefined>();
@@ -230,6 +232,7 @@ export function PlanDetailPage() {
           goingCount={plan.participants.going.length}
           joinType={plan.joinType}
           isHosting={isHosting}
+          onJustMarkedInterested={() => setShowInvite(true)}
         />
 
         <div className="plan-actions-row">
@@ -313,6 +316,9 @@ export function PlanDetailPage() {
 
       {showShare && <ShareSheet plan={plan} onClose={() => setShowShare(false)} />}
       {showGetThere && <GetThereSheet plan={plan} onClose={() => setShowGetThere(false)} />}
+      {showInvite && (
+        <InviteSheet planId={plan.id} planTitle={plan.title} onClose={() => setShowInvite(false)} />
+      )}
     </main>
   );
 }

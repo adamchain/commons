@@ -54,6 +54,91 @@ placesRouter.get("/autocomplete", requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * Text Search — used by Explore's location search box. Returns a few candidate
+ * venues with a photo reference we can re-fetch via /photo.
+ */
+placesRouter.get("/search", requireAuth, async (req, res) => {
+  const key = googleKey();
+  const query = String(req.query.q ?? "").trim();
+  if (!key) {
+    res.status(503).json({ error: "Places API not configured", results: [] });
+    return;
+  }
+  if (query.length < 2) {
+    res.json({ results: [] });
+    return;
+  }
+  const url = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
+  url.searchParams.set("query", query);
+  url.searchParams.set("location", PHILLY);
+  url.searchParams.set("radius", "40000");
+  url.searchParams.set("key", key);
+  try {
+    const r = await fetch(url);
+    const data = (await r.json()) as {
+      results?: Array<{
+        place_id: string;
+        name: string;
+        formatted_address?: string;
+        geometry?: { location?: { lat: number; lng: number } };
+        photos?: Array<{ photo_reference: string }>;
+        rating?: number;
+        user_ratings_total?: number;
+      }>;
+      status: string;
+    };
+    if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+      console.error("[places] search", data.status);
+      res.status(502).json({ error: "Places search failed", results: [] });
+      return;
+    }
+    const results = (data.results ?? []).slice(0, 12).map((r) => ({
+      placeId: r.place_id,
+      name: r.name,
+      address: r.formatted_address ?? "",
+      lat: r.geometry?.location?.lat,
+      lng: r.geometry?.location?.lng,
+      photoRef: r.photos?.[0]?.photo_reference,
+      rating: r.rating,
+      ratings: r.user_ratings_total,
+    }));
+    res.json({ results });
+  } catch (e) {
+    console.error("[places] search fetch", e);
+    res.status(502).json({ error: "Places search failed", results: [] });
+  }
+});
+
+/** Proxy a Places Photo so the API key never leaves the server. */
+placesRouter.get("/photo", requireAuth, async (req, res) => {
+  const key = googleKey();
+  const photoRef = String(req.query.ref ?? "").trim();
+  const maxwidth = Math.min(1024, Math.max(64, Number(req.query.w ?? 400) || 400));
+  if (!key || !photoRef) {
+    res.status(400).end();
+    return;
+  }
+  const url = new URL("https://maps.googleapis.com/maps/api/place/photo");
+  url.searchParams.set("photo_reference", photoRef);
+  url.searchParams.set("maxwidth", String(maxwidth));
+  url.searchParams.set("key", key);
+  try {
+    const r = await fetch(url, { redirect: "follow" });
+    if (!r.ok || !r.body) {
+      res.status(502).end();
+      return;
+    }
+    res.setHeader("Content-Type", r.headers.get("content-type") ?? "image/jpeg");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    const buf = Buffer.from(await r.arrayBuffer());
+    res.end(buf);
+  } catch (e) {
+    console.error("[places] photo fetch", e);
+    res.status(502).end();
+  }
+});
+
 placesRouter.get("/details", requireAuth, async (req, res) => {
   const key = googleKey();
   const placeId = String(req.query.placeId ?? "").trim();

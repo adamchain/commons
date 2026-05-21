@@ -195,6 +195,8 @@ export interface PlanDTO {
   isRecurring: boolean;
   /** Host locked venue + time from coordination thread. */
   lockedAt: string | null;
+  /** Optional flyer image (data URL). People screenshot flyers — attach one. */
+  flyerDataUrl?: string;
   suggestions: PlanSuggestionDTO[];
   participants: {
     going: PublicUser[];

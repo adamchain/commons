@@ -30,6 +30,11 @@ interface ProfilePayload {
   sharedPlanId: string | null;
   /** Null until viewer earns visibility (shared completed plan or in network). */
   socialLinks: { instagram?: string } | null;
+  network: {
+    inMyNetwork: boolean;
+    mutualCount: number;
+    mutuals: PublicUser[];
+  };
 }
 
 export function ProfilePage() {
@@ -99,8 +104,29 @@ export function ProfilePage() {
         )}
         {!isSelf && profile.socialLinks === null && (
           <p className="profile-social-locked">
-            Socials unlock after you go to a plan together.
+            Add to your network to see more — face and interests stay public.
           </p>
+        )}
+
+        {!isSelf && profile.network.mutualCount > 0 && (
+          <div className="profile-mutuals">
+            <div className="profile-mutuals-avatars">
+              {profile.network.mutuals.map((u) => (
+                <Avatar
+                  key={u.id}
+                  seed={u.avatarSeed}
+                  style={u.avatarStyle}
+                  photoDataUrl={u.avatarPhotoDataUrl}
+                  params={u.avatarParams}
+                  name={u.firstName}
+                  size="sm"
+                />
+              ))}
+            </div>
+            <span className="profile-mutuals-text">
+              {profile.network.mutualCount} mutual{profile.network.mutualCount === 1 ? "" : "s"} in your network
+            </span>
+          </div>
         )}
 
         <div className="profile-stats" aria-label="Profile stats">
@@ -124,6 +150,8 @@ export function ProfilePage() {
             {editing ? "Done editing" : "Edit profile"}
           </button>
         )}
+
+        {!isSelf && <FriendButton profile={profile} onUpdated={reloadProfile} />}
 
         {topTags.length > 0 && (
           <div className="profile-tags">
@@ -161,7 +189,7 @@ export function ProfilePage() {
 
       {isSelf && <InviteCard firstName={user?.firstName ?? "a friend"} />}
 
-      {isSelf && <MonthCalendar plans={feedPlans} />}
+      {isSelf && <CondensedCalendar plans={feedPlans} />}
 
       {isSelf && user?.canAccessAdmin && (
         <section className="profile-block">
@@ -217,6 +245,49 @@ export function ProfilePage() {
         </section>
       )}
     </main>
+  );
+}
+
+function FriendButton({
+  profile,
+  onUpdated,
+}: {
+  profile: ProfilePayload;
+  onUpdated: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const { setUser } = useAuth();
+  const inNet = profile.network.inMyNetwork;
+
+  async function toggle() {
+    setBusy(true);
+    try {
+      const r = await api<{ me: MeDTO }>(
+        inNet ? "/api/auth/friend-remove" : "/api/auth/friend-add",
+        {
+          method: "POST",
+          body: JSON.stringify({ userId: profile.user.id }),
+        },
+      );
+      setUser(r.me);
+      onUpdated();
+    } catch {
+      /* swallow */
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className={inNet ? "btn-secondary" : "btn-primary"}
+      onClick={() => void toggle()}
+      disabled={busy}
+      style={{ marginTop: 14 }}
+    >
+      {busy ? "…" : inNet ? "In your network" : "Add to network"}
+    </button>
   );
 }
 
@@ -436,6 +507,64 @@ function SettingsPanel({ onSignOut }: { onSignOut: () => void }) {
   );
 }
 
+function CondensedCalendar({ plans }: { plans: PlanDTO[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+
+  // Week strip: today + next 6 days
+  const week: { iso: string; dow: string; dom: number; isToday: boolean }[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(year, month, now.getDate() + i);
+    week.push({
+      iso: d.toISOString().slice(0, 10),
+      dow: ["S", "M", "T", "W", "T", "F", "S"][d.getDay()] ?? "",
+      dom: d.getDate(),
+      isToday: i === 0,
+    });
+  }
+  const byIso = new Map<string, PlanDTO[]>();
+  for (const p of plans) {
+    const key = p.date.slice(0, 10);
+    if (!byIso.has(key)) byIso.set(key, []);
+    byIso.get(key)!.push(p);
+  }
+
+  return (
+    <section className="profile-calendar" aria-label="Your plans">
+      <div className="profile-calendar-header">
+        <h3 className="who-block-heading">Your plans</h3>
+        <button type="button" className="btn-link" onClick={() => setExpanded((v) => !v)}>
+          {expanded ? "Hide month" : "Show month"}
+        </button>
+      </div>
+      {!expanded && (
+        <div className="profile-week-strip">
+          {week.map((d) => {
+            const dayPlans = byIso.get(d.iso) ?? [];
+            return (
+              <div
+                key={d.iso}
+                className={`profile-week-cell ${dayPlans.length > 0 ? "has-plans" : ""} ${d.isToday ? "is-today" : ""}`}
+              >
+                <div className="profile-week-dow">{d.dow}</div>
+                <div className="profile-week-num">{d.dom}</div>
+                {dayPlans.length > 0 && (
+                  <div className="profile-week-dot" aria-hidden="true">
+                    {dayPlans[0]!.hostEmoji}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {expanded && <MonthCalendar plans={plans} />}
+    </section>
+  );
+}
+
 function MonthCalendar({ plans }: { plans: PlanDTO[] }) {
   const now = new Date();
   const year = now.getFullYear();
@@ -456,10 +585,10 @@ function MonthCalendar({ plans }: { plans: PlanDTO[] }) {
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
   return (
-    <section className="profile-month-calendar" aria-label="Month view">
-      <h3 className="who-block-heading">
+    <div className="profile-month-calendar" aria-label="Month view">
+      <h4 className="profile-month-caption">
         {first.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
-      </h3>
+      </h4>
       <div className="month-cal-grid">
         {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
           <div key={`${d}-${i}`} className="month-cal-dow">
@@ -483,6 +612,6 @@ function MonthCalendar({ plans }: { plans: PlanDTO[] }) {
           ),
         )}
       </div>
-    </section>
+    </div>
   );
 }

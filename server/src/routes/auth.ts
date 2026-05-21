@@ -260,6 +260,74 @@ authRouter.post("/network-add", requireAuth, async (req, res) => {
   res.json({ ok: true, me });
 });
 
+/**
+ * One-tap "Add to network" from a profile page — no shared plan required.
+ * One-sided add: target shows up in viewer's network. Mutual happens when the
+ * target also taps it from your profile. (Prototype — no pending state yet.)
+ */
+authRouter.post("/friend-add", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const targetId = String(req.body?.userId ?? "");
+  if (!targetId || targetId === userId) {
+    res.status(400).json({ error: "userId required" });
+    return;
+  }
+  const viewer = await findUserById(userId);
+  const target = await findUserById(targetId);
+  if (!viewer || !target) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  const myNet = new Set(viewer.networkIds ?? []);
+  myNet.add(targetId);
+  await updateUser(userId, { networkIds: [...myNet] });
+  const me = await userToMe(userId);
+  res.json({ ok: true, me });
+});
+
+authRouter.post("/friend-remove", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const targetId = String(req.body?.userId ?? "");
+  if (!targetId || targetId === userId) {
+    res.status(400).json({ error: "userId required" });
+    return;
+  }
+  const viewer = await findUserById(userId);
+  if (!viewer) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  const myNet = new Set(viewer.networkIds ?? []);
+  myNet.delete(targetId);
+  await updateUser(userId, { networkIds: [...myNet] });
+  const me = await userToMe(userId);
+  res.json({ ok: true, me });
+});
+
+/** Resolve the viewer's network into PublicUser records for the invite picker. */
+authRouter.get("/network", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const viewer = await findUserById(userId);
+  if (!viewer) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const ids = viewer.networkIds ?? [];
+  const users = ids
+    .map((id) => store.findUserById(id))
+    .filter((u): u is UserRecord => !!u)
+    .map((u) => ({
+      id: u.id,
+      firstName: u.firstName,
+      neighborhoodId: u.neighborhoodId ?? null,
+      avatarSeed: u.avatarSeed,
+      avatarStyle: u.avatarStyle,
+      avatarPhotoDataUrl: u.avatarPhotoDataUrl,
+      avatarParams: u.avatarParams,
+    }));
+  res.json({ users });
+});
+
 authRouter.post("/network-dismiss", requireAuth, async (req, res) => {
   const userId = String(req.userId);
   const planId = String(req.body?.planId ?? "");

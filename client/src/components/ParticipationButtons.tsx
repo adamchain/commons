@@ -11,6 +11,7 @@ export function ParticipationButtons({
   goingCount = 0,
   joinType = "open",
   isHosting = false,
+  onJustMarkedInterested,
 }: {
   planId: string;
   initialState: ParticipationState | null;
@@ -23,6 +24,8 @@ export function ParticipationButtons({
   joinType?: JoinType;
   /** Host bypasses capacity and approve gates. */
   isHosting?: boolean;
+  /** Called when the user goes from null → interested (open invite sheet). */
+  onJustMarkedInterested?: () => void;
 }) {
   const [state, setState] = useState<ParticipationState | null>(initialState);
   const [pending, setPending] = useState(false);
@@ -42,6 +45,7 @@ export function ParticipationButtons({
           method: "PUT",
           body: JSON.stringify({ state: next }),
         });
+        if (next === "interested" && prev === null) onJustMarkedInterested?.();
       } else {
         await api(`/api/plans/${planId}/participation`, { method: "DELETE" });
       }

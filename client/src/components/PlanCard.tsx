@@ -4,63 +4,24 @@ import { Link } from "react-router-dom";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
 import type { PlanDTO } from "../types/shared";
-import { INTEREST_LABELS } from "../types/shared";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
 
-function initials(u: { firstName: string }): string {
-  const p = u.firstName.trim().split(/\s+/);
-  if (p.length >= 2) return (p[0]!.slice(0, 1) + p[1]!.slice(0, 1)).toUpperCase();
-  const one = p[0] ?? "?";
-  return one.slice(0, 2).toUpperCase();
-}
-
-function haversineMiles(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const R = 3958.8;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const lat1 = toRad(a.lat);
-  const lat2 = toRad(b.lat);
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
-
-function formatMiles(miles: number): string {
-  if (!isFinite(miles)) return "";
-  if (miles < 0.1) return "<0.1 mi";
-  if (miles < 10) return `${miles.toFixed(1)} mi`;
-  return `${Math.round(miles)} mi`;
-}
-
+/**
+ * Compact event card — title, time, details. Card type (confirmed / looking_for /
+ * plan_created) still drives shading and the reply form, but the dense metadata
+ * row (avatars, posted-by, distance) is gone per the simplified spec.
+ */
 export function PlanCard({
   plan,
-  neighborhoodName,
-  viewerCoords,
   onPlanRefresh,
   highlight = false,
 }: {
   plan: PlanDTO;
-  /** Area label for host line (e.g. Rittenhouse) */
-  neighborhoodName?: string;
-  /** Viewer's reference point for distance — typically their primary neighborhood centroid. */
-  viewerCoords?: { lat: number; lng: number };
   onPlanRefresh?: () => void;
-  /** Pin highlight after the user just posted this plan. */
   highlight?: boolean;
 }) {
-  const going = plan.participants.going;
-  const goingCount = going.length;
-  const three = going.slice(0, 3);
   const title = sentenceCaseTitle(plan.title);
-  const flexTag =
-    plan.isFlexibleTime || plan.isFlexibleLocation ? "Flexible on time + location" : null;
-  const distanceLabel =
-    viewerCoords && typeof plan.location?.lat === "number" && typeof plan.location?.lng === "number"
-      ? formatMiles(haversineMiles(viewerCoords, { lat: plan.location.lat, lng: plan.location.lng }))
-      : null;
   const isLooking = plan.planKind === "looking_for";
-  // Once a looking-for plan is locked, its lifecycle resolved into a real plan.
-  // Keep planKind=looking_for as a history marker but render as "Plan created".
   const isPlanCreated = isLooking && Boolean(plan.lockedAt);
   const suggestions = plan.suggestions ?? [];
   const [reply, setReply] = useState("");
@@ -89,6 +50,14 @@ export function PlanCard({
     }
   }
 
+  const whenLine = plan.isFlexibleLocation && plan.isFlexibleTime
+    ? "Flexible"
+    : plan.isFlexibleLocation
+      ? `${formatPlanDate(plan.date)} · Location TBD`
+      : plan.isFlexibleTime
+        ? `${formatPlanDate(plan.date)} · Time TBD`
+        : `${formatPlanDate(plan.date)} · ${formatPlanTime(plan.time, plan.isFlexibleTime)}`;
+
   return (
     <div
       data-plan-id={plan.id}
@@ -101,54 +70,17 @@ export function PlanCard({
       } ${highlight ? "plan-card--just-posted" : ""}`}
     >
       {highlight && <div className="plan-card-just-posted-banner">Just posted · Live on the feed</div>}
-      <Link to={`/plans/${plan.id}`} className="plan-card plan-card-link">
-        <span
-          className={`plan-card-kind-pill ${
-            isPlanCreated ? "is-plan-created" : isLooking ? "is-looking" : "is-confirmed"
-          }`}
-        >
-          {isPlanCreated ? "Plan created" : isLooking ? "Looking for" : "Confirmed plan"}
-        </span>
-
+      <Link to={`/plans/${plan.id}`} className="plan-card plan-card-link plan-card--compact">
+        {plan.flyerDataUrl && (
+          <div className="plan-card-flyer">
+            <img src={plan.flyerDataUrl} alt="" />
+          </div>
+        )}
         <h3 className="plan-card-title">{title}</h3>
-
-        <p className="plan-card-posted-by">
-          posted by {plan.creator.firstName}
-          {plan.location?.name ? ` · ${plan.location.name}` : ""}
-          {distanceLabel ? ` · ${distanceLabel}` : neighborhoodName ? ` · ${neighborhoodName}` : ""}
-        </p>
-
-        {plan.description ? (
-          <p className="plan-card-description">&ldquo;{plan.description}&rdquo;</p>
-        ) : null}
-
-        <div className="plan-card-meta-row">
-          <div className="plan-card-meta-main">
-            {!plan.isFlexibleLocation && (
-              <span className="plan-card-when">
-                {formatPlanDate(plan.date)} · {formatPlanTime(plan.time, plan.isFlexibleTime)}
-              </span>
-            )}
-            {plan.isFlexibleLocation && !flexTag && <span className="plan-card-when">Location TBD</span>}
-            {flexTag && <span className="plan-card-flex-tag">{flexTag}</span>}
-          </div>
-          <div className="plan-card-avatars" aria-label={`${goingCount} going`}>
-            {three.map((u) => (
-              <span key={u.id} className="plan-card-initials" title={u.firstName}>
-                {initials(u)}
-              </span>
-            ))}
-            <span className="plan-card-going-count">{goingCount} going</span>
-          </div>
-        </div>
-
-        <div className="plan-card-tags">
-          {plan.tags.slice(0, 3).map((tag) => (
-            <span key={tag} className="tag-chip tag-chip-quiet">
-              {INTEREST_LABELS[tag] ?? tag}
-            </span>
-          ))}
-        </div>
+        <p className="plan-card-when">{whenLine}</p>
+        {plan.description && (
+          <p className="plan-card-description">{plan.description}</p>
+        )}
 
         {(plan.myState === "going" || plan.myState === "interested") && (
           <div className="plan-card-my-state">

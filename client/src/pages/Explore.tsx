@@ -1,43 +1,62 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { PlanCard } from "../components/PlanCard";
 import { useAuth } from "../context/AuthContext";
-import type { NeighborhoodDTO, PlanDTO } from "../types/shared";
+import type { PlanDTO } from "../types/shared";
 
 type Mode = "nearby" | "similar" | "both";
 
-/**
- * Explore — discover plans outside the default feed: by proximity, by interest
- * overlap, or both. Communities preview lives bottom-left as a coming-soon
- * surface.
- */
+interface PlaceResult {
+  placeId: string;
+  name: string;
+  address: string;
+  lat?: number;
+  lng?: number;
+  photoRef?: string;
+  rating?: number;
+  ratings?: number;
+}
+
 export function ExplorePage() {
   const { user } = useAuth();
   const [plans, setPlans] = useState<PlanDTO[] | null>(null);
-  const [neighborhoods, setNeighborhoods] = useState<NeighborhoodDTO[]>([]);
   const [mode, setMode] = useState<Mode>("both");
+  const [locationQuery, setLocationQuery] = useState("");
+  const [places, setPlaces] = useState<PlaceResult[]>([]);
+  const [placesLoading, setPlacesLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     void api<PlanDTO[]>("/api/plans").then(setPlans).catch(() => setPlans([]));
-    void api<NeighborhoodDTO[]>("/api/neighborhoods").then(setNeighborhoods).catch(() => undefined);
   }, []);
 
-  const hoodById = useMemo(() => new Map(neighborhoods.map((n) => [n.id, n])), [neighborhoods]);
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const q = locationQuery.trim();
+    if (q.length < 2) {
+      setPlaces([]);
+      return;
+    }
+    debounceRef.current = setTimeout(() => {
+      setPlacesLoading(true);
+      void api<{ results: PlaceResult[] }>(`/api/places/search?q=${encodeURIComponent(q)}`)
+        .then((r) => setPlaces(r.results))
+        .catch(() => setPlaces([]))
+        .finally(() => setPlacesLoading(false));
+    }, 350);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [locationQuery]);
+
   const myHoodIds = useMemo(
     () => user?.neighborhoodIds ?? (user?.neighborhoodId ? [user.neighborhoodId] : []),
     [user],
   );
   const myInterests = useMemo(() => new Set(user?.interests ?? []), [user]);
-  const primaryHood = myHoodIds[0] ? hoodById.get(myHoodIds[0]) : undefined;
-  const viewerCoords =
-    primaryHood && typeof primaryHood.lat === "number" && typeof primaryHood.lng === "number"
-      ? { lat: primaryHood.lat, lng: primaryHood.lng }
-      : undefined;
 
-  // Nearby = same hood or adjacent (we approximate adjacency by "any of my
-  // hoods or close in distance"). Similar = at least one tag overlap.
   const filtered = useMemo(() => {
     if (!plans) return [];
     return plans.filter((p) => {
@@ -52,10 +71,63 @@ export function ExplorePage() {
   if (plans === null) return <LoadingScreen tagline="Exploring" />;
 
   return (
-    <main className="app-shell app-shell--wide app-shell--with-nav">
-      <header className="app-header app-header--minimal">
-        <h1 className="brand">Explore</h1>
-      </header>
+    <main className="app-shell app-shell--wide app-shell--with-nav app-shell--with-topbar">
+      <h1 className="brand" style={{ marginBottom: 14 }}>Explore</h1>
+
+      <div className="explore-search">
+        <SearchIcon />
+        <input
+          type="search"
+          placeholder="Search a venue, neighborhood, or vibe…"
+          value={locationQuery}
+          onChange={(e) => setLocationQuery(e.target.value)}
+        />
+        {locationQuery && (
+          <button type="button" className="explore-search-clear" onClick={() => setLocationQuery("")}>
+            ×
+          </button>
+        )}
+      </div>
+
+      {locationQuery.trim().length >= 2 && (
+        <section className="explore-places">
+          <h2 className="section-title">Spots</h2>
+          {placesLoading && places.length === 0 && (
+            <p className="form-help">Looking…</p>
+          )}
+          {!placesLoading && places.length === 0 && (
+            <p className="form-help">No spots found — try another search.</p>
+          )}
+          <div className="explore-places-grid">
+            {places.map((p) => {
+              const search = new URLSearchParams();
+              search.set("name", p.name);
+              if (p.address) search.set("address", p.address);
+              return (
+                <Link key={p.placeId} to={`/plans/new?${search.toString()}`} className="explore-place-tile">
+                  <div className="explore-place-photo">
+                    {p.photoRef ? (
+                      <img src={`/api/places/photo?ref=${encodeURIComponent(p.photoRef)}&w=400`} alt="" />
+                    ) : (
+                      <div className="explore-place-photo-fallback">📍</div>
+                    )}
+                  </div>
+                  <div className="explore-place-body">
+                    <div className="explore-place-name">{p.name}</div>
+                    <div className="explore-place-address">{p.address}</div>
+                    {p.rating && (
+                      <div className="explore-place-rating">
+                        ★ {p.rating.toFixed(1)}
+                        {p.ratings ? ` · ${p.ratings}` : ""}
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <div className="segmented segmented-explore" role="tablist" aria-label="Explore mode">
         <button
@@ -97,12 +169,7 @@ export function ExplorePage() {
       ) : (
         <div className="plan-grid">
           {filtered.map((plan) => (
-            <PlanCard
-              key={plan.id}
-              plan={plan}
-              neighborhoodName={hoodById.get(plan.neighborhoodId)?.name}
-              viewerCoords={viewerCoords}
-            />
+            <PlanCard key={plan.id} plan={plan} />
           ))}
         </div>
       )}
@@ -147,5 +214,14 @@ function CommunitiesPreview() {
         </li>
       </ul>
     </aside>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
   );
 }

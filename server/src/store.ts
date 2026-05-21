@@ -77,6 +77,7 @@ export interface PlanRecord {
   joinType?: JoinType;
   isRecurring?: boolean;
   lockedAt?: string | null;
+  flyerDataUrl?: string;
   createdAt: string;
 }
 
