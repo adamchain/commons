@@ -49,7 +49,7 @@ export const VIBE_TAGS = ALL_INTERESTS;
  * existing tag set. Multiple emojis can collapse to the same tag (Martini and
  * Burger both → food_drinks); the resolved tag list de-duplicates.
  */
-export type VibeIcon = "coffee" | "martini" | "burger" | "music" | "book" | "paint" | "dice" | "disco";
+export type VibeIcon = "coffee" | "martini" | "burger" | "music" | "book" | "paint" | "dice" | "disco" | "workout";
 
 export interface VibeOption {
   id: VibeIcon;
@@ -67,6 +67,7 @@ export const VIBE_OPTIONS: VibeOption[] = [
   { id: "paint",   emoji: "🎨", label: "Paint",   tag: "arts_culture" },
   { id: "dice",    emoji: "🎲", label: "Dice",    tag: "local_events" },
   { id: "disco",   emoji: "💃", label: "Disco",   tag: "music_nightlife" },
+  { id: "workout", emoji: "💪", label: "Workout", tag: "fitness_outdoors" },
 ];
 
 export type PlanKind = "standard" | "looking_for";
@@ -193,8 +194,12 @@ export interface PlanDTO {
   /** How RSVPs are accepted when capacity is set. */
   joinType: JoinType;
   isRecurring: boolean;
+  /** Series anchor — null for one-offs, shared across every instance of a recurring plan. */
+  seriesId: string | null;
   /** Host locked venue + time from coordination thread. */
   lockedAt: string | null;
+  /** ISO timestamp when the host cancelled this plan, or null if active. */
+  cancelledAt: string | null;
   /** Optional flyer image (data URL). People screenshot flyers — attach one. */
   flyerDataUrl?: string;
   suggestions: PlanSuggestionDTO[];
@@ -265,6 +270,10 @@ export interface MeDTO {
   socialLinks?: SocialLinks;
   /** True when this verified phone may use `/api/admin` and `/admin`. */
   canAccessAdmin?: boolean;
+  /** ISO timestamp the user accepted the community guidelines, or null if not yet. */
+  guidelinesAcknowledgedAt?: string | null;
+  /** Notification toggles. Missing keys fall back to DEFAULT_NOTIFICATION_PREFS. */
+  notificationPrefs?: NotificationPrefs;
 }
 
 export interface NetworkPromptDTO {
@@ -272,3 +281,66 @@ export interface NetworkPromptDTO {
   planTitle: string;
   others: PublicUser[];
 }
+
+/** Notification toggles — persisted on the user record, gate both in-app and push delivery. */
+export interface NotificationPrefs {
+  someoneJoinedYourPlan: boolean;
+  planTomorrow: boolean;
+  planInTwoHours: boolean;
+  newGroupChatMessage: boolean;
+  postPlanNetworkNudge: boolean;
+  planCancellation: boolean;
+  weeklyFridayDigest: boolean;
+  lookingForRecovery: boolean;
+}
+
+export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
+  someoneJoinedYourPlan: true,
+  planTomorrow: true,
+  planInTwoHours: true,
+  newGroupChatMessage: true,
+  postPlanNetworkNudge: true,
+  planCancellation: true,
+  weeklyFridayDigest: true,
+  lookingForRecovery: true,
+};
+
+export type NotificationKind =
+  | "someoneJoinedYourPlan"
+  | "planTomorrow"
+  | "planInTwoHours"
+  | "newGroupChatMessage"
+  | "postPlanNetworkNudge"
+  | "planCancellation"
+  | "weeklyFridayDigest"
+  | "lookingForRecovery";
+
+export interface NotificationDTO {
+  id: string;
+  kind: NotificationKind;
+  body: string;
+  /** Optional plan link — clients route to /plans/:planId on tap. */
+  planId?: string;
+  /** Optional conversation link — chat-message events route here. */
+  conversationId?: string;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export interface InviteCodeDTO {
+  code: string;
+  redeemedAt: string | null;
+  /** First name of the person who redeemed it — null until/unless redeemed. */
+  redeemedByFirstName: string | null;
+}
+
+export const NOTIFICATION_LABELS: Record<keyof NotificationPrefs, string> = {
+  someoneJoinedYourPlan: "Someone joined your plan",
+  planTomorrow: "Your plan is tomorrow",
+  planInTwoHours: "Your plan is in 2 hours",
+  newGroupChatMessage: "New message in group chat",
+  postPlanNetworkNudge: "Add people you went out with to your network",
+  planCancellation: "A plan you RSVP'd to was cancelled",
+  weeklyFridayDigest: "Weekly Friday: what's happening in Philly",
+  lookingForRecovery: "Reminder when a Looking For plan needs a host",
+};

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
@@ -9,7 +9,7 @@ import { LoadingScreen } from "../components/LoadingScreen";
 import { ParticipationButtons } from "../components/ParticipationButtons";
 import { ShareSheet } from "../components/ShareSheet";
 import { useAuth } from "../context/AuthContext";
-import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
+import { formatPlaceAddress, formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
 import { INTEREST_LABELS, type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
 
 export function PlanDetailPage() {
@@ -28,6 +28,8 @@ export function PlanDetailPage() {
   const [lockTime, setLockTime] = useState("19:00");
   const [lockFlexTime, setLockFlexTime] = useState(false);
   const [lockBusy, setLockBusy] = useState(false);
+  const [claimedHost, setClaimedHost] = useState(false);
+  const lockFormRef = useRef<HTMLDivElement | null>(null);
 
   const load = async () => {
     const data = await api<PlanDTO>(`/api/plans/${id}`);
@@ -93,6 +95,31 @@ export function PlanDetailPage() {
   const canChat =
     isHosting || plan.myState === "going" || plan.myState === "interested";
 
+  async function cancelPlan() {
+    if (!plan) return;
+    if (!confirm(`Cancel "${plan.title}"? Everyone who RSVP'd will be notified.`)) return;
+    try {
+      await api(`/api/plans/${plan.id}/cancel`, { method: "POST" });
+      await load();
+    } catch {
+      /* surface via reload */
+    }
+  }
+
+  async function transferHost(newHostId: string, newHostName: string) {
+    if (!plan) return;
+    if (!confirm(`Transfer hosting of "${plan.title}" to ${newHostName}? You'll drop off the going list.`)) return;
+    try {
+      await api(`/api/plans/${plan.id}/transfer-host`, {
+        method: "POST",
+        body: JSON.stringify({ newHostId }),
+      });
+      await load();
+    } catch {
+      /* surface via reload */
+    }
+  }
+
   async function lockIn() {
     if (!lockVenue.trim() || !lockDate) return;
     setLockBusy(true);
@@ -132,12 +159,42 @@ export function PlanDetailPage() {
         <div className="plan-when">
           {formatPlanDate(plan.date)} · {formatPlanTime(plan.time, plan.isFlexibleTime)}
         </div>
-        <div className="plan-where">
-          <strong>{plan.location.name}</strong>
-          {plan.location.address && plan.location.address !== plan.location.name && (
-            <div className="meta-secondary">{plan.location.address}</div>
-          )}
-        </div>
+        {(() => {
+          const pretty = formatPlaceAddress(plan.location.address);
+          const showAddressLine = pretty && pretty !== plan.location.name;
+          if (plan.isFlexibleLocation) {
+            return (
+              <div className="plan-where">
+                <strong>{plan.location.name}</strong>
+                {showAddressLine && <div className="meta-secondary">{pretty}</div>}
+              </div>
+            );
+          }
+          const query = encodeURIComponent(
+            [plan.location.name, plan.location.address].filter(Boolean).join(" "),
+          );
+          const mapsHref = `https://www.google.com/maps/search/?api=1&query=${query}`;
+          return (
+            <a
+              className="plan-where plan-where--link"
+              href={mapsHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Open ${plan.location.name} in Google Maps`}
+            >
+              <strong>
+                {plan.location.name}
+                {!showAddressLine && <span className="plan-where-arrow" aria-hidden="true"> ↗</span>}
+              </strong>
+              {showAddressLine && (
+                <div className="meta-secondary">
+                  {pretty}
+                  <span className="plan-where-arrow" aria-hidden="true"> ↗</span>
+                </div>
+              )}
+            </a>
+          );
+        })()}
 
         <button
           type="button"
@@ -162,17 +219,47 @@ export function PlanDetailPage() {
 
         {showGroupPrompt && (
           <div className="lock-prompt" role="note">
-            <p>Looks like you’ve got a group. Ready to lock something in?</p>
-            <span className="lock-prompt-arrow">↓ Make it a plan</span>
+            <p className="lock-prompt-headline">
+              Looks like you've got a group. Ready to lock something in?
+            </p>
+            <p className="lock-prompt-soft">
+              Plans work best when someone locks it in early.
+            </p>
+            {canLock && !claimedHost && (
+              <button
+                type="button"
+                className="btn-primary btn-block lock-prompt-claim"
+                onClick={() => {
+                  setClaimedHost(true);
+                  // Defer scroll so the expanded form has mounted.
+                  setTimeout(() => {
+                    lockFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  }, 50);
+                }}
+              >
+                I'll take it from here
+              </button>
+            )}
+            {canLock && claimedHost && (
+              <p className="lock-prompt-claimed">
+                <strong>You're hosting.</strong> Fill in venue + day below when you're ready.
+              </p>
+            )}
           </div>
         )}
 
         {canLock && (plan.isFlexibleTime || plan.isFlexibleLocation || isLookingFor) && (
-          <div className="coordination-banner coordination-banner--expanded" role="note">
+          <div
+            ref={lockFormRef}
+            className="coordination-banner coordination-banner--expanded"
+            role="note"
+          >
             <p>
-              {isLookingFor
-                ? "Whoever picks the spot becomes the host. Fill in venue and day to make it a plan."
-                : "Still working out the details? Fill in venue & time when you’re ready and lock it in."}
+              {claimedHost
+                ? `You're hosting — pick a venue and day to lock it in.`
+                : isLookingFor
+                  ? "Whoever picks the spot becomes the host. Fill in venue and day to make it a plan."
+                  : "Still working out the details? Fill in venue & time when you’re ready and lock it in."}
             </p>
             <label className="form-question">Venue</label>
             <LocationAutocomplete
@@ -243,6 +330,28 @@ export function PlanDetailPage() {
             ↗ Share
           </button>
         </div>
+
+        {plan.cancelledAt && (
+          <div className="plan-cancelled-banner" role="alert">
+            This plan was cancelled by the host.
+          </div>
+        )}
+
+        {isHosting && !plan.cancelledAt && (
+          <div className="plan-host-actions">
+            <HostTransferControl
+              candidates={plan.participants.going.filter((p) => p.id !== user.id)}
+              onTransfer={(id, name) => void transferHost(id, name)}
+            />
+            <button
+              type="button"
+              className="btn-link plan-cancel-link"
+              onClick={() => void cancelPlan()}
+            >
+              Cancel plan
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="who-block">
@@ -320,5 +429,54 @@ export function PlanDetailPage() {
         <InviteSheet planId={plan.id} planTitle={plan.title} onClose={() => setShowInvite(false)} />
       )}
     </main>
+  );
+}
+
+function HostTransferControl({
+  candidates,
+  onTransfer,
+}: {
+  candidates: PublicUser[];
+  onTransfer: (id: string, name: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  if (candidates.length === 0) return null;
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className="btn-link plan-transfer-link"
+        onClick={() => setOpen(true)}
+      >
+        Transfer hosting
+      </button>
+    );
+  }
+  return (
+    <div className="plan-transfer-picker" role="menu">
+      <div className="plan-transfer-picker-label">Hand off to:</div>
+      <div className="plan-transfer-picker-list">
+        {candidates.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            className="plan-transfer-pick"
+            onClick={() => onTransfer(c.id, c.firstName)}
+          >
+            <Avatar
+              seed={c.avatarSeed}
+              style={c.avatarStyle}
+              photoDataUrl={c.avatarPhotoDataUrl}
+              params={c.avatarParams}
+              size="sm"
+            />
+            <span>{c.firstName}</span>
+          </button>
+        ))}
+      </div>
+      <button type="button" className="btn-link" onClick={() => setOpen(false)}>
+        Cancel
+      </button>
+    </div>
   );
 }

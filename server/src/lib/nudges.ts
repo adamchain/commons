@@ -2,6 +2,7 @@ import { sendTransactionalSms } from "./sms.js";
 import { planEndTimestamp, planHasEnded, planStartTimestamp } from "./planTime.js";
 import { store, type PlanRecord } from "../store.js";
 import { findUserById, findUsersByIds } from "../userRepo.js";
+import { emit } from "./notify.js";
 
 const REMINDER_SENT = new Set<string>();
 const REVIEW_SENT = new Set<string>();
@@ -107,6 +108,12 @@ export async function runWeekendNudgeIfWeekendEve(): Promise<void> {
       console.error("[nudge] weekend sms", e);
     }
     store.log("nudge_weekend_sent", { userId: u.id });
+    await emit({
+      userId: u.id,
+      kind: "weeklyFridayDigest",
+      body: `Here's what's happening in Philly this week:\n${lines}`,
+      dedupKey: `weeklyFridayDigest:${dayKey}:${u.id}`,
+    });
     if (seen.size >= 80) break;
   }
   lastWeekendNudgeDay = dayKey;
@@ -144,6 +151,47 @@ export async function runPlanReminders(): Promise<void> {
       } catch (e) {
         console.error("[nudge] reminder sms", e);
       }
+      await emit({
+        userId: uid,
+        kind: "planInTwoHours",
+        body: `"${plan.title}" starts in ~2 hours at ${plan.location.name}`,
+        planId: plan.id,
+        dedupKey: `planInTwoHours:${plan.id}:${uid}`,
+      });
+    }
+  }
+}
+
+/** ~24 hours before start — in-app notification only (SMS noise too high for tomorrow). */
+const TOMORROW_NOTIFIED = new Set<string>();
+export async function runPlanTomorrowReminders(): Promise<void> {
+  const now = Date.now();
+  const windowStart = now + 23.5 * 60 * 60 * 1000;
+  const windowEnd = now + 24.5 * 60 * 60 * 1000;
+
+  for (const plan of store.listPlans()) {
+    if (plan.isFlexibleTime && !plan.time) continue;
+    const start = planStartTimestamp(plan);
+    if (start < windowStart || start > windowEnd) continue;
+    if (planHasEnded(plan)) continue;
+
+    const going = store
+      .listParticipationsForPlan(plan.id)
+      .filter((p) => p.state === "going")
+      .map((p) => p.userId);
+    const userIds = Array.from(new Set([...going, plan.creatorId]));
+
+    for (const uid of userIds) {
+      const key = `${plan.id}:${uid}`;
+      if (TOMORROW_NOTIFIED.has(key)) continue;
+      const created = await emit({
+        userId: uid,
+        kind: "planTomorrow",
+        body: `"${plan.title}" is tomorrow at ${plan.location.name}`,
+        planId: plan.id,
+        dedupKey: `planTomorrow:${plan.id}:${uid}`,
+      });
+      if (created) TOMORROW_NOTIFIED.add(key);
     }
   }
 }
@@ -177,11 +225,80 @@ export async function runPostPlanReviewPrompts(): Promise<void> {
   }
 }
 
+/**
+ * Looking-For recovery — two paths:
+ *   • Group case (≥2 RSVPs, not locked 12h after the group formed): nudge
+ *     everyone in the thread so someone steps up to lock it in.
+ *   • Solo case (0 non-host RSVPs, 24h since the plan was posted): nudge the
+ *     creator to share it or tweak the day before it goes stale.
+ * Dedup is per (plan, user) and per path so each person sees each path at most
+ * once per plan.
+ */
+const LOOKING_FOR_RECOVERY_NOTIFIED = new Set<string>();
+const LOOKING_FOR_SOLO_NOTIFIED = new Set<string>();
+export async function runLookingForRecoveryNudges(): Promise<void> {
+  const now = Date.now();
+  for (const plan of store.listPlans()) {
+    if ((plan.planKind ?? "standard") !== "looking_for") continue;
+    if (plan.lockedAt) continue;
+    if (plan.cancelledAt) continue;
+    if (planHasEnded(plan)) continue;
+    const parts = store
+      .listParticipationsForPlan(plan.id)
+      .filter((p) => p.state === "going" || p.state === "interested");
+    const nonHostRsvps = parts.filter((p) => p.userId !== plan.creatorId);
+
+    // Solo path: still zero non-host RSVPs 24h after posting.
+    if (nonHostRsvps.length === 0) {
+      const createdAt = Date.parse(plan.createdAt);
+      if (Number.isFinite(createdAt) && now - createdAt >= 24 * 60 * 60 * 1000) {
+        const key = `${plan.id}:${plan.creatorId}`;
+        if (!LOOKING_FOR_SOLO_NOTIFIED.has(key)) {
+          const created = await emit({
+            userId: plan.creatorId,
+            kind: "lookingForRecovery",
+            body: `"${plan.title}" has been quiet — want to invite someone or tweak the day?`,
+            planId: plan.id,
+            dedupKey: `lookingForRecoverySolo:${plan.id}:${plan.creatorId}`,
+          });
+          if (created) LOOKING_FOR_SOLO_NOTIFIED.add(key);
+        }
+      }
+      continue;
+    }
+
+    // Group path: ≥2 RSVPs (host included), 12h since the group formed.
+    if (parts.length < 2) continue;
+    const sorted = parts
+      .map((p) => Date.parse(p.updatedAt))
+      .filter((n) => Number.isFinite(n))
+      .sort((a, b) => a - b);
+    const groupFormedAt = sorted[1];
+    if (groupFormedAt === undefined) continue;
+    if (now - groupFormedAt < 12 * 60 * 60 * 1000) continue;
+    const recipientIds = Array.from(new Set([plan.creatorId, ...parts.map((p) => p.userId)]));
+    for (const uid of recipientIds) {
+      const key = `${plan.id}:${uid}`;
+      if (LOOKING_FOR_RECOVERY_NOTIFIED.has(key)) continue;
+      const created = await emit({
+        userId: uid,
+        kind: "lookingForRecovery",
+        body: `"${plan.title}" has a group but no plan yet — want to lock it in?`,
+        planId: plan.id,
+        dedupKey: `lookingForRecovery:${plan.id}:${uid}`,
+      });
+      if (created) LOOKING_FOR_RECOVERY_NOTIFIED.add(key);
+    }
+  }
+}
+
 export function startNudgeSchedulers(): void {
   const tick = () => {
     void runPlanReminders().catch((e) => console.error(e));
+    void runPlanTomorrowReminders().catch((e) => console.error(e));
     void runWeekendNudgeIfWeekendEve().catch((e) => console.error(e));
     void runPostPlanReviewPrompts().catch((e) => console.error(e));
+    void runLookingForRecoveryNudges().catch((e) => console.error(e));
   };
   setInterval(tick, 5 * 60 * 1000);
   void tick();

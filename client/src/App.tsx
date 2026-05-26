@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useAuth } from "./context/AuthContext";
 import { BottomNav } from "./components/BottomNav";
@@ -14,6 +15,9 @@ import { PlanDetailPage } from "./pages/PlanDetail";
 import { AdminPage } from "./pages/Admin";
 import { ProfilePage } from "./pages/Profile";
 
+const APP_BOOT_AT = Date.now();
+const MIN_BOOT_SPLASH_MS = 1500;
+
 function Protected({
   children,
   allowIncomplete = false,
@@ -22,7 +26,16 @@ function Protected({
   allowIncomplete?: boolean;
 }) {
   const { user, loading } = useAuth();
-  if (loading) return <LoadingScreen tagline="Warming things up" />;
+  const [bootSplashDone, setBootSplashDone] = useState(
+    () => Date.now() - APP_BOOT_AT >= MIN_BOOT_SPLASH_MS,
+  );
+  useEffect(() => {
+    if (bootSplashDone) return;
+    const remaining = MIN_BOOT_SPLASH_MS - (Date.now() - APP_BOOT_AT);
+    const t = setTimeout(() => setBootSplashDone(true), Math.max(0, remaining));
+    return () => clearTimeout(t);
+  }, [bootSplashDone]);
+  if (loading || !bootSplashDone) return <LoadingScreen tagline="A place for plans meant to be shared." />;
   if (!user) return <Navigate to="/onboarding" replace />;
   if (!allowIncomplete && !user.onboardingComplete) return <Navigate to="/onboarding" replace />;
   return <>{children}</>;

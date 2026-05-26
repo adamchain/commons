@@ -3,6 +3,7 @@ import { requireAuth } from "../middleware/requireAuth.js";
 import { store } from "../store.js";
 import { findUserById, findUsersByIds } from "../userRepo.js";
 import { userToPublic } from "./plans.js";
+import { emit } from "../lib/notify.js";
 import type { ConversationDTO, MessageDTO } from "../types/shared.js";
 
 export const chatRouter = Router();
@@ -89,8 +90,33 @@ chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => 
     return;
   }
   const message = store.createMessage(convId, userId, body);
+  // Notify every other group participant. Group chat only — DM rooms collapse
+  // unread to a single signal that's already in conversation lists.
+  if (conv.type === "group") {
+    const sender = await findUserById(userId);
+    const senderName = sender?.firstName || "Someone";
+    const plan = store.findPlanById(conv.planId);
+    const planTitle = plan?.title ?? "your plan";
+    // Dedup per (conversation, recipient) — one "new message" until the user
+    // reads. Once they mark notifications read, dedup advances by message id.
+    for (const recipientId of conv.participantIds) {
+      if (recipientId === userId) continue;
+      await emit({
+        userId: recipientId,
+        kind: "newGroupChatMessage",
+        body: `${senderName} in "${planTitle}": ${truncate(body, 80)}`,
+        planId: conv.planId,
+        conversationId: convId,
+        dedupKey: `newGroupChatMessage:${message.id}:${recipientId}`,
+      });
+    }
+  }
   res.status(201).json(await toMessageDto(message));
 });
+
+function truncate(s: string, n: number): string {
+  return s.length <= n ? s : s.slice(0, n - 1) + "…";
+}
 
 async function toConversationDto(
   conv: NonNullable<ReturnType<typeof store.findConversationById>>,

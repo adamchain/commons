@@ -38,3 +38,15 @@ export function planStartTimestamp(plan: PlanRecord): number {
   if (Number.isNaN(start.getTime())) return new Date(`${day}T12:00:00`).getTime();
   return start.getTime();
 }
+
+/** Two plans overlap if their [start, end] windows intersect. Flexible-time
+ *  plans land at midday + 3h, which is conservative enough to flag obvious
+ *  conflicts ("two same-day plans") without false-positiving across genuinely
+ *  separate parts of the day. */
+export function plansOverlap(a: PlanRecord, b: PlanRecord): boolean {
+  const aStart = planStartTimestamp(a);
+  const aEnd = planEndTimestamp(a);
+  const bStart = planStartTimestamp(b);
+  const bEnd = planEndTimestamp(b);
+  return aStart < bEnd && bStart < aEnd;
+}

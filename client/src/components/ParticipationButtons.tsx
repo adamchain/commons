@@ -2,6 +2,21 @@ import { useState } from "react";
 import { api } from "../api/http";
 import type { JoinType, ParticipationState, PlanKind } from "../types/shared";
 
+// API errors arrive as "<status>: <jsonBody>" — pull the friendly message out.
+function extractApiError(err: unknown): string {
+  if (!(err instanceof Error)) return "Couldn't update";
+  const m = err.message.match(/^\d+:\s*(.+)$/s);
+  const body = m ? m[1] : err.message;
+  if (body === undefined) return err.message;
+  try {
+    const parsed = JSON.parse(body);
+    if (typeof parsed?.error === "string") return parsed.error;
+  } catch {
+    /* not JSON — fall through */
+  }
+  return body;
+}
+
 export function ParticipationButtons({
   planId,
   initialState,
@@ -35,6 +50,14 @@ export function ParticipationButtons({
     if (pending) return;
     const next = state === target ? null : target;
     const prev = state;
+    // Confirm before dropping from "going" — the host will be notified, so we
+    // want this to be a conscious act, not a fat-finger un-tap.
+    if (next === null && prev === "going" && !isHosting) {
+      const confirmed = window.confirm(
+        "Drop out? The host will be notified.",
+      );
+      if (!confirmed) return;
+    }
     setState(next);
     onChange(next);
     setPending(true);
@@ -52,7 +75,7 @@ export function ParticipationButtons({
     } catch (err) {
       setState(prev);
       onChange(prev);
-      setError(err instanceof Error ? err.message : "Couldn't update");
+      setError(extractApiError(err));
     } finally {
       setPending(false);
     }
@@ -99,12 +122,12 @@ export function ParticipationButtons({
       >
         {interestedActive
           ? loose
-            ? "You're down"
+            ? "You're Interested"
             : isApproveOnly
               ? "Applied"
               : "You're interested"
           : loose
-            ? "I'm down"
+            ? "I'm Interested"
             : isApproveOnly
               ? "Apply"
               : "Interested"}

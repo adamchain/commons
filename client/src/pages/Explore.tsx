@@ -4,6 +4,7 @@ import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { PlanCard } from "../components/PlanCard";
 import { useAuth } from "../context/AuthContext";
+import { formatPlaceAddress } from "../lib/format";
 import type { PlanDTO } from "../types/shared";
 
 type Mode = "nearby" | "similar" | "both";
@@ -114,7 +115,7 @@ export function ExplorePage() {
                   </div>
                   <div className="explore-place-body">
                     <div className="explore-place-name">{p.name}</div>
-                    <div className="explore-place-address">{p.address}</div>
+                    <div className="explore-place-address">{formatPlaceAddress(p.address)}</div>
                     {p.rating && (
                       <div className="explore-place-rating">
                         ★ {p.rating.toFixed(1)}

@@ -36,6 +36,19 @@ export interface UserRecord {
   dismissedNetworkPromptPlanIds?: string[];
   /** Social links — only surfaced to viewers who share a past plan or DM. */
   socialLinks?: { instagram?: string };
+  /** ISO timestamp the user tapped through the community-guidelines acknowledgment. */
+  guidelinesAcknowledgedAt?: string | null;
+  /** Notification toggles. Stored as a partial — missing keys default to true at the boundary. */
+  notificationPrefs?: Partial<{
+    someoneJoinedYourPlan: boolean;
+    planTomorrow: boolean;
+    planInTwoHours: boolean;
+    newGroupChatMessage: boolean;
+    postPlanNetworkNudge: boolean;
+    planCancellation: boolean;
+    weeklyFridayDigest: boolean;
+    lookingForRecovery: boolean;
+  }>;
 }
 
 export interface NeighborhoodRecord {
@@ -76,8 +89,19 @@ export interface PlanRecord {
   /** How RSVPs are accepted; defaults to "open" if absent. */
   joinType?: JoinType;
   isRecurring?: boolean;
+  /**
+   * Series lineage for recurring plans. When `isRecurring` is true on the first
+   * post, `seriesId` is set to that plan's own id; future instances spawned
+   * from the series share the same `seriesId`. This is what lets us later
+   * promote an active series into a Community (e.g. weekly run club) without
+   * a migration — the membership lives in `participations` joined on
+   * `seriesId`.
+   */
+  seriesId?: string | null;
   lockedAt?: string | null;
   flyerDataUrl?: string;
+  /** ISO timestamp when the host cancelled this plan. Null/absent = active. */
+  cancelledAt?: string | null;
   createdAt: string;
 }
 
@@ -147,6 +171,65 @@ export interface LogRecord {
   createdAt: string;
 }
 
+/**
+ * Foundation for both Your Network (V1) and Communities (V2). Each row is a
+ * directed relationship from `userId` to `targetId`. `kind` distinguishes
+ * one-way friend adds (V1) from community memberships (V2 — `targetId` is a
+ * community id rather than a user id). `source` records the moment that
+ * created the edge (post-plan modal, manual add from a profile, etc.) so we
+ * can later weight "people you've actually shared time with" higher than
+ * one-tap adds when surfacing suggestions.
+ *
+ * For V1 the embedded `UserRecord.networkIds` array is still the source of
+ * truth at read time. Writes dual-mirror to this table so the graph is queryable
+ * before the V2 communities work needs it.
+ */
+export interface RelationshipRecord {
+  id: string;
+  userId: string;
+  targetId: string;
+  kind: "network" | "community";
+  source: "post_plan_modal" | "profile_friend_add" | "seed" | "other";
+  createdAt: string;
+}
+
+/**
+ * Launch-mechanic invite codes. Every user gets `INVITE_CODES_PER_USER` codes
+ * at signup. Codes are 6-char alphanumeric, case-insensitive. Each can be
+ * redeemed once; we record who redeemed it so the inviter can see who joined
+ * through them. Codes don't gate signup today — `redeemedByUserId` is purely
+ * informational — but the schema is ready to flip on for a closed-beta launch.
+ */
+export interface InviteCodeRecord {
+  id: string;
+  code: string;
+  ownerUserId: string;
+  redeemedByUserId: string | null;
+  redeemedAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationRecord {
+  id: string;
+  userId: string;
+  kind:
+    | "someoneJoinedYourPlan"
+    | "planTomorrow"
+    | "planInTwoHours"
+    | "newGroupChatMessage"
+    | "postPlanNetworkNudge"
+    | "planCancellation"
+    | "weeklyFridayDigest"
+    | "lookingForRecovery";
+  body: string;
+  planId?: string;
+  conversationId?: string;
+  /** Idempotency key — same key blocked on re-emit. */
+  dedupKey: string;
+  createdAt: string;
+  readAt: string | null;
+}
+
 interface Snapshot {
   users: UserRecord[];
   neighborhoods: NeighborhoodRecord[];
@@ -159,6 +242,9 @@ interface Snapshot {
   smsCodes: SmsCodeRecord[];
   logs: LogRecord[];
   planSuggestions: PlanSuggestionRecord[];
+  notifications: NotificationRecord[];
+  relationships: RelationshipRecord[];
+  inviteCodes: InviteCodeRecord[];
 }
 
 const DATA_PATH = resolve(process.cwd(), "data.json");
@@ -176,7 +262,29 @@ function emptySnapshot(): Snapshot {
     smsCodes: [],
     logs: [],
     planSuggestions: [],
+    notifications: [],
+    relationships: [],
+    inviteCodes: [],
   };
+}
+
+// Crockford-style base32 alphabet — drops 0/O/I/L/U to keep codes legible when
+// shared via text or read aloud at a launch event. 32^6 ≈ 1.07B values.
+const INVITE_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTVWXYZ23456789";
+const INVITE_CODE_LENGTH = 6;
+export const INVITE_CODES_PER_USER = 3;
+
+function generateInviteCode(): string {
+  let s = "";
+  for (let i = 0; i < INVITE_CODE_LENGTH; i++) {
+    s += INVITE_CODE_ALPHABET[Math.floor(Math.random() * INVITE_CODE_ALPHABET.length)];
+  }
+  return s;
+}
+
+/** Normalize user input — uppercase, strip whitespace + dashes. */
+export function normalizeInviteCode(raw: string): string {
+  return raw.toUpperCase().replace(/[\s-]/g, "");
 }
 
 function load(): Snapshot {
@@ -188,6 +296,9 @@ function load(): Snapshot {
       ...emptySnapshot(),
       ...parsed,
       planSuggestions: parsed.planSuggestions ?? [],
+      notifications: parsed.notifications ?? [],
+      relationships: parsed.relationships ?? [],
+      inviteCodes: parsed.inviteCodes ?? [],
     };
   } catch {
     return emptySnapshot();
@@ -300,6 +411,7 @@ export const store = {
     return snapshot.plans.find((p) => p.id === id);
   },
   createPlan(input: Omit<PlanRecord, "id" | "createdAt">): PlanRecord {
+    const id = randomUUID();
     const plan: PlanRecord = {
       isFlexibleLocation: false,
       planKind: "standard",
@@ -309,11 +421,17 @@ export const store = {
       capacity: null,
       joinType: "open",
       isRecurring: false,
+      seriesId: null,
       lockedAt: null,
       ...input,
-      id: randomUUID(),
+      id,
       createdAt: new Date().toISOString(),
     };
+    // Recurring posts get their own id as the series anchor unless the caller
+    // explicitly passed a seriesId (future code that spawns child instances).
+    if (plan.isRecurring && !plan.seriesId) {
+      plan.seriesId = id;
+    }
     snapshot.plans.push(plan);
     persist();
     mongoMirror.upsertPlan(plan);
@@ -578,5 +696,130 @@ export const store = {
     snapshot.logs.push(entry);
     persist();
     mongoMirror.upsertLog(entry);
+  },
+
+  // Invite codes
+  listInviteCodesForOwner(ownerUserId: string): InviteCodeRecord[] {
+    return snapshot.inviteCodes.filter((c) => c.ownerUserId === ownerUserId);
+  },
+  listAllInviteCodes(): InviteCodeRecord[] {
+    return [...snapshot.inviteCodes];
+  },
+  findInviteCodeByCode(raw: string): InviteCodeRecord | undefined {
+    const norm = normalizeInviteCode(raw);
+    return snapshot.inviteCodes.find((c) => c.code === norm);
+  },
+  createInviteCodesForUser(ownerUserId: string, count: number): InviteCodeRecord[] {
+    const created: InviteCodeRecord[] = [];
+    while (created.length < count) {
+      const code = generateInviteCode();
+      // Skip if collision against existing — astronomically unlikely with the
+      // 32^6 keyspace and ~hundreds of users, but cheap to guard.
+      if (snapshot.inviteCodes.some((c) => c.code === code)) continue;
+      const row: InviteCodeRecord = {
+        id: randomUUID(),
+        code,
+        ownerUserId,
+        redeemedByUserId: null,
+        redeemedAt: null,
+        createdAt: new Date().toISOString(),
+      };
+      snapshot.inviteCodes.push(row);
+      created.push(row);
+      mongoMirror.upsertInviteCode(row);
+    }
+    persist();
+    return created;
+  },
+  redeemInviteCode(raw: string, redeemerUserId: string): InviteCodeRecord | null {
+    const row = this.findInviteCodeByCode(raw);
+    if (!row) return null;
+    if (row.redeemedByUserId) return row; // idempotent — return prior state
+    if (row.ownerUserId === redeemerUserId) return null; // can't redeem your own
+    row.redeemedByUserId = redeemerUserId;
+    row.redeemedAt = new Date().toISOString();
+    persist();
+    mongoMirror.upsertInviteCode(row);
+    return row;
+  },
+
+  // Relationships
+  listRelationshipsForUser(userId: string): RelationshipRecord[] {
+    return snapshot.relationships.filter((r) => r.userId === userId);
+  },
+  listAllRelationships(): RelationshipRecord[] {
+    return [...snapshot.relationships];
+  },
+  upsertRelationship(input: {
+    userId: string;
+    targetId: string;
+    kind: "network" | "community";
+    source?: RelationshipRecord["source"];
+  }): RelationshipRecord {
+    const existing = snapshot.relationships.find(
+      (r) => r.userId === input.userId && r.targetId === input.targetId && r.kind === input.kind,
+    );
+    if (existing) return existing;
+    const row: RelationshipRecord = {
+      id: randomUUID(),
+      userId: input.userId,
+      targetId: input.targetId,
+      kind: input.kind,
+      source: input.source ?? "other",
+      createdAt: new Date().toISOString(),
+    };
+    snapshot.relationships.push(row);
+    persist();
+    mongoMirror.upsertRelationship(row);
+    return row;
+  },
+  deleteRelationship(userId: string, targetId: string, kind: "network" | "community"): void {
+    const before = snapshot.relationships.length;
+    snapshot.relationships = snapshot.relationships.filter(
+      (r) => !(r.userId === userId && r.targetId === targetId && r.kind === kind),
+    );
+    if (snapshot.relationships.length !== before) {
+      persist();
+      mongoMirror.deleteRelationship(userId, targetId, kind);
+    }
+  },
+
+  // Notifications
+  listNotificationsForUser(userId: string, limit = 50): NotificationRecord[] {
+    return snapshot.notifications
+      .filter((n) => n.userId === userId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, Math.max(0, limit));
+  },
+  /** Insert a notification only if no record with the same dedupKey exists. */
+  insertNotificationIfNew(input: Omit<NotificationRecord, "id" | "createdAt" | "readAt">): NotificationRecord | null {
+    const existing = snapshot.notifications.find((n) => n.dedupKey === input.dedupKey);
+    if (existing) return null;
+    const row: NotificationRecord = {
+      id: randomUUID(),
+      ...input,
+      createdAt: new Date().toISOString(),
+      readAt: null,
+    };
+    snapshot.notifications.push(row);
+    persist();
+    mongoMirror.upsertNotification(row);
+    return row;
+  },
+  markAllNotificationsRead(userId: string): number {
+    const now = new Date().toISOString();
+    let count = 0;
+    for (const n of snapshot.notifications) {
+      if (n.userId === userId && n.readAt === null) {
+        n.readAt = now;
+        mongoMirror.upsertNotification(n);
+        count++;
+      }
+    }
+    if (count > 0) persist();
+    return count;
+  },
+  listAllNotifications(): NotificationRecord[] {
+    return [...snapshot.notifications];
   },
 };

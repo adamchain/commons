@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/http";
+import { formatPlaceAddress } from "../lib/format";
 
 export type LocationValue = { name: string; address: string; lat?: number; lng?: number };
 
@@ -167,7 +168,7 @@ export function LocationAutocomplete({
               onClick={() => void pick(s)}
             >
               <div className="location-suggestion-name">{s.name}</div>
-              <div className="location-suggestion-address">{s.address}</div>
+              <div className="location-suggestion-address">{formatPlaceAddress(s.address)}</div>
             </button>
           ))}
         </div>

@@ -23,17 +23,23 @@ import {
   PlanModel,
   PlanSuggestionModel,
 } from "./models/index.js";
+import { InviteCodeModel } from "./models/InviteCode.js";
+import { NotificationModel } from "./models/Notification.js";
+import { RelationshipModel } from "./models/Relationship.js";
 import { UserModel } from "./models/User.js";
 import type {
   ConversationRecord,
   DeclineRecord,
   FeedbackRecord,
+  InviteCodeRecord,
   LogRecord,
   MessageRecord,
   NeighborhoodRecord,
+  NotificationRecord,
   ParticipationRecord,
   PlanRecord,
   PlanSuggestionRecord,
+  RelationshipRecord,
   UserRecord,
 } from "./store.js";
 
@@ -172,5 +178,27 @@ export const mongoMirror = {
   // Logs
   upsertLog(l: LogRecord): void {
     upsert(LogModel as never, l, `upsertLog ${l.id}`);
+  },
+
+  // Notifications
+  upsertNotification(n: NotificationRecord): void {
+    upsert(NotificationModel as never, n, `upsertNotification ${n.id}`);
+  },
+
+  // Relationships
+  upsertRelationship(r: RelationshipRecord): void {
+    upsert(RelationshipModel as never, r, `upsertRelationship ${r.id}`);
+  },
+  deleteRelationship(userId: string, targetId: string, kind: RelationshipRecord["kind"]): void {
+    if (!isMongoConnected()) return;
+    const p = RelationshipModel.deleteOne({ userId, targetId, kind })
+      .exec()
+      .catch((err) => fail(`deleteRelationship ${userId}/${targetId}/${kind}`, err));
+    track(p);
+  },
+
+  // Invite codes
+  upsertInviteCode(c: InviteCodeRecord): void {
+    upsert(InviteCodeModel as never, c, `upsertInviteCode ${c.id}`);
   },
 };

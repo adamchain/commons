@@ -15,7 +15,14 @@ import {
   type NeighborhoodDTO,
 } from "../types/shared";
 
-type Step = "phone" | "code" | "admin_choice" | "location" | "interests" | "profile";
+type Step =
+  | "phone"
+  | "code"
+  | "admin_choice"
+  | "location"
+  | "interests"
+  | "profile"
+  | "guidelines";
 
 export function OnboardingPage() {
   const { user, refreshUser, setUser } = useAuth();
@@ -31,6 +38,12 @@ export function OnboardingPage() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const lastAutoSubmittedCode = useRef<string | null>(null);
   const verifyInFlight = useRef(false);
+  // Invite code: prefilled from ?invite= on the share link, redeemed after
+  // verify-code succeeds. Stays around through the whole onboarding session.
+  const [inviteCode, setInviteCode] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("invite")?.toUpperCase() ?? "";
+  });
 
   // If logged-in user lands here with onboarding done, send them home.
   useEffect(() => {
@@ -99,6 +112,18 @@ export function OnboardingPage() {
         body: JSON.stringify({ phoneNumber, code }),
       });
       setUser(me);
+      // Best-effort redeem — failure here doesn't block onboarding. The user
+      // is already authenticated; the code is just attribution for the inviter.
+      if (inviteCode.trim()) {
+        try {
+          await api("/api/auth/redeem-code", {
+            method: "POST",
+            body: JSON.stringify({ code: inviteCode.trim() }),
+          });
+        } catch {
+          /* swallow — bad code shouldn't block the signup */
+        }
+      }
       if (me.canAccessAdmin) {
         sessionStorage.setItem("commons_pending_admin_choice", "1");
         setStep("admin_choice");
@@ -124,7 +149,7 @@ export function OnboardingPage() {
 
   if (step === "phone") {
     return (
-      <OnboardingShell landing title="" subtitle="Plans, made together.">
+      <OnboardingShell landing title="" subtitle="A place for plans meant to be shared.">
         <input
           className="onboarding-input"
           type="tel"
@@ -133,6 +158,15 @@ export function OnboardingPage() {
           placeholder="(555) 555-0100"
           value={phoneNumber}
           onChange={(e) => setPhoneNumber(formatPhoneInput(e.target.value))}
+        />
+        <input
+          className="onboarding-input onboarding-input-invite"
+          type="text"
+          inputMode="text"
+          maxLength={10}
+          placeholder="Invite code (optional)"
+          value={inviteCode}
+          onChange={(e) => setInviteCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
         />
         {error && <div className="onboarding-error">{error}</div>}
         <button className="btn-primary btn-block" disabled={busy || !phoneNumber} onClick={requestCode}>
@@ -252,7 +286,19 @@ export function OnboardingPage() {
             avatarStyle,
             avatarPhotoDataUrl: avatarPhotoDataUrl ?? undefined,
             avatarParams: avatarParams ?? undefined,
-            onboardingComplete: true,
+          });
+          setStep("guidelines");
+        }}
+      />
+    );
+  }
+  if (step === "guidelines") {
+    return (
+      <GuidelinesStep
+        onAgree={async () => {
+          await api<MeDTO>("/api/auth/me", {
+            method: "PATCH",
+            body: JSON.stringify({ guidelinesAcknowledged: true, onboardingComplete: true }),
           });
           await refreshUser();
           navigate("/", { replace: true });
@@ -270,7 +316,9 @@ function pickInitial(user: MeDTO | null): Step {
     user.neighborhoodIds?.length ? user.neighborhoodIds : user.neighborhoodId ? [user.neighborhoodId] : [];
   if (hoods.length === 0) return "location";
   if (user.interests.length < 2) return "interests";
-  return "profile";
+  if (!user.firstName.trim()) return "profile";
+  if (!user.guidelinesAcknowledgedAt) return "guidelines";
+  return "guidelines";
 }
 
 function formatError(e: unknown): string {
@@ -541,6 +589,63 @@ function LocationStep({
       >
         Continue
       </button>
+    </OnboardingShell>
+  );
+}
+
+function GuidelinesStep({ onAgree }: { onAgree: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <OnboardingShell
+      title="Community guidelines"
+      subtitle="A quick read before you hit the feed."
+    >
+      <ul className="guidelines-list">
+        <li>
+          <span className="guidelines-icon" aria-hidden="true">🤝</span>
+          <div>
+            <strong>Show up kindly.</strong>
+            <p>Respect hosts, neighbors, and the people you meet. No harassment, hate, or bigotry.</p>
+          </div>
+        </li>
+        <li>
+          <span className="guidelines-icon" aria-hidden="true">📍</span>
+          <div>
+            <strong>Keep it real.</strong>
+            <p>Be yourself. Plans, photos, and profiles should reflect the actual you.</p>
+          </div>
+        </li>
+        <li>
+          <span className="guidelines-icon" aria-hidden="true">🛟</span>
+          <div>
+            <strong>Look out for each other.</strong>
+            <p>Meet in public for first plans. Report anything that feels off.</p>
+          </div>
+        </li>
+        <li>
+          <span className="guidelines-icon" aria-hidden="true">🏙️</span>
+          <div>
+            <strong>Love the city.</strong>
+            <p>Support local spots, tip well, and leave places better than you found them.</p>
+          </div>
+        </li>
+      </ul>
+      <button
+        type="button"
+        className="btn-primary btn-block"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            await onAgree();
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "One sec…" : "I agree — let me in"}
+      </button>
+      <p className="onboarding-fineprint">Tapping agree confirms you’ll follow the Commons guidelines.</p>
     </OnboardingShell>
   );
 }

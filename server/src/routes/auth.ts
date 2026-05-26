@@ -4,12 +4,18 @@ import { signSessionToken } from "../lib/jwt.js";
 import { normalizePhone } from "../lib/phone.js";
 import { checkPhoneVerification, isTwilioVerifyConfigured, startPhoneVerification } from "../lib/verify.js";
 import { requireAuth } from "../middleware/requireAuth.js";
-import { store } from "../store.js";
+import { INVITE_CODES_PER_USER, normalizeInviteCode, store } from "../store.js";
 import type { UserRecord } from "../store.js";
 import { createUser, findUserByPhone, findUserById, updateUser, type UserPatch } from "../userRepo.js";
-import type { MeDTO } from "../types/shared.js";
+import {
+  DEFAULT_NOTIFICATION_PREFS,
+  type InviteCodeDTO,
+  type MeDTO,
+  type NotificationPrefs,
+} from "../types/shared.js";
 import { planHasEnded } from "../lib/planTime.js";
 import { nextNetworkPrompt, otherGoingIds, userWasGoing } from "../lib/networkPrompt.js";
+import { emit } from "../lib/notify.js";
 
 export const authRouter = Router();
 
@@ -69,6 +75,8 @@ function meFromUser(user: UserRecord): MeDTO {
     // other-viewer profile reads (see /api/profile).
     socialLinks: user.socialLinks,
     canAccessAdmin: isAdminPhone(user.phoneNumber),
+    guidelinesAcknowledgedAt: user.guidelinesAcknowledgedAt ?? null,
+    notificationPrefs: { ...DEFAULT_NOTIFICATION_PREFS, ...(user.notificationPrefs ?? {}) },
   };
 }
 
@@ -203,9 +211,21 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
   if (typeof req.body?.avatarParams === "string") patch.avatarParams = req.body.avatarParams;
   if (req.body?.avatarParams === null) patch.avatarParams = null;
   if (typeof req.body?.onboardingComplete === "boolean") patch.onboardingComplete = req.body.onboardingComplete;
+  if (req.body?.guidelinesAcknowledged === true) {
+    patch.guidelinesAcknowledgedAt = new Date().toISOString();
+  }
   if (req.body?.socialLinks && typeof req.body.socialLinks === "object") {
     const ig = String(req.body.socialLinks.instagram ?? "").replace(/^@/, "").trim();
     patch.socialLinks = ig ? { instagram: ig } : undefined;
+  }
+  if (req.body?.notificationPrefs && typeof req.body.notificationPrefs === "object") {
+    const incoming = req.body.notificationPrefs as Record<string, unknown>;
+    const next: Partial<NotificationPrefs> = {};
+    for (const key of Object.keys(DEFAULT_NOTIFICATION_PREFS) as Array<keyof NotificationPrefs>) {
+      if (typeof incoming[key] === "boolean") next[key] = incoming[key] as boolean;
+    }
+    const existing = (await findUserById(userId))?.notificationPrefs ?? {};
+    patch.notificationPrefs = { ...existing, ...next };
   }
   await updateUser(userId, patch);
   const me = await userToMe(userId);
@@ -221,8 +241,72 @@ authRouter.post("/logout", (_req, res) => {
   res.status(200).json({ ok: true });
 });
 
+authRouter.get("/invite-codes", requireAuth, (req, res) => {
+  const userId = String(req.userId);
+  // Backfill on first read so users that pre-date the launch mechanic still
+  // get their three codes the first time they open the share screen.
+  let codes = store.listInviteCodesForOwner(userId);
+  if (codes.length < INVITE_CODES_PER_USER) {
+    store.createInviteCodesForUser(userId, INVITE_CODES_PER_USER - codes.length);
+    codes = store.listInviteCodesForOwner(userId);
+  }
+  const dtos: InviteCodeDTO[] = codes
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map((c) => ({
+      code: c.code,
+      redeemedAt: c.redeemedAt,
+      redeemedByFirstName:
+        c.redeemedByUserId !== null
+          ? store.findUserById(c.redeemedByUserId)?.firstName ?? null
+          : null,
+    }));
+  res.json({ codes: dtos });
+});
+
+authRouter.post("/redeem-code", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const raw = String(req.body?.code ?? "");
+  if (!raw.trim()) {
+    res.status(400).json({ error: "Code required" });
+    return;
+  }
+  const code = normalizeInviteCode(raw);
+  const row = store.findInviteCodeByCode(code);
+  if (!row) {
+    res.status(404).json({ error: "Code not found" });
+    return;
+  }
+  if (row.ownerUserId === userId) {
+    res.status(400).json({ error: "Can't redeem your own code" });
+    return;
+  }
+  if (row.redeemedByUserId && row.redeemedByUserId !== userId) {
+    res.status(409).json({ error: "Code already redeemed" });
+    return;
+  }
+  store.redeemInviteCode(code, userId);
+  res.json({ ok: true });
+});
+
 authRouter.get("/network-prompt", requireAuth, async (req, res) => {
-  const prompt = await nextNetworkPrompt(String(req.userId));
+  const userId = String(req.userId);
+  const prompt = await nextNetworkPrompt(userId);
+  // Persist the nudge as a notification too, so the user has a record of it
+  // even after the modal closes. Dedup'd per (user, plan) so dismissing the
+  // modal doesn't keep producing new entries.
+  if (prompt) {
+    const otherNames = prompt.others
+      .map((o) => o.firstName)
+      .slice(0, 3)
+      .join(", ");
+    await emit({
+      userId,
+      kind: "postPlanNetworkNudge",
+      body: `You went to "${prompt.planTitle}" with ${prompt.others.length} ${prompt.others.length === 1 ? "person" : "people"}${otherNames ? ` (${otherNames})` : ""} — add them to your network?`,
+      planId: prompt.planId,
+      dedupKey: `postPlanNetworkNudge:${prompt.planId}:${userId}`,
+    });
+  }
   res.json({ prompt });
 });
 
@@ -250,12 +334,23 @@ authRouter.post("/network-add", requireAuth, async (req, res) => {
     return;
   }
   const next = new Set(viewer.networkIds ?? []);
+  const newlyAdded: string[] = [];
   for (const id of userIds) {
     if (id === userId) continue;
     if (!allowed.has(id)) continue;
+    if (!next.has(id)) newlyAdded.push(id);
     next.add(id);
   }
   await updateUser(userId, { networkIds: [...next] });
+  // Mirror to the relationships table — foundation for V2 Communities.
+  for (const id of newlyAdded) {
+    store.upsertRelationship({
+      userId,
+      targetId: id,
+      kind: "network",
+      source: "post_plan_modal",
+    });
+  }
   const me = await userToMe(userId);
   res.json({ ok: true, me });
 });
@@ -279,8 +374,17 @@ authRouter.post("/friend-add", requireAuth, async (req, res) => {
     return;
   }
   const myNet = new Set(viewer.networkIds ?? []);
+  const isNew = !myNet.has(targetId);
   myNet.add(targetId);
   await updateUser(userId, { networkIds: [...myNet] });
+  if (isNew) {
+    store.upsertRelationship({
+      userId,
+      targetId,
+      kind: "network",
+      source: "profile_friend_add",
+    });
+  }
   const me = await userToMe(userId);
   res.json({ ok: true, me });
 });
@@ -298,8 +402,11 @@ authRouter.post("/friend-remove", requireAuth, async (req, res) => {
     return;
   }
   const myNet = new Set(viewer.networkIds ?? []);
-  myNet.delete(targetId);
+  const existed = myNet.delete(targetId);
   await updateUser(userId, { networkIds: [...myNet] });
+  if (existed) {
+    store.deleteRelationship(userId, targetId, "network");
+  }
   const me = await userToMe(userId);
   res.json({ ok: true, me });
 });

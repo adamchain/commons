@@ -176,7 +176,7 @@ const ICONS: Array<{
   },
 ];
 
-export function LoadingScreen({ tagline = "A place for plans meant to be shared" }: { tagline?: string }) {
+export function LoadingScreen({ tagline = "A place for plans meant to be shared." }: { tagline?: string }) {
   return (
     <div className="loader-screen" role="status" aria-live="polite">
       <div className="loader-icons" aria-hidden="true">

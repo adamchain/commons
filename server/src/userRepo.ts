@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { store, type UserRecord } from "./store.js";
+import { INVITE_CODES_PER_USER, store, type UserRecord } from "./store.js";
 
 // A patch value of `null` for an optional field is treated as "clear it" —
 // distinct from `undefined`, which means "leave it alone." Toggling between
@@ -45,7 +45,10 @@ export async function createUser(
   phoneNumber: string,
   opts?: CreateUserOptions,
 ): Promise<UserRecord> {
-  return store.createUser(phoneNumber, opts);
+  const user = store.createUser(phoneNumber, opts);
+  // Every new user gets a fixed set of invite codes — launch mechanic.
+  store.createInviteCodesForUser(user.id, INVITE_CODES_PER_USER);
+  return user;
 }
 
 export async function updateUser(id: string, patch: UserPatch): Promise<UserRecord | undefined> {

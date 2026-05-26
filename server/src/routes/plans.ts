@@ -15,6 +15,8 @@ import {
   type PublicUser,
 } from "../types/shared.js";
 import { onPlanCreatedVenueNudge, notifyInterestedPlanLocked } from "../lib/nudges.js";
+import { emit } from "../lib/notify.js";
+import { plansOverlap } from "../lib/planTime.js";
 
 export const plansRouter = Router();
 
@@ -128,7 +130,9 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     capacity: plan.capacity ?? null,
     joinType: plan.joinType ?? "open",
     isRecurring: plan.isRecurring ?? false,
+    seriesId: plan.seriesId ?? null,
     lockedAt: plan.lockedAt ?? null,
+    cancelledAt: plan.cancelledAt ?? null,
     flyerDataUrl: plan.flyerDataUrl,
     suggestions,
     participants: {
@@ -446,7 +450,7 @@ plansRouter.get("/:id", requireAuth, async (req, res) => {
   res.json(await planSummary(plan, userId));
 });
 
-plansRouter.put("/:id/participation", requireAuth, (req, res) => {
+plansRouter.put("/:id/participation", requireAuth, async (req, res) => {
   const planId = String(req.params.id);
   const userId = String(req.userId);
   const state = req.body?.state as ParticipationState;
@@ -477,6 +481,25 @@ plansRouter.put("/:id/participation", requireAuth, (req, res) => {
       return;
     }
   }
+  // Double-booking: only blocks "going" commitments (interested doesn't lock
+  // your time). Host's own plans are always allowed. Skips cancelled or already-
+  // ended plans, and locked-in looking_for variants count as commitments too.
+  if (state === "going" && existing?.state !== "going") {
+    const myGoing = store
+      .listParticipationsForUser(userId)
+      .filter((p) => p.state === "going" && p.planId !== planId);
+    for (const row of myGoing) {
+      const other = store.findPlanById(row.planId);
+      if (!other) continue;
+      if (other.cancelledAt) continue;
+      if (!plansOverlap(plan, other)) continue;
+      res.status(409).json({
+        error: `You're already going to "${other.title}" at that time.`,
+        conflictPlanId: other.id,
+      });
+      return;
+    }
+  }
   store.upsertParticipation(planId, userId, state);
   if (state === "going") {
     store.ensureGroupConversation(planId, [plan.creatorId, userId]);
@@ -489,6 +512,19 @@ plansRouter.put("/:id/participation", requireAuth, (req, res) => {
     from: existing?.state ?? null,
     to: state,
   });
+  // Notify host on first promotion to "going" — fires once per (plan, joiner)
+  // via dedupKey.
+  if (state === "going" && existing?.state !== "going" && plan.creatorId !== userId) {
+    const joiner = await findUserById(userId);
+    const joinerName = joiner?.firstName || "Someone";
+    await emit({
+      userId: plan.creatorId,
+      kind: "someoneJoinedYourPlan",
+      body: `${joinerName} is in for "${plan.title}"`,
+      planId: plan.id,
+      dedupKey: `someoneJoinedYourPlan:${plan.id}:${userId}`,
+    });
+  }
   res.json({ ok: true });
 });
 
@@ -527,7 +563,7 @@ plansRouter.post("/:id/approve", requireAuth, async (req, res) => {
   res.json(await planSummary(plan, userId));
 });
 
-plansRouter.delete("/:id/participation", requireAuth, (req, res) => {
+plansRouter.delete("/:id/participation", requireAuth, async (req, res) => {
   const planId = String(req.params.id);
   const userId = String(req.userId);
   const existing = store.findParticipation(planId, userId);
@@ -540,5 +576,118 @@ plansRouter.delete("/:id/participation", requireAuth, (req, res) => {
     from: existing?.state ?? null,
     to: null,
   });
+  // Notify the host when a committed ("going") guest drops out — makes the
+  // drop a conscious act rather than a silent ghost. Skips when the host is
+  // the one dropping (handled via cancel/transfer) and skips when the user
+  // was only "interested" (tentative — not worth pinging).
+  if (existing?.state === "going") {
+    const plan = store.findPlanById(planId);
+    if (plan && plan.creatorId !== userId && !plan.cancelledAt) {
+      const leaver = await findUserById(userId);
+      const leaverName = leaver?.firstName || "Someone";
+      await emit({
+        userId: plan.creatorId,
+        kind: "someoneJoinedYourPlan",
+        body: `${leaverName} dropped out of "${plan.title}"`,
+        planId: plan.id,
+        dedupKey: `dropOut:${plan.id}:${userId}:${Date.now()}`,
+      });
+    }
+  }
   res.json({ ok: true });
+});
+
+// Host transfer — current host hands the plan to another going participant.
+// Used when the host needs to drop out but doesn't want to cancel the plan.
+// The new host is notified ("You're hosting X now"). Cannot transfer to a
+// non-participant or to someone who's only interested — they need to be
+// committed before they take over.
+plansRouter.post("/:id/transfer-host", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const planId = String(req.params.id);
+  const newHostId = String(req.body?.newHostId ?? "");
+  const plan = store.findPlanById(planId);
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  if (plan.creatorId !== userId) {
+    res.status(403).json({ error: "Only the host can transfer" });
+    return;
+  }
+  if (plan.cancelledAt) {
+    res.status(400).json({ error: "Plan was cancelled" });
+    return;
+  }
+  if (!newHostId || newHostId === userId) {
+    res.status(400).json({ error: "Pick someone else from the going list" });
+    return;
+  }
+  const target = store.findParticipation(planId, newHostId);
+  if (!target || target.state !== "going") {
+    res.status(400).json({ error: "New host must be marked going first" });
+    return;
+  }
+  const newHost = await findUserById(newHostId);
+  if (!newHost) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  store.updatePlan(planId, { creatorId: newHostId });
+  store.ensureGroupConversation(planId, [newHostId]);
+  // The outgoing host drops their own participation — they explicitly handed
+  // it off, so they're no longer committed.
+  store.deleteParticipation(planId, userId);
+  store.log("plan_host_transferred", { planId, from: userId, to: newHostId });
+  await emit({
+    userId: newHostId,
+    kind: "someoneJoinedYourPlan",
+    body: `You're hosting "${plan.title}" now`,
+    planId: plan.id,
+    dedupKey: `hostTransfer:${plan.id}:${newHostId}`,
+  });
+  res.json({ ok: true, newHostId });
+});
+
+// Host-only plan cancellation. Marks the plan cancelled and notifies every
+// participant (going + interested) so they see it on /notifications.
+plansRouter.post("/:id/cancel", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const planId = String(req.params.id);
+  const plan = store.findPlanById(planId);
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  if (plan.creatorId !== userId) {
+    res.status(403).json({ error: "Only the host can cancel" });
+    return;
+  }
+  if (plan.cancelledAt) {
+    res.status(400).json({ error: "Plan already cancelled" });
+    return;
+  }
+  const cancelledAt = new Date().toISOString();
+  store.updatePlan(planId, { cancelledAt });
+
+  const participants = store.listParticipationsForPlan(planId);
+  const recipientIds = Array.from(
+    new Set(
+      participants
+        .filter((p) => p.state === "going" || p.state === "interested")
+        .map((p) => p.userId)
+        .filter((id) => id !== userId),
+    ),
+  );
+  for (const uid of recipientIds) {
+    await emit({
+      userId: uid,
+      kind: "planCancellation",
+      body: `"${plan.title}" was cancelled by the host`,
+      planId: plan.id,
+      dedupKey: `planCancellation:${plan.id}:${uid}`,
+    });
+  }
+  store.log("plan_cancelled", { planId, by: userId, notified: recipientIds.length });
+  res.json({ ok: true, cancelledAt });
 });

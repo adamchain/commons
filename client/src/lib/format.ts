@@ -37,6 +37,38 @@ export function formatPlanTime(time: string, isFlexible: boolean): string {
   return `${hour12}:${mStr.padStart(2, "0")} ${ampm}`;
 }
 
+/**
+ * Trim city/state/county/zip/country tails off a Google Places or Nominatim
+ * address so cards show the meaningful part. "114 S 13th St, Philadelphia,
+ * PA 19107, USA" → "114 S 13th St". The full string is still passed to maps
+ * deep-links so routing isn't affected.
+ */
+const ADDRESS_DROP_TOKENS = new Set([
+  "philadelphia",
+  "philadelphia county",
+  "pennsylvania",
+  "pa",
+  "united states",
+  "united states of america",
+  "usa",
+  "us",
+]);
+
+export function formatPlaceAddress(raw: string | undefined | null): string {
+  if (!raw) return "";
+  const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  const kept = parts.filter((part) => {
+    const lc = part.toLowerCase();
+    if (ADDRESS_DROP_TOKENS.has(lc)) return false;
+    // Bare ZIP / ZIP+4
+    if (/^\d{5}(-\d{4})?$/.test(part)) return false;
+    // "PA 19107" or "PA 19107-1234"
+    if (/^[A-Za-z]{2}\s+\d{5}(-\d{4})?$/.test(part)) return false;
+    return true;
+  });
+  return kept.join(", ");
+}
+
 export function formatRelative(iso: string): string {
   const then = new Date(iso).getTime();
   const seconds = Math.max(0, Math.round((Date.now() - then) / 1000));

@@ -15,6 +15,9 @@ import {
   PlanModel,
   PlanSuggestionModel,
 } from "./models/index.js";
+import { InviteCodeModel } from "./models/InviteCode.js";
+import { NotificationModel } from "./models/Notification.js";
+import { RelationshipModel } from "./models/Relationship.js";
 import { UserModel } from "./models/User.js";
 import { store } from "./store.js";
 
@@ -35,6 +38,9 @@ export async function hydrateSnapshotFromMongo(): Promise<void> {
       feedback,
       declines,
       logs,
+      notifications,
+      relationships,
+      inviteCodes,
     ] = await Promise.all([
       UserModel.find({}).lean(),
       NeighborhoodModel.find({}).lean(),
@@ -46,6 +52,9 @@ export async function hydrateSnapshotFromMongo(): Promise<void> {
       FeedbackModel.find({}).lean(),
       DeclineModel.find({}).lean(),
       LogModel.find({}).sort({ createdAt: -1 }).limit(500).lean(),
+      NotificationModel.find({}).sort({ createdAt: -1 }).limit(2000).lean(),
+      RelationshipModel.find({}).lean(),
+      InviteCodeModel.find({}).lean(),
     ]);
 
     // `reset` replaces the snapshot wholesale. We bypass mirror here — Mongo
@@ -62,6 +71,9 @@ export async function hydrateSnapshotFromMongo(): Promise<void> {
       declines,
       smsCodes: [],
       logs,
+      notifications,
+      relationships,
+      inviteCodes,
     });
 
     console.log(

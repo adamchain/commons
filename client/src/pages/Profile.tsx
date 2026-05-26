@@ -10,11 +10,15 @@ import { formatPlanDate } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import {
   AVATAR_PRESETS,
+  DEFAULT_NOTIFICATION_PREFS,
   HOST_TAG_LABELS,
   INTEREST_LABELS,
+  NOTIFICATION_LABELS,
   type HostTag,
   type InterestTag,
+  type InviteCodeDTO,
   type MeDTO,
+  type NotificationPrefs,
   type PlanDTO,
   type PublicUser,
 } from "../types/shared";
@@ -43,6 +47,7 @@ export function ProfilePage() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfilePayload | null>(null);
   const [feedPlans, setFeedPlans] = useState<PlanDTO[]>([]);
+  const [network, setNetwork] = useState<PublicUser[] | null>(null);
   const [editing, setEditing] = useState(false);
   const isSelf = user?.id === userId;
 
@@ -66,6 +71,13 @@ export function ProfilePage() {
     }
   }, [isSelf]);
 
+  useEffect(() => {
+    if (!isSelf) return;
+    void api<{ users: PublicUser[] }>("/api/auth/network")
+      .then((r) => setNetwork(r.users))
+      .catch(() => setNetwork([]));
+  }, [isSelf, user?.networkUserIds?.length]);
+
   if (!profile) return <LoadingScreen tagline="Loading profile" />;
 
   const topTags: Array<[HostTag, number]> = (Object.entries(profile.tagCounts) as Array<[HostTag, number]>)
@@ -74,7 +86,7 @@ export function ProfilePage() {
     .slice(0, 3);
 
   return (
-    <main className="app-shell app-shell--with-nav">
+    <main className="app-shell app-shell--with-nav app-shell--with-topbar">
       <header className="app-header app-header--minimal">
         <Link to="/" className="detail-back">← Back</Link>
       </header>
@@ -151,6 +163,16 @@ export function ProfilePage() {
           </button>
         )}
 
+        {!isSelf && (
+          <Link
+            to={`/plans/new?inviteUser=${encodeURIComponent(profile.user.id)}&inviteName=${encodeURIComponent(profile.user.firstName)}`}
+            className="btn-primary btn-block"
+            style={{ marginTop: 14, textAlign: "center", display: "block" }}
+          >
+            Make a plan with {profile.user.firstName}
+          </Link>
+        )}
+
         {!isSelf && <FriendButton profile={profile} onUpdated={reloadProfile} />}
 
         {topTags.length > 0 && (
@@ -164,6 +186,8 @@ export function ProfilePage() {
         )}
       </section>
 
+      {isSelf && <NetworkSection network={network} />}
+
       {isSelf && editing && user && (
         <EditPanel
           me={user}
@@ -176,7 +200,7 @@ export function ProfilePage() {
 
       {profile.interests.length > 0 && (
         <section className="profile-block">
-          <h3 className="who-block-heading">Communities</h3>
+          <h3 className="who-block-heading">Interests</h3>
           <div className="profile-interests">
             {profile.interests.map((t) => (
               <span key={t} className="profile-interest-chip">
@@ -197,6 +221,10 @@ export function ProfilePage() {
             Admin dashboard
           </Link>
         </section>
+      )}
+
+      {isSelf && user && (
+        <NotificationSettings me={user} onUpdated={setUser} />
       )}
 
       {isSelf && <SettingsPanel onSignOut={() => void signOut()} />}
@@ -281,10 +309,10 @@ function FriendButton({
   return (
     <button
       type="button"
-      className={inNet ? "btn-secondary" : "btn-primary"}
+      className="btn-secondary"
       onClick={() => void toggle()}
       disabled={busy}
-      style={{ marginTop: 14 }}
+      style={{ marginTop: 10 }}
     >
       {busy ? "…" : inNet ? "In your network" : "Add to network"}
     </button>
@@ -442,42 +470,169 @@ function EditPanel({ me, onSaved }: { me: MeDTO; onSaved: (next: MeDTO) => void 
   );
 }
 
+function NetworkSection({ network }: { network: PublicUser[] | null }) {
+  if (network === null) return null;
+  const count = network.length;
+  return (
+    <section className="profile-block">
+      <h3 className="who-block-heading">Your network · {count}</h3>
+      {count === 0 ? (
+        <p className="form-help" style={{ marginTop: 4 }}>
+          Go to plans, meet people, add them after.
+        </p>
+      ) : (
+        <div className="profile-network-list">
+          {network.map((u) => (
+            <Link
+              key={u.id}
+              to={`/profile/${u.id}`}
+              className="profile-network-row"
+              aria-label={`Open ${u.firstName}'s profile`}
+            >
+              <Avatar
+                seed={u.avatarSeed}
+                style={u.avatarStyle}
+                photoDataUrl={u.avatarPhotoDataUrl}
+                params={u.avatarParams}
+                name={u.firstName}
+                size="md"
+              />
+              <span className="profile-network-name">{u.firstName}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 /**
- * Light-layer friend invite — opens the OS share sheet (native share) or
- * falls back to a prefilled SMS deep link. No server invite tracking yet —
- * the link just points at the public landing, and after the friend signs up
- * the post-event network prompt is the path to add each other in-app.
+ * Launch-mechanic invite codes — three per user. Each code is shown with its
+ * own share button; the deep link drops the recipient on onboarding with the
+ * code prefilled. Redeemed codes show who used them.
  */
 function InviteCard({ firstName }: { firstName: string }) {
-  const inviteUrl = `${window.location.origin}/`;
-  const body = `${firstName} invited you to Commons — neighborhood plans, no pressure. ${inviteUrl}`;
+  const [codes, setCodes] = useState<InviteCodeDTO[] | null>(null);
 
-  async function share() {
-    const data = { title: "Join me on Commons", text: body, url: inviteUrl };
+  useEffect(() => {
+    void api<{ codes: InviteCodeDTO[] }>("/api/auth/invite-codes")
+      .then((r) => setCodes(r.codes))
+      .catch(() => setCodes([]));
+  }, []);
+
+  function shareCode(code: string) {
+    const url = `${window.location.origin}/?invite=${encodeURIComponent(code)}`;
+    const body = `${firstName} invited you to Commons — neighborhood plans, no pressure. Code: ${code}\n${url}`;
+    const data = { title: "Join me on Commons", text: body, url };
     const nav = navigator as Navigator & {
       share?: (data: { title?: string; text?: string; url?: string }) => Promise<void>;
     };
     if (typeof nav.share === "function") {
-      try {
-        await nav.share(data);
-        return;
-      } catch {
-        // user canceled — silently fall through
-      }
+      void nav.share(data).catch(() => undefined);
+      return;
     }
     window.location.href = `sms:?&body=${encodeURIComponent(body)}`;
   }
 
+  async function copyCode(code: string) {
+    const url = `${window.location.origin}/?invite=${encodeURIComponent(code)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      window.prompt("Copy this link", url);
+    }
+  }
+
+  const remaining = (codes ?? []).filter((c) => c.redeemedAt === null).length;
+
   return (
     <section className="profile-block profile-invite-card">
-      <h3 className="who-block-heading">Bring your people</h3>
+      <h3 className="who-block-heading">Invite codes</h3>
       <p className="profile-invite-body">
-        Want to plan something with a friend who isn’t here yet? Send them an
-        invite — once they’re on, you can add each other to your network.
+        You've got {remaining} code{remaining === 1 ? "" : "s"} left to share. Each one gets one person in.
       </p>
-      <button type="button" className="btn-secondary btn-block" onClick={() => void share()}>
-        Invite a friend by text
-      </button>
+      {codes === null && <p className="form-help">Loading…</p>}
+      {codes !== null && (
+        <ul className="invite-code-list">
+          {codes.map((c) => (
+            <li key={c.code} className={`invite-code-row ${c.redeemedAt ? "is-redeemed" : ""}`}>
+              <code className="invite-code-value">{c.code}</code>
+              {c.redeemedAt ? (
+                <span className="invite-code-meta">
+                  Used by {c.redeemedByFirstName ?? "someone"}
+                </span>
+              ) : (
+                <div className="invite-code-actions">
+                  <button
+                    type="button"
+                    className="btn-link"
+                    onClick={() => void copyCode(c.code)}
+                  >
+                    Copy link
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => shareCode(c.code)}
+                  >
+                    Share
+                  </button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function NotificationSettings({
+  me,
+  onUpdated,
+}: {
+  me: MeDTO;
+  onUpdated: (next: MeDTO) => void;
+}) {
+  const current: NotificationPrefs = { ...DEFAULT_NOTIFICATION_PREFS, ...(me.notificationPrefs ?? {}) };
+  const [busy, setBusy] = useState<keyof NotificationPrefs | null>(null);
+
+  async function toggle(key: keyof NotificationPrefs) {
+    if (busy) return;
+    setBusy(key);
+    const next: NotificationPrefs = { ...current, [key]: !current[key] };
+    try {
+      const updated = await api<MeDTO>("/api/auth/me", {
+        method: "PATCH",
+        body: JSON.stringify({ notificationPrefs: next }),
+      });
+      onUpdated(updated);
+    } catch {
+      /* keep previous state; user can retry */
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const keys = Object.keys(NOTIFICATION_LABELS) as Array<keyof NotificationPrefs>;
+
+  return (
+    <section className="profile-block profile-settings">
+      <h3 className="who-block-heading">Notifications</h3>
+      <div className="notif-prefs-list">
+        {keys.map((key) => (
+          <label key={key} className="notif-pref-row">
+            <span className="notif-pref-label">{NOTIFICATION_LABELS[key]}</span>
+            <input
+              type="checkbox"
+              className="notif-pref-toggle"
+              checked={current[key]}
+              disabled={busy === key}
+              onChange={() => void toggle(key)}
+            />
+          </label>
+        ))}
+      </div>
     </section>
   );
 }

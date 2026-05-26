@@ -27,6 +27,20 @@ const UserSchema = new mongoose.Schema<UserRecord>(
     networkIds: { type: [String], default: undefined },
     dismissedNetworkPromptPlanIds: { type: [String], default: undefined },
     socialLinks: { type: { instagram: { type: String } }, default: undefined },
+    guidelinesAcknowledgedAt: { type: String, default: null },
+    notificationPrefs: {
+      type: {
+        someoneJoinedYourPlan: { type: Boolean },
+        planTomorrow: { type: Boolean },
+        planInTwoHours: { type: Boolean },
+        newGroupChatMessage: { type: Boolean },
+        postPlanNetworkNudge: { type: Boolean },
+        planCancellation: { type: Boolean },
+        weeklyFridayDigest: { type: Boolean },
+        lookingForRecovery: { type: Boolean },
+      },
+      default: undefined,
+    },
   },
   { collection: "users" },
 );

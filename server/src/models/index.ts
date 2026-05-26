@@ -66,7 +66,9 @@ const PlanSchema = new Schema<PlanRecord>(
     capacity: { type: Number, default: null },
     joinType: { type: String, enum: ["open", "approve"], default: "open" },
     isRecurring: { type: Boolean, default: false },
+    seriesId: { type: String, default: null },
     lockedAt: { type: String, default: null },
+    cancelledAt: { type: String, default: null },
     createdAt: { type: String, required: true },
   },
   { collection: "plans" },
@@ -75,6 +77,7 @@ PlanSchema.index({ id: 1 }, { unique: true });
 PlanSchema.index({ creatorId: 1 });
 PlanSchema.index({ neighborhoodId: 1 });
 PlanSchema.index({ date: 1 });
+PlanSchema.index({ seriesId: 1 });
 export const PlanModel = compile<PlanRecord>("Plan", PlanSchema);
 
 // Participations

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/http";
+import { Avatar } from "../components/Avatar";
 import { LocationAutocomplete } from "../components/LocationAutocomplete";
 import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
@@ -11,6 +12,7 @@ import {
   type JoinType,
   type NeighborhoodDTO,
   type PlanVisibility,
+  type PublicUser,
   type VibeIcon,
 } from "../types/shared";
 
@@ -26,6 +28,8 @@ export function CreatePlanPage() {
   const prefillName = searchParams.get("name") ?? "";
   const prefillAddress = searchParams.get("address") ?? "";
   const prefillTagParam = searchParams.get("tag");
+  const inviteUserId = searchParams.get("inviteUser");
+  const inviteUserName = searchParams.get("inviteName");
   const prefillVibe: VibeIcon | null = useMemo(() => {
     if (!prefillTagParam) return null;
     const opt = VIBE_OPTIONS.find((o) => o.tag === prefillTagParam);
@@ -54,7 +58,7 @@ export function CreatePlanPage() {
     isFlexibleDate: false,
     vibes: defaultVibes,
     description: "",
-    visibility: "everyone" as PlanVisibility,
+    visibility: (inviteUserId ? "network" : "everyone") as PlanVisibility,
     capacityOn: false,
     capacity: "6",
     joinType: "open" as JoinType,
@@ -63,12 +67,38 @@ export function CreatePlanPage() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [network, setNetwork] = useState<PublicUser[] | null>(null);
+  const [invitedIds, setInvitedIds] = useState<Set<string>>(() =>
+    inviteUserId ? new Set([inviteUserId]) : new Set(),
+  );
   const navigate = useNavigate();
   const flyerRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void api<NeighborhoodDTO[]>("/api/neighborhoods").then(setNeighborhoods).catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (!inviteUserId) return;
+    void api<{ users: PublicUser[] }>("/api/auth/network")
+      .then((r) => setNetwork(r.users))
+      .catch(() => setNetwork([]));
+  }, [inviteUserId]);
+
+  const seededOutsideNetwork = useMemo(() => {
+    if (!inviteUserId || !inviteUserName || !network) return null;
+    if (network.some((u) => u.id === inviteUserId)) return null;
+    return { id: inviteUserId, firstName: inviteUserName };
+  }, [inviteUserId, inviteUserName, network]);
+
+  const toggleInvited = (id: string) => {
+    setInvitedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     const first = user?.neighborhoodIds?.[0] ?? user?.neighborhoodId;
@@ -146,6 +176,16 @@ export function CreatePlanPage() {
           flyerDataUrl: form.flyerDataUrl ?? undefined,
         }),
       });
+      if (invitedIds.size > 0) {
+        try {
+          await api(`/api/plans/${created.id}/invite`, {
+            method: "POST",
+            body: JSON.stringify({ userIds: [...invitedIds] }),
+          });
+        } catch {
+          /* best-effort — user can invite again from the plan */
+        }
+      }
       navigate("/", { state: { justPostedId: created.id, openInviteForPlanId: created.id } });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't post");
@@ -180,6 +220,16 @@ export function CreatePlanPage() {
       <p className="brand-tagline" style={{ marginBottom: 24 }}>
         Fill what you know · toggle what's flexible
       </p>
+
+      {inviteUserId && inviteUserName && (
+        <div className="create-plan-invite-banner" role="note">
+          Inviting <strong>{inviteUserName}</strong>
+          {invitedIds.size > 1 && ` + ${invitedIds.size - 1} more`} once you post ·{" "}
+          {form.visibility === "network"
+            ? "Visible to your network"
+            : "Visible to everyone on COMMONS"}
+        </div>
+      )}
 
       <form onSubmit={(event) => void submit(event)} className="form-card">
         {/* Interests at top — defaults to user's selected interests so the feed map points there. */}
@@ -332,6 +382,42 @@ export function CreatePlanPage() {
           </select>
         </section>
 
+        {/* Visibility — who can see this plan on the feed */}
+        <section className="form-section">
+          <label className="form-question">Who can see this?</label>
+          <div className="visibility-options">
+            <button
+              type="button"
+              className={`visibility-option ${form.visibility === "everyone" ? "is-active" : ""}`}
+              onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
+              aria-pressed={form.visibility === "everyone"}
+            >
+              <span className="visibility-option-title">Everyone on COMMONS</span>
+              <span className="visibility-option-sub">Open to anyone in your neighborhood</span>
+            </button>
+            <button
+              type="button"
+              className={`visibility-option ${form.visibility === "network" ? "is-active" : ""}`}
+              onClick={() => setForm((f) => ({ ...f, visibility: "network" }))}
+              aria-pressed={form.visibility === "network"}
+            >
+              <span className="visibility-option-title">Your Network</span>
+              <span className="visibility-option-sub">Only people you've added show up</span>
+            </button>
+            <button
+              type="button"
+              className="visibility-option is-disabled"
+              disabled
+              aria-disabled="true"
+            >
+              <span className="visibility-option-title">
+                Communities <span className="visibility-option-pill">Coming soon</span>
+              </span>
+              <span className="visibility-option-sub">Run clubs, book clubs, recurring crews</span>
+            </button>
+          </div>
+        </section>
+
         {/* Spots — toggle for open vs capped */}
         <section className="form-section">
           <div className="form-row-flex">
@@ -423,6 +509,59 @@ export function CreatePlanPage() {
           </div>
         </section>
 
+        {inviteUserId && (
+          <section className="form-section">
+            <label className="form-question">Invite from your network</label>
+            <p className="form-help">
+              {inviteUserName ? <><strong>{inviteUserName}</strong> is already added. </> : null}
+              Pick anyone else you want in on this.
+            </p>
+            {network === null && <p className="form-help">Loading…</p>}
+            {network !== null && network.length === 0 && !seededOutsideNetwork && (
+              <p className="form-help">No one in your network yet — you can still post.</p>
+            )}
+            {(network && network.length > 0) || seededOutsideNetwork ? (
+              <div className="invite-people-list">
+                {seededOutsideNetwork && (
+                  <button
+                    type="button"
+                    className="invite-person is-picked"
+                    disabled
+                    aria-pressed
+                  >
+                    <Avatar seed={seededOutsideNetwork.id} style="avataaars" name={seededOutsideNetwork.firstName} size="sm" />
+                    <span className="invite-person-name">{seededOutsideNetwork.firstName}</span>
+                    <span className="invite-person-check">✓</span>
+                  </button>
+                )}
+                {network?.map((u) => {
+                  const picked = invitedIds.has(u.id);
+                  return (
+                    <button
+                      key={u.id}
+                      type="button"
+                      className={`invite-person ${picked ? "is-picked" : ""}`}
+                      onClick={() => toggleInvited(u.id)}
+                      aria-pressed={picked}
+                    >
+                      <Avatar
+                        seed={u.avatarSeed}
+                        style={u.avatarStyle}
+                        photoDataUrl={u.avatarPhotoDataUrl}
+                        params={u.avatarParams}
+                        name={u.firstName}
+                        size="sm"
+                      />
+                      <span className="invite-person-name">{u.firstName}</span>
+                      {picked && <span className="invite-person-check">✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </section>
+        )}
+
         {error && <p className="error-text">{error}</p>}
 
         <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
@@ -461,7 +600,7 @@ function FlexIcon() {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M5 12h14" />
       <path d="m12 5 7 7-7 7" />
-      <path d="M19 5l-7 7 7 7" />
+      <path d="m12 5-7 7 7 7" />
     </svg>
   );
 }

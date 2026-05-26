@@ -106,7 +106,11 @@ export interface PlanDTO {
   /** How RSVPs are accepted when capacity is set. */
   joinType: JoinType;
   isRecurring: boolean;
+  /** Series anchor — null for one-offs, shared across every instance of a recurring plan. */
+  seriesId: string | null;
   lockedAt: string | null;
+  /** ISO timestamp when the host cancelled this plan, or null if active. */
+  cancelledAt: string | null;
   /** Optional flyer image stored as data URL. */
   flyerDataUrl?: string;
   /** Inline replies on “looking for” plans (feed + detail). */
@@ -181,11 +185,64 @@ export interface MeDTO {
   socialLinks?: SocialLinks;
   /** True when this verified phone may use `/api/admin` and `/admin`. */
   canAccessAdmin?: boolean;
+  /** ISO timestamp the user accepted the community guidelines, or null if not yet. */
+  guidelinesAcknowledgedAt?: string | null;
+  /** Notification toggles. Missing keys fall back to DEFAULT_NOTIFICATION_PREFS. */
+  notificationPrefs?: NotificationPrefs;
 }
+
+export interface NotificationPrefs {
+  someoneJoinedYourPlan: boolean;
+  planTomorrow: boolean;
+  planInTwoHours: boolean;
+  newGroupChatMessage: boolean;
+  postPlanNetworkNudge: boolean;
+  planCancellation: boolean;
+  weeklyFridayDigest: boolean;
+  lookingForRecovery: boolean;
+}
+
+export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
+  someoneJoinedYourPlan: true,
+  planTomorrow: true,
+  planInTwoHours: true,
+  newGroupChatMessage: true,
+  postPlanNetworkNudge: true,
+  planCancellation: true,
+  weeklyFridayDigest: true,
+  lookingForRecovery: true,
+};
 
 export interface NetworkPromptDTO {
   planId: string;
   planTitle: string;
   /** People you went with who aren’t in your network yet. */
   others: PublicUser[];
+}
+
+export type NotificationKind =
+  | "someoneJoinedYourPlan"
+  | "planTomorrow"
+  | "planInTwoHours"
+  | "newGroupChatMessage"
+  | "postPlanNetworkNudge"
+  | "planCancellation"
+  | "weeklyFridayDigest"
+  | "lookingForRecovery";
+
+export interface NotificationDTO {
+  id: string;
+  kind: NotificationKind;
+  body: string;
+  planId?: string;
+  conversationId?: string;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export interface InviteCodeDTO {
+  code: string;
+  redeemedAt: string | null;
+  /** First name of the person who redeemed it — null until/unless redeemed. */
+  redeemedByFirstName: string | null;
 }

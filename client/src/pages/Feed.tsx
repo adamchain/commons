@@ -51,10 +51,14 @@ export function FeedPage() {
   }, [justPostedId, plans]);
 
   useEffect(() => {
+    if (user?.notificationPrefs && user.notificationPrefs.postPlanNetworkNudge === false) {
+      setNetworkPrompt(null);
+      return;
+    }
     void api<{ prompt: NetworkPromptDTO | null }>("/api/auth/network-prompt")
       .then((r) => setNetworkPrompt(r.prompt))
       .catch(() => setNetworkPrompt(null));
-  }, [plans]);
+  }, [plans, user?.notificationPrefs?.postPlanNetworkNudge]);
 
   const filteredPlans = useMemo(() => {
     let list = plans ?? [];
@@ -138,12 +142,16 @@ export function FeedPage() {
 
       <div id="feed-plans">
         {filteredPlans.length === 0 ? (
-          <div className="empty-state empty-state-feed">
-            <p style={{ margin: 0 }}>Nothing yet — be the first to post a plan.</p>
-            <Link to="/plans/new" className="btn-primary" style={{ marginTop: 16, display: "inline-block" }}>
-              Post something
-            </Link>
-          </div>
+          <FeedEmptyState
+            view={view}
+            hasAnyPlans={(plans?.length ?? 0) > 0}
+            hasFilters={activeFilterCount > 0 || selectedDayIso !== null}
+            onClearFilters={() => {
+              setSelectedTag(null);
+              setSelectedHoodId(null);
+              setSelectedDayIso(null);
+            }}
+          />
         ) : (
           <div className="plan-grid">
             {filteredPlans.map((plan) => (
@@ -183,6 +191,59 @@ export function FeedPage() {
         />
       )}
     </main>
+  );
+}
+
+function FeedEmptyState({
+  view,
+  hasAnyPlans,
+  hasFilters,
+  onClearFilters,
+}: {
+  view: "all" | "mine";
+  hasAnyPlans: boolean;
+  hasFilters: boolean;
+  onClearFilters: () => void;
+}) {
+  // Pick copy based on what's actually causing the empty result.
+  // The 3 buckets the user can hit: filters hide everything; "My plans" tab
+  // empty; or truly nothing in the feed (slow week).
+  let headline: string;
+  let body: string;
+  if (hasFilters) {
+    headline = "Nothing matches those filters.";
+    body = "Try clearing them — there's more going on across the city.";
+  } else if (view === "mine") {
+    headline = "You haven't joined anything yet.";
+    body = "Tap All plans to see what's happening this week.";
+  } else if (hasAnyPlans) {
+    // Edge case: plans exist but none in the filtered view (rare without filters
+    // — usually a stale state). Treat like the slow-week message.
+    headline = "Nothing near you this week.";
+    body = "Be the first to post.";
+  } else {
+    headline = "Nothing near you this week.";
+    body = "Be the first to post — coffee run, gallery night, pickup soccer. Anything.";
+  }
+
+  return (
+    <div className="feed-empty" role="status">
+      <div className="feed-empty-glyph" aria-hidden="true">
+        ☕
+      </div>
+      <h2 className="feed-empty-headline">{headline}</h2>
+      <p className="feed-empty-body">{body}</p>
+      <div className="feed-empty-actions">
+        {hasFilters ? (
+          <button type="button" className="btn-secondary" onClick={onClearFilters}>
+            Clear filters
+          </button>
+        ) : null}
+        <Link to="/plans/new" className="btn-primary">
+          Post a plan
+        </Link>
+      </div>
+    </div>
   );
 }
 
