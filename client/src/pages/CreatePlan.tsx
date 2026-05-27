@@ -3,7 +3,6 @@ import type { FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
-import { LocationAutocomplete } from "../components/LocationAutocomplete";
 import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import {
@@ -135,10 +134,6 @@ export function CreatePlanPage() {
     }
     if (!form.isFlexibleDate && !form.date) {
       setError("Pick a day or toggle date flexible.");
-      return;
-    }
-    if (!form.isFlexibleLocation && !form.locationName.trim()) {
-      setError("Add a spot or toggle location flexible.");
       return;
     }
 
@@ -336,28 +331,25 @@ export function CreatePlanPage() {
           </label>
         </section>
 
-        {/* Location + flex toggle inline */}
+        {/* Neighborhood + flex toggle inline */}
         <section className="form-section">
           <div className="form-row-flex">
             <div className="form-row-flex-main">
-              <label className="form-question">Where</label>
-              {!form.isFlexibleLocation ? (
-                <LocationAutocomplete
-                  name={form.locationName}
-                  address={form.locationAddress}
-                  onChange={({ name, address, lat, lng }) =>
-                    setForm((f) => ({
-                      ...f,
-                      locationName: name,
-                      locationAddress: address,
-                      locationLat: lat,
-                      locationLng: lng,
-                    }))
-                  }
-                />
-              ) : (
-                <div className="form-flex-placeholder">Flexible — we'll figure it out</div>
-              )}
+              <label className="form-question" htmlFor="neighborhood">
+                Neighborhood
+              </label>
+              <select
+                id="neighborhood"
+                value={form.neighborhoodId}
+                onChange={(e) => setForm((f) => ({ ...f, neighborhoodId: e.target.value }))}
+              >
+                <option value="">Whereabouts…</option>
+                {neighborhoods.map((n) => (
+                  <option key={n.id} value={n.id}>
+                    {n.name}
+                  </option>
+                ))}
+              </select>
             </div>
             <FlexToggle
               active={form.isFlexibleLocation}
@@ -365,21 +357,6 @@ export function CreatePlanPage() {
               label="Flexible"
             />
           </div>
-          <label className="form-question" htmlFor="neighborhood" style={{ marginTop: 8 }}>
-            Neighborhood
-          </label>
-          <select
-            id="neighborhood"
-            value={form.neighborhoodId}
-            onChange={(e) => setForm((f) => ({ ...f, neighborhoodId: e.target.value }))}
-          >
-            <option value="">Whereabouts…</option>
-            {neighborhoods.map((n) => (
-              <option key={n.id} value={n.id}>
-                {n.name}
-              </option>
-            ))}
-          </select>
         </section>
 
         {/* Visibility — who can see this plan on the feed */}

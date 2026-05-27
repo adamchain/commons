@@ -106,6 +106,6 @@ function iconFor(kind: NotificationKind): string {
     case "weeklyFridayDigest":
       return "📰";
     case "lookingForRecovery":
-      return "🔓";
+      return "🔍";
   }
 }

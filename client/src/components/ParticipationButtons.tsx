@@ -100,20 +100,22 @@ export function ParticipationButtons({
                 ? `${goingCount}/${capacity} spots taken — first come, first serve.`
                 : "Committed vs tentative — pick what fits."}
       </p>
-      <button
-        type="button"
-        className={`btn-going ${goingActive ? "is-active" : ""}`}
-        onClick={() => void toggleState("going")}
-        disabled={pending || isFull || isApproveOnly}
-      >
-        {goingActive
-          ? "✓ You're in"
-          : isFull
-            ? "Full"
-            : isApproveOnly
-              ? "Application-only"
-              : "I'm in"}
-      </button>
+      {!loose && (
+        <button
+          type="button"
+          className={`btn-going ${goingActive ? "is-active" : ""}`}
+          onClick={() => void toggleState("going")}
+          disabled={pending || isFull || isApproveOnly}
+        >
+          {goingActive
+            ? "✓ You're in"
+            : isFull
+              ? "Full"
+              : isApproveOnly
+                ? "Application-only"
+                : "I'm in"}
+        </button>
+      )}
       <button
         type="button"
         className={`btn-interested ${interestedActive ? "is-active" : ""}`}
@@ -122,10 +124,10 @@ export function ParticipationButtons({
       >
         {interestedActive
           ? loose
-            ? "You're Interested"
+            ? "I'm Interested"
             : isApproveOnly
               ? "Applied"
-              : "You're interested"
+              : "I'm interested"
           : loose
             ? "I'm Interested"
             : isApproveOnly
