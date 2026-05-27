@@ -122,6 +122,13 @@ export interface PlanDTO {
     image?: string;
     siteName?: string;
   };
+  /** Host-proposed date/time waiting on the host to apply. Null/absent = none pending. */
+  pendingTimeProposal?: {
+    date: string;
+    time: string;
+    isFlexibleTime: boolean;
+    proposedAt: string;
+  } | null;
   /** Inline replies on “looking for” plans (feed + detail). */
   suggestions: PlanSuggestionDTO[];
   participants: {
@@ -237,7 +244,9 @@ export type NotificationKind =
   | "postPlanNetworkNudge"
   | "planCancellation"
   | "weeklyFridayDigest"
-  | "lookingForRecovery";
+  | "lookingForRecovery"
+  | "planTimeProposed"
+  | "planTimeChanged";
 
 export interface NotificationDTO {
   id: string;

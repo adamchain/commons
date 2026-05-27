@@ -136,6 +136,7 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     flyerDataUrl: plan.flyerDataUrl,
     flyerLinkUrl: plan.flyerLinkUrl,
     flyerLinkPreview: plan.flyerLinkPreview,
+    pendingTimeProposal: plan.pendingTimeProposal ?? null,
     suggestions,
     participants: {
       going: going.map((p) => pu(p.userId)),
@@ -334,6 +335,242 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   void onPlanCreatedVenueNudge(plan).catch((err) => console.error("[nudge] venue", err));
 
   res.status(201).json(await planSummary(plan, userId));
+});
+
+// Host-only patch for instant fields. Date/time are deliberately excluded —
+// those go through the `propose-time` / `apply-time` flow so participants get a
+// chance to see a change before it lands.
+plansRouter.patch("/:id", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const planId = String(req.params.id);
+  const plan = store.findPlanById(planId);
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  if (plan.creatorId !== userId) {
+    res.status(403).json({ error: "Only the host can edit this plan" });
+    return;
+  }
+
+  const patch: Partial<Omit<PlanRecord, "id" | "createdAt">> = {};
+
+  if (req.body?.title !== undefined) {
+    const t = String(req.body.title).trim();
+    if (!t) {
+      res.status(400).json({ error: "Title can't be empty" });
+      return;
+    }
+    patch.title = t;
+  }
+  if (req.body?.description !== undefined) {
+    const d = String(req.body.description ?? "").trim();
+    patch.description = d || undefined;
+  }
+  if (req.body?.hostEmoji !== undefined) {
+    const e = String(req.body.hostEmoji).trim();
+    if (e) patch.hostEmoji = e;
+  }
+  if (Array.isArray(req.body?.tags)) {
+    const tags = Array.from(
+      new Set(
+        (req.body.tags as unknown[])
+          .map((t) => String(t))
+          .filter((t): t is InterestTag => ALL_INTERESTS.includes(t as InterestTag)),
+      ),
+    );
+    patch.tags = tags;
+  }
+  if (req.body?.neighborhoodId !== undefined) {
+    const n = String(req.body.neighborhoodId).trim();
+    if (n && !store.findNeighborhoodById(n)) {
+      res.status(400).json({ error: "Unknown neighborhood" });
+      return;
+    }
+    if (n) patch.neighborhoodId = n;
+  }
+  if (req.body?.location && typeof req.body.location === "object") {
+    const loc = req.body.location as Record<string, unknown>;
+    const name = typeof loc.name === "string" ? loc.name.trim() : "";
+    const address = typeof loc.address === "string" ? loc.address.trim() : "";
+    const lat = typeof loc.lat === "number" ? loc.lat : undefined;
+    const lng = typeof loc.lng === "number" ? loc.lng : undefined;
+    if (name) {
+      patch.location = { name, address: address || name, lat, lng };
+    }
+  }
+  if (req.body?.isFlexibleLocation !== undefined) {
+    patch.isFlexibleLocation = Boolean(req.body.isFlexibleLocation);
+  }
+  if (req.body?.visibility !== undefined) {
+    const raw = String(req.body.visibility);
+    if (["everyone", "community", "network"].includes(raw)) {
+      patch.visibility = raw as PlanVisibility;
+    }
+  }
+  if (req.body?.visibilityCommunityTag !== undefined) {
+    const raw = req.body.visibilityCommunityTag;
+    if (raw === null) patch.visibilityCommunityTag = null;
+    else if (typeof raw === "string" && ALL_INTERESTS.includes(raw as InterestTag)) {
+      patch.visibilityCommunityTag = raw as InterestTag;
+    }
+  }
+  if (req.body?.capacity !== undefined) {
+    const raw = req.body.capacity;
+    if (raw === null) patch.capacity = null;
+    else if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {
+      patch.capacity = Math.floor(raw);
+    }
+  }
+  if (req.body?.joinType !== undefined) {
+    const raw = String(req.body.joinType);
+    patch.joinType = raw === "approve" ? "approve" : "open";
+  }
+  if (req.body?.flyerDataUrl !== undefined) {
+    const raw = req.body.flyerDataUrl;
+    if (raw === null) patch.flyerDataUrl = undefined;
+    else if (typeof raw === "string" && raw.startsWith("data:image/") && raw.length < 1_600_000) {
+      patch.flyerDataUrl = raw;
+    }
+  }
+  if (req.body?.flyerLinkUrl !== undefined) {
+    const raw = req.body.flyerLinkUrl;
+    if (raw === null || raw === "") {
+      patch.flyerLinkUrl = undefined;
+      patch.flyerLinkPreview = undefined;
+    } else if (typeof raw === "string") {
+      try {
+        const u = new URL(raw.trim());
+        if (u.protocol === "http:" || u.protocol === "https:") {
+          patch.flyerLinkUrl = u.toString().slice(0, 2048);
+        }
+      } catch {
+        /* invalid — drop */
+      }
+    }
+  }
+  if (req.body?.flyerLinkPreview !== undefined) {
+    const raw = req.body.flyerLinkPreview;
+    if (raw === null) {
+      patch.flyerLinkPreview = undefined;
+    } else if (typeof raw === "object") {
+      const p = raw as Record<string, unknown>;
+      const trim = (v: unknown, max: number): string | undefined =>
+        typeof v === "string" && v.trim() ? v.trim().slice(0, max) : undefined;
+      patch.flyerLinkPreview = {
+        title: trim(p.title, 200),
+        description: trim(p.description, 400),
+        image: trim(p.image, 2048),
+        siteName: trim(p.siteName, 100),
+      };
+    }
+  }
+
+  store.updatePlan(planId, patch);
+  const updated = store.findPlanById(planId)!;
+  res.json(await planSummary(updated, userId));
+});
+
+// Host proposes a new date/time. The proposal is stored on the plan but the
+// real date/time don't move until the host applies — keeps participants from
+// finding out about a change only when they show up.
+plansRouter.post("/:id/propose-time", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const planId = String(req.params.id);
+  const plan = store.findPlanById(planId);
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  if (plan.creatorId !== userId) {
+    res.status(403).json({ error: "Only the host can propose a time change" });
+    return;
+  }
+  const date = String(req.body?.date ?? "").trim();
+  const time = String(req.body?.time ?? "").trim();
+  const isFlexibleTime = Boolean(req.body?.isFlexibleTime);
+  if (!date) {
+    res.status(400).json({ error: "Date required" });
+    return;
+  }
+  const proposedAt = new Date().toISOString();
+  store.updatePlan(planId, {
+    pendingTimeProposal: { date, time, isFlexibleTime, proposedAt },
+  });
+  // Notify everyone going or interested except the host.
+  const parts = store.listParticipationsForPlan(planId);
+  for (const p of parts) {
+    if (p.userId === userId) continue;
+    void emit({
+      userId: p.userId,
+      kind: "planTimeProposed",
+      planId,
+      body: `Host proposed a new time for "${plan.title}"`,
+      dedupKey: `planTimeProposed:${planId}:${proposedAt}`,
+    });
+  }
+  store.log("plan_time_proposed", { planId, date, time });
+  const updated = store.findPlanById(planId)!;
+  res.json(await planSummary(updated, userId));
+});
+
+// Host applies the pending proposal — real date/time move, proposal clears,
+// participants get a "this changed" notification.
+plansRouter.post("/:id/apply-time", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const planId = String(req.params.id);
+  const plan = store.findPlanById(planId);
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  if (plan.creatorId !== userId) {
+    res.status(403).json({ error: "Only the host can apply the time change" });
+    return;
+  }
+  const proposal = plan.pendingTimeProposal;
+  if (!proposal) {
+    res.status(400).json({ error: "No pending time proposal" });
+    return;
+  }
+  store.updatePlan(planId, {
+    date: proposal.date,
+    time: proposal.isFlexibleTime ? "" : proposal.time,
+    isFlexibleTime: proposal.isFlexibleTime,
+    pendingTimeProposal: null,
+  });
+  const parts = store.listParticipationsForPlan(planId);
+  const stamp = new Date().toISOString();
+  for (const p of parts) {
+    if (p.userId === userId) continue;
+    void emit({
+      userId: p.userId,
+      kind: "planTimeChanged",
+      planId,
+      body: `"${plan.title}" moved to a new date/time`,
+      dedupKey: `planTimeChanged:${planId}:${stamp}`,
+    });
+  }
+  store.log("plan_time_changed", { planId, date: proposal.date, time: proposal.time });
+  const updated = store.findPlanById(planId)!;
+  res.json(await planSummary(updated, userId));
+});
+
+plansRouter.delete("/:id/propose-time", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const planId = String(req.params.id);
+  const plan = store.findPlanById(planId);
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  if (plan.creatorId !== userId) {
+    res.status(403).json({ error: "Only the host can cancel the proposal" });
+    return;
+  }
+  store.updatePlan(planId, { pendingTimeProposal: null });
+  const updated = store.findPlanById(planId)!;
+  res.json(await planSummary(updated, userId));
 });
 
 /**

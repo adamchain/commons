@@ -24,6 +24,10 @@ const PREF_KEY: Record<NotificationKind, keyof NotificationPrefs> = {
   planCancellation: "planCancellation",
   weeklyFridayDigest: "weeklyFridayDigest",
   lookingForRecovery: "lookingForRecovery",
+  // Time-change events ride on the existing "plan changes" toggle — both are
+  // host actions that move the plan out from under participants.
+  planTimeProposed: "planCancellation",
+  planTimeChanged: "planCancellation",
 };
 
 export async function emit(input: {

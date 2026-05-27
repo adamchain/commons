@@ -100,6 +100,18 @@ export interface PlanRecord {
   seriesId?: string | null;
   lockedAt?: string | null;
   flyerDataUrl?: string;
+  /**
+   * Host-proposed date/time change waiting to be applied. Set by
+   * `propose-time`, cleared by `apply-time` / `delete propose-time`. The plan's
+   * real `date`/`time` don't move until the host applies — until then the
+   * proposal is just a banner participants see.
+   */
+  pendingTimeProposal?: {
+    date: string;
+    time: string;
+    isFlexibleTime: boolean;
+    proposedAt: string;
+  } | null;
   /** Optional shareable link the host attached (event page, ticket page, etc.). */
   flyerLinkUrl?: string;
   /** Cached OG-style preview of `flyerLinkUrl` captured at create time. */
@@ -229,7 +241,9 @@ export interface NotificationRecord {
     | "postPlanNetworkNudge"
     | "planCancellation"
     | "weeklyFridayDigest"
-    | "lookingForRecovery";
+    | "lookingForRecovery"
+    | "planTimeProposed"
+    | "planTimeChanged";
   body: string;
   planId?: string;
   conversationId?: string;

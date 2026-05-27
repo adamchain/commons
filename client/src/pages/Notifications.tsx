@@ -107,5 +107,9 @@ function iconFor(kind: NotificationKind): string {
       return "📰";
     case "lookingForRecovery":
       return "🔍";
+    case "planTimeProposed":
+      return "🕰️";
+    case "planTimeChanged":
+      return "🔄";
   }
 }

@@ -341,8 +341,22 @@ export function PlanDetailPage() {
           </div>
         )}
 
+        {plan.pendingTimeProposal && !plan.cancelledAt && (
+          <div className="coordination-banner" role="note">
+            <strong>{isHosting ? "You proposed" : "Host proposed"} a new time:</strong>{" "}
+            {formatPlanDate(plan.pendingTimeProposal.date)} ·{" "}
+            {formatPlanTime(plan.pendingTimeProposal.time, plan.pendingTimeProposal.isFlexibleTime)}.
+            {isHosting ? (
+              <> Open <Link to={`/plans/${plan.id}/edit`}>edit</Link> to apply or cancel.</>
+            ) : (
+              <> The host will apply it shortly.</>
+            )}
+          </div>
+        )}
+
         {isHosting && !plan.cancelledAt && (
           <div className="plan-host-actions">
+            <Link to={`/plans/${plan.id}/edit`} className="btn-link">Edit plan</Link>
             <HostTransferControl
               candidates={plan.participants.going.filter((p) => p.id !== user.id)}
               onTransfer={(id, name) => void transferHost(id, name)}

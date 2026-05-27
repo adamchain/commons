@@ -7,6 +7,7 @@ import { TopBar } from "./components/TopBar";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { ChatPage } from "./pages/Chat";
 import { CreatePlanPage } from "./pages/CreatePlan";
+import { EditPlanPage } from "./pages/EditPlan";
 import { ExplorePage } from "./pages/Explore";
 import { FeedPage } from "./pages/Feed";
 import { NotificationsPage } from "./pages/Notifications";
@@ -54,6 +55,7 @@ export default function App() {
         <Route path="/explore" element={<Protected><ExplorePage /></Protected>} />
         <Route path="/notifications" element={<Protected><NotificationsPage /></Protected>} />
         <Route path="/plans/new" element={<Protected><CreatePlanPage /></Protected>} />
+        <Route path="/plans/:id/edit" element={<Protected><EditPlanPage /></Protected>} />
         <Route path="/plans/:id" element={<Protected><PlanDetailPage /></Protected>} />
         <Route path="/plans/:planId/chat" element={<Protected><ChatPage /></Protected>} />
         {/* Profile is reachable even before onboarding completes — users can review/edit themselves. */}

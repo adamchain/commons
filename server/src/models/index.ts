@@ -77,6 +77,12 @@ const PlanSchema = new Schema<PlanRecord>(
       image: { type: String },
       siteName: { type: String },
     },
+    pendingTimeProposal: {
+      date: { type: String },
+      time: { type: String },
+      isFlexibleTime: { type: Boolean },
+      proposedAt: { type: String },
+    },
     createdAt: { type: String, required: true },
   },
   { collection: "plans" },
