@@ -89,17 +89,17 @@ export function ParticipationButtons({
 
   return (
     <div className={`participation ${loose ? "participation--loose" : ""}`}>
-      <p className="participation-hint">
-        {loose
-          ? "Loose idea — tap if you’re tentatively interested."
-          : isApproveOnly
+      {!loose && (
+        <p className="participation-hint">
+          {isApproveOnly
             ? "Application-only — tap interested to request a spot."
             : isFull
               ? "This plan is full."
               : capacity !== null
                 ? `${goingCount}/${capacity} spots taken — first come, first serve.`
                 : "Committed vs tentative — pick what fits."}
-      </p>
+        </p>
+      )}
       {!loose && (
         <button
           type="button"

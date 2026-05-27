@@ -23,7 +23,7 @@ interface PlaceResult {
 export function ExplorePage() {
   const { user } = useAuth();
   const [plans, setPlans] = useState<PlanDTO[] | null>(null);
-  const [mode, setMode] = useState<Mode>("both");
+  const [mode] = useState<Mode>("both");
   const [locationQuery, setLocationQuery] = useState("");
   const [places, setPlaces] = useState<PlaceResult[]>([]);
   const [placesLoading, setPlacesLoading] = useState(false);
@@ -79,7 +79,7 @@ export function ExplorePage() {
         <SearchIcon />
         <input
           type="search"
-          placeholder="Search a venue, neighborhood, or vibe…"
+          placeholder="Find a run club, book club, or neighborhood crew"
           value={locationQuery}
           onChange={(e) => setLocationQuery(e.target.value)}
         />
@@ -129,36 +129,6 @@ export function ExplorePage() {
           </div>
         </section>
       )}
-
-      <div className="segmented segmented-explore" role="tablist" aria-label="Explore mode">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "nearby"}
-          className={mode === "nearby" ? "is-active" : ""}
-          onClick={() => setMode("nearby")}
-        >
-          Nearby
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "similar"}
-          className={mode === "similar" ? "is-active" : ""}
-          onClick={() => setMode("similar")}
-        >
-          Similar interests
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "both"}
-          className={mode === "both" ? "is-active" : ""}
-          onClick={() => setMode("both")}
-        >
-          Both
-        </button>
-      </div>
 
       {filtered.length === 0 ? (
         <div className="empty-state empty-state-feed">

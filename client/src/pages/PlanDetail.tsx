@@ -91,7 +91,7 @@ export function PlanDetailPage() {
   // Prompt fires when the thread has at least 2 people committing (interested
   // or going) — that's the signal there's a group.
   const groupSize = plan.participants.interested.length + plan.participants.going.length;
-  const showGroupPrompt = isLookingFor && !plan.lockedAt && groupSize >= 2;
+  const showGroupPrompt = isLookingFor && !plan.lockedAt && groupSize >= 2 && !isHosting;
   const canChat =
     isHosting || plan.myState === "going" || plan.myState === "interested";
 
@@ -255,11 +255,13 @@ export function PlanDetailPage() {
             role="note"
           >
             <p>
-              {claimedHost
-                ? `You're hosting — pick a venue and day to lock it in.`
-                : isLookingFor
-                  ? "Whoever picks the spot becomes the host. Fill in venue and day to make it a plan."
-                  : "Still working out the details? Fill in venue & time when you’re ready and lock it in."}
+              {isHosting && isLookingFor
+                ? "You can lock this in anytime — or wait to see who's interested."
+                : claimedHost
+                  ? `You're hosting — pick a venue and day to lock it in.`
+                  : isLookingFor
+                    ? "Whoever picks the spot becomes the host. Fill in venue and day to make it a plan."
+                    : "Still working out the details? Fill in venue & time when you’re ready and lock it in."}
             </p>
             <label className="form-question">Venue</label>
             <LocationAutocomplete
@@ -310,17 +312,19 @@ export function PlanDetailPage() {
           </div>
         )}
 
-        <ParticipationButtons
-          planId={plan.id}
-          initialState={plan.myState}
-          onChange={onStateChange}
-          planKind={plan.planKind}
-          capacity={plan.capacity}
-          goingCount={plan.participants.going.length}
-          joinType={plan.joinType}
-          isHosting={isHosting}
-          onJustMarkedInterested={() => setShowInvite(true)}
-        />
+        {!(isHosting && isLookingFor) && (
+          <ParticipationButtons
+            planId={plan.id}
+            initialState={plan.myState}
+            onChange={onStateChange}
+            planKind={plan.planKind}
+            capacity={plan.capacity}
+            goingCount={plan.participants.going.length}
+            joinType={plan.joinType}
+            isHosting={isHosting}
+            onJustMarkedInterested={() => setShowInvite(true)}
+          />
+        )}
 
         <div className="plan-actions-row">
           <button type="button" className="action-btn" onClick={() => setShowGetThere(true)}>
