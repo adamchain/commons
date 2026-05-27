@@ -62,6 +62,10 @@ export async function updateUser(id: string, patch: UserPatch): Promise<UserReco
   return store.updateUser(id, cleaned as Partial<Omit<UserRecord, "id" | "createdAt">>);
 }
 
+export async function deleteUser(id: string): Promise<boolean> {
+  return store.deleteUserCascade(id);
+}
+
 /** Used when shutting down tests or scripts (optional). */
 export async function disconnectMongo(): Promise<void> {
   if (mongoose.connection.readyState !== 0) {

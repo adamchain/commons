@@ -639,6 +639,32 @@ function NotificationSettings({
 
 function SettingsPanel({ onSignOut }: { onSignOut: () => void }) {
   const { theme } = useTheme();
+  const { setUser } = useAuth();
+  const navigate = useNavigate();
+  const [showDelete, setShowDelete] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const canDelete = confirmText.trim().toLowerCase() === "delete";
+
+  async function doDelete() {
+    if (!canDelete || deleting) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await api("/api/auth/me", {
+        method: "DELETE",
+        body: JSON.stringify({ confirm: "DELETE" }),
+      });
+      setUser(null);
+      navigate("/onboarding", { replace: true });
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Couldn't delete account");
+      setDeleting(false);
+    }
+  }
+
   return (
     <section className="profile-block profile-settings">
       <h3 className="who-block-heading">Settings</h3>
@@ -658,6 +684,70 @@ function SettingsPanel({ onSignOut }: { onSignOut: () => void }) {
           Sign out
         </button>
       </div>
+      <div className="profile-settings-row">
+        <div>
+          <div className="profile-settings-label">Delete account</div>
+          <div className="profile-settings-sub">Permanently removes your profile, plans, and history.</div>
+        </div>
+        <button
+          type="button"
+          className="btn-link"
+          style={{ color: "var(--color-danger, #c0392b)" }}
+          onClick={() => {
+            setConfirmText("");
+            setDeleteError(null);
+            setShowDelete(true);
+          }}
+        >
+          Delete
+        </button>
+      </div>
+      {showDelete && (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-account-title"
+          onClick={() => !deleting && setShowDelete(false)}
+        >
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <h4 id="delete-account-title" style={{ marginTop: 0 }}>Delete your account?</h4>
+            <p style={{ marginTop: 0 }}>
+              This is permanent. Your plans will be cancelled, your network connections
+              will be removed, and you'll be signed out. Type <strong>delete</strong> to confirm.
+            </p>
+            <input
+              type="text"
+              autoFocus
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="delete"
+              disabled={deleting}
+              style={{ width: "100%", marginBottom: 12 }}
+            />
+            {deleteError && <p className="error-text">{deleteError}</p>}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                className="btn-link"
+                onClick={() => setShowDelete(false)}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => void doDelete()}
+                disabled={!canDelete || deleting}
+                style={{ background: "var(--color-danger, #c0392b)" }}
+              >
+                {deleting ? "Deleting…" : "Delete my account"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

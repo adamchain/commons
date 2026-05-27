@@ -103,6 +103,37 @@ export const mongoMirror = {
   upsertUser(u: UserRecord): void {
     upsert(UserModel as never, u, `upsertUser ${u.id}`);
   },
+  deleteUser(id: string): void {
+    removeById(UserModel as never, id, `deleteUser ${id}`);
+  },
+  deleteParticipationsByUser(userId: string): void {
+    if (!isMongoConnected()) return;
+    const p = ParticipationModel.deleteMany({ userId })
+      .exec()
+      .catch((err) => fail(`deleteParticipationsByUser ${userId}`, err));
+    track(p);
+  },
+  deleteNotificationsByUser(userId: string): void {
+    if (!isMongoConnected()) return;
+    const p = NotificationModel.deleteMany({ userId })
+      .exec()
+      .catch((err) => fail(`deleteNotificationsByUser ${userId}`, err));
+    track(p);
+  },
+  deleteInviteCodesByOwner(ownerUserId: string): void {
+    if (!isMongoConnected()) return;
+    const p = InviteCodeModel.deleteMany({ ownerUserId })
+      .exec()
+      .catch((err) => fail(`deleteInviteCodesByOwner ${ownerUserId}`, err));
+    track(p);
+  },
+  deleteRelationshipsTouching(userId: string): void {
+    if (!isMongoConnected()) return;
+    const p = RelationshipModel.deleteMany({ $or: [{ userId }, { targetId: userId }] })
+      .exec()
+      .catch((err) => fail(`deleteRelationshipsTouching ${userId}`, err));
+    track(p);
+  },
 
   // Neighborhoods
   upsertNeighborhood(n: NeighborhoodRecord): void {

@@ -6,7 +6,7 @@ import { checkPhoneVerification, isTwilioVerifyConfigured, startPhoneVerificatio
 import { requireAuth } from "../middleware/requireAuth.js";
 import { INVITE_CODES_PER_USER, normalizeInviteCode, store } from "../store.js";
 import type { UserRecord } from "../store.js";
-import { createUser, findUserByPhone, findUserById, updateUser, type UserPatch } from "../userRepo.js";
+import { createUser, deleteUser, findUserByPhone, findUserById, updateUser, type UserPatch } from "../userRepo.js";
 import {
   DEFAULT_NOTIFICATION_PREFS,
   type InviteCodeDTO,
@@ -237,6 +237,24 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
 });
 
 authRouter.post("/logout", (_req, res) => {
+  res.clearCookie("session");
+  res.status(200).json({ ok: true });
+});
+
+// Hard-delete the signed-in user. Body must include `{ confirm: "DELETE" }` —
+// a belt-and-suspenders check against the client's type-to-confirm modal.
+authRouter.delete("/me", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const confirm = String(req.body?.confirm ?? "").trim().toUpperCase();
+  if (confirm !== "DELETE") {
+    res.status(400).json({ error: "Confirmation required" });
+    return;
+  }
+  const ok = await deleteUser(userId);
+  if (!ok) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
   res.clearCookie("session");
   res.status(200).json({ ok: true });
 });

@@ -382,6 +382,62 @@ export const store = {
     return user;
   },
 
+  /**
+   * Hard-delete a user and clean up everything that references them. Hosted
+   * plans are cancelled (not deleted) so other participants' history doesn't
+   * vanish. Messages and feedback authored by the user are intentionally
+   * preserved — the chat UI tolerates missing senders.
+   */
+  deleteUserCascade(userId: string): boolean {
+    const user = snapshot.users.find((u) => u.id === userId);
+    if (!user) return false;
+    const nowIso = new Date().toISOString();
+
+    // Cancel active plans the user was hosting.
+    for (const plan of snapshot.plans) {
+      if (plan.creatorId === userId && !plan.cancelledAt) {
+        plan.cancelledAt = nowIso;
+        mongoMirror.upsertPlan(plan);
+      }
+    }
+
+    // Drop the user from any conversation participantIds.
+    for (const conv of snapshot.conversations) {
+      if (conv.participantIds.includes(userId)) {
+        conv.participantIds = conv.participantIds.filter((id) => id !== userId);
+        mongoMirror.upsertConversation(conv);
+      }
+    }
+
+    // Drop the user from other users' networkIds.
+    for (const u of snapshot.users) {
+      if (u.id === userId) continue;
+      if (u.networkIds?.includes(userId)) {
+        u.networkIds = u.networkIds.filter((id) => id !== userId);
+        mongoMirror.upsertUser(u);
+      }
+    }
+
+    // Remove participations, notifications, invite codes, relationships.
+    snapshot.participations = snapshot.participations.filter((p) => p.userId !== userId);
+    snapshot.notifications = snapshot.notifications.filter((n) => n.userId !== userId);
+    snapshot.inviteCodes = snapshot.inviteCodes.filter((c) => c.ownerUserId !== userId);
+    snapshot.relationships = snapshot.relationships.filter(
+      (r) => r.userId !== userId && r.targetId !== userId,
+    );
+    mongoMirror.deleteParticipationsByUser(userId);
+    mongoMirror.deleteNotificationsByUser(userId);
+    mongoMirror.deleteInviteCodesByOwner(userId);
+    mongoMirror.deleteRelationshipsTouching(userId);
+
+    // Finally the user record itself.
+    snapshot.users = snapshot.users.filter((u) => u.id !== userId);
+    mongoMirror.deleteUser(userId);
+
+    persist();
+    return true;
+  },
+
   // Neighborhoods
   listNeighborhoods(): NeighborhoodRecord[] {
     return [...snapshot.neighborhoods];
