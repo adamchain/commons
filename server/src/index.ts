@@ -15,6 +15,7 @@ import { notificationsRouter } from "./routes/notifications.js";
 import { plansRouter } from "./routes/plans.js";
 import { profileRouter } from "./routes/profile.js";
 import { placesRouter } from "./routes/places.js";
+import { linkPreviewRouter } from "./routes/linkPreview.js";
 import { startNudgeSchedulers } from "./lib/nudges.js";
 import { seedIfEmpty } from "./seed.js";
 
@@ -46,6 +47,7 @@ app.use("/api/neighborhoods", neighborhoodsRouter);
 app.use("/api/feedback", feedbackRouter);
 app.use("/api/profile", profileRouter);
 app.use("/api/notifications", notificationsRouter);
+app.use("/api/link-preview", linkPreviewRouter);
 app.use("/api", chatRouter); // chat router defines its own paths under /plans/.../conversation and /conversations/...
 
 if (isProduction) {

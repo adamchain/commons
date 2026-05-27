@@ -99,7 +99,7 @@ export function PlanCard({
           : isLooking
             ? "plan-card--looking"
             : "plan-card--confirmed"
-      } ${highlight ? "plan-card--just-posted" : ""} ${hasEnded ? "plan-card--happened" : ""} ${isCancelled ? "plan-card--cancelled" : ""}`}
+      } ${highlight ? "plan-card--just-posted" : ""} ${hasEnded ? "plan-card--happened" : ""} ${isCancelled ? "plan-card--cancelled" : ""} ${plan.visibility === "network" ? "plan-card--network" : ""}`}
     >
       {highlight && (
         <div className="plan-card-just-posted-banner">
@@ -138,6 +138,33 @@ export function PlanCard({
         </p>
         {plan.description && (
           <p className="plan-card-description">{plan.description}</p>
+        )}
+
+        {plan.flyerLinkUrl && (plan.flyerLinkPreview || plan.flyerLinkUrl) && (
+          <a
+            href={plan.flyerLinkUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="link-preview link-preview--card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {plan.flyerLinkPreview?.image && (
+              <img src={plan.flyerLinkPreview.image} alt="" className="link-preview-image" />
+            )}
+            <div className="link-preview-body">
+              {plan.flyerLinkPreview?.siteName && (
+                <div className="link-preview-site">{plan.flyerLinkPreview.siteName}</div>
+              )}
+              {plan.flyerLinkPreview?.title ? (
+                <div className="link-preview-title">{plan.flyerLinkPreview.title}</div>
+              ) : (
+                <div className="link-preview-title">{plan.flyerLinkUrl}</div>
+              )}
+              {plan.flyerLinkPreview?.description && (
+                <div className="link-preview-desc">{plan.flyerLinkPreview.description}</div>
+              )}
+            </div>
+          </a>
         )}
 
         {(plan.myState === "going" || plan.myState === "interested") && (

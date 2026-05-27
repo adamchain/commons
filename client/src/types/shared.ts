@@ -202,6 +202,15 @@ export interface PlanDTO {
   cancelledAt: string | null;
   /** Optional flyer image (data URL). People screenshot flyers — attach one. */
   flyerDataUrl?: string;
+  /** Optional shareable link (event page, ticket page, etc.). */
+  flyerLinkUrl?: string;
+  /** Cached OG-style preview captured at create time. */
+  flyerLinkPreview?: {
+    title?: string;
+    description?: string;
+    image?: string;
+    siteName?: string;
+  };
   suggestions: PlanSuggestionDTO[];
   participants: {
     going: PublicUser[];

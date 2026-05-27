@@ -63,6 +63,13 @@ export function CreatePlanPage() {
     joinType: "open" as JoinType,
     isRecurring: false,
     flyerDataUrl: null as string | null,
+    flyerLinkUrl: "",
+    flyerLinkPreview: null as null | {
+      title?: string;
+      description?: string;
+      image?: string;
+      siteName?: string;
+    },
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,8 +135,8 @@ export function CreatePlanPage() {
       setError("Give your plan a title.");
       return;
     }
-    if (!form.neighborhoodId) {
-      setError("Pick a neighborhood.");
+    if (!form.neighborhoodId && !form.isFlexibleLocation) {
+      setError("Pick a neighborhood or toggle flexible.");
       return;
     }
     if (!form.isFlexibleDate && !form.date) {
@@ -169,6 +176,8 @@ export function CreatePlanPage() {
           joinType: form.joinType,
           isRecurring: form.isRecurring,
           flyerDataUrl: form.flyerDataUrl ?? undefined,
+          flyerLinkUrl: form.flyerLinkUrl.trim() || undefined,
+          flyerLinkPreview: form.flyerLinkPreview ?? undefined,
         }),
       });
       if (invitedIds.size > 0) {
@@ -200,6 +209,49 @@ export function CreatePlanPage() {
     fileToResizedDataUrl(file)
       .then((dataUrl) => setForm((f) => ({ ...f, flyerDataUrl: dataUrl })))
       .catch(() => setError("Couldn't read that image. Try another."));
+  };
+
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const fetchLinkPreview = async (rawUrl: string) => {
+    setLinkError(null);
+    const trimmed = rawUrl.trim();
+    if (!trimmed) {
+      setForm((f) => ({ ...f, flyerLinkUrl: "", flyerLinkPreview: null }));
+      return;
+    }
+    // Tolerate "example.com" without a scheme.
+    const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    setLinkBusy(true);
+    try {
+      const preview = await api<{
+        url: string;
+        title?: string;
+        description?: string;
+        image?: string;
+        siteName?: string;
+      }>("/api/link-preview", {
+        method: "POST",
+        body: JSON.stringify({ url: withScheme }),
+      });
+      setForm((f) => ({
+        ...f,
+        flyerLinkUrl: preview.url,
+        flyerLinkPreview: {
+          title: preview.title,
+          description: preview.description,
+          image: preview.image,
+          siteName: preview.siteName,
+        },
+      }));
+    } catch (err) {
+      setLinkError(err instanceof Error ? err.message : "Couldn't load preview");
+      // Keep the URL string so the user can still post even if the preview
+      // failed (some sites block scrapers).
+      setForm((f) => ({ ...f, flyerLinkUrl: withScheme, flyerLinkPreview: null }));
+    } finally {
+      setLinkBusy(false);
+    }
   };
 
   return (
@@ -447,10 +499,10 @@ export function CreatePlanPage() {
           )}
         </section>
 
-        {/* Flyer upload */}
+        {/* Flyer — image upload OR link with preview */}
         <section className="form-section">
           <label className="form-question">Flyer (optional)</label>
-          <p className="form-help">Got a flyer? Screenshot or upload — it'll show on the card.</p>
+          <p className="form-help">Upload a screenshot or paste a link — it'll show on the card.</p>
           <div className="flyer-uploader">
             {form.flyerDataUrl ? (
               <div className="flyer-preview">
@@ -484,6 +536,46 @@ export function CreatePlanPage() {
               }}
             />
           </div>
+
+          <label className="form-question" htmlFor="flyer-link" style={{ marginTop: 12 }}>
+            Or paste a link
+          </label>
+          <input
+            id="flyer-link"
+            type="url"
+            placeholder="https://…"
+            value={form.flyerLinkUrl}
+            onChange={(e) => setForm((f) => ({ ...f, flyerLinkUrl: e.target.value }))}
+            onBlur={(e) => void fetchLinkPreview(e.target.value)}
+            disabled={linkBusy}
+          />
+          {linkBusy && <p className="form-help">Loading preview…</p>}
+          {linkError && <p className="form-help" style={{ color: "var(--color-danger, #c0392b)" }}>{linkError}</p>}
+          {form.flyerLinkPreview && (
+            <div className="link-preview" style={{ marginTop: 8 }}>
+              {form.flyerLinkPreview.image && (
+                <img src={form.flyerLinkPreview.image} alt="" className="link-preview-image" />
+              )}
+              <div className="link-preview-body">
+                {form.flyerLinkPreview.siteName && (
+                  <div className="link-preview-site">{form.flyerLinkPreview.siteName}</div>
+                )}
+                {form.flyerLinkPreview.title && (
+                  <div className="link-preview-title">{form.flyerLinkPreview.title}</div>
+                )}
+                {form.flyerLinkPreview.description && (
+                  <div className="link-preview-desc">{form.flyerLinkPreview.description}</div>
+                )}
+              </div>
+              <button
+                type="button"
+                className="btn-link"
+                onClick={() => setForm((f) => ({ ...f, flyerLinkUrl: "", flyerLinkPreview: null }))}
+              >
+                Remove
+              </button>
+            </div>
+          )}
         </section>
 
         {inviteUserId && (

@@ -134,6 +134,8 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     lockedAt: plan.lockedAt ?? null,
     cancelledAt: plan.cancelledAt ?? null,
     flyerDataUrl: plan.flyerDataUrl,
+    flyerLinkUrl: plan.flyerLinkUrl,
+    flyerLinkPreview: plan.flyerLinkPreview,
     suggestions,
     participants: {
       going: going.map((p) => pu(p.userId)),
@@ -164,7 +166,20 @@ plansRouter.get("/", requireAuth, async (req, res) => {
   }
   const scope = combinedNeighborhoodScope(me);
   const inHood = scope ? store.listPlansByNeighborhoods(scope) : store.listPlans();
-  const candidates = inHood.filter((p) => planVisibleToViewer(p, me));
+  // Always include the user's own plans and ones they've RSVP'd to, even if
+  // they sit outside their neighborhood scope — otherwise a plan posted to a
+  // different hood (or shared "Your Network" only) disappears from its own
+  // author's feed.
+  const ownPlans = store.listPlansByCreator(me.id);
+  const rsvpPlanIds = new Set(
+    store.listParticipationsForUser(me.id).map((p) => p.planId),
+  );
+  const rsvpPlans = store
+    .listPlans()
+    .filter((p) => rsvpPlanIds.has(p.id));
+  const merged = new Map<string, typeof inHood[number]>();
+  for (const p of [...inHood, ...ownPlans, ...rsvpPlans]) merged.set(p.id, p);
+  const candidates = [...merged.values()].filter((p) => planVisibleToViewer(p, me));
   const ranked = rankPlansForUser(me, candidates);
   const summaries = await Promise.all(ranked.map((plan) => planSummary(plan, userId)));
   res.json(summaries);
@@ -220,23 +235,22 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     visibilityCommunityTag = tagPick as InterestTag;
   }
 
-  if (!title || !dateInput || !neighborhoodId) {
-    res.status(400).json({ error: "Title, date, and neighborhood are required" });
+  if (!title || !dateInput) {
+    res.status(400).json({ error: "Title and date are required" });
     return;
   }
-  if (!isFlexibleLocation && !locationName) {
-    res.status(400).json({ error: "Add a spot or turn on flexible location" });
+  // Neighborhood is required unless the host explicitly toggled flexible. The
+  // form no longer renders a free-text "Where" field — the neighborhood is the
+  // location signal — so we don't enforce locationName here.
+  if (!neighborhoodId && !isFlexibleLocation) {
+    res.status(400).json({ error: "Pick a neighborhood or turn on flexible." });
     return;
   }
-  if (!store.findNeighborhoodById(neighborhoodId)) {
+  if (neighborhoodId && !store.findNeighborhoodById(neighborhoodId)) {
     res.status(400).json({ error: "Unknown neighborhood" });
     return;
   }
-  // "Your Network" visibility ships in V1.5 — accept the value so the toggle
-  // works end-to-end and the field persists, but treat it like everyone-visible
-  // for now (no network ACL exists yet). The real network filter lands with
-  // Track 6 once we seed user networks.
-  const resolvedLocationName = isFlexibleLocation ? (locationName || "Flexible location") : locationName;
+  const resolvedLocationName = locationName || "Flexible location";
   const resolvedAddress = locationAddress || resolvedLocationName;
 
   // Accept communityId from the client now so the field round-trips, but real
@@ -261,6 +275,34 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   const flyerDataUrl =
     rawFlyer.startsWith("data:image/") && rawFlyer.length < 1_600_000 ? rawFlyer : undefined;
 
+  // Optional shareable link. We trust the client-fetched OG preview rather than
+  // re-fetching at create time — the preview endpoint already validated and
+  // sanitized the URL; refetching here would just double the latency.
+  let flyerLinkUrl: string | undefined;
+  let flyerLinkPreview: PlanRecord["flyerLinkPreview"];
+  const rawLink = typeof req.body?.flyerLinkUrl === "string" ? req.body.flyerLinkUrl.trim() : "";
+  if (rawLink) {
+    try {
+      const u = new URL(rawLink);
+      if (u.protocol === "http:" || u.protocol === "https:") {
+        flyerLinkUrl = u.toString().slice(0, 2048);
+      }
+    } catch {
+      /* invalid URL — silently drop */
+    }
+  }
+  if (flyerLinkUrl && req.body?.flyerLinkPreview && typeof req.body.flyerLinkPreview === "object") {
+    const p = req.body.flyerLinkPreview as Record<string, unknown>;
+    const trim = (v: unknown, max: number): string | undefined =>
+      typeof v === "string" && v.trim() ? v.trim().slice(0, max) : undefined;
+    flyerLinkPreview = {
+      title: trim(p.title, 200),
+      description: trim(p.description, 400),
+      image: trim(p.image, 2048),
+      siteName: trim(p.siteName, 100),
+    };
+  }
+
   const plan = store.createPlan({
     creatorId: userId,
     title,
@@ -282,6 +324,8 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     isRecurring,
     lockedAt: null,
     flyerDataUrl,
+    flyerLinkUrl,
+    flyerLinkPreview,
   });
 
   store.upsertParticipation(plan.id, userId, "going");

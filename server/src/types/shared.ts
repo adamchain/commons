@@ -113,6 +113,15 @@ export interface PlanDTO {
   cancelledAt: string | null;
   /** Optional flyer image stored as data URL. */
   flyerDataUrl?: string;
+  /** Optional shareable link (event page, ticket page, etc.). */
+  flyerLinkUrl?: string;
+  /** Cached OG-style preview captured at create time. */
+  flyerLinkPreview?: {
+    title?: string;
+    description?: string;
+    image?: string;
+    siteName?: string;
+  };
   /** Inline replies on “looking for” plans (feed + detail). */
   suggestions: PlanSuggestionDTO[];
   participants: {

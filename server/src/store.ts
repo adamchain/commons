@@ -100,6 +100,15 @@ export interface PlanRecord {
   seriesId?: string | null;
   lockedAt?: string | null;
   flyerDataUrl?: string;
+  /** Optional shareable link the host attached (event page, ticket page, etc.). */
+  flyerLinkUrl?: string;
+  /** Cached OG-style preview of `flyerLinkUrl` captured at create time. */
+  flyerLinkPreview?: {
+    title?: string;
+    description?: string;
+    image?: string;
+    siteName?: string;
+  };
   /** ISO timestamp when the host cancelled this plan. Null/absent = active. */
   cancelledAt?: string | null;
   createdAt: string;
