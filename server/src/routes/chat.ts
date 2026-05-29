@@ -4,9 +4,70 @@ import { store } from "../store.js";
 import { findUserById, findUsersByIds } from "../userRepo.js";
 import { userToPublic } from "./plans.js";
 import { emit } from "../lib/notify.js";
-import type { ConversationDTO, MessageDTO } from "../types/shared.js";
+import type { ConversationDTO, ConversationSummaryDTO, MessageDTO } from "../types/shared.js";
 
 export const chatRouter = Router();
+
+// GET /api/conversations — unified inbox: group chats for every plan the user
+// is hosting / going to / interested in. Upcoming plans always show; past plans
+// only show once there's been real (non-system) chatter.
+chatRouter.get("/conversations", requireAuth, (req, res) => {
+  const userId = String(req.userId);
+  const todayIso = new Date().toISOString().slice(0, 10);
+
+  // role per accessible plan — hosting wins over participation.
+  const roleByPlan = new Map<string, ConversationSummaryDTO["myRole"]>();
+  for (const plan of store.listPlans()) {
+    if (plan.creatorId === userId && !plan.cancelledAt) roleByPlan.set(plan.id, "hosting");
+  }
+  for (const part of store.listParticipationsForUser(userId)) {
+    if (roleByPlan.has(part.planId)) continue;
+    if (part.state !== "going" && part.state !== "interested") continue;
+    const plan = store.findPlanById(part.planId);
+    if (plan && !plan.cancelledAt) roleByPlan.set(part.planId, part.state);
+  }
+
+  const summaries: ConversationSummaryDTO[] = [];
+  for (const [planId, myRole] of roleByPlan) {
+    const plan = store.findPlanById(planId);
+    if (!plan) continue;
+    const conv = store.findGroupConversationByPlan(planId);
+    const msgs = conv ? store.listMessagesForConversation(conv.id) : [];
+    const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
+    const hasRealChatter = msgs.some((m) => m.kind !== "system");
+    const isUpcoming = (plan.date ?? "") >= todayIso;
+    if (!isUpcoming && !hasRealChatter) continue;
+
+    const participantCount =
+      store
+        .listParticipationsForPlan(planId)
+        .filter((p) => (p.state === "going" || p.state === "interested") && p.userId !== plan.creatorId)
+        .length + 1;
+
+    summaries.push({
+      planId,
+      planTitle: plan.title,
+      hostEmoji: plan.hostEmoji,
+      planDate: plan.date,
+      conversationId: conv?.id ?? null,
+      lastMessageAt: conv && msgs.length ? conv.lastMessageAt : null,
+      lastMessagePreview: lastMsg ? truncate(lastMsg.body, 80) : null,
+      unreadCount: conv ? msgs.filter((m) => !m.readBy.includes(userId)).length : 0,
+      participantCount,
+      myRole,
+    });
+  }
+
+  // Most recent chatter first; then upcoming-but-quiet plans by date.
+  summaries.sort((a, b) => {
+    if (a.lastMessageAt && b.lastMessageAt) return a.lastMessageAt < b.lastMessageAt ? 1 : -1;
+    if (a.lastMessageAt) return -1;
+    if (b.lastMessageAt) return 1;
+    return a.planDate < b.planDate ? -1 : 1;
+  });
+
+  res.json(summaries);
+});
 
 function canAccessPlanGroupChat(planId: string, userId: string): boolean {
   const plan = store.findPlanById(planId);

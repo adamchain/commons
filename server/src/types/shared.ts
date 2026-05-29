@@ -147,6 +147,22 @@ export interface ConversationDTO {
   unreadCount: number;
 }
 
+/** A row in the unified Messages inbox — one per accessible plan group chat. */
+export interface ConversationSummaryDTO {
+  planId: string;
+  planTitle: string;
+  hostEmoji: string;
+  planDate: string;
+  /** Null when no one has opened the plan's chat yet. */
+  conversationId: string | null;
+  lastMessageAt: string | null;
+  lastMessagePreview: string | null;
+  unreadCount: number;
+  /** Host + everyone going/interested who could be in the thread. */
+  participantCount: number;
+  myRole: "hosting" | "going" | "interested";
+}
+
 export interface MessageDTO {
   id: string;
   conversationId: string;

@@ -18,6 +18,7 @@ import { ProfilePage } from "./pages/Profile";
 import { NetworkPage } from "./pages/Network";
 import { InvitePage } from "./pages/Invite";
 import { SettingsPage } from "./pages/Settings";
+import { MessagesPage } from "./pages/Messages";
 
 const APP_BOOT_AT = Date.now();
 const MIN_BOOT_SPLASH_MS = 1500;
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="/" element={<Protected><FeedPage /></Protected>} />
         <Route path="/explore" element={<Protected><ExplorePage /></Protected>} />
         <Route path="/notifications" element={<Protected><NotificationsPage /></Protected>} />
+        <Route path="/messages" element={<Protected><MessagesPage /></Protected>} />
         <Route path="/plans/new" element={<Protected><CreatePlanPage /></Protected>} />
         <Route path="/plans/:id/edit" element={<Protected><EditPlanPage /></Protected>} />
         <Route path="/plans/:id" element={<Protected><PlanDetailPage /></Protected>} />
