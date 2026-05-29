@@ -1,13 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/http";
-import { LoadingScreen } from "../components/LoadingScreen";
-import { PlanCard } from "../components/PlanCard";
 import { useAuth } from "../context/AuthContext";
 import { formatPlaceAddress } from "../lib/format";
-import type { PlanDTO } from "../types/shared";
-
-type Mode = "nearby" | "similar" | "both";
+import type { NeighborhoodDTO } from "../types/shared";
 
 interface PlaceResult {
   placeId: string;
@@ -18,135 +14,235 @@ interface PlaceResult {
   photoRef?: string;
   rating?: number;
   ratings?: number;
+  openNow?: boolean;
 }
+
+interface Coords {
+  lat: number;
+  lng: number;
+}
+
+// Google place types behind each browse chip. "" = everything nearby.
+const CATEGORIES: Array<{ type: string; label: string }> = [
+  { type: "", label: "All" },
+  { type: "cafe", label: "Coffee" },
+  { type: "restaurant", label: "Food" },
+  { type: "bar", label: "Drinks" },
+  { type: "gym", label: "Fitness" },
+  { type: "park", label: "Parks" },
+  { type: "tourist_attraction", label: "Culture" },
+];
 
 export function ExplorePage() {
   const { user } = useAuth();
-  const [plans, setPlans] = useState<PlanDTO[] | null>(null);
-  const [mode] = useState<Mode>("both");
-  const [locationQuery, setLocationQuery] = useState("");
-  const [places, setPlaces] = useState<PlaceResult[]>([]);
-  const [placesLoading, setPlacesLoading] = useState(false);
+
+  // Where "near me" is anchored: real GPS if granted, else the user's
+  // neighborhood center. Null while we're still figuring it out.
+  const [coords, setCoords] = useState<Coords | null>(null);
+  const [locating, setLocating] = useState(true);
+
+  const [category, setCategory] = useState("");
+  const [nearby, setNearby] = useState<PlaceResult[] | null>(null);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<PlaceResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    void api<PlanDTO[]>("/api/plans").then(setPlans).catch(() => setPlans([]));
-  }, []);
+  const searching = query.trim().length >= 2;
 
+  // Resolve a location once: try the browser, fall back to the neighborhood
+  // center from onboarding so the page still works without GPS permission.
+  useEffect(() => {
+    let cancelled = false;
+    const useNeighborhood = async () => {
+      try {
+        const hoods = await api<NeighborhoodDTO[]>("/api/neighborhoods");
+        const ids = user?.neighborhoodIds ?? (user?.neighborhoodId ? [user.neighborhoodId] : []);
+        const mine = hoods.find((h) => ids.includes(h.id) && h.lat != null && h.lng != null);
+        const any = mine ?? hoods.find((h) => h.lat != null && h.lng != null);
+        if (!cancelled && any?.lat != null && any?.lng != null) {
+          setCoords({ lat: any.lat, lng: any.lng });
+        }
+      } catch {
+        /* leave coords null — UI handles the no-location case */
+      } finally {
+        if (!cancelled) setLocating(false);
+      }
+    };
+
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (cancelled) return;
+          setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          setLocating(false);
+        },
+        () => void useNeighborhood(),
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 },
+      );
+    } else {
+      void useNeighborhood();
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  // Default "near you" list — refreshes when the location or category changes.
+  useEffect(() => {
+    if (!coords) return;
+    let cancelled = false;
+    const params = new URLSearchParams({ lat: String(coords.lat), lng: String(coords.lng) });
+    if (category) params.set("type", category);
+    setNearbyLoading(true);
+    void api<{ results: PlaceResult[] }>(`/api/places/nearby?${params.toString()}`)
+      .then((r) => {
+        if (!cancelled) setNearby(r.results);
+      })
+      .catch(() => {
+        if (!cancelled) setNearby([]);
+      })
+      .finally(() => {
+        if (!cancelled) setNearbyLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [coords, category]);
+
+  // Free-text venue search (existing Places text-search endpoint).
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    const q = locationQuery.trim();
+    const q = query.trim();
     if (q.length < 2) {
-      setPlaces([]);
+      setResults([]);
       return;
     }
     debounceRef.current = setTimeout(() => {
-      setPlacesLoading(true);
+      setSearchLoading(true);
       void api<{ results: PlaceResult[] }>(`/api/places/search?q=${encodeURIComponent(q)}`)
-        .then((r) => setPlaces(r.results))
-        .catch(() => setPlaces([]))
-        .finally(() => setPlacesLoading(false));
+        .then((r) => setResults(r.results))
+        .catch(() => setResults([]))
+        .finally(() => setSearchLoading(false));
     }, 350);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [locationQuery]);
-
-  const myHoodIds = useMemo(
-    () => user?.neighborhoodIds ?? (user?.neighborhoodId ? [user.neighborhoodId] : []),
-    [user],
-  );
-  const myInterests = useMemo(() => new Set(user?.interests ?? []), [user]);
-
-  const filtered = useMemo(() => {
-    if (!plans) return [];
-    return plans.filter((p) => {
-      const isNearby = myHoodIds.includes(p.neighborhoodId);
-      const isSimilar = p.tags.some((t) => myInterests.has(t));
-      if (mode === "nearby") return isNearby;
-      if (mode === "similar") return isSimilar;
-      return isNearby || isSimilar;
-    });
-  }, [plans, mode, myHoodIds, myInterests]);
-
-  if (plans === null) return <LoadingScreen tagline="Exploring" />;
+  }, [query]);
 
   return (
     <main className="app-shell app-shell--wide app-shell--with-nav app-shell--with-topbar">
-      <h1 className="brand" style={{ marginBottom: 14 }}>Explore</h1>
+      <h1 className="brand" style={{ marginBottom: 4 }}>Explore</h1>
+      <p className="form-help" style={{ marginTop: 0, marginBottom: 14 }}>
+        Spots and communities near you — see what's around, then make a plan there.
+      </p>
 
       <div className="explore-search">
         <SearchIcon />
         <input
           type="search"
-          placeholder="Find a run club, book club, or neighborhood crew"
-          value={locationQuery}
-          onChange={(e) => setLocationQuery(e.target.value)}
+          placeholder="Search a café, bar, gym, or park"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
         />
-        {locationQuery && (
-          <button type="button" className="explore-search-clear" onClick={() => setLocationQuery("")}>
+        {query && (
+          <button type="button" className="explore-search-clear" onClick={() => setQuery("")}>
             ×
           </button>
         )}
       </div>
 
-      {locationQuery.trim().length >= 2 && (
+      {searching ? (
         <section className="explore-places">
-          <h2 className="section-title">Spots</h2>
-          {placesLoading && places.length === 0 && (
-            <p className="form-help">Looking…</p>
-          )}
-          {!placesLoading && places.length === 0 && (
+          <h2 className="section-title">Search results</h2>
+          {searchLoading && results.length === 0 && <p className="form-help">Looking…</p>}
+          {!searchLoading && results.length === 0 && (
             <p className="form-help">No spots found — try another search.</p>
           )}
-          <div className="explore-places-grid">
-            {places.map((p) => {
-              const search = new URLSearchParams();
-              search.set("name", p.name);
-              if (p.address) search.set("address", p.address);
-              return (
-                <Link key={p.placeId} to={`/plans/new?${search.toString()}`} className="explore-place-tile">
-                  <div className="explore-place-photo">
-                    {p.photoRef ? (
-                      <img src={`/api/places/photo?ref=${encodeURIComponent(p.photoRef)}&w=400`} alt="" />
-                    ) : (
-                      <div className="explore-place-photo-fallback">📍</div>
-                    )}
-                  </div>
-                  <div className="explore-place-body">
-                    <div className="explore-place-name">{p.name}</div>
-                    <div className="explore-place-address">{formatPlaceAddress(p.address)}</div>
-                    {p.rating && (
-                      <div className="explore-place-rating">
-                        ★ {p.rating.toFixed(1)}
-                        {p.ratings ? ` · ${p.ratings}` : ""}
-                      </div>
-                    )}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+          <PlaceGrid places={results} />
         </section>
-      )}
-
-      {filtered.length === 0 ? (
-        <div className="empty-state empty-state-feed">
-          <p style={{ margin: 0 }}>Nothing here yet — try another filter or post the first one.</p>
-          <Link to="/plans/new" className="btn-primary" style={{ marginTop: 16, display: "inline-block" }}>
-            Post a plan
-          </Link>
-        </div>
       ) : (
-        <div className="plan-grid">
-          {filtered.map((plan) => (
-            <PlanCard key={plan.id} plan={plan} />
-          ))}
-        </div>
+        <section className="explore-places">
+          <div className="explore-cats" role="tablist" aria-label="Browse nearby by category">
+            {CATEGORIES.map((c) => (
+              <button
+                key={c.type || "all"}
+                type="button"
+                role="tab"
+                aria-selected={category === c.type}
+                className={`explore-cat-chip ${category === c.type ? "is-active" : ""}`}
+                onClick={() => setCategory(c.type)}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+
+          <h2 className="section-title">Near you</h2>
+
+          {locating || (nearby === null && coords) ? (
+            <p className="form-help">Finding what's around you…</p>
+          ) : !coords ? (
+            <p className="form-help">
+              Turn on location to see places near you — or search for a spot above.
+            </p>
+          ) : nearbyLoading && (nearby?.length ?? 0) === 0 ? (
+            <p className="form-help">Finding what's around you…</p>
+          ) : (nearby?.length ?? 0) === 0 ? (
+            <p className="form-help">Nothing nearby in this category — try another.</p>
+          ) : (
+            <PlaceGrid places={nearby ?? []} />
+          )}
+        </section>
       )}
 
       <CommunitiesPreview />
     </main>
+  );
+}
+
+function PlaceGrid({ places }: { places: PlaceResult[] }) {
+  return (
+    <div className="explore-places-grid">
+      {places.map((p) => {
+        const search = new URLSearchParams();
+        search.set("name", p.name);
+        if (p.address) search.set("address", p.address);
+        return (
+          <Link
+            key={p.placeId}
+            to={`/plans/new?${search.toString()}`}
+            className="explore-place-tile"
+          >
+            <div className="explore-place-photo">
+              {p.photoRef ? (
+                <img
+                  src={`/api/places/photo?ref=${encodeURIComponent(p.photoRef)}&w=400`}
+                  alt=""
+                />
+              ) : (
+                <div className="explore-place-photo-fallback">📍</div>
+              )}
+            </div>
+            <div className="explore-place-body">
+              <div className="explore-place-name">{p.name}</div>
+              <div className="explore-place-address">{formatPlaceAddress(p.address)}</div>
+              <div className="explore-place-meta">
+                {p.rating ? (
+                  <span className="explore-place-rating">
+                    ★ {p.rating.toFixed(1)}
+                    {p.ratings ? ` · ${p.ratings}` : ""}
+                  </span>
+                ) : null}
+                {p.openNow ? <span className="explore-place-open">Open now</span> : null}
+              </div>
+            </div>
+          </Link>
+        );
+      })}
+    </div>
   );
 }
 

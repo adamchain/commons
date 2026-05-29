@@ -110,6 +110,82 @@ placesRouter.get("/search", requireAuth, async (req, res) => {
   }
 });
 
+/** Google place types we allow as Explore category filters. */
+const NEARBY_TYPES = new Set([
+  "cafe",
+  "restaurant",
+  "bar",
+  "gym",
+  "park",
+  "tourist_attraction",
+]);
+
+/**
+ * Nearby Search — powers Explore's default "near you" list (no search term
+ * needed). Returns the same shape as /search so the place tiles are reused.
+ */
+placesRouter.get("/nearby", requireAuth, async (req, res) => {
+  const key = googleKey();
+  if (!key) {
+    res.status(503).json({ error: "Places API not configured", results: [] });
+    return;
+  }
+  const lat = Number(req.query.lat);
+  const lng = Number(req.query.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    res.status(400).json({ error: "lat and lng required", results: [] });
+    return;
+  }
+  const radius = Math.min(5000, Math.max(250, Number(req.query.radius ?? 1500) || 1500));
+  const typeParam = String(req.query.type ?? "").trim();
+  const type = NEARBY_TYPES.has(typeParam) ? typeParam : "";
+  const keyword = String(req.query.q ?? "").trim();
+
+  const url = new URL("https://maps.googleapis.com/maps/api/place/nearbysearch/json");
+  url.searchParams.set("location", `${lat},${lng}`);
+  url.searchParams.set("radius", String(radius));
+  if (type) url.searchParams.set("type", type);
+  if (keyword) url.searchParams.set("keyword", keyword);
+  url.searchParams.set("key", key);
+  try {
+    const r = await fetch(url);
+    const data = (await r.json()) as {
+      results?: Array<{
+        place_id: string;
+        name: string;
+        vicinity?: string;
+        formatted_address?: string;
+        geometry?: { location?: { lat: number; lng: number } };
+        photos?: Array<{ photo_reference: string }>;
+        rating?: number;
+        user_ratings_total?: number;
+        opening_hours?: { open_now?: boolean };
+      }>;
+      status: string;
+    };
+    if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+      console.error("[places] nearby", data.status);
+      res.status(502).json({ error: "Nearby lookup failed", results: [] });
+      return;
+    }
+    const results = (data.results ?? []).slice(0, 20).map((r) => ({
+      placeId: r.place_id,
+      name: r.name,
+      address: r.vicinity ?? r.formatted_address ?? "",
+      lat: r.geometry?.location?.lat,
+      lng: r.geometry?.location?.lng,
+      photoRef: r.photos?.[0]?.photo_reference,
+      rating: r.rating,
+      ratings: r.user_ratings_total,
+      openNow: r.opening_hours?.open_now,
+    }));
+    res.json({ results });
+  } catch (e) {
+    console.error("[places] nearby fetch", e);
+    res.status(502).json({ error: "Nearby lookup failed", results: [] });
+  }
+});
+
 /** Proxy a Places Photo so the API key never leaves the server. */
 placesRouter.get("/photo", requireAuth, async (req, res) => {
   const key = googleKey();

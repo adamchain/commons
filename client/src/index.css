@@ -4234,6 +4234,49 @@ label {
   cursor: pointer;
 }
 
+.explore-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.explore-cat-chip {
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.explore-cat-chip:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.explore-cat-chip.is-active {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: transparent;
+}
+
+.explore-place-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.explore-place-open {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
 .explore-places {
   margin-bottom: 24px;
 }
