@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useAuth } from "./context/AuthContext";
 import { LoginPage } from "./pages/Login";
 import { FeedPage } from "./pages/Feed";
+import { ExplorePage } from "./pages/Explore";
 import { CreatePlanPage } from "./pages/CreatePlan";
 import { PlanDetailPage } from "./pages/PlanDetail";
 import { LoadingScreen } from "./components/LoadingScreen";
@@ -23,6 +24,14 @@ export default function App() {
         element={
           <Protected>
             <FeedPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/explore"
+        element={
+          <Protected>
+            <ExplorePage />
           </Protected>
         }
       />

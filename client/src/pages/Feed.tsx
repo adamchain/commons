@@ -37,6 +37,9 @@ export function FeedPage() {
           <p className="brand-tagline">Plans, made together</p>
         </div>
         <div className="app-header-actions">
+          <Link to="/explore" className="app-nav-link">
+            Explore nearby
+          </Link>
           <Link to="/plans/new" className="app-header-cta">
             + Make a plan
           </Link>

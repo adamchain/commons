@@ -6,7 +6,8 @@ import cors from "cors";
 import express from "express";
 import { authRouter } from "./routes/auth.js";
 import { plansRouter } from "./routes/plans.js";
-import { seedIfEmpty } from "./seed.js";
+import { exploreRouter } from "./routes/explore.js";
+import { seedCommunitiesIfEmpty, seedIfEmpty } from "./seed.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -28,6 +29,7 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/plans", plansRouter);
+app.use("/api/explore", exploreRouter);
 
 if (isProduction) {
   const here = path.dirname(fileURLToPath(import.meta.url));
@@ -40,6 +42,7 @@ if (isProduction) {
 }
 
 seedIfEmpty();
+seedCommunitiesIfEmpty();
 
 app.listen(port, () => {
   console.log(`Commons API listening on http://localhost:${port}`);

@@ -27,6 +27,16 @@ export function formatPlanTime(time: string, isFlexible: boolean): string {
   return `${hour12}:${mStr.padStart(2, "0")} ${ampm}`;
 }
 
+export function formatDistance(km: number | null): string | null {
+  if (km === null || Number.isNaN(km)) return null;
+  if (km < 1) {
+    const meters = Math.round(km * 1000);
+    const rounded = meters < 100 ? Math.max(10, Math.round(meters / 10) * 10) : Math.round(meters / 50) * 50;
+    return `${rounded} m away`;
+  }
+  return `${km.toFixed(km < 10 ? 1 : 0)} km away`;
+}
+
 export function formatRelative(iso: string): string {
   const then = new Date(iso).getTime();
   const seconds = Math.max(0, Math.round((Date.now() - then) / 1000));

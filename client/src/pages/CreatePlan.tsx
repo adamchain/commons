@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LocationAutocomplete } from "../components/LocationAutocomplete";
@@ -15,11 +15,18 @@ const today = (): string => {
   return `${d.getFullYear()}-${month}-${day}`;
 };
 
+interface PrefillState {
+  location?: { name?: string; address?: string };
+}
+
 export function CreatePlanPage() {
+  const location = useLocation();
+  // Prefilled when arriving from an Explore venue's "Plan something here".
+  const prefill = (location.state as PrefillState | null)?.location;
   const [form, setForm] = useState({
     title: "",
-    locationName: "",
-    locationAddress: "",
+    locationName: prefill?.name ?? "",
+    locationAddress: prefill?.address ?? prefill?.name ?? "",
     date: today(),
     time: "19:00",
     isFlexibleTime: false,

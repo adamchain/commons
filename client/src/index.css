@@ -1505,3 +1505,214 @@ label {
     animation: none;
   }
 }
+
+/* ---------- Explore page ---------- */
+
+.app-nav-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.app-nav-link:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.btn-sm {
+  padding: 9px 14px;
+  font-size: 13px;
+  border-radius: 10px;
+}
+
+.explore-location-note {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0 0 18px;
+}
+
+.explore-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  margin-bottom: 16px;
+}
+
+.explore-tab {
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-muted);
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.explore-tab.is-active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-card);
+}
+
+.explore-search {
+  width: 100%;
+  margin-bottom: 14px;
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.filter-chip:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.filter-chip.is-active {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: transparent;
+}
+
+/* Place / community cards — deliberately distinct from plan cards:
+   no date or time, no RSVP. They describe a spot or group, not an event. */
+
+.place-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  box-shadow: var(--shadow-card);
+  transition: transform 120ms ease, border-color 120ms ease;
+  height: 100%;
+}
+
+.place-card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+}
+
+.place-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.place-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+.place-card-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.place-card-title {
+  font-size: 17px;
+  font-weight: 800;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.place-card-kind {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.distance-pill {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.place-card-blurb,
+.place-card-address,
+.place-card-hours {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.place-card-address,
+.place-card-hours {
+  font-size: 13px;
+  color: var(--text-subtle);
+}
+
+.place-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.place-card-maplink {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.place-card-maplink:hover {
+  color: var(--accent);
+}
+
+.community-meta {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.place-card .place-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 6px;
+  gap: 12px;
+}

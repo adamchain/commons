@@ -1,5 +1,5 @@
 import { store } from "./store.js";
-import type { PlanTag } from "./types/shared.js";
+import type { CommunityCategory, PlanTag } from "./types/shared.js";
 
 interface SeedUser {
   email: string;
@@ -119,6 +119,113 @@ const SEED_PLANS: SeedPlan[] = [
   },
 ];
 
+interface SeedCommunity {
+  name: string;
+  category: CommunityCategory;
+  neighborhood: string;
+  blurb: string;
+  cadence: string;
+  memberCount: number;
+  tags: string[];
+  link?: string;
+  lat: number;
+  lng: number;
+}
+
+// Curated local communities. These don't exist in OpenStreetMap, so unlike
+// venues (fetched live on the client) they live in the store. Coordinates are
+// real Philadelphia neighborhoods so distance sorting behaves sensibly.
+const SEED_COMMUNITIES: SeedCommunity[] = [
+  {
+    name: "Schuylkill Sunrise Runners",
+    category: "running",
+    neighborhood: "Fairmount",
+    blurb: "No-drop social runs along Boathouse Row. All paces welcome, coffee after.",
+    cadence: "Tue & Sat mornings",
+    memberCount: 240,
+    tags: ["beginner-friendly", "5k", "free"],
+    lat: 39.9684,
+    lng: -75.1814,
+  },
+  {
+    name: "South Philly Cyclists",
+    category: "cycling",
+    neighborhood: "East Passyunk",
+    blurb: "Weekend group rides and casual bike maintenance nights. Helmets, not egos.",
+    cadence: "Weekly",
+    memberCount: 410,
+    tags: ["road", "casual", "maintenance"],
+    lat: 39.9265,
+    lng: -75.1659,
+  },
+  {
+    name: "Rittenhouse Reads",
+    category: "books",
+    neighborhood: "Rittenhouse",
+    blurb: "A friendly book club rotating between fiction and narrative non-fiction.",
+    cadence: "Monthly",
+    memberCount: 86,
+    tags: ["fiction", "discussion", "wine"],
+    lat: 39.9495,
+    lng: -75.1718,
+  },
+  {
+    name: "Fishtown Coffee Society",
+    category: "coffee",
+    neighborhood: "Fishtown",
+    blurb: "Cafe crawls and home-brew tastings for people who take their pour-over seriously.",
+    cadence: "Every other week",
+    memberCount: 158,
+    tags: ["pour-over", "cafe-crawl", "tastings"],
+    lat: 39.9712,
+    lng: -75.1342,
+  },
+  {
+    name: "Old City Sketch Club",
+    category: "art",
+    neighborhood: "Old City",
+    blurb: "Bring a sketchbook — we draw at galleries, parks, and the occasional dive bar.",
+    cadence: "Weekly",
+    memberCount: 132,
+    tags: ["drawing", "all-levels", "social"],
+    lat: 39.9505,
+    lng: -75.1438,
+  },
+  {
+    name: "West Philly Vinyl Heads",
+    category: "music",
+    neighborhood: "University City",
+    blurb: "Record swaps and listening nights spanning jazz, soul, and everything dusty.",
+    cadence: "Monthly",
+    memberCount: 204,
+    tags: ["vinyl", "listening-party", "swap"],
+    lat: 39.9522,
+    lng: -75.2024,
+  },
+  {
+    name: "Italian Market Supper Club",
+    category: "food",
+    neighborhood: "Bella Vista",
+    blurb: "Shop the market together, then cook a shared meal. Skill optional, appetite required.",
+    cadence: "Monthly",
+    memberCount: 97,
+    tags: ["cooking", "potluck", "market"],
+    lat: 39.9357,
+    lng: -75.1587,
+  },
+  {
+    name: "Northern Liberties Newcomers",
+    category: "social",
+    neighborhood: "Northern Liberties",
+    blurb: "New to the city? Low-key hangs, trivia nights, and patio meetups to find your people.",
+    cadence: "Weekly",
+    memberCount: 312,
+    tags: ["new-in-town", "meetup", "casual"],
+    lat: 39.9637,
+    lng: -75.1419,
+  },
+];
+
 function dateForOffset(days: number): string {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -129,6 +236,26 @@ function dateForOffset(days: number): string {
 function isoMinutesAgo(minutes: number): string {
   const d = new Date(Date.now() - minutes * 60 * 1000);
   return d.toISOString();
+}
+
+// Communities seed independently of plans/users so the Explore page is
+// populated even on data files created before this feature existed.
+export function seedCommunitiesIfEmpty(): void {
+  if (!store.communitiesEmpty()) return;
+  for (const seed of SEED_COMMUNITIES) {
+    store.addCommunity({
+      name: seed.name,
+      category: seed.category,
+      neighborhood: seed.neighborhood,
+      blurb: seed.blurb,
+      cadence: seed.cadence,
+      memberCount: seed.memberCount,
+      tags: seed.tags,
+      link: seed.link,
+      lat: seed.lat,
+      lng: seed.lng,
+    });
+  }
 }
 
 export function seedIfEmpty(): void {

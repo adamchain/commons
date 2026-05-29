@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import type { ParticipationState, PlanTag } from "./types/shared.js";
+import type { CommunityCategory, ParticipationState, PlanTag } from "./types/shared.js";
 
 export interface UserRecord {
   id: string;
@@ -39,6 +39,21 @@ export interface CommentRecord {
   createdAt: string;
 }
 
+export interface CommunityRecord {
+  id: string;
+  name: string;
+  category: CommunityCategory;
+  neighborhood: string;
+  blurb: string;
+  cadence: string;
+  memberCount: number;
+  tags: string[];
+  link?: string;
+  lat: number;
+  lng: number;
+  createdAt: string;
+}
+
 export interface LogRecord {
   id: string;
   event: string;
@@ -51,13 +66,14 @@ interface Snapshot {
   plans: PlanRecord[];
   participations: ParticipationRecord[];
   comments: CommentRecord[];
+  communities: CommunityRecord[];
   logs: LogRecord[];
 }
 
 const DATA_PATH = resolve(process.cwd(), "data.json");
 
 function emptySnapshot(): Snapshot {
-  return { users: [], plans: [], participations: [], comments: [], logs: [] };
+  return { users: [], plans: [], participations: [], comments: [], communities: [], logs: [] };
 }
 
 function load(): Snapshot {
@@ -70,6 +86,7 @@ function load(): Snapshot {
       plans: parsed.plans ?? [],
       participations: parsed.participations ?? [],
       comments: parsed.comments ?? [],
+      communities: parsed.communities ?? [],
       logs: parsed.logs ?? [],
     };
   } catch {
@@ -188,6 +205,24 @@ export const store = {
     snapshot.comments.push(comment);
     persist();
     return comment;
+  },
+
+  // Communities (curated nearby groups for the Explore page)
+  communitiesEmpty(): boolean {
+    return snapshot.communities.length === 0;
+  },
+  listCommunities(): CommunityRecord[] {
+    return [...snapshot.communities];
+  },
+  addCommunity(input: Omit<CommunityRecord, "id" | "createdAt">): CommunityRecord {
+    const community: CommunityRecord = {
+      id: randomUUID(),
+      ...input,
+      createdAt: new Date().toISOString(),
+    };
+    snapshot.communities.push(community);
+    persist();
+    return community;
   },
 
   // Logs
