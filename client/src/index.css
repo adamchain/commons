@@ -1458,7 +1458,7 @@ label {
   top: 100%;
   left: 0;
   right: 0;
-  z-index: 30;
+  z-index: 60;
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: var(--r-md);

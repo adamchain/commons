@@ -774,6 +774,7 @@ function PlacePicker({
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [errored, setErrored] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blurRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Seed true when a venue is already filled (e.g. prefilled from Explore) so
@@ -794,9 +795,13 @@ function PlacePicker({
     }
     debounceRef.current = setTimeout(() => {
       setLoading(true);
+      setErrored(false);
       void api<{ results: PlaceHit[] }>(`/api/places/search?q=${encodeURIComponent(q)}`)
-        .then((r) => setResults(r.results))
-        .catch(() => setResults([]))
+        .then((r) => setResults(r.results ?? []))
+        .catch(() => {
+          setResults([]);
+          setErrored(true);
+        })
         .finally(() => {
           setLoading(false);
           setSearched(true);
@@ -861,7 +866,12 @@ function PlacePicker({
       {showDropdown && (
         <ul className="place-picker-results" role="listbox">
           {loading && results.length === 0 && <li className="place-picker-empty">Searching…</li>}
-          {!loading && searched && results.length === 0 && (
+          {!loading && errored && (
+            <li className="place-picker-empty">
+              Venue search is unavailable — we'll use "{value.trim()}" as the venue.
+            </li>
+          )}
+          {!loading && !errored && searched && results.length === 0 && (
             <li className="place-picker-empty">No matches — we'll use "{value.trim()}" as the venue.</li>
           )}
           {results.map((p) => (
