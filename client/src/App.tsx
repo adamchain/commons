@@ -15,6 +15,9 @@ import { OnboardingPage } from "./pages/Onboarding";
 import { PlanDetailPage } from "./pages/PlanDetail";
 import { AdminPage } from "./pages/Admin";
 import { ProfilePage } from "./pages/Profile";
+import { NetworkPage } from "./pages/Network";
+import { InvitePage } from "./pages/Invite";
+import { SettingsPage } from "./pages/Settings";
 
 const APP_BOOT_AT = Date.now();
 const MIN_BOOT_SPLASH_MS = 1500;
@@ -58,6 +61,9 @@ export default function App() {
         <Route path="/plans/:id/edit" element={<Protected><EditPlanPage /></Protected>} />
         <Route path="/plans/:id" element={<Protected><PlanDetailPage /></Protected>} />
         <Route path="/plans/:planId/chat" element={<Protected><ChatPage /></Protected>} />
+        <Route path="/network" element={<Protected><NetworkPage /></Protected>} />
+        <Route path="/invite" element={<Protected><InvitePage /></Protected>} />
+        <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />
         {/* Profile is reachable even before onboarding completes — users can review/edit themselves. */}
         <Route path="/profile/:userId" element={<Protected allowIncomplete><ProfilePage /></Protected>} />
       </Routes>

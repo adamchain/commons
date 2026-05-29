@@ -2288,6 +2288,53 @@ label {
   margin-top: 24px;
 }
 
+/* ----- Profile nav menu (links to network / invite / settings) ----- */
+.profile-menu {
+  margin-top: 24px;
+  display: grid;
+  gap: 8px;
+}
+.profile-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--text);
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+.profile-menu-row:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+.profile-menu-icon {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.profile-menu-text {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.profile-menu-label {
+  font-weight: 600;
+  font-size: 15px;
+}
+.profile-menu-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.profile-menu-chevron {
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
 .profile-interests {
   display: flex;
   gap: 8px;
