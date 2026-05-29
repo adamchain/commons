@@ -357,7 +357,14 @@ export function CreatePlanPage() {
           <label className="form-question">When</label>
           <div className="form-when-grid">
             <div className="form-when-cell">
-              <span className="form-sublabel">Date</span>
+              <div className="form-when-head">
+                <span className="form-sublabel">Date</span>
+                <FlexToggle
+                  active={form.isFlexibleDate}
+                  onClick={() => setForm((f) => ({ ...f, isFlexibleDate: !f.isFlexibleDate }))}
+                  label="Flexible"
+                />
+              </div>
               {!form.isFlexibleDate ? (
                 <input
                   id="date"
@@ -368,14 +375,16 @@ export function CreatePlanPage() {
               ) : (
                 <div className="form-flex-placeholder">Flexible day</div>
               )}
-              <FlexToggle
-                active={form.isFlexibleDate}
-                onClick={() => setForm((f) => ({ ...f, isFlexibleDate: !f.isFlexibleDate }))}
-                label="Flexible"
-              />
             </div>
             <div className="form-when-cell">
-              <span className="form-sublabel">Time</span>
+              <div className="form-when-head">
+                <span className="form-sublabel">Time</span>
+                <FlexToggle
+                  active={form.isFlexibleTime}
+                  onClick={() => setForm((f) => ({ ...f, isFlexibleTime: !f.isFlexibleTime }))}
+                  label="Flexible"
+                />
+              </div>
               {!form.isFlexibleTime ? (
                 <input
                   id="time"
@@ -386,11 +395,6 @@ export function CreatePlanPage() {
               ) : (
                 <div className="form-flex-placeholder">Flexible time</div>
               )}
-              <FlexToggle
-                active={form.isFlexibleTime}
-                onClick={() => setForm((f) => ({ ...f, isFlexibleTime: !f.isFlexibleTime }))}
-                label="Flexible"
-              />
             </div>
           </div>
         </section>
@@ -767,9 +771,11 @@ function PlacePicker({
   onClear: () => void;
 }) {
   const [results, setResults] = useState<PlaceHit[]>([]);
-  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [searched, setSearched] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blurRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Seed true when a venue is already filled (e.g. prefilled from Explore) so
   // we don't auto-search and pop the dropdown on mount.
   const skipNextSearch = useRef(value.trim().length >= 2);
@@ -783,32 +789,41 @@ function PlacePicker({
     const q = value.trim();
     if (q.length < 2) {
       setResults([]);
-      setOpen(false);
+      setSearched(false);
       return;
     }
     debounceRef.current = setTimeout(() => {
       setLoading(true);
       void api<{ results: PlaceHit[] }>(`/api/places/search?q=${encodeURIComponent(q)}`)
-        .then((r) => {
-          setResults(r.results);
-          setOpen(r.results.length > 0);
-        })
+        .then((r) => setResults(r.results))
         .catch(() => setResults([]))
-        .finally(() => setLoading(false));
+        .finally(() => {
+          setLoading(false);
+          setSearched(true);
+        });
     }, 300);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [value]);
 
+  // Clean up the blur timer on unmount.
+  useEffect(() => () => {
+    if (blurRef.current) clearTimeout(blurRef.current);
+  }, []);
+
   const choose = (p: PlaceHit) => {
     skipNextSearch.current = true;
     onSelect({ name: p.name, address: p.address, lat: p.lat, lng: p.lng });
-    setOpen(false);
     setResults([]);
+    setSearched(false);
+    setFocused(false);
   };
 
   const hasPickedAddress = Boolean(address && address !== value);
+  // Visibility is gated on focus (not a separate flag that can desync), so the
+  // list stays put while you read it instead of flickering on every keystroke.
+  const showDropdown = focused && value.trim().length >= 2;
 
   return (
     <div className="place-picker">
@@ -819,17 +834,22 @@ function PlacePicker({
           placeholder="Search a venue, or type your own"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          onFocus={() => results.length > 0 && setOpen(true)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => {
+            // Delay so a result tap (mousedown) registers before we hide.
+            blurRef.current = setTimeout(() => setFocused(false), 150);
+          }}
           autoComplete="off"
         />
         {value && (
           <button
             type="button"
             className="place-picker-clear"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
               onClear();
               setResults([]);
-              setOpen(false);
+              setSearched(false);
             }}
             aria-label="Clear place"
           >
@@ -837,13 +857,23 @@ function PlacePicker({
           </button>
         )}
       </div>
-      {loading && <p className="form-help">Searching…</p>}
-      {hasPickedAddress && !open && <p className="place-picker-chosen">📍 {address}</p>}
-      {open && results.length > 0 && (
+      {hasPickedAddress && !showDropdown && <p className="place-picker-chosen">📍 {address}</p>}
+      {showDropdown && (
         <ul className="place-picker-results" role="listbox">
+          {loading && results.length === 0 && <li className="place-picker-empty">Searching…</li>}
+          {!loading && searched && results.length === 0 && (
+            <li className="place-picker-empty">No matches — we'll use "{value.trim()}" as the venue.</li>
+          )}
           {results.map((p) => (
             <li key={p.placeId}>
-              <button type="button" className="place-picker-result" onClick={() => choose(p)}>
+              <button
+                type="button"
+                className="place-picker-result"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  choose(p);
+                }}
+              >
                 <span className="place-picker-result-name">{p.name}</span>
                 {p.address && <span className="place-picker-result-addr">{p.address}</span>}
               </button>

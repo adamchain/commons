@@ -377,17 +377,15 @@ export function PlanDetailPage() {
         {plan.participants.going.length === 0 ? (
           <p className="subtle">No one's locked in yet. Be the first to say "I'm in."</p>
         ) : (
-          <div className="participant-list-going">
+          <div className="roster">
             {plan.participants.going.map((person) => (
-              <Link key={person.id} to={`/profile/${person.id}`} className="participant-row">
-                <Avatar seed={person.avatarSeed} style={person.avatarStyle} photoDataUrl={person.avatarPhotoDataUrl} params={person.avatarParams} size="lg" />
-                <div>
-                  <div className="participant-name">
-                    {person.firstName}
-                    {person.id === user.id && <span className="you-pill">You</span>}
-                  </div>
-                  {person.id === plan.creator.id && <div className="participant-role">Host</div>}
-                </div>
+              <Link key={person.id} to={`/profile/${person.id}`} className="roster-tile">
+                <Avatar seed={person.avatarSeed} style={person.avatarStyle} photoDataUrl={person.avatarPhotoDataUrl} params={person.avatarParams} size="md" />
+                <span className="roster-name">
+                  {person.firstName}
+                  {person.id === user.id && <span className="you-pill">You</span>}
+                </span>
+                {person.id === plan.creator.id && <span className="roster-role">Host</span>}
               </Link>
             ))}
           </div>
@@ -398,38 +396,53 @@ export function PlanDetailPage() {
             <h3 className="who-block-heading" style={{ marginTop: 18 }}>
               {plan.joinType === "approve" && isHosting ? "Applications" : "Interested"} · {plan.participants.interested.length}
             </h3>
-            <div className="participant-list-interested">
-              {plan.participants.interested.map((person) => (
-                <div key={person.id} className="participant-row participant-row--with-action">
-                  <Link to={`/profile/${person.id}`} className="participant-row-link">
+            {plan.joinType === "approve" && isHosting ? (
+              // Host approval flow keeps the full row with a "Let them in" action.
+              <div className="participant-list-interested">
+                {plan.participants.interested.map((person) => (
+                  <div key={person.id} className="participant-row participant-row--with-action">
+                    <Link to={`/profile/${person.id}`} className="participant-row-link">
+                      <Avatar seed={person.avatarSeed} style={person.avatarStyle} photoDataUrl={person.avatarPhotoDataUrl} params={person.avatarParams} size="sm" />
+                      <span className="participant-name">
+                        {person.firstName}
+                        {person.id === user.id && <span className="you-pill">You</span>}
+                      </span>
+                    </Link>
+                    {person.id !== user.id && (
+                      <button
+                        type="button"
+                        className="btn-secondary participant-approve-btn"
+                        onClick={async () => {
+                          try {
+                            await api(`/api/plans/${plan.id}/approve`, {
+                              method: "POST",
+                              body: JSON.stringify({ userId: person.id }),
+                            });
+                            await load();
+                          } catch {
+                            /* swallow */
+                          }
+                        }}
+                      >
+                        Let them in
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="roster roster--sm">
+                {plan.participants.interested.map((person) => (
+                  <Link key={person.id} to={`/profile/${person.id}`} className="roster-tile">
                     <Avatar seed={person.avatarSeed} style={person.avatarStyle} photoDataUrl={person.avatarPhotoDataUrl} params={person.avatarParams} size="sm" />
-                    <span className="participant-name">
+                    <span className="roster-name">
                       {person.firstName}
                       {person.id === user.id && <span className="you-pill">You</span>}
                     </span>
                   </Link>
-                  {plan.joinType === "approve" && isHosting && person.id !== user.id && (
-                    <button
-                      type="button"
-                      className="btn-secondary participant-approve-btn"
-                      onClick={async () => {
-                        try {
-                          await api(`/api/plans/${plan.id}/approve`, {
-                            method: "POST",
-                            body: JSON.stringify({ userId: person.id }),
-                          });
-                          await load();
-                        } catch {
-                          /* swallow */
-                        }
-                      }}
-                    >
-                      Let them in
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </>
         )}
       </section>

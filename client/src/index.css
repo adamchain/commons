@@ -794,6 +794,50 @@ label {
   box-shadow: var(--shadow-card);
 }
 
+/* Compact attendee roster — avatar grid instead of full-width rows. */
+.roster {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 16px 8px;
+  margin-top: 10px;
+}
+.roster-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text);
+  text-align: center;
+}
+.roster-tile:hover .roster-name {
+  color: var(--accent);
+}
+.roster-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.roster-role {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: -3px;
+}
+.roster--sm {
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 12px 6px;
+}
+
 .who-block-heading {
   font-size: 12px;
   text-transform: uppercase;
@@ -1446,16 +1490,21 @@ label {
   font-size: 12px;
   color: var(--text-muted);
 }
+.place-picker-empty {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
 
 /* ----- Create plan: when grid ----- */
 .form-when-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  grid-template-columns: 1fr;
+  gap: 16px;
 }
-@media (max-width: 460px) {
+@media (min-width: 520px) {
   .form-when-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
   }
 }
 .form-when-cell {
@@ -1463,8 +1512,14 @@ label {
   gap: 8px;
   align-content: start;
 }
-.form-when-cell .flex-toggle-btn {
-  justify-self: start;
+.form-when-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.form-when-cell input {
+  text-align: left;
 }
 
 /* ----- Create plan: advanced disclosure ----- */
