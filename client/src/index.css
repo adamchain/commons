@@ -3,90 +3,129 @@
    dark indigo #0C0A1E / #141130, light #EBE4DA. Shadows stay minimal (border-led). */
 
 :root {
-  /* Commons Brand 2.0 */
-  --brand-red: #c01313;
-  --brand-pink: #efd5d6;
-  --brand-orange: #db6923;
-  --brand-indigo-deep: #0c0a1e;
-  --brand-indigo: #141130;
-  --brand-cream: #ebe4da;
-  --accent-rgb: 219, 105, 35;
+  /* ===== COMMONS Design System v0.4 — paper / ink / signal =====
+     Warm paper surfaces, deep navy ink for type, a single signal red for
+     every decision. Default is the light "paper" theme; an ink dark theme
+     lives under [data-theme="dark"]. */
 
-  /* default = dark */
-  --bg: var(--brand-indigo-deep);
-  --bg-gradient: radial-gradient(120% 80% at 50% -10%, rgba(var(--accent-rgb), 0.12), transparent 55%),
-    var(--bg);
-  --surface: #14122a;
-  --surface-2: #1c1a32;
-  --surface-hover: #232140;
-  --border: rgba(235, 228, 218, 0.1);
-  --border-strong: rgba(235, 228, 218, 0.16);
-  --text: #f4f1ec;
-  --text-muted: #a39ebc;
-  --text-subtle: #6f6a8a;
-  --accent: var(--brand-orange);
-  --accent-hover: #e8803a;
-  --accent-soft: rgba(var(--accent-rgb), 0.18);
-  --accent-on: #fffaf6;
-  --success: #9fd89a;
-  --success-bg: rgba(159, 216, 154, 0.08);
-  --success-border: rgba(159, 216, 154, 0.28);
-  --danger: var(--brand-red);
-  --shadow-card: none;
-  --shadow-elevate: 0 1px 2px rgba(0, 0, 0, 0.22);
-  --shadow-fab: 0 4px 16px rgba(var(--accent-rgb), 0.28);
-  --shadow-nav: 0 -1px 0 rgba(0, 0, 0, 0.42);
-  --radius: 12px;
-  --radius-lg: 16px;
+  /* --- Primitives --- */
+  --paper-50:  #faf5ec;
+  --paper-100: #f5efe4;
+  --paper-200: #ecdfc8;
+  --paper-300: #d9c9aa;
+
+  --ink-900: #14143a;
+  --ink-800: #1c1c4a;
+  --ink-700: #2a2a5e;
+  --ink-600: #4a4a72;
+  --ink-500: #6b6b85;
+  --ink-400: #9b9bad;
+
+  --signal-100: #fde2e3;
+  --signal-300: #f4a8ab;
+  --signal-500: #d63440;
+  --signal-600: #b8252f;
+  --signal-700: #931a23;
+
+  --hairline: rgba(20, 20, 58, 0.10);
+  --hairline-strong: rgba(20, 20, 58, 0.22);
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Spacing scale (4px base) */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px;
+  --s-6: 32px; --s-7: 48px; --s-8: 64px; --s-9: 96px;
+
+  /* Radius scale */
+  --r-sm: 8px; --r-md: 14px; --r-lg: 22px; --r-xl: 32px; --r-pill: 999px;
+
+  /* Fonts */
+  --font-display: "Bowlby One", "Arial Black", system-ui, sans-serif;
+  --font-serif: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-ui: "Inter Tight", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  /* --- Semantic mapping: default = PAPER (light) --- */
+  --accent-rgb: 214, 52, 64;
+  --bg: var(--paper-100);
+  --bg-gradient: var(--bg);
+  --surface: var(--paper-50);
+  --surface-2: var(--paper-200);
+  --surface-hover: var(--paper-300);
+  --border: var(--hairline);
+  --border-strong: var(--hairline-strong);
+  --text: var(--ink-900);
+  --text-muted: var(--ink-500);
+  --text-subtle: var(--ink-400);
+  --accent: var(--signal-500);
+  --accent-hover: var(--signal-600);
+  --accent-soft: var(--signal-100);
+  --accent-on: var(--paper-50);
+  --success: #2f8f55;
+  --success-bg: rgba(47, 143, 85, 0.14);
+  --success-border: rgba(47, 143, 85, 0.28);
+  --warning: #c97a1a;
+  --danger: var(--signal-500);
+  --shadow-card: 0 1px 0 rgba(20, 20, 58, 0.04), 0 6px 18px -6px rgba(20, 20, 58, 0.14);
+  --shadow-elevate: 0 1px 3px rgba(20, 20, 58, 0.08);
+  --shadow-fab: 0 8px 20px -4px rgba(var(--accent-rgb), 0.45);
+  --shadow-nav: 0 -1px 0 var(--hairline);
+  --radius: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-pill: var(--r-pill);
   --max-shell: 540px;
   --max-shell-mid: 720px;
   --max-shell-wide: 1180px;
-  --font-ui: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    sans-serif;
-  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
 
   font-family: var(--font-ui);
   color: var(--text);
   background: var(--bg);
-  color-scheme: dark;
+  color-scheme: light;
 
-  /* layout + community tints (single :root; see bottom-nav) */
+  /* layout + community tints */
   --nav-height: 72px;
-  --community-pink: #f0dde1;
-  --community-pink-soft: rgba(239, 213, 214, 0.12);
-  --community-pink-border: rgba(239, 213, 214, 0.28);
+  --community-pink: #6b2f42;
+  --community-pink-soft: rgba(214, 52, 64, 0.10);
+  --community-pink-border: rgba(214, 52, 64, 0.22);
 }
 
+/* Light = paper (explicit, mirrors the default). */
 [data-theme="light"] {
-  --bg: var(--brand-cream);
-  --bg-gradient: radial-gradient(120% 70% at 50% -15%, rgba(var(--accent-rgb), 0.08), transparent 50%),
-    var(--bg);
-  --surface: #ffffff;
-  --surface-2: #f3eee8;
-  --surface-hover: #ebe6df;
-  --border: rgba(20, 17, 48, 0.1);
-  --border-strong: rgba(20, 17, 48, 0.16);
-  --text: var(--brand-indigo);
-  --text-muted: #5c5678;
-  --text-subtle: #8a849e;
-  --accent: var(--brand-orange);
-  --accent-hover: #c75e1f;
-  --accent-soft: rgba(var(--accent-rgb), 0.12);
-  --accent-on: #fffaf6;
-  --success: #1a6b3c;
-  --success-bg: #e8f5eb;
-  --success-border: #b8dcc4;
-  --danger: var(--brand-red);
-  --shadow-card: none;
-  --shadow-elevate: 0 1px 3px rgba(20, 17, 48, 0.06);
-  --shadow-fab: 0 3px 14px rgba(var(--accent-rgb), 0.22);
-  --shadow-nav: 0 -1px 0 rgba(12, 10, 30, 0.08);
-
-  --community-pink: #6b2f42;
-  --community-pink-soft: rgba(239, 213, 214, 0.45);
-  --community-pink-border: rgba(107, 47, 66, 0.22);
-
   color-scheme: light;
+}
+
+/* Dark = ink. Deep navy surfaces, paper-toned type, same signal red. */
+[data-theme="dark"] {
+  --bg: var(--ink-900);
+  --bg-gradient: radial-gradient(120% 80% at 50% -10%, rgba(var(--accent-rgb), 0.10), transparent 55%),
+    var(--bg);
+  --surface: var(--ink-800);
+  --surface-2: var(--ink-700);
+  --surface-hover: var(--ink-600);
+  --border: rgba(245, 239, 228, 0.10);
+  --border-strong: rgba(245, 239, 228, 0.20);
+  --text: var(--paper-50);
+  --text-muted: #a9a9c4;
+  --text-subtle: #7c7c9c;
+  --accent: var(--signal-500);
+  --accent-hover: var(--signal-300);
+  --accent-soft: rgba(var(--accent-rgb), 0.22);
+  --accent-on: var(--paper-50);
+  --success: #4caf72;
+  --success-bg: rgba(76, 175, 114, 0.14);
+  --success-border: rgba(76, 175, 114, 0.30);
+  --warning: #e0962f;
+  --danger: var(--signal-500);
+  --shadow-card: 0 1px 0 rgba(0, 0, 0, 0.18), 0 8px 22px -8px rgba(0, 0, 0, 0.5);
+  --shadow-elevate: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-fab: 0 8px 20px -4px rgba(var(--accent-rgb), 0.5);
+  --shadow-nav: 0 -1px 0 rgba(0, 0, 0, 0.42);
+
+  --community-pink: #f0dde1;
+  --community-pink-soft: rgba(214, 52, 64, 0.18);
+  --community-pink-border: rgba(214, 52, 64, 0.32);
+
+  color-scheme: dark;
 }
 
 * {
@@ -407,12 +446,12 @@ label {
 }
 
 .plan-card-title {
-  font-size: 18px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   margin: 0;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 
 .badge {
@@ -503,13 +542,13 @@ label {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 14px 18px;
-  border-radius: 12px;
-  font-weight: 700;
+  padding: 14px 22px;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
   font-size: 15px;
-  letter-spacing: 0.02em;
-  transition: background 120ms ease, color 120ms ease, border-color 120ms ease,
-    transform 120ms ease;
+  letter-spacing: 0.01em;
+  transition: background 200ms var(--ease-out), color 200ms var(--ease-out),
+    border-color 200ms var(--ease-out), transform 150ms var(--ease-out);
   border: 1px solid transparent;
 }
 
@@ -520,20 +559,24 @@ label {
 .btn-primary {
   background: var(--accent);
   color: var(--accent-on);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 4px 12px -2px rgba(var(--accent-rgb), 0.35);
 }
 
 .btn-primary:hover {
   background: var(--accent-hover);
+  transform: translateY(-1px);
 }
 
 .btn-secondary {
-  background: var(--surface-2);
+  background: transparent;
   color: var(--text);
-  border-color: var(--border-strong);
+  border: 1.5px solid var(--text);
 }
 
 .btn-secondary:hover {
-  background: var(--surface-hover);
+  background: var(--text);
+  color: var(--surface);
 }
 
 .btn-ghost {
@@ -910,12 +953,12 @@ label {
     justify-content: space-between;
     background: linear-gradient(
       145deg,
-      var(--brand-indigo-deep) 0%,
-      var(--brand-indigo) 40%,
-      #7a3d18 78%,
-      var(--brand-orange) 100%
+      var(--ink-900) 0%,
+      var(--ink-800) 45%,
+      var(--signal-700) 80%,
+      var(--signal-500) 100%
     );
-    color: #fff;
+    color: var(--paper-50);
     padding: 56px;
     position: relative;
     overflow: hidden;
@@ -1704,21 +1747,23 @@ label {
 .btn-block { width: 100%; }
 .btn-primary {
   background: var(--accent, #2c2c2c);
-  color: white;
+  color: var(--accent-on);
   border: none;
-  padding: 12px 18px;
-  border-radius: 12px;
+  padding: 14px 22px;
+  border-radius: var(--radius-pill);
   font-weight: 600;
   font-size: 16px;
   cursor: pointer;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 4px 12px -2px rgba(var(--accent-rgb), 0.35);
 }
 .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn-secondary {
   background: transparent;
   color: var(--text);
-  border: 1px solid var(--border);
-  padding: 10px 16px;
-  border-radius: 12px;
+  border: 1.5px solid var(--text);
+  padding: 12px 20px;
+  border-radius: var(--radius-pill);
   font-weight: 600;
   cursor: pointer;
 }
@@ -3025,10 +3070,12 @@ label {
 }
 
 .plan-card-title {
-  font-size: 18px;
-  font-weight: 700;
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   margin: 0 0 6px;
-  line-height: 1.25;
+  line-height: 1.15;
 }
 
 .plan-card-posted-by {
@@ -4042,9 +4089,9 @@ label {
 }
 
 .plan-card--compact .plan-card-title {
-  font-family: var(--font-display);
+  font-family: var(--font-serif);
   font-size: 22px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 1.15;
   margin: 0 0 4px;

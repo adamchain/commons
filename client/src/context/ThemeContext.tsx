@@ -12,15 +12,16 @@ interface ThemeContextValue {
 const STORAGE_KEY = "commons-theme";
 
 function detectInitialTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
+  // Paper (light) is the default Commons surface; dark is opt-in.
+  if (typeof window === "undefined") return "light";
   const stored = window.localStorage.getItem(STORAGE_KEY);
   if (stored === "light" || stored === "dark") return stored;
-  if (window.matchMedia?.("(prefers-color-scheme: light)").matches) return "light";
-  return "dark";
+  if (window.matchMedia?.("(prefers-color-scheme: dark)").matches) return "dark";
+  return "light";
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
-  theme: "dark",
+  theme: "light",
   toggleTheme: () => undefined,
   setTheme: () => undefined,
 });
