@@ -16,10 +16,12 @@ export function PlanCard({
   plan,
   onPlanRefresh,
   highlight = false,
+  onHideKind,
 }: {
   plan: PlanDTO;
   onPlanRefresh?: () => void;
   highlight?: boolean;
+  onHideKind?: (kind: "happened" | "cancelled") => void;
 }) {
   const title = sentenceCaseTitle(plan.title);
   const isLooking = plan.planKind === "looking_for";
@@ -109,6 +111,16 @@ export function PlanCard({
               ? "Visible to your community"
               : "Live on the feed"}
         </div>
+      )}
+      {(isCancelled || hasEnded) && onHideKind && (
+        <button
+          type="button"
+          className="plan-card-hide-btn"
+          onClick={() => onHideKind(isCancelled ? "cancelled" : "happened")}
+          aria-label={isCancelled ? "Hide cancelled plans" : "Hide past plans"}
+        >
+          Hide {isCancelled ? "cancelled" : "past"}
+        </button>
       )}
       <Link to={`/plans/${plan.id}`} className="plan-card plan-card-link plan-card--compact">
         {plan.flyerDataUrl && (

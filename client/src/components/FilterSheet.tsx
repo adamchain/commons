@@ -12,8 +12,12 @@ export function FilterSheet({
   userInterests,
   selectedTag,
   selectedHoodId,
+  hideHappened,
+  hideCancelled,
   onTagChange,
   onHoodChange,
+  onHideHappenedChange,
+  onHideCancelledChange,
   onClose,
   onClear,
 }: {
@@ -22,8 +26,12 @@ export function FilterSheet({
   userInterests: InterestTag[];
   selectedTag: InterestTag | null;
   selectedHoodId: string | null;
+  hideHappened: boolean;
+  hideCancelled: boolean;
   onTagChange: (t: InterestTag | null) => void;
   onHoodChange: (id: string | null) => void;
+  onHideHappenedChange: (v: boolean) => void;
+  onHideCancelledChange: (v: boolean) => void;
   onClose: () => void;
   onClear: () => void;
 }) {
@@ -54,6 +62,28 @@ export function FilterSheet({
           <button type="button" className="btn-link" onClick={onClear}>
             Clear
           </button>
+        </div>
+
+        <div className="filter-sheet-group">
+          <div className="filter-sheet-group-label">Show</div>
+          <div className="filter-sheet-chips">
+            <button
+              type="button"
+              className={`community-chip ${hideHappened ? "is-active" : ""}`}
+              onClick={() => onHideHappenedChange(!hideHappened)}
+              aria-pressed={hideHappened}
+            >
+              Hide past
+            </button>
+            <button
+              type="button"
+              className={`community-chip ${hideCancelled ? "is-active" : ""}`}
+              onClick={() => onHideCancelledChange(!hideCancelled)}
+              aria-pressed={hideCancelled}
+            >
+              Hide cancelled
+            </button>
+          </div>
         </div>
 
         <div className="filter-sheet-group">

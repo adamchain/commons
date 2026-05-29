@@ -9,6 +9,7 @@ import { NetworkPromptModal } from "../components/NetworkPromptModal";
 import { PlanCard } from "../components/PlanCard";
 import { WeekStrip } from "../components/WeekStrip";
 import { useAuth } from "../context/AuthContext";
+import { planHasEnded } from "../lib/planTime";
 import type { InterestTag, MeDTO, NeighborhoodDTO, NetworkPromptDTO, PlanDTO } from "../types/shared";
 
 export function FeedPage() {
@@ -17,6 +18,8 @@ export function FeedPage() {
   const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState<InterestTag | null>(null);
   const [selectedHoodId, setSelectedHoodId] = useState<string | null>(null);
+  const [hideHappened, setHideHappened] = useState(false);
+  const [hideCancelled, setHideCancelled] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [view, setView] = useState<"all" | "mine">("all");
   const { user, setUser } = useAuth();
@@ -70,16 +73,22 @@ export function FeedPage() {
     if (selectedTag) list = list.filter((p) => p.tags.includes(selectedTag));
     if (selectedHoodId) list = list.filter((p) => p.neighborhoodId === selectedHoodId);
     if (selectedDayIso) list = list.filter((p) => p.date.slice(0, 10) === selectedDayIso);
+    // Happened = ended and not cancelled (mirrors PlanCard badge logic).
+    if (hideHappened) list = list.filter((p) => p.cancelledAt || !planHasEnded(p));
+    if (hideCancelled) list = list.filter((p) => !p.cancelledAt);
     if (justPostedId) {
       const pinned = list.find((p) => p.id === justPostedId);
       if (pinned) list = [pinned, ...list.filter((p) => p.id !== justPostedId)];
     }
     list = [...list].sort((a, b) => a.date.localeCompare(b.date));
     return list;
-  }, [plans, view, selectedTag, selectedHoodId, selectedDayIso, justPostedId]);
+  }, [plans, view, selectedTag, selectedHoodId, selectedDayIso, hideHappened, hideCancelled, justPostedId]);
 
   const activeFilterCount =
-    (selectedTag ? 1 : 0) + (selectedHoodId ? 1 : 0);
+    (selectedTag ? 1 : 0) +
+    (selectedHoodId ? 1 : 0) +
+    (hideHappened ? 1 : 0) +
+    (hideCancelled ? 1 : 0);
 
   if (plans === null) {
     return <LoadingScreen tagline="Gathering plans" />;
@@ -150,6 +159,8 @@ export function FeedPage() {
               setSelectedTag(null);
               setSelectedHoodId(null);
               setSelectedDayIso(null);
+              setHideHappened(false);
+              setHideCancelled(false);
             }}
           />
         ) : (
@@ -160,6 +171,10 @@ export function FeedPage() {
                 plan={plan}
                 onPlanRefresh={refreshPlans}
                 highlight={justPostedId === plan.id}
+                onHideKind={(kind) => {
+                  if (kind === "happened") setHideHappened(true);
+                  else setHideCancelled(true);
+                }}
               />
             ))}
           </div>
@@ -181,12 +196,18 @@ export function FeedPage() {
           userInterests={user?.interests ?? []}
           selectedTag={selectedTag}
           selectedHoodId={selectedHoodId}
+          hideHappened={hideHappened}
+          hideCancelled={hideCancelled}
           onTagChange={setSelectedTag}
           onHoodChange={setSelectedHoodId}
+          onHideHappenedChange={setHideHappened}
+          onHideCancelledChange={setHideCancelled}
           onClose={() => setFilterOpen(false)}
           onClear={() => {
             setSelectedTag(null);
             setSelectedHoodId(null);
+            setHideHappened(false);
+            setHideCancelled(false);
           }}
         />
       )}
