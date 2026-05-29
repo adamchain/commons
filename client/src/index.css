@@ -4026,6 +4026,7 @@ label {
 }
 
 .top-bar-icon-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4034,6 +4035,26 @@ label {
   border-radius: 50%;
   color: var(--text);
   transition: background 120ms ease;
+}
+
+.top-bar-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--accent-on);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--surface);
+  box-sizing: content-box;
 }
 
 .top-bar-icon-btn:hover {

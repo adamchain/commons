@@ -1,14 +1,40 @@
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Avatar } from "./Avatar";
+import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
+import type { ConversationSummaryDTO } from "../types/shared";
 
 /**
- * Global top bar — COMMONS wordmark on the left, notifications + profile
- * icons on the right (no labels). Hidden on full-screen flows.
+ * Global top bar — COMMONS wordmark on the left, notifications + messages +
+ * profile icons on the right (no labels). Hidden on full-screen flows.
  */
 export function TopBar() {
   const { user } = useAuth();
   const { pathname } = useLocation();
+  const [unreadMessages, setUnreadMessages] = useState(0);
+
+  // Keep the messages badge fresh: refetch on navigation + poll lightly.
+  useEffect(() => {
+    if (!user) {
+      setUnreadMessages(0);
+      return;
+    }
+    let cancelled = false;
+    const load = () => {
+      void api<ConversationSummaryDTO[]>("/api/conversations")
+        .then((rows) => {
+          if (!cancelled) setUnreadMessages(rows.reduce((n, r) => n + r.unreadCount, 0));
+        })
+        .catch(() => undefined);
+    };
+    load();
+    const t = setInterval(load, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [user?.id, pathname]);
 
   const hide =
     pathname.startsWith("/onboarding") ||
@@ -31,8 +57,15 @@ export function TopBar() {
         <Link to="/notifications" className="top-bar-icon-btn" aria-label="Notifications">
           <BellIcon />
         </Link>
-        <Link to="/messages" className="top-bar-icon-btn" aria-label="Messages">
+        <Link
+          to="/messages"
+          className="top-bar-icon-btn"
+          aria-label={unreadMessages > 0 ? `Messages, ${unreadMessages} unread` : "Messages"}
+        >
           <ChatIcon />
+          {unreadMessages > 0 && (
+            <span className="top-bar-badge">{unreadMessages > 9 ? "9+" : unreadMessages}</span>
+          )}
         </Link>
         <Link to={profileTo} className="top-bar-icon-btn top-bar-icon-btn--avatar" aria-label="Your profile">
           {user ? (
