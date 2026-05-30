@@ -1919,11 +1919,29 @@ label {
   justify-content: center;
   padding: 24px;
 }
-/* Landing/login variant: same bg as the rest of the screen, no card, no decoration. */
+/* Landing/login variant: full-bleed b&w hero photo with white type stacked
+   over a subtle top/bottom darkening gradient for legibility. */
 .onboarding-shell--landing {
   position: relative;
-  background: var(--bg);
+  background-color: #000;
+  background-image: linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.45) 0%,
+      rgba(0, 0, 0, 0.15) 38%,
+      rgba(0, 0, 0, 0.55) 100%
+    ),
+    url("/landing-bg.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   overflow: hidden;
+  align-items: stretch;
+  padding: 0;
+  color: #fff;
+  color-scheme: dark;
+}
+.onboarding-shell--landing .loader-icons {
+  display: none;
 }
 .onboarding-card {
   width: 100%;
@@ -1937,37 +1955,77 @@ label {
   flex-direction: column;
   gap: 12px;
 }
-/* Landing card sheds the surface so it blends into the bg — clean, minimal. */
+/* Landing card spans floor-to-ceiling so the wordmark sits up top and the
+   sign-in form drops to the bottom edge. Text reads white on the dark photo. */
 .onboarding-card--landing {
   background: transparent;
   border: none;
   box-shadow: none;
   border-radius: 0;
-  padding: 0;
+  padding: calc(40px + env(safe-area-inset-top, 0px)) 24px calc(28px + env(safe-area-inset-bottom, 0px));
   text-align: center;
-  gap: 18px;
+  gap: 16px;
+  min-height: 100dvh;
+  max-width: 480px;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  color: #fff;
 }
 .onboarding-card--landing .loader-wordmark {
-  font-size: 28px;
+  font-size: 44px;
   text-align: center;
   animation: none;
   margin: 0 0 8px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.02em;
+  color: #fff;
 }
 .onboarding-card--landing .onboarding-subtitle {
   font-size: 13px;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+}
+.onboarding-card--landing .onboarding-body {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 .onboarding-card--landing .onboarding-input {
-  background: var(--surface-2);
-  border-color: transparent;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+  font-size: 17px;
+  text-align: center;
+}
+.onboarding-card--landing .onboarding-input::placeholder {
+  color: rgba(255, 255, 255, 0.55);
 }
 .onboarding-card--landing .onboarding-input:focus {
-  border-color: var(--accent);
+  border-color: #fff;
   outline: none;
+}
+.onboarding-card--landing .onboarding-fineprint {
+  color: rgba(255, 255, 255, 0.85);
+}
+.onboarding-card--landing .onboarding-invite-link {
+  color: #fff;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  align-self: center;
+  margin-top: 4px;
+}
+.onboarding-card--landing .btn-link {
+  color: #fff;
+}
+.onboarding-card--landing .onboarding-error {
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
 }
 .onboarding-brand {
   font-size: 14px;

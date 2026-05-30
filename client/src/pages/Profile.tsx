@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { LoadingScreen } from "../components/LoadingScreen";
@@ -37,6 +37,7 @@ interface ProfilePayload {
 
 export function ProfilePage() {
   const { userId = "" } = useParams();
+  const navigate = useNavigate();
   const { user, setUser } = useAuth();
   const [profile, setProfile] = useState<ProfilePayload | null>(null);
   const [feedPlans, setFeedPlans] = useState<PlanDTO[]>([]);
@@ -242,7 +243,32 @@ export function ProfilePage() {
           )}
         </section>
       )}
+
+      {isSelf && (
+        <button
+          type="button"
+          className="settings-signout"
+          onClick={async () => {
+            sessionStorage.removeItem("commons_pending_admin_choice");
+            await api("/api/auth/logout", { method: "POST" });
+            setUser(null);
+            navigate("/onboarding", { replace: true });
+          }}
+        >
+          <SignOutGlyph />
+          Sign out of COMMONS
+        </button>
+      )}
     </main>
+  );
+}
+
+function SignOutGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />
+      <path d="M10 17 5 12l5-5M5 12h11" />
+    </svg>
   );
 }
 

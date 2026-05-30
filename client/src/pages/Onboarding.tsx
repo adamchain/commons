@@ -45,6 +45,9 @@ export function OnboardingPage() {
     if (typeof window === "undefined") return "";
     return new URLSearchParams(window.location.search).get("invite")?.toUpperCase() ?? "";
   });
+  // Landing screen hides the invite field behind a "Have an invite code?" link;
+  // expanded automatically when one is prefilled from the share-link query param.
+  const [showInviteField, setShowInviteField] = useState<boolean>(() => inviteCode.length > 0);
 
   // If logged-in user lands here with onboarding done, send them home.
   useEffect(() => {
@@ -160,15 +163,18 @@ export function OnboardingPage() {
           value={phoneNumber}
           onChange={(e) => setPhoneNumber(formatPhoneInput(e.target.value))}
         />
-        <input
-          className="onboarding-input onboarding-input-invite"
-          type="text"
-          inputMode="text"
-          maxLength={10}
-          placeholder="Invite code (optional)"
-          value={inviteCode}
-          onChange={(e) => setInviteCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
-        />
+        {showInviteField && (
+          <input
+            className="onboarding-input onboarding-input-invite"
+            type="text"
+            inputMode="text"
+            maxLength={10}
+            placeholder="Invite code"
+            value={inviteCode}
+            onChange={(e) => setInviteCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+            autoFocus
+          />
+        )}
         {error && <div className="onboarding-error">{error}</div>}
         <button className="btn-primary btn-block" disabled={busy || !phoneNumber} onClick={requestCode}>
           {busy ? "Sending…" : "Get started"}
@@ -180,12 +186,21 @@ export function OnboardingPage() {
               ? "You'll get a text with your verification code (Twilio Verify). Message rates may apply."
               : "We'll text you a code to verify your number."}
         </p>
+        {!showInviteField && (
+          <button
+            type="button"
+            className="btn-link onboarding-invite-link"
+            onClick={() => setShowInviteField(true)}
+          >
+            Have an invite code?
+          </button>
+        )}
       </OnboardingShell>
     );
   }
   if (step === "code") {
     return (
-      <OnboardingShell landing title="Check your texts." subtitle={`Sent to ${phoneNumber}`}>
+      <OnboardingShell title="Check your texts." subtitle={`Sent to ${phoneNumber}`}>
         <input
           className="onboarding-input onboarding-input-code"
           type="text"
