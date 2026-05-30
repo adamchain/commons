@@ -1,20 +1,30 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
-import { ThemeToggle } from "../components/ThemeToggle";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import {
-  DEFAULT_NOTIFICATION_PREFS,
-  NOTIFICATION_LABELS,
-  type MeDTO,
-  type NotificationPrefs,
+  INTEREST_LABELS,
+  type InviteCodeDTO,
 } from "../types/shared";
 
+/**
+ * Grouped settings — ACCOUNT / ACTIVITY / APP cards each with icon rows.
+ * Notifications + interests + privacy each link out to dedicated screens; the
+ * Appearance row hosts the Light / Dark / Auto segment inline.
+ */
 export function SettingsPage() {
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
+  const [inviteCount, setInviteCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    void api<{ codes: InviteCodeDTO[] }>("/api/auth/invite-codes")
+      .then((r) => setInviteCount(r.codes.filter((c) => c.redeemedAt === null).length))
+      .catch(() => setInviteCount(0));
+  }, []);
 
   const signOut = async () => {
     sessionStorage.removeItem("commons_pending_admin_choice");
@@ -25,104 +35,221 @@ export function SettingsPage() {
 
   if (!user) return <LoadingScreen tagline="Loading settings" />;
 
+  const interestsSub =
+    user.interests.length === 0
+      ? "Tap to pick what you’re into"
+      : user.interests.map((t) => INTEREST_LABELS[t]).join(" · ");
+
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">
       <header className="app-header app-header--minimal">
         <Link to={`/profile/${user.id}`} className="detail-back">
-          ← Back
+          ← Profile
         </Link>
       </header>
-      <h1 className="brand" style={{ marginBottom: 20 }}>
+      <h1 className="brand" style={{ marginBottom: 8 }}>
         Settings
       </h1>
 
-      <AppearanceSection />
-      <NotificationSettings me={user} onUpdated={setUser} />
+      <SettingsGroup label="Account">
+        <SettingsRow
+          to={`/profile/${user.id}`}
+          icon={<UserIcon />}
+          title="Edit profile"
+          sub="Name, photo, neighborhood"
+        />
+        <SettingsRow
+          to={`/profile/${user.id}`}
+          icon={<HeartIcon />}
+          iconAccent
+          title="Interests"
+          sub={interestsSub}
+        />
+        <SettingsRow
+          to="/invite"
+          icon={<MailIcon />}
+          title="Invite codes"
+          sub={
+            inviteCount === null
+              ? "Loading…"
+              : `${inviteCount} left to share`
+          }
+          badge={inviteCount ?? undefined}
+        />
+      </SettingsGroup>
+
+      <SettingsGroup label="Activity">
+        <SettingsRow
+          to="/settings/notifications"
+          icon={<BellIcon />}
+          title="Notifications"
+          sub="Manage what reaches you"
+        />
+        <SettingsRow
+          icon={<LockIcon />}
+          title="Privacy"
+          sub="Who can see your plans"
+          comingSoon
+        />
+      </SettingsGroup>
+
+      <SettingsGroup label="App">
+        <AppearanceRow />
+        <SettingsRow
+          icon={<GlobeIcon />}
+          title="Language"
+          sub="English (US)"
+          comingSoon
+        />
+        <SettingsRow
+          icon={<InfoIcon />}
+          title="About COMMONS"
+          sub="Version 0.4 · Help · Terms"
+          comingSoon
+        />
+      </SettingsGroup>
+
       {user.canAccessAdmin && (
-        <section className="profile-block">
-          <Link
+        <SettingsGroup label="Admin">
+          <SettingsRow
             to="/admin"
-            className="btn-secondary btn-block"
-            style={{ textAlign: "center", display: "block" }}
-          >
-            Admin dashboard
-          </Link>
-        </section>
+            icon={<ShieldIcon />}
+            title="Admin dashboard"
+            sub="Metrics, users, moderation"
+          />
+        </SettingsGroup>
       )}
-      <AccountSection onSignOut={() => void signOut()} />
+
+      <button type="button" className="settings-signout" onClick={() => void signOut()}>
+        <SignOutIcon />
+        Sign out of COMMONS
+      </button>
+
+      <DeleteAccountRow onSignedOut={() => navigate("/onboarding", { replace: true })} />
     </main>
   );
 }
 
-function AppearanceSection() {
-  const { theme } = useTheme();
+function SettingsGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <section className="profile-block profile-settings">
-      <h3 className="who-block-heading">Appearance</h3>
-      <div className="profile-settings-row">
-        <div>
-          <div className="profile-settings-label">Theme</div>
-          <div className="profile-settings-sub">{theme === "dark" ? "Dark" : "Light"} mode</div>
-        </div>
-        <ThemeToggle />
-      </div>
+    <section className="settings-group">
+      <div className="settings-group-label">{label}</div>
+      <div className="settings-card">{children}</div>
     </section>
   );
 }
 
-function NotificationSettings({
-  me,
-  onUpdated,
+function SettingsRow({
+  to,
+  icon,
+  iconAccent = false,
+  title,
+  sub,
+  badge,
+  right,
+  comingSoon = false,
 }: {
-  me: MeDTO;
-  onUpdated: (next: MeDTO) => void;
+  to?: string;
+  icon: ReactNode;
+  iconAccent?: boolean;
+  title: string;
+  sub: string;
+  badge?: number;
+  right?: ReactNode;
+  comingSoon?: boolean;
 }) {
-  const current: NotificationPrefs = { ...DEFAULT_NOTIFICATION_PREFS, ...(me.notificationPrefs ?? {}) };
-  const [busy, setBusy] = useState<keyof NotificationPrefs | null>(null);
-
-  async function toggle(key: keyof NotificationPrefs) {
-    if (busy) return;
-    setBusy(key);
-    const next: NotificationPrefs = { ...current, [key]: !current[key] };
-    try {
-      const updated = await api<MeDTO>("/api/auth/me", {
-        method: "PATCH",
-        body: JSON.stringify({ notificationPrefs: next }),
-      });
-      onUpdated(updated);
-    } catch {
-      /* keep previous state; user can retry */
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  const keys = Object.keys(NOTIFICATION_LABELS) as Array<keyof NotificationPrefs>;
-
-  return (
-    <section className="profile-block profile-settings">
-      <h3 className="who-block-heading">Notifications</h3>
-      <div className="notif-prefs-list">
-        {keys.map((key) => (
-          <label key={key} className="notif-pref-row">
-            <span className="notif-pref-label">{NOTIFICATION_LABELS[key]}</span>
-            <input
-              type="checkbox"
-              className="notif-pref-toggle"
-              checked={current[key]}
-              disabled={busy === key}
-              onChange={() => void toggle(key)}
-            />
-          </label>
-        ))}
+  const inner = (
+    <>
+      <span className={`settings-row-icon ${iconAccent ? "settings-row-icon--accent" : ""}`}>
+        {icon}
+      </span>
+      <div className="settings-row-body">
+        <div className="settings-row-title">{title}</div>
+        <div className="settings-row-sub">{sub}</div>
       </div>
-    </section>
+      <div className="settings-row-right">
+        {badge !== undefined && badge > 0 && (
+          <span className="settings-row-badge">{badge}</span>
+        )}
+        {right ?? (
+          <span className="settings-row-chevron">
+            <ChevronIcon />
+          </span>
+        )}
+      </div>
+    </>
+  );
+  if (to) {
+    return (
+      <Link to={to} className="settings-row">
+        {inner}
+      </Link>
+    );
+  }
+  return (
+    <button
+      type="button"
+      className="settings-row"
+      onClick={comingSoon ? () => alert("Coming soon.") : undefined}
+    >
+      {inner}
+    </button>
   );
 }
 
-function AccountSection({ onSignOut }: { onSignOut: () => void }) {
+function AppearanceRow() {
+  const { theme, setTheme } = useTheme();
+  return (
+    <div className="settings-row">
+      <span className="settings-row-icon">
+        <SunIcon />
+      </span>
+      <div className="settings-row-body">
+        <div className="settings-row-title">Appearance</div>
+        <div className="settings-row-sub">
+          {theme === "dark" ? "Dark mode" : "Light mode"}
+        </div>
+      </div>
+      <div className="settings-row-right">
+        <div className="settings-seg" role="tablist" aria-label="Theme">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={theme === "light"}
+            className={theme === "light" ? "is-active" : ""}
+            onClick={() => setTheme("light")}
+          >
+            Light
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={theme === "dark"}
+            className={theme === "dark" ? "is-active" : ""}
+            onClick={() => setTheme("dark")}
+          >
+            Dark
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={false}
+            onClick={() => alert("Auto mode coming soon.")}
+          >
+            Auto
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Delete-account flow. Tucked below sign-out so it isn't the first thing
+ * users see, but kept reachable without an extra screen.
+ */
+function DeleteAccountRow({ onSignedOut }: { onSignedOut: () => void }) {
   const { setUser } = useAuth();
-  const navigate = useNavigate();
   const [showDelete, setShowDelete] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -140,7 +267,7 @@ function AccountSection({ onSignOut }: { onSignOut: () => void }) {
         body: JSON.stringify({ confirm: "DELETE" }),
       });
       setUser(null);
-      navigate("/onboarding", { replace: true });
+      onSignedOut();
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : "Couldn't delete account");
       setDeleting(false);
@@ -148,35 +275,19 @@ function AccountSection({ onSignOut }: { onSignOut: () => void }) {
   }
 
   return (
-    <section className="profile-block profile-settings">
-      <h3 className="who-block-heading">Account</h3>
-      <div className="profile-settings-row">
-        <div>
-          <div className="profile-settings-label">Sign out</div>
-          <div className="profile-settings-sub">Sign out of COMMONS</div>
-        </div>
-        <button type="button" className="btn-link" onClick={onSignOut}>
-          Sign out
-        </button>
-      </div>
-      <div className="profile-settings-row">
-        <div>
-          <div className="profile-settings-label">Delete account</div>
-          <div className="profile-settings-sub">Permanently removes your profile, plans, and history.</div>
-        </div>
-        <button
-          type="button"
-          className="btn-link"
-          style={{ color: "var(--danger)" }}
-          onClick={() => {
-            setConfirmText("");
-            setDeleteError(null);
-            setShowDelete(true);
-          }}
-        >
-          Delete
-        </button>
-      </div>
+    <>
+      <button
+        type="button"
+        className="btn-link"
+        style={{ color: "var(--danger)", marginTop: 16, display: "block" }}
+        onClick={() => {
+          setConfirmText("");
+          setDeleteError(null);
+          setShowDelete(true);
+        }}
+      >
+        Delete account
+      </button>
       {showDelete && (
         <div
           className="modal-backdrop"
@@ -186,7 +297,9 @@ function AccountSection({ onSignOut }: { onSignOut: () => void }) {
           onClick={() => !deleting && setShowDelete(false)}
         >
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <h4 id="delete-account-title" style={{ marginTop: 0 }}>Delete your account?</h4>
+            <h4 id="delete-account-title" style={{ marginTop: 0 }}>
+              Delete your account?
+            </h4>
             <p style={{ marginTop: 0 }}>
               This is permanent. Your plans will be cancelled, your network connections
               will be removed, and you'll be signed out. Type <strong>delete</strong> to confirm.
@@ -202,7 +315,12 @@ function AccountSection({ onSignOut }: { onSignOut: () => void }) {
             />
             {deleteError && <p className="error-text">{deleteError}</p>}
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button type="button" className="btn-link" onClick={() => setShowDelete(false)} disabled={deleting}>
+              <button
+                type="button"
+                className="btn-link"
+                onClick={() => setShowDelete(false)}
+                disabled={deleting}
+              >
                 Cancel
               </button>
               <button
@@ -218,6 +336,94 @@ function AccountSection({ onSignOut }: { onSignOut: () => void }) {
           </div>
         </div>
       )}
-    </section>
+    </>
+  );
+}
+
+/* ---------- icons (line-based, inherit currentColor) ---------- */
+
+function UserIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c1-4 5-6 8-6s7 2 8 6" />
+    </svg>
+  );
+}
+function HeartIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+      <path d="M12 21s-7-4.5-9.5-9C.8 8.5 2 5 5.5 5c2 0 3.5 1 4.5 2.5 1-1.5 2.5-2.5 4.5-2.5C18 5 19.2 8.5 21.5 12 19 16.5 12 21 12 21Z" />
+    </svg>
+  );
+}
+function MailIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3 7 9 6 9-6" />
+    </svg>
+  );
+}
+function BellIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 7 3 7H3s3 0 3-7" />
+      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </svg>
+  );
+}
+function LockIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </svg>
+  );
+}
+function SunIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </svg>
+  );
+}
+function GlobeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+    </svg>
+  );
+}
+function InfoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v6M12 7.5v.5" />
+    </svg>
+  );
+}
+function ShieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3 4 6v6c0 5 3.5 8.5 8 9 4.5-.5 8-4 8-9V6l-8-3Z" />
+    </svg>
+  );
+}
+function SignOutIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />
+      <path d="M10 17 5 12l5-5M5 12h11" />
+    </svg>
+  );
+}
+function ChevronIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m9 6 6 6-6 6" />
+    </svg>
   );
 }

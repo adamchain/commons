@@ -127,7 +127,7 @@ export function FeedPage() {
 
       <div className="page-filter-bar">
         <span className="page-filter-bar-label">
-          {filteredPlans.length} plan{filteredPlans.length === 1 ? "" : "s"}
+          {filteredPlans.length} plan{filteredPlans.length === 1 ? "" : "s"} this week
         </span>
         <button
           type="button"

@@ -25,3 +25,15 @@ notificationsRouter.post("/read", requireAuth, (req, res) => {
   const count = store.markAllNotificationsRead(userId);
   res.json({ ok: true, count });
 });
+
+notificationsRouter.post("/clear", requireAuth, (req, res) => {
+  const userId = String(req.userId);
+  const count = store.clearAllNotificationsForUser(userId);
+  res.json({ ok: true, count });
+});
+
+notificationsRouter.delete("/:id", requireAuth, (req, res) => {
+  const userId = String(req.userId);
+  const ok = store.deleteNotification(userId, String(req.params.id));
+  res.json({ ok });
+});

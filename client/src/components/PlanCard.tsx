@@ -2,10 +2,12 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/http";
+import { Avatar } from "./Avatar";
 import { useAuth } from "../context/AuthContext";
 import type { PlanDTO } from "../types/shared";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
 import { planHasEnded } from "../lib/planTime";
+import { useNeighborhoods } from "../lib/useNeighborhoods";
 
 /**
  * Compact event card — title, time, details. Card type (confirmed / looking_for /
@@ -25,6 +27,8 @@ export function PlanCard({
 }) {
   const title = sentenceCaseTitle(plan.title);
   const isLooking = plan.planKind === "looking_for";
+  const hoods = useNeighborhoods();
+  const hoodName = hoods[plan.neighborhoodId]?.name ?? null;
   const isPlanCreated = isLooking && Boolean(plan.lockedAt);
   const isCancelled = Boolean(plan.cancelledAt);
   const hasEnded = !isCancelled && planHasEnded(plan);
@@ -128,24 +132,45 @@ export function PlanCard({
             <img src={plan.flyerDataUrl} alt="" />
           </div>
         )}
-        {isCancelled ? (
-          <span className="plan-card-kind-pill is-cancelled">Cancelled</span>
-        ) : hasEnded ? (
-          <span className="plan-card-kind-pill is-happened">Happened</span>
-        ) : isPlanCreated ? (
-          <span className="plan-card-kind-pill is-plan-created">Plan created</span>
-        ) : isLooking ? (
-          <span className="plan-card-kind-pill is-looking">Looking for</span>
-        ) : null}
+        <header className="plan-card-poster-row">
+          <Avatar
+            seed={plan.creator.avatarSeed}
+            style={plan.creator.avatarStyle}
+            photoDataUrl={plan.creator.avatarPhotoDataUrl}
+            params={plan.creator.avatarParams}
+            size="sm"
+          />
+          <span className="plan-card-posted-by">
+            Posted by <strong>{plan.creator.firstName}</strong>
+          </span>
+          {isCancelled ? (
+            <span className="plan-card-kind-pill is-cancelled">Cancelled</span>
+          ) : hasEnded ? (
+            <span className="plan-card-kind-pill is-happened">Happened</span>
+          ) : isPlanCreated ? (
+            <span className="plan-card-kind-pill is-plan-created">Plan created</span>
+          ) : isLooking ? (
+            <span className="plan-card-kind-pill is-looking">Looking For</span>
+          ) : null}
+        </header>
         <h3 className="plan-card-title">{title}</h3>
-        <p className="plan-card-posted-by">Posted by {plan.creator.firstName}</p>
-        <p className="plan-card-when">
-          {whenLine}
-          {socialProof && (
-            <>
-              {" "}
-              <span className="plan-card-going-count">· {socialProof}</span>
-            </>
+        <p className="plan-card-meta-line">
+          <span className="plan-card-meta-icon" aria-hidden="true">
+            <ClockGlyph />
+          </span>
+          {plan.isFlexibleTime && plan.isFlexibleLocation ? (
+            <span className="plan-card-meta-empty" aria-label="Time TBD" />
+          ) : (
+            whenLine
+          )}
+        </p>
+        <p className="plan-card-meta-line">
+          <span className="plan-card-meta-icon" aria-hidden="true">
+            <PinGlyph />
+          </span>
+          {plan.isFlexibleLocation ? "Flexible location" : plan.location.name}
+          {hoodName && (
+            <span className="plan-card-meta-sub"> · {hoodName}</span>
           )}
         </p>
         {plan.description && (
@@ -179,12 +204,37 @@ export function PlanCard({
           </a>
         )}
 
-        {(plan.myState === "going" || plan.myState === "interested") && (
-          <div className="plan-card-my-state">
-            {plan.myState === "going" && <span className="badge">You&apos;re in</span>}
-            {plan.myState === "interested" && <span className="badge badge-muted">Interested</span>}
+        <footer className="plan-card-footer-row">
+          <div className="plan-card-attendees">
+            {(plan.participants.going.length > 0 || plan.participants.interested.length > 0) && (
+              <div className="avatar-stack">
+                {[...plan.participants.going, ...plan.participants.interested]
+                  .slice(0, 3)
+                  .map((p) => (
+                    <Avatar
+                      key={p.id}
+                      seed={p.avatarSeed}
+                      style={p.avatarStyle}
+                      photoDataUrl={p.avatarPhotoDataUrl}
+                      params={p.avatarParams}
+                      size="xs"
+                    />
+                  ))}
+              </div>
+            )}
+            {socialProof && (
+              <span className="plan-card-going-count">{socialProof}</span>
+            )}
           </div>
-        )}
+          {plan.myState === "going" && (
+            <span className="plan-card-state-pill plan-card-state-pill--in">
+              <span aria-hidden="true">✓</span> You&apos;re in
+            </span>
+          )}
+          {plan.myState === "interested" && (
+            <span className="plan-card-state-pill plan-card-state-pill--interested">Interested</span>
+          )}
+        </footer>
       </Link>
 
       {canChat && (
@@ -230,5 +280,23 @@ export function PlanCard({
         </div>
       )}
     </div>
+  );
+}
+
+function ClockGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+
+function PinGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
   );
 }

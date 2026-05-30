@@ -27,6 +27,19 @@ export const INTEREST_LABELS: Record<InterestTag, string> = {
   running: "Running",
 };
 
+export const INTEREST_EMOJI: Record<InterestTag, string> = {
+  fitness_outdoors: "💪",
+  food_drinks: "🍔",
+  arts_culture: "🎨",
+  music_nightlife: "🎵",
+  thrifting: "🛍️",
+  local_events: "🎉",
+  wellness: "🧘",
+  coffee_cowork: "☕",
+  dog_owners: "🐶",
+  running: "🏃",
+};
+
 export const ALL_INTERESTS: InterestTag[] = [
   "fitness_outdoors",
   "food_drinks",

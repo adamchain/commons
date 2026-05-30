@@ -18,13 +18,32 @@ export function NotificationsPage() {
     void api<{ notifications: NotificationDTO[] }>("/api/notifications")
       .then((r) => setItems(r.notifications))
       .catch(() => setItems([]));
-    void api("/api/notifications/read", { method: "POST" }).catch(() => undefined);
   }, []);
 
   const sorted = useMemo(() => {
     if (!items) return [];
     return [...items].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [items]);
+
+  const unreadCount = useMemo(
+    () => (items ?? []).filter((n) => n.readAt === null).length,
+    [items],
+  );
+
+  function markAllRead() {
+    setItems((prev) => prev?.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })) ?? prev);
+    void api("/api/notifications/read", { method: "POST" }).catch(() => undefined);
+  }
+
+  function clearAll() {
+    setItems([]);
+    void api("/api/notifications/clear", { method: "POST" }).catch(() => undefined);
+  }
+
+  function dismiss(id: string) {
+    setItems((prev) => (prev ?? []).filter((n) => n.id !== id));
+    void api(`/api/notifications/${id}`, { method: "DELETE" }).catch(() => undefined);
+  }
 
   if (items === null) return <LoadingScreen tagline="Catching up" />;
 
@@ -44,13 +63,38 @@ export function NotificationsPage() {
         </button>
       </div>
 
+      {sorted.length > 0 && (
+        <div className="notif-toolbar">
+          <span className="notif-toolbar-count">
+            {unreadCount > 0 ? `${unreadCount} unread` : "All read"}
+          </span>
+          <div className="notif-toolbar-actions">
+            <button
+              type="button"
+              className="notif-toolbar-link"
+              disabled={unreadCount === 0}
+              onClick={markAllRead}
+            >
+              Mark all read
+            </button>
+            <button
+              type="button"
+              className="notif-toolbar-link notif-toolbar-link--accent"
+              onClick={clearAll}
+            >
+              <span aria-hidden="true">🗑</span> Clear all
+            </button>
+          </div>
+        </div>
+      )}
+
       {sorted.length === 0 ? (
         <p className="empty-state">Nothing new — you're all caught up.</p>
       ) : (
         <section className="notif-section">
           <div className="notif-list">
             {sorted.map((n) => (
-              <NotifRow key={n.id} item={n} />
+              <NotifRow key={n.id} item={n} onDismiss={() => dismiss(n.id)} />
             ))}
           </div>
         </section>
@@ -59,7 +103,7 @@ export function NotificationsPage() {
   );
 }
 
-function NotifRow({ item }: { item: NotificationDTO }) {
+function NotifRow({ item, onDismiss }: { item: NotificationDTO; onDismiss: () => void }) {
   const href = hrefFor(item);
   const inner = (
     <>
@@ -71,6 +115,18 @@ function NotifRow({ item }: { item: NotificationDTO }) {
         <div className="notif-row-sub">{formatRelative(item.createdAt)}</div>
       </div>
       {item.readAt === null && <span className="notif-row-unread" aria-label="Unread" />}
+      <button
+        type="button"
+        className="notif-row-dismiss"
+        aria-label="Dismiss notification"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onDismiss();
+        }}
+      >
+        ×
+      </button>
     </>
   );
   if (href) {

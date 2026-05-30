@@ -120,6 +120,9 @@ export const mongoMirror = {
       .catch((err) => fail(`deleteNotificationsByUser ${userId}`, err));
     track(p);
   },
+  deleteNotification(id: string): void {
+    removeById(NotificationModel as never, id, `deleteNotification ${id}`);
+  },
   deleteInviteCodesByOwner(ownerUserId: string): void {
     if (!isMongoConnected()) return;
     const p = InviteCodeModel.deleteMany({ ownerUserId })

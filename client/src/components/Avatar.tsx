@@ -3,7 +3,7 @@ import type { AvatarStyle } from "../types/shared";
 interface AvatarProps {
   seed: string;
   style?: AvatarStyle;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
   backgroundColor?: string;
   photoDataUrl?: string;
   /** DiceBear URL overrides ("top=curly&skinColor=..."). Merged before friendly eyes/mouth so hair/skin stay preset-driven. */
@@ -13,6 +13,7 @@ interface AvatarProps {
 }
 
 const PIXEL_SIZE: Record<NonNullable<AvatarProps["size"]>, number> = {
+  xs: 24,
   sm: 32,
   md: 48,
   lg: 72,

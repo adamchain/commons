@@ -28,7 +28,6 @@ export function PlanDetailPage() {
   const [lockTime, setLockTime] = useState("19:00");
   const [lockFlexTime, setLockFlexTime] = useState(false);
   const [lockBusy, setLockBusy] = useState(false);
-  const [claimedHost, setClaimedHost] = useState(false);
   const lockFormRef = useRef<HTMLDivElement | null>(null);
 
   const load = async () => {
@@ -83,15 +82,15 @@ export function PlanDetailPage() {
 
   const isHosting = plan.creator.id === user.id;
   const isLookingFor = plan.planKind === "looking_for";
-  const inThread = isHosting || plan.myState === "going" || plan.myState === "interested";
-  // Looking-For lifecycle: anyone in the thread can lock the plan in (spec is
-  // explicit that the original poster isn't privileged). The locker becomes
-  // the host server-side.
-  const canLock = !plan.lockedAt && (isLookingFor ? inThread : isHosting);
+  // Looking-For lifecycle: only the original poster can lock the plan in.
+  // Other interested folks coordinate via the group chat until the host
+  // commits to a venue + day.
+  const canLock = !plan.lockedAt && isHosting;
   // Prompt fires when the thread has at least 2 people committing (interested
-  // or going) — that's the signal there's a group.
+  // or going) — but only the original poster sees the "lock it in" callout,
+  // since they're the only one who can act on it.
   const groupSize = plan.participants.interested.length + plan.participants.going.length;
-  const showGroupPrompt = isLookingFor && !plan.lockedAt && groupSize >= 2 && !isHosting;
+  const showGroupPrompt = isLookingFor && !plan.lockedAt && groupSize >= 2 && isHosting;
   const canChat =
     isHosting || plan.myState === "going" || plan.myState === "interested";
 
@@ -203,11 +202,17 @@ export function PlanDetailPage() {
         >
           <Avatar seed={plan.creator.avatarSeed} style={plan.creator.avatarStyle} photoDataUrl={plan.creator.avatarPhotoDataUrl} params={plan.creator.avatarParams} size="md" />
           <span>
-            Hosted by <strong>{plan.creator.firstName}</strong>
+            Started by <strong>{plan.creator.firstName}</strong>
           </span>
         </button>
 
-        {plan.description && <p className="plan-description plan-description-quote">&ldquo;{plan.description}&rdquo;</p>}
+        {plan.description && (
+          plan.planKind === "looking_for" ? (
+            <p className="plan-description plan-description-quote">&ldquo;{plan.description}&rdquo;</p>
+          ) : (
+            <p className="plan-description">{plan.description}</p>
+          )
+        )}
 
         {plan.tags.length > 0 && (
           <div className="tag-chip-row">
@@ -220,31 +225,22 @@ export function PlanDetailPage() {
         {showGroupPrompt && (
           <div className="lock-prompt" role="note">
             <p className="lock-prompt-headline">
-              Looks like you've got a group. Ready to lock something in?
+              Looks like you've got a group. Ready to lock it in?
             </p>
             <p className="lock-prompt-soft">
-              Plans work best when someone locks it in early.
+              Plans work best when the host locks it in early.
             </p>
-            {canLock && !claimedHost && (
-              <button
-                type="button"
-                className="btn-primary btn-block lock-prompt-claim"
-                onClick={() => {
-                  setClaimedHost(true);
-                  // Defer scroll so the expanded form has mounted.
-                  setTimeout(() => {
-                    lockFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-                  }, 50);
-                }}
-              >
-                I'll take it from here
-              </button>
-            )}
-            {canLock && claimedHost && (
-              <p className="lock-prompt-claimed">
-                <strong>You're hosting.</strong> Fill in venue + day below when you're ready.
-              </p>
-            )}
+            <button
+              type="button"
+              className="btn-primary btn-block lock-prompt-claim"
+              onClick={() => {
+                setTimeout(() => {
+                  lockFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                }, 50);
+              }}
+            >
+              Set it up
+            </button>
           </div>
         )}
 
@@ -255,13 +251,9 @@ export function PlanDetailPage() {
             role="note"
           >
             <p>
-              {isHosting && isLookingFor
+              {isLookingFor
                 ? "You can lock this in anytime — or wait to see who's interested."
-                : claimedHost
-                  ? `You're hosting — pick a venue and day to lock it in.`
-                  : isLookingFor
-                    ? "Whoever picks the spot becomes the host. Fill in venue and day to make it a plan."
-                    : "Still working out the details? Fill in venue & time when you’re ready and lock it in."}
+                : "Still working out the details? Fill in venue & time when you’re ready and lock it in."}
             </p>
             <label className="form-question">Venue</label>
             <LocationAutocomplete
@@ -326,12 +318,18 @@ export function PlanDetailPage() {
           />
         )}
 
-        <div className="plan-actions-row">
-          <button type="button" className="action-btn" onClick={() => setShowGetThere(true)}>
-            🚗 Get there
+        <div className="plan-actions-row plan-actions-row--triple">
+          <button type="button" className="action-btn action-btn--stack" onClick={() => setShowGetThere(true)}>
+            <span className="action-btn-icon" aria-hidden="true">📍</span>
+            <span className="action-btn-label">Get there</span>
           </button>
-          <button type="button" className="action-btn" onClick={() => setShowShare(true)}>
-            ↗ Share
+          <button type="button" className="action-btn action-btn--stack" onClick={() => setShowInvite(true)}>
+            <span className="action-btn-icon" aria-hidden="true">＋</span>
+            <span className="action-btn-label">Invite</span>
+          </button>
+          <button type="button" className="action-btn action-btn--stack" onClick={() => setShowShare(true)}>
+            <span className="action-btn-icon" aria-hidden="true">↗</span>
+            <span className="action-btn-label">Share</span>
           </button>
         </div>
 
@@ -372,32 +370,54 @@ export function PlanDetailPage() {
         )}
       </section>
 
+      {canChat && (
+        <Link to={`/plans/${plan.id}/chat`} className="chat-entry">
+          💬 Group chat ({plan.participants.going.length + plan.participants.interested.length})
+          <span className="chat-entry-arrow">→</span>
+        </Link>
+      )}
+
       <section className="who-block">
-        <h3 className="who-block-heading">Going · {plan.participants.going.length}</h3>
-        {plan.participants.going.length === 0 ? (
-          <p className="subtle">No one's locked in yet. Be the first to say "I'm in."</p>
-        ) : (
-          <div className="roster">
-            {plan.participants.going.map((person) => (
-              <Link key={person.id} to={`/profile/${person.id}`} className="roster-tile">
-                <Avatar seed={person.avatarSeed} style={person.avatarStyle} photoDataUrl={person.avatarPhotoDataUrl} params={person.avatarParams} size="md" />
-                <span className="roster-name">
-                  {person.firstName}
-                  {person.id === user.id && <span className="you-pill">You</span>}
-                </span>
-                {person.id === plan.creator.id && <span className="roster-role">Host</span>}
-              </Link>
-            ))}
-          </div>
-        )}
+        <div className="who-row">
+          <h3 className="who-block-heading">Going · {plan.participants.going.length}</h3>
+          {plan.participants.going.length === 0 ? (
+            <p className="subtle" style={{ margin: 0 }}>Be the first to say "I'm in."</p>
+          ) : (
+            <div className="who-row-body">
+              <div className="avatar-stack avatar-stack--md">
+                {plan.participants.going.slice(0, 5).map((person) => (
+                  <Link
+                    key={person.id}
+                    to={`/profile/${person.id}`}
+                    className="avatar-stack-link"
+                    aria-label={person.firstName}
+                  >
+                    <Avatar
+                      seed={person.avatarSeed}
+                      style={person.avatarStyle}
+                      photoDataUrl={person.avatarPhotoDataUrl}
+                      params={person.avatarParams}
+                      size="sm"
+                    />
+                  </Link>
+                ))}
+                {plan.participants.going.length > 5 && (
+                  <span className="avatar-stack-more">+{plan.participants.going.length - 5}</span>
+                )}
+              </div>
+              <span className="who-row-count">{plan.participants.going.length} going</span>
+            </div>
+          )}
+        </div>
 
         {plan.participants.interested.length > 0 && (
-          <>
-            <h3 className="who-block-heading" style={{ marginTop: 18 }}>
+          <div className="who-row" style={{ marginTop: 14 }}>
+            <h3 className="who-block-heading">
               {plan.joinType === "approve" && isHosting ? "Applications" : "Interested"} · {plan.participants.interested.length}
             </h3>
             {plan.joinType === "approve" && isHosting ? (
-              // Host approval flow keeps the full row with a "Let them in" action.
+              // Host approval flow keeps the per-person rows so the host can
+              // tap "Let them in" without leaving the page.
               <div className="participant-list-interested">
                 {plan.participants.interested.map((person) => (
                   <div key={person.id} className="participant-row participant-row--with-action">
@@ -431,28 +451,34 @@ export function PlanDetailPage() {
                 ))}
               </div>
             ) : (
-              <div className="roster roster--sm">
-                {plan.participants.interested.map((person) => (
-                  <Link key={person.id} to={`/profile/${person.id}`} className="roster-tile">
-                    <Avatar seed={person.avatarSeed} style={person.avatarStyle} photoDataUrl={person.avatarPhotoDataUrl} params={person.avatarParams} size="sm" />
-                    <span className="roster-name">
-                      {person.firstName}
-                      {person.id === user.id && <span className="you-pill">You</span>}
-                    </span>
-                  </Link>
-                ))}
+              <div className="who-row-body">
+                <div className="avatar-stack avatar-stack--md">
+                  {plan.participants.interested.slice(0, 5).map((person) => (
+                    <Link
+                      key={person.id}
+                      to={`/profile/${person.id}`}
+                      className="avatar-stack-link"
+                      aria-label={person.firstName}
+                    >
+                      <Avatar
+                        seed={person.avatarSeed}
+                        style={person.avatarStyle}
+                        photoDataUrl={person.avatarPhotoDataUrl}
+                        params={person.avatarParams}
+                        size="sm"
+                      />
+                    </Link>
+                  ))}
+                  {plan.participants.interested.length > 5 && (
+                    <span className="avatar-stack-more">+{plan.participants.interested.length - 5}</span>
+                  )}
+                </div>
+                <span className="who-row-count">{plan.participants.interested.length} interested</span>
               </div>
             )}
-          </>
+          </div>
         )}
       </section>
-
-      {canChat && (
-        <Link to={`/plans/${plan.id}/chat`} className="chat-entry">
-          💬 Group chat ({plan.participants.going.length + plan.participants.interested.length})
-          <span className="chat-entry-arrow">→</span>
-        </Link>
-      )}
 
       {showShare && <ShareSheet plan={plan} onClose={() => setShowShare(false)} />}
       {showGetThere && <GetThereSheet plan={plan} onClose={() => setShowGetThere(false)} />}

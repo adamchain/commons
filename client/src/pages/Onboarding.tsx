@@ -8,6 +8,7 @@ import { fileToResizedDataUrl } from "../lib/imageResize";
 import {
   ALL_INTERESTS,
   AVATAR_PRESETS,
+  INTEREST_EMOJI,
   INTEREST_LABELS,
   type AvatarStyle,
   type InterestTag,
@@ -170,7 +171,7 @@ export function OnboardingPage() {
         />
         {error && <div className="onboarding-error">{error}</div>}
         <button className="btn-primary btn-block" disabled={busy || !phoneNumber} onClick={requestCode}>
-          {busy ? "Sending…" : "Send code"}
+          {busy ? "Sending…" : "Get started"}
         </button>
         <p className="onboarding-fineprint">
           {smsConfigured === false
@@ -184,7 +185,7 @@ export function OnboardingPage() {
   }
   if (step === "code") {
     return (
-      <OnboardingShell landing title="Enter the code" subtitle={`Sent to ${phoneNumber}`}>
+      <OnboardingShell landing title="Check your texts." subtitle={`Sent to ${phoneNumber}`}>
         <input
           className="onboarding-input onboarding-input-code"
           type="text"
@@ -537,12 +538,12 @@ function LocationStep({
 
   return (
     <OnboardingShell
-      title={coords ? "Where do you spend time?" : "Where do you hang out?"}
-      subtitle={coords ? "Sorted by closest to you. Tap all that apply." : "Pick every area that fits — we’ll personalize your feed."}
+      title="Where do you spend time?"
+      subtitle={coords ? "Pick your neighborhoods — we’ll show you what’s happening nearby." : "Pick every area that fits — we’ll personalize your feed."}
     >
       <input
         className="onboarding-input"
-        placeholder="Search…"
+        placeholder="Search neighborhoods…"
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
       />
@@ -564,7 +565,10 @@ function LocationStep({
                   });
                 }}
               >
-                <span className="neighborhood-name">{n.name}</span>
+                <span className="neighborhood-name">
+                  {on && <span className="neighborhood-check" aria-hidden="true">✓</span>}
+                  {n.name}
+                </span>
                 <span className="neighborhood-metro">
                   {coords && n.lat !== undefined && n.lng !== undefined
                     ? `${formatMiles(distance(coords, n))} away`
@@ -587,7 +591,7 @@ function LocationStep({
           }
         }}
       >
-        Continue
+        {selected.size > 0 ? `Continue · ${selected.size} picked` : "Continue"}
       </button>
     </OnboardingShell>
   );
@@ -597,15 +601,22 @@ function GuidelinesStep({ onAgree }: { onAgree: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   return (
     <OnboardingShell
-      title="Community guidelines"
-      subtitle="A quick read before you hit the feed."
+      title="Before you hit the feed."
+      subtitle="A quick read. We mean it."
     >
       <ul className="guidelines-list">
         <li>
           <span className="guidelines-icon" aria-hidden="true">🤝</span>
           <div>
             <strong>Show up kindly.</strong>
-            <p>Respect hosts, neighbors, and the people you meet. No harassment, hate, or bigotry.</p>
+            <p>Respect the people you meet and the city you’re in. No harassment, hate, or bigotry.</p>
+          </div>
+        </li>
+        <li>
+          <span className="guidelines-icon" aria-hidden="true">📅</span>
+          <div>
+            <strong>Show up when you say you will.</strong>
+            <p>If something comes up, drop out early — don’t ghost. Someone else might want your spot.</p>
           </div>
         </li>
         <li>
@@ -643,7 +654,7 @@ function GuidelinesStep({ onAgree }: { onAgree: () => Promise<void> }) {
           }
         }}
       >
-        {busy ? "One sec…" : "I agree — let me in"}
+        {busy ? "One sec…" : "I’m in — let’s go"}
       </button>
       <p className="onboarding-fineprint">Tapping agree confirms you’ll follow the Commons guidelines.</p>
     </OnboardingShell>
@@ -663,7 +674,7 @@ function InterestsStep({ me, onSave }: { me: MeDTO; onSave: (interests: Interest
   }
 
   return (
-    <OnboardingShell title="What are you into?" subtitle="Pick as many as you like — we’ll tune your feed from day one.">
+    <OnboardingShell title="What are you into?" subtitle="Pick what you’re into. Your feed does the rest.">
       <div className="interest-grid">
         {ALL_INTERESTS.map((t) => {
           const isPicked = picked.includes(t);
@@ -674,6 +685,7 @@ function InterestsStep({ me, onSave }: { me: MeDTO; onSave: (interests: Interest
               className={`interest-tile ${isPicked ? "is-picked" : ""}`}
               onClick={() => toggle(t)}
             >
+              <span className="interest-emoji" aria-hidden="true">{INTEREST_EMOJI[t]}</span>
               <span className="interest-label">{INTEREST_LABELS[t]}</span>
             </button>
           );
@@ -719,7 +731,7 @@ function ProfileStep({
   }
 
   return (
-    <OnboardingShell title="Your profile" subtitle="A photo, a character, or your initials.">
+    <OnboardingShell title="Put a face to your name." subtitle="A photo, a character, or your initials — whatever feels like you.">
       <div className="profile-avatar-preview">
         <Avatar
           seed={me.avatarSeed}

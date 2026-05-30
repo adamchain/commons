@@ -898,6 +898,26 @@ export const store = {
     if (count > 0) persist();
     return count;
   },
+  deleteNotification(userId: string, notificationId: string): boolean {
+    const before = snapshot.notifications.length;
+    snapshot.notifications = snapshot.notifications.filter(
+      (n) => !(n.id === notificationId && n.userId === userId),
+    );
+    if (snapshot.notifications.length === before) return false;
+    persist();
+    mongoMirror.deleteNotification(notificationId);
+    return true;
+  },
+  clearAllNotificationsForUser(userId: string): number {
+    const before = snapshot.notifications.length;
+    snapshot.notifications = snapshot.notifications.filter((n) => n.userId !== userId);
+    const removed = before - snapshot.notifications.length;
+    if (removed > 0) {
+      persist();
+      mongoMirror.deleteNotificationsByUser(userId);
+    }
+    return removed;
+  },
   listAllNotifications(): NotificationRecord[] {
     return [...snapshot.notifications];
   },

@@ -74,6 +74,10 @@ export function CreatePlanPage() {
   const [submitting, setSubmitting] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Step 1 — user picks Make a plan (full form) vs Just an idea (loose, looking_for).
+  // Skipped automatically when arriving with an invite seed.
+  type Path = "choose" | "plan" | "idea";
+  const [path, setPath] = useState<Path>(inviteUserId ? "plan" : "choose");
   const [network, setNetwork] = useState<PublicUser[] | null>(null);
   const [invitedIds, setInvitedIds] = useState<Set<string>>(() =>
     inviteUserId ? new Set([inviteUserId]) : new Set(),
@@ -255,18 +259,65 @@ export function CreatePlanPage() {
     }
   };
 
+  if (path === "choose") {
+    return (
+      <main className="app-shell app-shell--mid">
+        <header className="app-header app-header--minimal">
+          <Link to="/" className="detail-back">
+            ← Back
+          </Link>
+        </header>
+        <h1 className="brand" style={{ marginBottom: 18 }}>
+          Got something in mind?
+        </h1>
+        <div className="path-picker">
+          <button
+            type="button"
+            className="path-picker-card"
+            onClick={() => setPath("plan")}
+          >
+            <span className="path-picker-icon path-picker-icon--neutral" aria-hidden="true">📅</span>
+            <span className="path-picker-title">Make a plan</span>
+            <span className="path-picker-sub">Know what you want to do? Start here.</span>
+          </button>
+          <button
+            type="button"
+            className="path-picker-card path-picker-card--accent"
+            onClick={() => {
+              // "Just an idea" pre-flexes the constraints so the resulting plan
+              // posts as a looking_for and the host can fill in the rest later.
+              setForm((f) => ({
+                ...f,
+                isFlexibleLocation: true,
+                isFlexibleTime: true,
+                isFlexibleDate: true,
+              }));
+              setPath("idea");
+            }}
+          >
+            <span className="path-picker-icon path-picker-icon--accent" aria-hidden="true">💡</span>
+            <span className="path-picker-title">Just an idea</span>
+            <span className="path-picker-sub">Just a thought. See who&apos;s down.</span>
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  const isIdea = path === "idea";
+
   return (
     <main className="app-shell app-shell--mid">
       <header className="app-header app-header--minimal">
-        <Link to="/" className="detail-back">
+        <button type="button" className="detail-back" onClick={() => setPath("choose")}>
           ← Back
-        </Link>
+        </button>
       </header>
       <h1 className="brand" style={{ marginBottom: 8 }}>
-        New plan
+        {isIdea ? "Just an idea" : "New plan"}
       </h1>
       <p className="brand-tagline" style={{ marginBottom: 24 }}>
-        Fill what you know · toggle what's flexible
+        {isIdea ? "No details needed. Just the idea." : "Fill what you know · toggle what's flexible"}
       </p>
 
       {inviteUserId && inviteUserName && (
@@ -687,7 +738,7 @@ export function CreatePlanPage() {
         {error && <p className="error-text">{error}</p>}
 
         <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
-          {submitting ? "Posting…" : "Post it"}
+          {submitting ? "Posting…" : isIdea ? "Put it out there" : "Post it"}
         </button>
       </form>
     </main>
