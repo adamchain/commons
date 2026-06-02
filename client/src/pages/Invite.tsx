@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
+import { getPublicWebOrigin } from "../lib/platform";
 import type { InviteCodeDTO } from "../types/shared";
 
 /**
@@ -21,7 +22,7 @@ export function InvitePage() {
   }, []);
 
   function shareCode(code: string) {
-    const url = `${window.location.origin}/?invite=${encodeURIComponent(code)}`;
+    const url = `${getPublicWebOrigin()}/?invite=${encodeURIComponent(code)}`;
     const body = `${firstName} invited you to Commons — neighborhood plans, no pressure. Code: ${code}\n${url}`;
     const data = { title: "Join me on Commons", text: body, url };
     const nav = navigator as Navigator & {
@@ -35,7 +36,7 @@ export function InvitePage() {
   }
 
   async function copyCode(code: string) {
-    const url = `${window.location.origin}/?invite=${encodeURIComponent(code)}`;
+    const url = `${getPublicWebOrigin()}/?invite=${encodeURIComponent(code)}`;
     try {
       await navigator.clipboard.writeText(url);
     } catch {

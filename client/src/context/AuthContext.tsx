@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { api } from "../api/http";
+import { ensurePushRegistered } from "../lib/push";
 import type { MeDTO } from "../types/shared";
 
 interface AuthContextValue {
@@ -25,6 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const me = await api<MeDTO>("/api/auth/me");
       setUser(me);
+      void ensurePushRegistered();
     } catch {
       setUser(null);
     } finally {

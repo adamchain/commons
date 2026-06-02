@@ -4,6 +4,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
+import { pickPhotoNative } from "../lib/photoPicker";
+import { isNative } from "../lib/platform";
 import { formatPlanDate, formatPlanTime } from "../lib/format";
 import {
   VIBE_OPTIONS,
@@ -152,6 +154,19 @@ function EditForm({
     fileToResizedDataUrl(file)
       .then((dataUrl) => setForm((f) => ({ ...f, flyerDataUrl: dataUrl })))
       .catch(() => setSubmitErr("Couldn't read that image. Try another."));
+  }
+
+  async function openFlyerPicker(): Promise<void> {
+    if (isNative()) {
+      try {
+        const dataUrl = await pickPhotoNative({ maxPx: 1024, quality: 0.85 });
+        if (dataUrl) setForm((f) => ({ ...f, flyerDataUrl: dataUrl }));
+      } catch {
+        /* user canceled */
+      }
+      return;
+    }
+    flyerRef.current?.click();
   }
 
   function toggleVibe(vid: VibeIcon): void {
@@ -405,7 +420,7 @@ function EditForm({
               <button
                 type="button"
                 className="btn-secondary btn-block"
-                onClick={() => flyerRef.current?.click()}
+                onClick={() => void openFlyerPicker()}
               >Upload flyer</button>
             )}
             <input

@@ -8,8 +8,16 @@ declare module "express-serve-static-core" {
   }
 }
 
+function tokenFromRequest(req: Request): string | undefined {
+  const header = req.headers.authorization;
+  if (header && /^Bearer\s+/i.test(header)) {
+    return header.replace(/^Bearer\s+/i, "").trim() || undefined;
+  }
+  return req.cookies?.session as string | undefined;
+}
+
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
-  const token = req.cookies?.session as string | undefined;
+  const token = tokenFromRequest(req);
   if (!token) {
     res.status(401).json({ error: "Unauthorized" });
     return;

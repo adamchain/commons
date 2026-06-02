@@ -37,13 +37,15 @@ function parseTwilioError(err: unknown): TwilioLikeError {
   };
 }
 
-function setSessionCookie(res: import("express").Response, userId: string): void {
-  res.cookie("session", signSessionToken(userId), {
+function setSessionCookie(res: import("express").Response, userId: string): string {
+  const token = signSessionToken(userId);
+  res.cookie("session", token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     maxAge: 1000 * 60 * 60 * 24 * 30,
   });
+  return token;
 }
 
 function generateCode(): string {
@@ -179,8 +181,8 @@ authRouter.post("/verify-code", async (req, res) => {
     res.status(500).json({ error: "Could not finish sign in. Please try again." });
     return;
   }
-  setSessionCookie(res, user.id);
-  res.json(meFromUser(user));
+  const token = setSessionCookie(res, user.id);
+  res.json({ ...meFromUser(user), token });
 });
 
 authRouter.get("/me", requireAuth, async (req, res) => {

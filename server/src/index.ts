@@ -9,6 +9,7 @@ import { hydrateSnapshotFromMongo } from "./hydrate.js";
 import { adminRouter } from "./routes/admin.js";
 import { authRouter } from "./routes/auth.js";
 import { chatRouter } from "./routes/chat.js";
+import { devicesRouter } from "./routes/devices.js";
 import { feedbackRouter } from "./routes/feedback.js";
 import { neighborhoodsRouter } from "./routes/neighborhoods.js";
 import { notificationsRouter } from "./routes/notifications.js";
@@ -24,9 +25,23 @@ const port = Number(process.env.PORT ?? 4000);
 const clientUrl = process.env.APP_URL ?? "http://localhost:5173";
 const isProduction = process.env.NODE_ENV === "production";
 
+// Web build uses cookie auth with credentials; Capacitor builds use Bearer
+// tokens from capacitor://localhost (iOS) or http://localhost (Android).
+const NATIVE_ORIGINS = new Set([
+  "capacitor://localhost",
+  "ionic://localhost",
+  "http://localhost",
+]);
+
 app.use(
   cors({
-    origin: clientUrl,
+    origin: (origin, cb) => {
+      if (!origin || origin === clientUrl || NATIVE_ORIGINS.has(origin)) {
+        cb(null, true);
+        return;
+      }
+      cb(null, false);
+    },
     credentials: true,
   })
 );
@@ -41,6 +56,7 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/admin", adminRouter);
 app.use("/api/auth", authRouter);
+app.use("/api/devices", devicesRouter);
 app.use("/api/plans", plansRouter);
 app.use("/api/places", placesRouter);
 app.use("/api/neighborhoods", neighborhoodsRouter);

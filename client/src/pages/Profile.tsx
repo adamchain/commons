@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
+import { clearAuthToken } from "../api/authToken";
 import { Avatar } from "../components/Avatar";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
+import { pickPhotoNative } from "../lib/photoPicker";
+import { isNative } from "../lib/platform";
 import {
   AVATAR_PRESETS,
   HOST_TAG_LABELS,
@@ -251,6 +254,7 @@ export function ProfilePage() {
           onClick={async () => {
             sessionStorage.removeItem("commons_pending_admin_choice");
             await api("/api/auth/logout", { method: "POST" });
+            await clearAuthToken();
             setUser(null);
             navigate("/onboarding", { replace: true });
           }}
@@ -385,7 +389,18 @@ function EditPanel({ me, onSaved }: { me: MeDTO; onSaved: (next: MeDTO) => void 
           <button
             type="button"
             className="btn-secondary"
-            onClick={() => fileRef.current?.click()}
+            onClick={async () => {
+              if (isNative()) {
+                try {
+                  const dataUrl = await pickPhotoNative({ maxPx: 512, quality: 0.82 });
+                  if (dataUrl) pickPhoto(dataUrl);
+                } catch {
+                  /* user canceled */
+                }
+                return;
+              }
+              fileRef.current?.click();
+            }}
           >
             {photo ? "Replace photo" : "Upload photo"}
           </button>

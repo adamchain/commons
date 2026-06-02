@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import type { AvatarStyle } from "../types/shared";
 import { Avatar } from "./Avatar";
+import { isNative } from "../lib/platform";
+import { pickPhotoNative } from "../lib/photoPicker";
 
 interface AvatarBuilderProps {
   initialSeed: string;
@@ -46,6 +48,22 @@ export function AvatarBuilder({ initialSeed, initialStyle = "avataaars", initial
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
     }
+  }
+
+  async function openPicker() {
+    if (isNative()) {
+      setUploading(true);
+      try {
+        const dataUrl = await pickPhotoNative({ maxPx: TARGET_PX, quality: JPEG_QUALITY });
+        if (dataUrl) setPhoto(dataUrl);
+      } catch {
+        /* user canceled or denied permission */
+      } finally {
+        setUploading(false);
+      }
+      return;
+    }
+    fileRef.current?.click();
   }
 
   function commit() {
@@ -139,7 +157,7 @@ export function AvatarBuilder({ initialSeed, initialStyle = "avataaars", initial
             <button
               type="button"
               className="btn-secondary"
-              onClick={() => fileRef.current?.click()}
+              onClick={() => void openPicker()}
               disabled={uploading}
             >
               {uploading ? "Uploading…" : photo ? "Choose another" : "Choose photo"}

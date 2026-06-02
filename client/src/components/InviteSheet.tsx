@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/http";
 import { Avatar } from "./Avatar";
+import { getPublicWebOrigin } from "../lib/platform";
 import type { PublicUser } from "../types/shared";
 
 /**
@@ -28,7 +29,7 @@ export function InviteSheet({
       .catch(() => setNetwork([]));
   }, []);
 
-  const planUrl = `${window.location.origin}/plans/${planId}`;
+  const planUrl = `${getPublicWebOrigin()}/plans/${planId}`;
   const smsBody = `Come to ${planTitle} on Commons — ${planUrl}`;
 
   async function shareSms() {

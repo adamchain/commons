@@ -1,12 +1,13 @@
 import { useState } from "react";
 import type { PlanDTO } from "../types/shared";
+import { getPublicWebOrigin } from "../lib/platform";
 
 // Stub of the share sheet from PRD §17. In-app friend search isn't wired
 // up yet — this exposes the SMS path (mailto: / sms: deep link) and a copy
 // button so the screen is usable today.
 export function ShareSheet({ plan, onClose }: { plan: PlanDTO; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
-  const url = `${window.location.origin}/plans/${plan.id}`;
+  const url = `${getPublicWebOrigin()}/plans/${plan.id}`;
   const smsBody = encodeURIComponent(`Want to come to "${plan.title}" on Commons? ${url}`);
 
   return (

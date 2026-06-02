@@ -5,6 +5,8 @@ import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
+import { pickPhotoNative } from "../lib/photoPicker";
+import { isNative } from "../lib/platform";
 import {
   VIBE_OPTIONS,
   type InterestTag,
@@ -214,6 +216,19 @@ export function CreatePlanPage() {
     fileToResizedDataUrl(file)
       .then((dataUrl) => setForm((f) => ({ ...f, flyerDataUrl: dataUrl })))
       .catch(() => setError("Couldn't read that image. Try another."));
+  };
+
+  const openFlyerPicker = async () => {
+    if (isNative()) {
+      try {
+        const dataUrl = await pickPhotoNative({ maxPx: 1024, quality: 0.85 });
+        if (dataUrl) setForm((f) => ({ ...f, flyerDataUrl: dataUrl }));
+      } catch {
+        /* user canceled */
+      }
+      return;
+    }
+    flyerRef.current?.click();
   };
 
   const [linkBusy, setLinkBusy] = useState(false);
@@ -621,7 +636,7 @@ export function CreatePlanPage() {
               <button
                 type="button"
                 className="btn-secondary btn-block"
-                onClick={() => flyerRef.current?.click()}
+                onClick={() => void openFlyerPicker()}
               >
                 Upload flyer
               </button>

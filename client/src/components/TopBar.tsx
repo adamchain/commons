@@ -14,7 +14,8 @@ export function TopBar() {
   const { pathname } = useLocation();
   const [unreadMessages, setUnreadMessages] = useState(0);
 
-  // Keep the messages badge fresh: refetch on navigation + poll lightly.
+  // Keep the messages badge fresh: refetch on navigation + poll lightly while
+  // the app is foregrounded. Push notifications cover the backgrounded case.
   useEffect(() => {
     if (!user) {
       setUnreadMessages(0);
@@ -22,6 +23,7 @@ export function TopBar() {
     }
     let cancelled = false;
     const load = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
       void api<ConversationSummaryDTO[]>("/api/conversations")
         .then((rows) => {
           if (!cancelled) setUnreadMessages(rows.reduce((n, r) => n + r.unreadCount, 0));
@@ -29,10 +31,15 @@ export function TopBar() {
         .catch(() => undefined);
     };
     load();
-    const t = setInterval(load, 30000);
+    const t = setInterval(load, 60000);
+    const onVisible = () => {
+      if (!document.hidden) load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
       clearInterval(t);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [user?.id, pathname]);
 

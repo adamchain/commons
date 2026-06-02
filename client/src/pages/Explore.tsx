@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
 import { formatPlaceAddress } from "../lib/format";
+import { getCurrentCoords } from "../lib/geolocate";
 import type { NeighborhoodDTO } from "../types/shared";
 
 interface PlaceResult {
@@ -72,19 +73,16 @@ export function ExplorePage() {
       }
     };
 
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          if (cancelled) return;
-          setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-          setLocating(false);
-        },
-        () => void useNeighborhood(),
-        { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 },
-      );
-    } else {
-      void useNeighborhood();
-    }
+    void (async () => {
+      const c = await getCurrentCoords({ timeoutMs: 8000 });
+      if (cancelled) return;
+      if (c) {
+        setCoords(c);
+        setLocating(false);
+      } else {
+        await useNeighborhood();
+      }
+    })();
     return () => {
       cancelled = true;
     };

@@ -2,9 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { CSSProperties, ReactNode } from "react";
 import { api } from "../api/http";
+import { setAuthToken } from "../api/authToken";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
+import { pickPhotoNative } from "../lib/photoPicker";
+import { isNative } from "../lib/platform";
+import { getCurrentCoords } from "../lib/geolocate";
 import {
   ALL_INTERESTS,
   AVATAR_PRESETS,
@@ -111,10 +115,12 @@ export function OnboardingPage() {
     setError(null);
     setBusy(true);
     try {
-      const me = await api<MeDTO>("/api/auth/verify-code", {
+      const result = await api<MeDTO & { token?: string }>("/api/auth/verify-code", {
         method: "POST",
         body: JSON.stringify({ phoneNumber, code }),
       });
+      const { token, ...me } = result;
+      if (token) await setAuthToken(token);
       setUser(me);
       // Best-effort redeem — failure here doesn't block onboarding. The user
       // is already authenticated; the code is just attribution for the inviter.
@@ -504,22 +510,15 @@ function LocationStep({
     void api<NeighborhoodDTO[]>("/api/neighborhoods").then(setNeighborhoods).catch(() => undefined);
   }, []);
 
-  function shareLocation() {
-    if (!("geolocation" in navigator)) {
-      setPermissionState("denied");
-      return;
-    }
+  async function shareLocation() {
     setPermissionState("asking");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        onCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setPermissionState("granted");
-      },
-      () => {
-        setPermissionState("denied");
-      },
-      { enableHighAccuracy: false, timeout: 8000 }
-    );
+    const coords = await getCurrentCoords({ timeoutMs: 8000 });
+    if (coords) {
+      onCoords(coords);
+      setPermissionState("granted");
+    } else {
+      setPermissionState("denied");
+    }
   }
 
   // Sort by distance to user if we have coords; otherwise alphabetical.
@@ -767,18 +766,36 @@ function ProfileStep({
 
       <details className="profile-photo-picker">
         <summary>Upload a photo</summary>
-        <input
-          type="file"
-          accept="image/*"
-          className="onboarding-input"
-          style={{ marginTop: 8 }}
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (!f) return;
-            void fileToResizedDataUrl(f).then(pickPhoto).catch(() => undefined);
-            e.target.value = "";
-          }}
-        />
+        {isNative() ? (
+          <button
+            type="button"
+            className="btn-secondary btn-block"
+            style={{ marginTop: 8 }}
+            onClick={async () => {
+              try {
+                const dataUrl = await pickPhotoNative({ maxPx: 512, quality: 0.82 });
+                if (dataUrl) pickPhoto(dataUrl);
+              } catch {
+                /* user canceled */
+              }
+            }}
+          >
+            Choose photo
+          </button>
+        ) : (
+          <input
+            type="file"
+            accept="image/*"
+            className="onboarding-input"
+            style={{ marginTop: 8 }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              void fileToResizedDataUrl(f).then(pickPhoto).catch(() => undefined);
+              e.target.value = "";
+            }}
+          />
+        )}
       </details>
 
       <div className="profile-preset-block">
