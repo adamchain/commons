@@ -15,6 +15,7 @@ import { isMongoConnected } from "./lib/db.js";
 import {
   ConversationModel,
   DeclineModel,
+  DropoutModel,
   FeedbackModel,
   LogModel,
   MessageModel,
@@ -30,6 +31,7 @@ import { UserModel } from "./models/User.js";
 import type {
   ConversationRecord,
   DeclineRecord,
+  DropoutRecord,
   FeedbackRecord,
   InviteCodeRecord,
   LogRecord,
@@ -207,6 +209,18 @@ export const mongoMirror = {
   // Declines
   upsertDecline(d: DeclineRecord): void {
     upsert(DeclineModel as never, d, `upsertDecline ${d.id}`);
+  },
+
+  // Dropouts
+  upsertDropout(d: DropoutRecord): void {
+    upsert(DropoutModel as never, d, `upsertDropout ${d.id}`);
+  },
+  deleteDropoutsByUser(userId: string): void {
+    if (!isMongoConnected()) return;
+    const p = DropoutModel.deleteMany({ userId })
+      .exec()
+      .catch((err) => fail(`deleteDropoutsByUser ${userId}`, err));
+    track(p);
   },
 
   // Logs

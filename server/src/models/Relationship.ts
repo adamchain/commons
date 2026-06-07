@@ -12,6 +12,11 @@ const RelationshipSchema = new mongoose.Schema<RelationshipRecord>(
       required: true,
       enum: ["post_plan_modal", "profile_friend_add", "seed", "other"],
     },
+    role: {
+      type: String,
+      enum: ["member", "admin", "owner"],
+      default: null,
+    },
     createdAt: { type: String, required: true },
   },
   { collection: "relationships" },

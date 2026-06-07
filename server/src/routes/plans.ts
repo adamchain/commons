@@ -840,8 +840,14 @@ plansRouter.delete("/:id/participation", requireAuth, async (req, res) => {
   const userId = String(req.userId);
   const existing = store.findParticipation(planId, userId);
   store.deleteParticipation(planId, userId);
-  // A removal counts as a soft "decline" for the recommendation algo.
+  // A removal counts as a soft "decline" for the recommendation algo, and
+  // separately gets timestamped on the `dropouts` log for analytics (only
+  // when there was an active RSVP — bare deletes from a cancelled flow
+  // shouldn't show up as a dropout).
   store.recordDecline(userId, planId);
+  if (existing) {
+    store.recordDropOut(userId, planId, existing.state);
+  }
   store.log("participation_changed", {
     planId,
     userId,
@@ -908,8 +914,11 @@ plansRouter.post("/:id/transfer-host", requireAuth, async (req, res) => {
   store.updatePlan(planId, { creatorId: newHostId });
   store.ensureGroupConversation(planId, [newHostId]);
   // The outgoing host drops their own participation — they explicitly handed
-  // it off, so they're no longer committed.
+  // it off, so they're no longer committed. Hosts are implicitly "going"
+  // before the transfer, so we log a "going" drop-out for analytics.
+  const outgoing = store.findParticipation(planId, userId);
   store.deleteParticipation(planId, userId);
+  store.recordDropOut(userId, planId, outgoing?.state ?? "going");
   store.log("plan_host_transferred", { planId, from: userId, to: newHostId });
   await emit({
     userId: newHostId,

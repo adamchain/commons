@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "com.commons.app",
+  appId: "com.oncommons.commons",
   appName: "Commons",
   webDir: "dist",
   ios: {

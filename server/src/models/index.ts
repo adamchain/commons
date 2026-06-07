@@ -10,6 +10,7 @@ import mongoose, { Schema, type Model } from "mongoose";
 import type {
   ConversationRecord,
   DeclineRecord,
+  DropoutRecord,
   FeedbackRecord,
   LogRecord,
   MessageRecord,
@@ -101,7 +102,9 @@ const ParticipationSchema = new Schema<ParticipationRecord>(
     planId: { type: String, required: true },
     userId: { type: String, required: true },
     state: { type: String, enum: ["interested", "going"], required: true },
+    createdAt: { type: String },
     updatedAt: { type: String, required: true },
+    attended: { type: Boolean, default: null },
   },
   { collection: "participations" },
 );
@@ -109,6 +112,22 @@ ParticipationSchema.index({ id: 1 }, { unique: true });
 ParticipationSchema.index({ planId: 1, userId: 1 }, { unique: true });
 ParticipationSchema.index({ userId: 1 });
 export const ParticipationModel = compile<ParticipationRecord>("Participation", ParticipationSchema);
+
+// Dropouts — explicit drop-out event log. Parallel to Declines.
+const DropoutSchema = new Schema<DropoutRecord>(
+  {
+    id: { type: String, required: true },
+    userId: { type: String, required: true },
+    planId: { type: String, required: true },
+    fromState: { type: String, enum: ["interested", "going"], required: true },
+    createdAt: { type: String, required: true },
+  },
+  { collection: "dropouts" },
+);
+DropoutSchema.index({ id: 1 }, { unique: true });
+DropoutSchema.index({ userId: 1, createdAt: 1 });
+DropoutSchema.index({ planId: 1 });
+export const DropoutModel = compile<DropoutRecord>("Dropout", DropoutSchema);
 
 // Conversations
 const ConversationSchema = new Schema<ConversationRecord>(

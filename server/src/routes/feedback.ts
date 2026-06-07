@@ -66,5 +66,9 @@ feedbackRouter.post("/", requireAuth, (req, res) => {
     note,
     hostTags,
   });
+  // Submitting feedback implicitly confirms attendance — the prompt asks "how
+  // was it", not "did you go". Mark the participation as attended so the
+  // post-plan attendance signal lands in the same write the user made.
+  store.markAttended(planId, userId, true);
   res.status(201).json({ ok: true, id: record.id });
 });

@@ -131,7 +131,15 @@ export interface ParticipationRecord {
   planId: string;
   userId: string;
   state: ParticipationState;
+  /** First-join timestamp. Preserved across state toggles. Absent on legacy rows. */
+  createdAt?: string;
   updatedAt: string;
+  /**
+   * Post-plan attendance signal. `true` = confirmed they went (via the
+   * post-plan prompt / feedback submission). `null` or absent = unanswered or
+   * pre-event. We never set `false` automatically — silence is not a no-show.
+   */
+  attended?: boolean | null;
 }
 
 export interface ConversationRecord {
@@ -205,12 +213,36 @@ export interface LogRecord {
  * truth at read time. Writes dual-mirror to this table so the graph is queryable
  * before the V2 communities work needs it.
  */
+export type CommunityRole = "member" | "admin" | "owner";
+
 export interface RelationshipRecord {
   id: string;
   userId: string;
   targetId: string;
   kind: "network" | "community";
   source: "post_plan_modal" | "profile_friend_add" | "seed" | "other";
+  /**
+   * Membership role within a community. Only meaningful when `kind = "community"`.
+   * Absent or null for network edges. Legacy community rows are treated as
+   * "member" at read time.
+   */
+  role?: CommunityRole | null;
+  createdAt: string;
+}
+
+/**
+ * Explicit drop-out event log. Parallel to `DeclineRecord` (which is the rec-
+ * algo's "feed dismissal" signal). A row lands here whenever a user with an
+ * active participation explicitly drops their RSVP — DELETE /participation,
+ * host transfer (outgoing host), etc. `fromState` records whether they were
+ * committed ("going") or only interested at the moment of drop, so analytics
+ * can distinguish a real ghost from a tentative un-tap.
+ */
+export interface DropoutRecord {
+  id: string;
+  userId: string;
+  planId: string;
+  fromState: ParticipationState;
   createdAt: string;
 }
 
@@ -262,6 +294,7 @@ interface Snapshot {
   messages: MessageRecord[];
   feedback: FeedbackRecord[];
   declines: DeclineRecord[];
+  dropouts: DropoutRecord[];
   smsCodes: SmsCodeRecord[];
   logs: LogRecord[];
   planSuggestions: PlanSuggestionRecord[];
@@ -282,6 +315,7 @@ function emptySnapshot(): Snapshot {
     messages: [],
     feedback: [],
     declines: [],
+    dropouts: [],
     smsCodes: [],
     logs: [],
     planSuggestions: [],
@@ -322,6 +356,7 @@ function load(): Snapshot {
       notifications: parsed.notifications ?? [],
       relationships: parsed.relationships ?? [],
       inviteCodes: parsed.inviteCodes ?? [],
+      dropouts: parsed.dropouts ?? [],
     };
   } catch {
     return emptySnapshot();
@@ -441,17 +476,19 @@ export const store = {
       }
     }
 
-    // Remove participations, notifications, invite codes, relationships.
+    // Remove participations, notifications, invite codes, relationships, dropouts.
     snapshot.participations = snapshot.participations.filter((p) => p.userId !== userId);
     snapshot.notifications = snapshot.notifications.filter((n) => n.userId !== userId);
     snapshot.inviteCodes = snapshot.inviteCodes.filter((c) => c.ownerUserId !== userId);
     snapshot.relationships = snapshot.relationships.filter(
       (r) => r.userId !== userId && r.targetId !== userId,
     );
+    snapshot.dropouts = snapshot.dropouts.filter((d) => d.userId !== userId);
     mongoMirror.deleteParticipationsByUser(userId);
     mongoMirror.deleteNotificationsByUser(userId);
     mongoMirror.deleteInviteCodesByOwner(userId);
     mongoMirror.deleteRelationshipsTouching(userId);
+    mongoMirror.deleteDropoutsByUser(userId);
 
     // Finally the user record itself.
     snapshot.users = snapshot.users.filter((u) => u.id !== userId);
@@ -579,21 +616,42 @@ export const store = {
     if (existing) {
       existing.state = state;
       existing.updatedAt = new Date().toISOString();
+      // Backfill createdAt on legacy rows that never had one. After the
+      // backfill the field is stable across future state changes.
+      if (!existing.createdAt) existing.createdAt = existing.updatedAt;
       persist();
       mongoMirror.upsertParticipation(existing);
       return existing;
     }
+    const now = new Date().toISOString();
     const record: ParticipationRecord = {
       id: randomUUID(),
       planId,
       userId,
       state,
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
+      attended: null,
     };
     snapshot.participations.push(record);
     persist();
     mongoMirror.upsertParticipation(record);
     return record;
+  },
+  /**
+   * Set the post-plan attendance signal on a participation. Called from the
+   * feedback POST — submitting feedback implicitly confirms you went. We never
+   * write `false` from a flow (silence ≠ no-show), but callers can pass it
+   * explicitly if a future "didn't go after all" path is added.
+   */
+  markAttended(planId: string, userId: string, attended: boolean): ParticipationRecord | undefined {
+    const row = this.findParticipation(planId, userId);
+    if (!row) return undefined;
+    row.attended = attended;
+    row.updatedAt = new Date().toISOString();
+    persist();
+    mongoMirror.upsertParticipation(row);
+    return row;
   },
   deleteParticipation(planId: string, userId: string): void {
     snapshot.participations = snapshot.participations.filter(
@@ -601,6 +659,27 @@ export const store = {
     );
     persist();
     mongoMirror.deleteParticipation(planId, userId);
+  },
+  /**
+   * Record an explicit drop-out event. Call from any endpoint that removes an
+   * active RSVP (DELETE /participation, outgoing host on transfer). Cascade
+   * deletes (account deletion) do NOT emit this — the user is gone.
+   */
+  recordDropOut(userId: string, planId: string, fromState: ParticipationState): DropoutRecord {
+    const record: DropoutRecord = {
+      id: randomUUID(),
+      userId,
+      planId,
+      fromState,
+      createdAt: new Date().toISOString(),
+    };
+    snapshot.dropouts.push(record);
+    persist();
+    mongoMirror.upsertDropout(record);
+    return record;
+  },
+  listAllDropouts(): DropoutRecord[] {
+    return [...snapshot.dropouts];
   },
 
   // Conversations + Messages
@@ -834,6 +913,7 @@ export const store = {
     targetId: string;
     kind: "network" | "community";
     source?: RelationshipRecord["source"];
+    role?: CommunityRole;
   }): RelationshipRecord {
     const existing = snapshot.relationships.find(
       (r) => r.userId === input.userId && r.targetId === input.targetId && r.kind === input.kind,
@@ -845,9 +925,24 @@ export const store = {
       targetId: input.targetId,
       kind: input.kind,
       source: input.source ?? "other",
+      role: input.kind === "community" ? (input.role ?? "member") : null,
       createdAt: new Date().toISOString(),
     };
     snapshot.relationships.push(row);
+    persist();
+    mongoMirror.upsertRelationship(row);
+    return row;
+  },
+  /**
+   * Promote/demote a community member. No-op for `network` edges. Returns the
+   * updated row, or undefined if the relationship doesn't exist.
+   */
+  setCommunityRole(userId: string, communityId: string, role: CommunityRole): RelationshipRecord | undefined {
+    const row = snapshot.relationships.find(
+      (r) => r.userId === userId && r.targetId === communityId && r.kind === "community",
+    );
+    if (!row) return undefined;
+    row.role = role;
     persist();
     mongoMirror.upsertRelationship(row);
     return row;
