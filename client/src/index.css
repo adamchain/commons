@@ -1587,18 +1587,16 @@ label {
 /* ----- Create plan: when grid ----- */
 .form-when-grid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-}
-@media (min-width: 520px) {
-  .form-when-grid {
-    grid-template-columns: 1fr 1fr;
-  }
+  /* Side-by-side from the smallest screen so phones don't get a stacked
+     date+time layout, per wireframe. */
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 .form-when-cell {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   align-content: start;
+  min-width: 0;
 }
 .form-when-head {
   display: flex;
@@ -1608,6 +1606,33 @@ label {
 }
 .form-when-cell input {
   text-align: left;
+  width: 100%;
+}
+
+/* WHERE row: input takes the row, flex toggle sits beside it */
+.form-where-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.form-where-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Communities footer at the bottom of the Make-a-plan form */
+.create-communities-footer {
+  margin-top: 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  border-top: 1px dashed var(--border);
+  padding-top: 14px;
+}
+.create-communities-footer strong {
+  color: var(--text);
+  font-weight: 700;
 }
 
 /* ----- Create plan: advanced disclosure ----- */
@@ -4005,7 +4030,7 @@ label {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 12px 6px;
+  padding: 10px 6px;
   border-radius: 14px;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -4025,7 +4050,7 @@ label {
 }
 
 .vibe-tile-emoji {
-  font-size: 28px;
+  font-size: 22px;
   line-height: 1;
 }
 

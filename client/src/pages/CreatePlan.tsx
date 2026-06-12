@@ -92,11 +92,13 @@ export function CreatePlanPage() {
   }, []);
 
   useEffect(() => {
-    if (!inviteUserId) return;
+    // Always load the user's network once — needed for both the
+    // "Inviting [name]" seeded flow and the hand-pick picker inside the
+    // Your Network visibility option.
     void api<{ users: PublicUser[] }>("/api/auth/network")
       .then((r) => setNetwork(r.users))
       .catch(() => setNetwork([]));
-  }, [inviteUserId]);
+  }, []);
 
   const seededOutsideNetwork = useMemo(() => {
     if (!inviteUserId || !inviteUserName || !network) return null;
@@ -359,56 +361,44 @@ export function CreatePlanPage() {
           />
         </section>
 
-        {/* Where — specific venue (Google place) + neighborhood */}
+        {/* Where — venue picker, with Flexible toggle inline. Neighborhood is
+            no longer asked: when a Google Place is picked we keep the user's
+            default neighborhood on the plan; isFlexibleLocation supersedes. */}
         <section className="form-section">
           <label className="form-question">Where</label>
-          <PlacePicker
-            value={form.locationName}
-            address={form.locationAddress}
-            onChange={(name) =>
-              setForm((f) => ({
-                ...f,
-                locationName: name,
-                locationLat: undefined,
-                locationLng: undefined,
-              }))
-            }
-            onSelect={(p) =>
-              setForm((f) => ({
-                ...f,
-                locationName: p.name,
-                locationAddress: p.address,
-                locationLat: p.lat,
-                locationLng: p.lng,
-              }))
-            }
-            onClear={() =>
-              setForm((f) => ({
-                ...f,
-                locationName: "",
-                locationAddress: "",
-                locationLat: undefined,
-                locationLng: undefined,
-              }))
-            }
-          />
-          <div className="form-row-flex">
-            <div className="form-row-flex-main">
-              <label className="form-sublabel" htmlFor="neighborhood">
-                Neighborhood
-              </label>
-              <select
-                id="neighborhood"
-                value={form.neighborhoodId}
-                onChange={(e) => setForm((f) => ({ ...f, neighborhoodId: e.target.value }))}
-              >
-                <option value="">Whereabouts…</option>
-                {neighborhoods.map((n) => (
-                  <option key={n.id} value={n.id}>
-                    {n.name}
-                  </option>
-                ))}
-              </select>
+          <div className="form-where-row">
+            <div className="form-where-row-main">
+              <PlacePicker
+                value={form.locationName}
+                address={form.locationAddress}
+                placeholder="Drinker's Pub, La Colombe, Lloyd Hall…"
+                onChange={(name) =>
+                  setForm((f) => ({
+                    ...f,
+                    locationName: name,
+                    locationLat: undefined,
+                    locationLng: undefined,
+                  }))
+                }
+                onSelect={(p) =>
+                  setForm((f) => ({
+                    ...f,
+                    locationName: p.name,
+                    locationAddress: p.address,
+                    locationLat: p.lat,
+                    locationLng: p.lng,
+                  }))
+                }
+                onClear={() =>
+                  setForm((f) => ({
+                    ...f,
+                    locationName: "",
+                    locationAddress: "",
+                    locationLat: undefined,
+                    locationLng: undefined,
+                  }))
+                }
+              />
             </div>
             <FlexToggle
               active={form.isFlexibleLocation}
@@ -418,19 +408,13 @@ export function CreatePlanPage() {
           </div>
         </section>
 
-        {/* When — date + time side by side */}
+        {/* When — date + time side by side, flex toggle under each. Group
+            heading "Anything flexible?" sits above as a single eyebrow. */}
         <section className="form-section">
           <label className="form-question">When</label>
           <div className="form-when-grid">
             <div className="form-when-cell">
-              <div className="form-when-head">
-                <span className="form-sublabel">Date</span>
-                <FlexToggle
-                  active={form.isFlexibleDate}
-                  onClick={() => setForm((f) => ({ ...f, isFlexibleDate: !f.isFlexibleDate }))}
-                  label="Flexible"
-                />
-              </div>
+              <span className="form-sublabel">Date</span>
               {!form.isFlexibleDate ? (
                 <input
                   id="date"
@@ -441,16 +425,14 @@ export function CreatePlanPage() {
               ) : (
                 <div className="form-flex-placeholder">Flexible day</div>
               )}
+              <FlexToggle
+                active={form.isFlexibleDate}
+                onClick={() => setForm((f) => ({ ...f, isFlexibleDate: !f.isFlexibleDate }))}
+                label="Flexible"
+              />
             </div>
             <div className="form-when-cell">
-              <div className="form-when-head">
-                <span className="form-sublabel">Time</span>
-                <FlexToggle
-                  active={form.isFlexibleTime}
-                  onClick={() => setForm((f) => ({ ...f, isFlexibleTime: !f.isFlexibleTime }))}
-                  label="Flexible"
-                />
-              </div>
+              <span className="form-sublabel">Time</span>
               {!form.isFlexibleTime ? (
                 <input
                   id="time"
@@ -461,6 +443,11 @@ export function CreatePlanPage() {
               ) : (
                 <div className="form-flex-placeholder">Flexible time</div>
               )}
+              <FlexToggle
+                active={form.isFlexibleTime}
+                onClick={() => setForm((f) => ({ ...f, isFlexibleTime: !f.isFlexibleTime }))}
+                label="Flexible"
+              />
             </div>
           </div>
         </section>
@@ -500,6 +487,43 @@ export function CreatePlanPage() {
           />
         </section>
 
+        {/* Visibility — promoted out of "More options" because it's the
+            primary audience decision and was getting missed when hidden. */}
+        <section className="form-section">
+          <label className="form-question">Who can see this?</label>
+          <div className="visibility-options">
+            <button
+              type="button"
+              className={`visibility-option ${form.visibility === "everyone" ? "is-active" : ""}`}
+              onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
+              aria-pressed={form.visibility === "everyone"}
+            >
+              <span className="visibility-option-title">Everyone on COMMONS</span>
+              <span className="visibility-option-sub">Open to anyone in your neighborhood</span>
+            </button>
+            <button
+              type="button"
+              className={`visibility-option ${form.visibility === "network" ? "is-active" : ""}`}
+              onClick={() => setForm((f) => ({ ...f, visibility: "network" }))}
+              aria-pressed={form.visibility === "network"}
+            >
+              <span className="visibility-option-title">Your Network</span>
+              <span className="visibility-option-sub">Only people you've added show up</span>
+            </button>
+          </div>
+
+          {/* Granular hand-pick inside Your Network — when the host wants to
+              narrow it from "everyone in my network" to a specific group.
+              Empty list = the plan still goes to the full network. */}
+          {form.visibility === "network" && (
+            <NetworkHandPick
+              network={network}
+              invitedIds={invitedIds}
+              onToggle={toggleInvited}
+            />
+          )}
+        </section>
+
         {/* Advanced options — collapsed by default to keep the form short */}
         <button
           type="button"
@@ -508,50 +532,14 @@ export function CreatePlanPage() {
           aria-expanded={showMore}
         >
           <span className="create-more-toggle-main">
-            {showMore ? "Fewer options" : "More options"}
+            {showMore ? "Fewer details" : "Additional details"}
           </span>
-          <span className="create-more-toggle-sub">Visibility · spots · repeat · flyer</span>
+          <span className="create-more-toggle-sub">Spots, flyer, link.</span>
           <ChevronIcon open={showMore} />
         </button>
 
         {showMore && (
           <div className="create-more">
-            {/* Visibility — who can see this plan on the feed */}
-            <section className="form-section">
-              <label className="form-question">Who can see this?</label>
-              <div className="visibility-options">
-                <button
-                  type="button"
-                  className={`visibility-option ${form.visibility === "everyone" ? "is-active" : ""}`}
-                  onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
-                  aria-pressed={form.visibility === "everyone"}
-                >
-                  <span className="visibility-option-title">Everyone on COMMONS</span>
-                  <span className="visibility-option-sub">Open to anyone in your neighborhood</span>
-                </button>
-                <button
-                  type="button"
-                  className={`visibility-option ${form.visibility === "network" ? "is-active" : ""}`}
-                  onClick={() => setForm((f) => ({ ...f, visibility: "network" }))}
-                  aria-pressed={form.visibility === "network"}
-                >
-                  <span className="visibility-option-title">Your Network</span>
-                  <span className="visibility-option-sub">Only people you've added show up</span>
-                </button>
-                <button
-                  type="button"
-                  className="visibility-option is-disabled"
-                  disabled
-                  aria-disabled="true"
-                >
-                  <span className="visibility-option-title">
-                    Communities <span className="visibility-option-pill">Coming soon</span>
-                  </span>
-                  <span className="visibility-option-sub">Run clubs, book clubs, recurring crews</span>
-                </button>
-              </div>
-            </section>
-
             {/* Spots — toggle for open vs capped */}
             <section className="form-section">
               <div className="form-row-flex">
@@ -597,7 +585,7 @@ export function CreatePlanPage() {
                       className={form.joinType === "approve" ? "is-active" : ""}
                       onClick={() => setForm((f) => ({ ...f, joinType: "approve" }))}
                     >
-                      Pick from applicants
+                      Approve
                     </button>
                   </div>
                 </>
@@ -755,8 +743,73 @@ export function CreatePlanPage() {
         <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
           {submitting ? "Posting…" : isIdea ? "Put it out there" : "Post it"}
         </button>
+
+        <p className="create-communities-footer">
+          <strong>Communities</strong> <span className="visibility-option-pill">Coming soon</span>
+          <br />
+          Run clubs, book clubs, recurring crews.
+        </p>
       </form>
     </main>
+  );
+}
+
+/**
+ * Hand-pick a subset of the user's network. Empty selection means the plan
+ * still lands on the user's full network (we don't want a footgun where the
+ * host posts to no one). Once any chip is picked, the audience is narrowed
+ * to that explicit list via the existing invitedIds flow.
+ */
+function NetworkHandPick({
+  network,
+  invitedIds,
+  onToggle,
+}: {
+  network: PublicUser[] | null;
+  invitedIds: Set<string>;
+  onToggle: (id: string) => void;
+}) {
+  if (network === null) {
+    return <p className="form-help" style={{ marginTop: 8 }}>Loading your network…</p>;
+  }
+  if (network.length === 0) {
+    return (
+      <p className="form-help" style={{ marginTop: 8 }}>
+        No one in your network yet — your plan will still post to your network as it grows.
+      </p>
+    );
+  }
+  return (
+    <div style={{ marginTop: 10 }}>
+      <p className="form-help" style={{ marginTop: 0 }}>
+        Want to narrow it down? Pick specific people — leave blank to share with everyone in your network.
+      </p>
+      <div className="invite-people-list">
+        {network.map((u) => {
+          const picked = invitedIds.has(u.id);
+          return (
+            <button
+              key={u.id}
+              type="button"
+              className={`invite-person ${picked ? "is-picked" : ""}`}
+              onClick={() => onToggle(u.id)}
+              aria-pressed={picked}
+            >
+              <Avatar
+                seed={u.avatarSeed}
+                style={u.avatarStyle}
+                photoDataUrl={u.avatarPhotoDataUrl}
+                params={u.avatarParams}
+                name={u.firstName}
+                size="sm"
+              />
+              <span className="invite-person-name">{u.firstName}</span>
+              {picked && <span className="invite-person-check">✓</span>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -829,12 +882,14 @@ function PlacePicker({
   onChange,
   onSelect,
   onClear,
+  placeholder,
 }: {
   value: string;
   address: string;
   onChange: (name: string) => void;
   onSelect: (p: { name: string; address: string; lat?: number; lng?: number }) => void;
   onClear: () => void;
+  placeholder?: string;
 }) {
   const [results, setResults] = useState<PlaceHit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -902,7 +957,7 @@ function PlacePicker({
         <PinIcon />
         <input
           type="text"
-          placeholder="Search a venue, or type your own"
+          placeholder={placeholder ?? "Search a venue, or type your own"}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setFocused(true)}
