@@ -5578,7 +5578,10 @@ label {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
-  color: var(--text);
+  /* Both bulk-actions read as signal red per the notification spec, so the
+     destructive verbs (read everything / drop everything) are visually
+     consistent and unmistakable. */
+  color: var(--accent);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
