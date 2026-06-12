@@ -130,12 +130,12 @@ export function NotificationPrefsPage() {
         <InfoRow
           icon="✉️"
           title="Email"
-          sub={user.firstName ? `${user.firstName.toLowerCase()}@example.com` : "Add an email"}
+          sub="Add an email to receive digests"
         />
         <InfoRow
           icon="💬"
           title="SMS"
-          sub="Only for plans starting soon"
+          sub={user.phoneNumber ? `${user.phoneNumber} · Only for plans starting soon` : "Only for plans starting soon"}
         />
       </Group>
     </main>
