@@ -1620,6 +1620,51 @@ label {
   min-width: 0;
 }
 
+/* Idea form — minimal-by-default flow */
+.idea-textarea {
+  font-size: 17px;
+  min-height: 110px;
+  border-radius: 14px;
+  background: var(--surface);
+}
+.idea-context {
+  margin-top: 8px;
+  font-size: 15px;
+  min-height: 80px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+.idea-disclosure {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 14px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-top: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: left;
+}
+.idea-disclosure-value {
+  font-style: normal;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.idea-disclosure-chevron {
+  color: var(--text-muted);
+  font-size: 22px;
+  line-height: 1;
+  transform: rotate(90deg);
+  transition: transform 160ms ease;
+}
+.idea-disclosure-chevron.is-open {
+  transform: rotate(-90deg);
+}
+
 /* Communities footer at the bottom of the Make-a-plan form */
 .create-communities-footer {
   margin-top: 20px;
@@ -3875,6 +3920,16 @@ label {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--accent);
+}
+
+/* Softer variant for non-hosts at threshold — same callout but no CTA, since
+   they can't lock the plan in themselves. */
+.lock-prompt--soft {
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+.lock-prompt--soft .lock-prompt-headline {
+  color: var(--text);
 }
 
 .plan-card-title {

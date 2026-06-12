@@ -323,6 +323,22 @@ export function CreatePlanPage() {
 
   const isIdea = path === "idea";
 
+  // Idea path renders a stripped-down form (single text input + a couple of
+  // collapsed optional disclosures). The full-form path below is the standard
+  // "Make a plan" experience.
+  if (isIdea) {
+    return (
+      <IdeaForm
+        form={form}
+        setForm={setForm}
+        submit={submit}
+        submitting={submitting}
+        error={error}
+        onBack={() => setPath("choose")}
+      />
+    );
+  }
+
   return (
     <main className="app-shell app-shell--mid">
       <header className="app-header app-header--minimal">
@@ -330,11 +346,9 @@ export function CreatePlanPage() {
           ← Back
         </button>
       </header>
-      <h1 className="brand" style={{ marginBottom: 8 }}>
-        {isIdea ? "Just an idea" : "New plan"}
-      </h1>
+      <h1 className="brand" style={{ marginBottom: 8 }}>New plan</h1>
       <p className="brand-tagline" style={{ marginBottom: 24 }}>
-        {isIdea ? "No details needed. Just the idea." : "Fill what you know · toggle what's flexible"}
+        Fill what you know · toggle what's flexible
       </p>
 
       {inviteUserId && inviteUserName && (
@@ -741,7 +755,152 @@ export function CreatePlanPage() {
         {error && <p className="error-text">{error}</p>}
 
         <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
-          {submitting ? "Posting…" : isIdea ? "Put it out there" : "Post it"}
+          {submitting ? "Posting…" : "Post it"}
+        </button>
+
+        <p className="create-communities-footer">
+          <strong>Communities</strong> <span className="visibility-option-pill">Coming soon</span>
+          <br />
+          Run clubs, book clubs, recurring crews.
+        </p>
+      </form>
+    </main>
+  );
+}
+
+type FormShape = {
+  title: string;
+  locationName: string;
+  locationAddress: string;
+  locationLat: number | undefined;
+  locationLng: number | undefined;
+  neighborhoodId: string;
+  date: string;
+  time: string;
+  isFlexibleTime: boolean;
+  isFlexibleLocation: boolean;
+  isFlexibleDate: boolean;
+  vibes: VibeIcon[];
+  description: string;
+  visibility: PlanVisibility;
+  capacityOn: boolean;
+  capacity: string;
+  joinType: JoinType;
+  isRecurring: boolean;
+  flyerDataUrl: string | null;
+  flyerLinkUrl: string;
+  flyerLinkPreview: null | {
+    title?: string;
+    description?: string;
+    image?: string;
+    siteName?: string;
+  };
+};
+
+/**
+ * Just an Idea form — single open text field, everything else collapsed.
+ * Title doubles as the "what's on your mind" body since the server requires
+ * a title; on submit we set every flexibility flag so the resulting plan
+ * lives as a looking_for entry on the feed.
+ */
+function IdeaForm({
+  form,
+  setForm,
+  submit,
+  submitting,
+  error,
+  onBack,
+}: {
+  form: FormShape;
+  setForm: (updater: (f: FormShape) => FormShape) => void;
+  submit: (event: FormEvent) => void;
+  submitting: boolean;
+  error: string | null;
+  onBack: () => void;
+}) {
+  const [contextOpen, setContextOpen] = useState(false);
+  const [visibilityOpen, setVisibilityOpen] = useState(false);
+  return (
+    <main className="app-shell app-shell--mid">
+      <header className="app-header app-header--minimal">
+        <button type="button" className="detail-back" onClick={onBack}>
+          ← Back
+        </button>
+      </header>
+      <h1 className="brand" style={{ marginBottom: 8 }}>Just an idea</h1>
+      <p className="brand-tagline" style={{ marginBottom: 24 }}>
+        Just a thought. See who&apos;s down.
+      </p>
+
+      <form onSubmit={submit} className="form-card">
+        <section className="form-section">
+          <textarea
+            className="idea-textarea"
+            placeholder="What's on your mind?"
+            value={form.title}
+            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+            rows={3}
+            autoFocus
+          />
+        </section>
+
+        <button
+          type="button"
+          className="idea-disclosure"
+          aria-expanded={contextOpen}
+          onClick={() => setContextOpen((v) => !v)}
+        >
+          <span>A little context</span>
+          <span className={`idea-disclosure-chevron ${contextOpen ? "is-open" : ""}`}>›</span>
+        </button>
+        {contextOpen && (
+          <textarea
+            className="idea-context"
+            placeholder="Anything else worth knowing? (optional)"
+            value={form.description}
+            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+            rows={3}
+          />
+        )}
+
+        <button
+          type="button"
+          className="idea-disclosure"
+          aria-expanded={visibilityOpen}
+          onClick={() => setVisibilityOpen((v) => !v)}
+        >
+          <span>
+            Visibility · <em className="idea-disclosure-value">
+              {form.visibility === "network" ? "Your Network" : "Everyone on COMMONS"}
+            </em>
+          </span>
+          <span className={`idea-disclosure-chevron ${visibilityOpen ? "is-open" : ""}`}>›</span>
+        </button>
+        {visibilityOpen && (
+          <div className="visibility-options" style={{ marginTop: 6 }}>
+            <button
+              type="button"
+              className={`visibility-option ${form.visibility === "everyone" ? "is-active" : ""}`}
+              onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
+              aria-pressed={form.visibility === "everyone"}
+            >
+              <span className="visibility-option-title">Everyone on COMMONS</span>
+            </button>
+            <button
+              type="button"
+              className={`visibility-option ${form.visibility === "network" ? "is-active" : ""}`}
+              onClick={() => setForm((f) => ({ ...f, visibility: "network" }))}
+              aria-pressed={form.visibility === "network"}
+            >
+              <span className="visibility-option-title">Your Network</span>
+            </button>
+          </div>
+        )}
+
+        {error && <p className="error-text">{error}</p>}
+
+        <button type="submit" className="btn btn-primary btn-block" disabled={submitting || !form.title.trim()}>
+          {submitting ? "Posting…" : "Put it out there"}
         </button>
 
         <p className="create-communities-footer">

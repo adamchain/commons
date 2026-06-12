@@ -89,10 +89,11 @@ export function PlanDetailPage() {
   // commits to a venue + day.
   const canLock = !plan.lockedAt && isHosting;
   // Prompt fires when the thread has at least 2 people committing (interested
-  // or going) — but only the original poster sees the "lock it in" callout,
-  // since they're the only one who can act on it.
+  // or going). The host sees the actionable lock-in form; non-hosts see a
+  // softer nudge so they know the group can self-organize.
   const groupSize = plan.participants.interested.length + plan.participants.going.length;
-  const showGroupPrompt = isLookingFor && !plan.lockedAt && groupSize >= 2 && isHosting;
+  const groupAtThreshold = isLookingFor && !plan.lockedAt && groupSize >= 2;
+  const showGroupPrompt = groupAtThreshold && isHosting;
   const canChat =
     isHosting || plan.myState === "going" || plan.myState === "interested";
 
@@ -209,7 +210,7 @@ export function PlanDetailPage() {
         >
           <Avatar seed={plan.creator.avatarSeed} style={plan.creator.avatarStyle} photoDataUrl={plan.creator.avatarPhotoDataUrl} params={plan.creator.avatarParams} size="md" />
           <span className="host-row-text">
-            Started by <strong>{plan.creator.firstName}</strong>
+            Started by <strong>{isHosting ? "you" : plan.creator.firstName}</strong>
           </span>
           <span className="host-row-chevron" aria-hidden="true">›</span>
         </button>
@@ -236,19 +237,33 @@ export function PlanDetailPage() {
               Looks like you've got a group. Ready to lock it in?
             </p>
             <p className="lock-prompt-soft">
-              Plans work best when the host locks it in early.
+              Plans work best when someone locks it in early.
             </p>
             <button
               type="button"
-              className="btn-primary btn-block lock-prompt-claim"
+              className="btn-secondary btn-block lock-prompt-claim"
               onClick={() => {
                 setTimeout(() => {
                   lockFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
                 }, 50);
               }}
             >
-              Set it up
+              I'll take it from here
             </button>
+          </div>
+        )}
+
+        {/* Non-host threshold nudge — same copy as the host prompt but no
+            CTA, since only the original poster can convert the looking_for
+            to a confirmed plan. */}
+        {groupAtThreshold && !isHosting && (
+          <div className="lock-prompt lock-prompt--soft" role="note">
+            <p className="lock-prompt-headline">
+              Looks like you&apos;ve got a group.
+            </p>
+            <p className="lock-prompt-soft">
+              Plans work best when someone locks it in early — {plan.creator.firstName} can set it up from here.
+            </p>
           </div>
         )}
 
