@@ -3471,7 +3471,8 @@ label {
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 20px;
-  padding: 18px 18px 16px;
+  /* Condensed — the old 18/16 padding left too much air below the footer. */
+  padding: 14px 16px 12px;
   box-shadow: none;
   text-decoration: none;
   color: inherit;
@@ -3522,7 +3523,7 @@ label {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 .plan-card-poster-row .plan-card-kind-pill {
   margin-left: auto;
@@ -3547,14 +3548,13 @@ label {
 }
 
 .plan-card-meta-line {
-  margin: 4px 0;
+  margin: 2px 0;
   display: flex;
   align-items: center;
   gap: 8px;
   color: var(--text);
   font-size: 14px;
   font-weight: 500;
-  min-height: 20px;
 }
 .plan-card-meta-sub {
   color: var(--text-muted);
@@ -3587,7 +3587,7 @@ label {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 14px;
+  margin-top: 10px;
 }
 .plan-card-attendees {
   display: flex;
@@ -3624,15 +3624,17 @@ label {
   white-space: nowrap;
   flex-shrink: 0;
 }
+/* Signal-red badge so "YOU'RE IN" is unmistakable on the feed card —
+   previously read as a neutral pill and got missed. */
 .plan-card-state-pill--in {
-  background: var(--ink-900);
+  background: var(--accent);
   color: var(--paper-50);
-  border: 1px solid var(--ink-900);
+  border: 1px solid var(--accent);
 }
 [data-theme="dark"] .plan-card-state-pill--in {
-  background: var(--paper-50);
-  color: var(--ink-900);
-  border-color: var(--paper-50);
+  background: var(--accent);
+  color: var(--paper-50);
+  border-color: var(--accent);
 }
 .plan-card-state-pill--interested {
   background: transparent;

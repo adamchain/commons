@@ -60,13 +60,11 @@ export function PlanCard({
     }
   }
 
-  const whenLine = plan.isFlexibleLocation && plan.isFlexibleTime
-    ? "Flexible"
-    : plan.isFlexibleLocation
-      ? `${formatPlanDate(plan.date)} · Location TBD`
-      : plan.isFlexibleTime
-        ? `${formatPlanDate(plan.date)} · Time TBD`
-        : `${formatPlanDate(plan.date)} · ${formatPlanTime(plan.time, plan.isFlexibleTime)}`;
+  // Consistent flex labeling — every card type says "Flexible time" or
+  // "Flexible location" (never "TBD") so users learn one vocabulary.
+  const whenLine = plan.isFlexibleTime
+    ? `${formatPlanDate(plan.date)} · Flexible time`
+    : `${formatPlanDate(plan.date)} · ${formatPlanTime(plan.time, plan.isFlexibleTime)}`;
 
   const goingCount = plan.participants.going.length;
   const interestedCount = plan.participants.interested.length;
@@ -158,11 +156,7 @@ export function PlanCard({
           <span className="plan-card-meta-icon" aria-hidden="true">
             <ClockGlyph />
           </span>
-          {plan.isFlexibleTime && plan.isFlexibleLocation ? (
-            <span className="plan-card-meta-empty" aria-label="Time TBD" />
-          ) : (
-            whenLine
-          )}
+          {whenLine}
         </p>
         <p className="plan-card-meta-line">
           <span className="plan-card-meta-icon" aria-hidden="true">
