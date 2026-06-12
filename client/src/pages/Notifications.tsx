@@ -141,6 +141,11 @@ function NotifRow({ item, onDismiss }: { item: NotificationDTO; onDismiss: () =>
 
 function hrefFor(n: NotificationDTO): string | null {
   if (n.kind === "newGroupChatMessage" && n.planId) return `/plans/${n.planId}/chat`;
+  // Network request/accept link to the other person's profile, where the
+  // Accept / connected state lives.
+  if ((n.kind === "networkRequest" || n.kind === "networkAccepted") && n.profileUserId) {
+    return `/profile/${n.profileUserId}`;
+  }
   if (n.planId) return `/plans/${n.planId}`;
   return null;
 }
@@ -169,5 +174,9 @@ function iconFor(kind: NotificationKind): string {
       return "🔄";
     case "planInvite":
       return "✉️";
+    case "networkRequest":
+      return "🫱";
+    case "networkAccepted":
+      return "🤝";
   }
 }

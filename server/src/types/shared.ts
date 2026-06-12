@@ -286,7 +286,9 @@ export type NotificationKind =
   | "lookingForRecovery"
   | "planTimeProposed"
   | "planTimeChanged"
-  | "planInvite";
+  | "planInvite"
+  | "networkRequest"
+  | "networkAccepted";
 
 export interface NotificationDTO {
   id: string;
@@ -294,6 +296,7 @@ export interface NotificationDTO {
   body: string;
   planId?: string;
   conversationId?: string;
+  profileUserId?: string;
   createdAt: string;
   readAt: string | null;
 }

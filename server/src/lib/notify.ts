@@ -30,6 +30,9 @@ const PREF_KEY: Record<NotificationKind, keyof NotificationPrefs> = {
   planTimeChanged: "planCancellation",
   // Invites ride on the "someone joined" toggle — both are person-to-plan pings.
   planInvite: "someoneJoinedYourPlan",
+  // Network social pings ride on the post-plan network nudge toggle.
+  networkRequest: "postPlanNetworkNudge",
+  networkAccepted: "postPlanNetworkNudge",
 };
 
 export async function emit(input: {
@@ -39,6 +42,7 @@ export async function emit(input: {
   dedupKey: string;
   planId?: string;
   conversationId?: string;
+  profileUserId?: string;
 }): Promise<NotificationRecord | null> {
   const user = await findUserById(input.userId);
   if (!user) return null;
@@ -54,5 +58,6 @@ export async function emit(input: {
     dedupKey: input.dedupKey,
     planId: input.planId,
     conversationId: input.conversationId,
+    profileUserId: input.profileUserId,
   });
 }

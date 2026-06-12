@@ -60,6 +60,10 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
   const viewerNetwork = new Set(viewer?.networkIds ?? []);
   const targetNetwork = new Set(target.networkIds ?? []);
   const inMyNetwork = viewerNetwork.has(targetId);
+  // Pending-request state for the connect button: did I request them, or did
+  // they request me (so I can Accept)?
+  const requestSent = (target.incomingNetworkRequests ?? []).includes(viewerId);
+  const requestReceived = (viewer?.incomingNetworkRequests ?? []).includes(targetId);
   // Mutual = users that are in BOTH the viewer's and the target's network.
   const mutualIds = [...viewerNetwork].filter((id) => targetNetwork.has(id));
   const mutuals = mutualIds
@@ -103,6 +107,8 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
     socialLinks,
     network: {
       inMyNetwork,
+      requestSent,
+      requestReceived,
       mutualCount: mutualIds.length,
       mutuals,
     },

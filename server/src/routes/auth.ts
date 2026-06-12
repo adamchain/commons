@@ -379,9 +379,10 @@ authRouter.post("/network-add", requireAuth, async (req, res) => {
 });
 
 /**
- * One-tap "Add to network" from a profile page — no shared plan required.
- * One-sided add: target shows up in viewer's network. Mutual happens when the
- * target also taps it from your profile. (Prototype — no pending state yet.)
+ * "Add to network" from a profile — now a request the other person must
+ * accept. The target gets a `networkRequest` notification and must confirm via
+ * `/network-accept`. If the target had ALREADY requested the viewer, this
+ * second tap auto-accepts (mutual intent) and connects both immediately.
  */
 authRouter.post("/friend-add", requireAuth, async (req, res) => {
   const userId = String(req.userId);
@@ -396,21 +397,106 @@ authRouter.post("/friend-add", requireAuth, async (req, res) => {
     res.status(404).json({ error: "User not found" });
     return;
   }
-  const myNet = new Set(viewer.networkIds ?? []);
-  const isNew = !myNet.has(targetId);
-  myNet.add(targetId);
-  await updateUser(userId, { networkIds: [...myNet] });
-  if (isNew) {
-    store.upsertRelationship({
-      userId,
-      targetId,
-      kind: "network",
-      source: "profile_friend_add",
+  // Already connected — no-op.
+  if ((viewer.networkIds ?? []).includes(targetId)) {
+    res.json({ ok: true, status: "connected", me: await userToMe(userId) });
+    return;
+  }
+  // The target already requested the viewer → mutual intent, connect both now.
+  if ((viewer.incomingNetworkRequests ?? []).includes(targetId)) {
+    await connectNetwork(userId, targetId);
+    await emit({
+      userId: targetId,
+      kind: "networkAccepted",
+      body: `${viewer.firstName || "Someone"} connected with you on COMMONS`,
+      dedupKey: `networkAccepted:${userId}:${targetId}`,
+      profileUserId: userId,
+    });
+    res.json({ ok: true, status: "connected", me: await userToMe(userId) });
+    return;
+  }
+  // Otherwise record an incoming request on the target + notify them.
+  const targetIncoming = new Set(target.incomingNetworkRequests ?? []);
+  if (!targetIncoming.has(userId)) {
+    targetIncoming.add(userId);
+    await updateUser(targetId, { incomingNetworkRequests: [...targetIncoming] });
+    await emit({
+      userId: targetId,
+      kind: "networkRequest",
+      body: `${viewer.firstName || "Someone"} wants to add you to their network`,
+      dedupKey: `networkRequest:${userId}:${targetId}`,
+      profileUserId: userId,
     });
   }
-  const me = await userToMe(userId);
-  res.json({ ok: true, me });
+  res.json({ ok: true, status: "requested", me: await userToMe(userId) });
 });
+
+/** Accept a pending network request from `userId` — connects both directions. */
+authRouter.post("/network-accept", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const requesterId = String(req.body?.userId ?? "");
+  if (!requesterId || requesterId === userId) {
+    res.status(400).json({ error: "userId required" });
+    return;
+  }
+  const me = await findUserById(userId);
+  if (!me) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  if (!(me.incomingNetworkRequests ?? []).includes(requesterId)) {
+    res.status(400).json({ error: "No pending request from that person" });
+    return;
+  }
+  await connectNetwork(userId, requesterId);
+  await emit({
+    userId: requesterId,
+    kind: "networkAccepted",
+    body: `${me.firstName || "Someone"} accepted your network request`,
+    dedupKey: `networkAccepted:${userId}:${requesterId}`,
+    profileUserId: userId,
+  });
+  res.json({ ok: true, me: await userToMe(userId) });
+});
+
+/** Decline (or cancel) a pending request from `userId`. */
+authRouter.post("/network-decline", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const requesterId = String(req.body?.userId ?? "");
+  const me = await findUserById(userId);
+  if (!me) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  const incoming = new Set(me.incomingNetworkRequests ?? []);
+  incoming.delete(requesterId);
+  await updateUser(userId, { incomingNetworkRequests: [...incoming] });
+  res.json({ ok: true, me: await userToMe(userId) });
+});
+
+/**
+ * Connect two users mutually: each lands in the other's networkIds, the
+ * pending request is cleared, and relationship rows are mirrored both ways.
+ */
+async function connectNetwork(aId: string, bId: string): Promise<void> {
+  const a = await findUserById(aId);
+  const b = await findUserById(bId);
+  if (!a || !b) return;
+  const aNet = new Set(a.networkIds ?? []);
+  aNet.add(bId);
+  const aIncoming = new Set(a.incomingNetworkRequests ?? []);
+  aIncoming.delete(bId);
+  await updateUser(aId, { networkIds: [...aNet], incomingNetworkRequests: [...aIncoming] });
+
+  const bNet = new Set(b.networkIds ?? []);
+  bNet.add(aId);
+  const bIncoming = new Set(b.incomingNetworkRequests ?? []);
+  bIncoming.delete(aId);
+  await updateUser(bId, { networkIds: [...bNet], incomingNetworkRequests: [...bIncoming] });
+
+  store.upsertRelationship({ userId: aId, targetId: bId, kind: "network", source: "profile_friend_add" });
+  store.upsertRelationship({ userId: bId, targetId: aId, kind: "network", source: "profile_friend_add" });
+}
 
 authRouter.post("/friend-remove", requireAuth, async (req, res) => {
   const userId = String(req.userId);

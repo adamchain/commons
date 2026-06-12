@@ -33,6 +33,8 @@ export interface UserRecord {
   createdAt: string;
   /** One-way network — people added after shared plans. */
   networkIds?: string[];
+  /** UserIds who have requested to connect with this user (awaiting accept). */
+  incomingNetworkRequests?: string[];
   /** Plans the user saved/pinned — surfaced on the My Plans page. */
   savedPlanIds?: string[];
   /** Plan ids where the user dismissed the post-event network prompt. */
@@ -298,10 +300,14 @@ export interface NotificationRecord {
     | "lookingForRecovery"
     | "planTimeProposed"
     | "planTimeChanged"
-    | "planInvite";
+    | "planInvite"
+    | "networkRequest"
+    | "networkAccepted";
   body: string;
   planId?: string;
   conversationId?: string;
+  /** For person-centric notifications (network request/accept) — links to a profile. */
+  profileUserId?: string;
   /** Idempotency key — same key blocked on re-emit. */
   dedupKey: string;
   createdAt: string;

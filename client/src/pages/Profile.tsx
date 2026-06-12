@@ -33,6 +33,8 @@ interface ProfilePayload {
   socialLinks: { instagram?: string } | null;
   network: {
     inMyNetwork: boolean;
+    requestSent?: boolean;
+    requestReceived?: boolean;
     mutualCount: number;
     mutuals: PublicUser[];
   };
@@ -285,17 +287,16 @@ function FriendButton({
   const [busy, setBusy] = useState(false);
   const { setUser } = useAuth();
   const inNet = profile.network.inMyNetwork;
+  const requestSent = profile.network.requestSent ?? false;
+  const requestReceived = profile.network.requestReceived ?? false;
 
-  async function toggle() {
+  async function call(path: string) {
     setBusy(true);
     try {
-      const r = await api<{ me: MeDTO }>(
-        inNet ? "/api/auth/friend-remove" : "/api/auth/friend-add",
-        {
-          method: "POST",
-          body: JSON.stringify({ userId: profile.user.id }),
-        },
-      );
+      const r = await api<{ me: MeDTO }>(path, {
+        method: "POST",
+        body: JSON.stringify({ userId: profile.user.id }),
+      });
       setUser(r.me);
       onUpdated();
     } catch {
@@ -305,9 +306,7 @@ function FriendButton({
     }
   }
 
-  // When already connected, show a clear status line plus an explicit
-  // "Remove from network" action (a bare "In your network" toggle read as a
-  // dead label, so people couldn't tell they could undo it).
+  // Connected — show status + explicit remove.
   if (inNet) {
     return (
       <div className="friend-button-connected" style={{ marginTop: 10 }}>
@@ -315,7 +314,7 @@ function FriendButton({
         <button
           type="button"
           className="btn-link friend-remove-btn"
-          onClick={() => void toggle()}
+          onClick={() => void call("/api/auth/friend-remove")}
           disabled={busy}
         >
           {busy ? "…" : "Remove from network"}
@@ -323,11 +322,46 @@ function FriendButton({
       </div>
     );
   }
+
+  // They requested you — show Accept / Decline.
+  if (requestReceived) {
+    return (
+      <div className="friend-button-connected" style={{ marginTop: 10 }}>
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => void call("/api/auth/network-accept")}
+          disabled={busy}
+        >
+          {busy ? "…" : "Accept request"}
+        </button>
+        <button
+          type="button"
+          className="btn-link friend-remove-btn"
+          onClick={() => void call("/api/auth/network-decline")}
+          disabled={busy}
+        >
+          Decline
+        </button>
+      </div>
+    );
+  }
+
+  // You already requested them — pending.
+  if (requestSent) {
+    return (
+      <button type="button" className="btn-secondary" disabled style={{ marginTop: 10 }}>
+        Request sent
+      </button>
+    );
+  }
+
+  // No relationship yet — send a request.
   return (
     <button
       type="button"
       className="btn-secondary"
-      onClick={() => void toggle()}
+      onClick={() => void call("/api/auth/friend-add")}
       disabled={busy}
       style={{ marginTop: 10 }}
     >
