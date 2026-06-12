@@ -59,7 +59,7 @@ export function SettingsPage() {
           sub="Name, photo, neighborhood"
         />
         <SettingsRow
-          to={`/profile/${user.id}`}
+          to="/settings/interests"
           icon={<HeartIcon />}
           iconAccent
           title="Interests"
@@ -105,7 +105,6 @@ export function SettingsPage() {
           icon={<InfoIcon />}
           title="About COMMONS"
           sub="Version 0.4 · Help · Terms"
-          comingSoon
         />
       </SettingsGroup>
 
