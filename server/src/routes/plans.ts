@@ -200,6 +200,13 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   const locationAddress = String(location.address ?? "").trim();
   const lat = typeof location.lat === "number" ? location.lat : undefined;
   const lng = typeof location.lng === "number" ? location.lng : undefined;
+  // Google Places ID — optional, persisted on the plan so we can later
+  // aggregate plans by venue (the "Spots" grid + venue history nudges) without
+  // having to fuzzy-match on name strings.
+  const placeId =
+    typeof location.placeId === "string" && location.placeId.trim()
+      ? location.placeId.trim().slice(0, 256)
+      : undefined;
   const dateInput = String(req.body?.date ?? "").trim();
   const time = String(req.body?.time ?? "").trim();
   const isFlexibleTime = Boolean(req.body?.isFlexibleTime);
@@ -308,7 +315,7 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     creatorId: userId,
     title,
     neighborhoodId,
-    location: { name: resolvedLocationName, address: resolvedAddress, lat, lng },
+    location: { name: resolvedLocationName, address: resolvedAddress, lat, lng, placeId },
     date: dateInput,
     time: isFlexibleTime ? "" : time,
     isFlexibleTime: isFlexibleTime || !time,
@@ -662,6 +669,10 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
   const locationAddress = String(location.address ?? "").trim();
   const lat = typeof location.lat === "number" ? location.lat : undefined;
   const lng = typeof location.lng === "number" ? location.lng : undefined;
+  const placeId =
+    typeof location.placeId === "string" && location.placeId.trim()
+      ? location.placeId.trim().slice(0, 256)
+      : undefined;
   const dateInput = String(req.body?.date ?? "").trim();
   const time = String(req.body?.time ?? "").trim();
   const isFlexibleTime = Boolean(req.body?.isFlexibleTime);
@@ -682,6 +693,7 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
       address: locationAddress || locationName,
       lat,
       lng,
+      placeId,
     },
     date: dateInput,
     time: isFlexibleTime ? "" : time,

@@ -63,6 +63,7 @@ export function CreatePlanPage() {
     locationAddress: prefillAddress,
     locationLat: undefined as number | undefined,
     locationLng: undefined as number | undefined,
+    locationPlaceId: undefined as string | undefined,
     neighborhoodId: user?.neighborhoodIds?.[0] ?? user?.neighborhoodId ?? "",
     date: today(),
     time: "19:00",
@@ -188,6 +189,7 @@ export function CreatePlanPage() {
             address: form.locationAddress.trim() || form.locationName.trim(),
             lat: form.locationLat,
             lng: form.locationLng,
+            placeId: form.locationPlaceId,
           },
           date: form.isFlexibleDate ? today() : form.date,
           time: form.isFlexibleTime ? "" : form.time,
@@ -417,6 +419,7 @@ export function CreatePlanPage() {
                     locationName: name,
                     locationLat: undefined,
                     locationLng: undefined,
+                    locationPlaceId: undefined,
                   }))
                 }
                 onSelect={(p) =>
@@ -426,6 +429,7 @@ export function CreatePlanPage() {
                     locationAddress: p.address,
                     locationLat: p.lat,
                     locationLng: p.lng,
+                    locationPlaceId: p.placeId,
                   }))
                 }
                 onClear={() =>
@@ -435,6 +439,7 @@ export function CreatePlanPage() {
                     locationAddress: "",
                     locationLat: undefined,
                     locationLng: undefined,
+                    locationPlaceId: undefined,
                   }))
                 }
               />
@@ -799,6 +804,7 @@ type FormShape = {
   locationAddress: string;
   locationLat: number | undefined;
   locationLng: number | undefined;
+  locationPlaceId: string | undefined;
   neighborhoodId: string;
   date: string;
   time: string;
@@ -1071,7 +1077,7 @@ function PlacePicker({
   value: string;
   address: string;
   onChange: (name: string) => void;
-  onSelect: (p: { name: string; address: string; lat?: number; lng?: number }) => void;
+  onSelect: (p: { name: string; address: string; lat?: number; lng?: number; placeId?: string }) => void;
   onClear: () => void;
   placeholder?: string;
 }) {
@@ -1124,7 +1130,7 @@ function PlacePicker({
 
   const choose = (p: PlaceHit) => {
     skipNextSearch.current = true;
-    onSelect({ name: p.name, address: p.address, lat: p.lat, lng: p.lng });
+    onSelect({ name: p.name, address: p.address, lat: p.lat, lng: p.lng, placeId: p.placeId });
     setResults([]);
     setSearched(false);
     setFocused(false);

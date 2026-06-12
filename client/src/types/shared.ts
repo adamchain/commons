@@ -182,7 +182,15 @@ export interface PlanDTO {
   title: string;
   creator: PublicUser;
   neighborhoodId: string;
-  location: { name: string; address: string; lat?: number; lng?: number };
+  location: {
+    name: string;
+    address: string;
+    lat?: number;
+    lng?: number;
+    /** Google Places ID when the host picked a known venue. Used to group
+     *  plans by venue for the (post-launch) Spots grid + venue history. */
+    placeId?: string;
+  };
   date: string;
   time: string;
   isFlexibleTime: boolean;

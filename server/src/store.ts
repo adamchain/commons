@@ -65,7 +65,20 @@ export interface PlanRecord {
   creatorId: string;
   title: string;
   neighborhoodId: string;
-  location: { name: string; address: string; lat?: number; lng?: number };
+  /**
+   * Inline venue snapshot. `placeId` is the Google Places ID when the host
+   * picked a suggestion — it lets us group plans by venue (pin records,
+   * frequency, "people who went to X" nudges) without needing a separate
+   * Venue table on day one. Absent on flexible-location plans and on
+   * user-typed custom venues.
+   */
+  location: {
+    name: string;
+    address: string;
+    lat?: number;
+    lng?: number;
+    placeId?: string;
+  };
   date: string;
   time: string;
   isFlexibleTime: boolean;
@@ -525,6 +538,70 @@ export const store = {
   },
   findPlanById(id: string): PlanRecord | undefined {
     return snapshot.plans.find((p) => p.id === id);
+  },
+  /**
+   * Plans-by-venue lookup keyed off the Google Places ID. Backs the
+   * (post-launch) Spots grid + "people who went to X" venue history. Cheap
+   * O(n) scan today — fine while the dataset is small, and the only callers
+   * are admin/explore screens. Move to an index if it gets hot.
+   */
+  listPlansByPlaceId(placeId: string): PlanRecord[] {
+    if (!placeId) return [];
+    return snapshot.plans.filter((p) => p.location?.placeId === placeId);
+  },
+  /**
+   * Aggregate plan counts per venue — feeds the Explore Spots grid when it
+   * ships. Includes the latest venue snapshot (name/address/coords) so the
+   * caller doesn't need to re-resolve from Google.
+   */
+  listVenueStats(): Array<{
+    placeId: string;
+    name: string;
+    address: string;
+    lat?: number;
+    lng?: number;
+    planCount: number;
+    lastPlanAt: string;
+  }> {
+    const byPlace = new Map<
+      string,
+      {
+        placeId: string;
+        name: string;
+        address: string;
+        lat?: number;
+        lng?: number;
+        planCount: number;
+        lastPlanAt: string;
+      }
+    >();
+    for (const p of snapshot.plans) {
+      const pid = p.location?.placeId;
+      if (!pid) continue;
+      const prev = byPlace.get(pid);
+      if (prev) {
+        prev.planCount += 1;
+        if (p.createdAt > prev.lastPlanAt) {
+          prev.lastPlanAt = p.createdAt;
+          // Latest snapshot wins for the display fields so renames roll forward.
+          prev.name = p.location.name;
+          prev.address = p.location.address;
+          prev.lat = p.location.lat;
+          prev.lng = p.location.lng;
+        }
+      } else {
+        byPlace.set(pid, {
+          placeId: pid,
+          name: p.location.name,
+          address: p.location.address,
+          lat: p.location.lat,
+          lng: p.location.lng,
+          planCount: 1,
+          lastPlanAt: p.createdAt,
+        });
+      }
+    }
+    return Array.from(byPlace.values()).sort((a, b) => b.planCount - a.planCount);
   },
   createPlan(input: Omit<PlanRecord, "id" | "createdAt">): PlanRecord {
     const id = randomUUID();
