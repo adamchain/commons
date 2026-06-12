@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>COMMONS — Core User Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Fraunces:ital,opsz,wght@0,9..144,500;1,9..144,500&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper-50:#faf5ec; --paper-100:#f5efe4; --paper-200:#ecdfc8; --paper-300:#d9c9aa;
+    --ink-900:#14143a; --ink-700:#2a2a5e; --ink-500:#6b6b85;
+    --signal-500:#d63440; --signal-100:#fde2e3;
+    --hairline:rgba(20,20,58,.12); --hairline-strong:rgba(20,20,58,.22);
+    --font-display:'Bowlby One','Arial Black',sans-serif;
+    --font-serif:'Fraunces',Georgia,serif;
+    --font-sans:'Inter Tight',system-ui,sans-serif;
+    --font-mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; background:var(--paper-100); color:var(--ink-900);
+    font-family:var(--font-sans); line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .page { max-width: 980px; margin: 0 auto; padding: 48px 28px 80px; }
+
+  header.mast { border-bottom: 2px solid var(--ink-900); padding-bottom: 20px; margin-bottom: 8px; }
+  .wordmark { font-family:var(--font-display); font-size: clamp(36px,7vw,64px); line-height:.9; text-transform:uppercase; margin:0; letter-spacing:-.01em; }
+  .wordmark::after { content:'/'; color:var(--signal-500); margin-left:.06em; }
+  .deck { font-family:var(--font-serif); font-style:italic; font-size:clamp(16px,2.4vw,22px); color:var(--ink-700); margin:10px 0 0; }
+  .meta { font-family:var(--font-mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-500); margin-top:14px; }
+
+  section { margin-top: 40px; break-inside: avoid; }
+  h2 { font-family:var(--font-display); text-transform:uppercase; font-size: clamp(18px,3.4vw,26px); margin:0 0 4px; letter-spacing:.01em; }
+  h2 .num { color:var(--signal-500); margin-right:.4em; }
+  .sub { font-family:var(--font-serif); color:var(--ink-700); margin:0 0 14px; font-size:15px; }
+
+  .diagram {
+    background:var(--paper-50); border:1px solid var(--hairline); border-radius:16px;
+    padding:18px; overflow-x:auto; break-inside: avoid;
+  }
+  .diagram .mermaid { display:flex; justify-content:center; }
+
+  .endpoints { font-family:var(--font-mono); font-size:11.5px; color:var(--ink-500); margin-top:10px; line-height:1.7; word-break:break-word; }
+
+  table { width:100%; border-collapse:collapse; margin-top:8px; font-size:13.5px; }
+  th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--hairline); vertical-align:top; }
+  th { font-family:var(--font-mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-500); }
+  td code { font-family:var(--font-mono); font-size:12px; background:var(--paper-200); padding:1px 6px; border-radius:6px; }
+
+  footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--hairline); font-family:var(--font-mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-500); }
+
+  .hint {
+    margin: 18px 0 0; padding:10px 14px; border-left:3px solid var(--signal-500);
+    background:var(--signal-100); border-radius:8px; font-size:13px;
+  }
+  @media print {
+    .hint { display:none; }
+    body { background:#fff; }
+    .page { padding:0; max-width:none; }
+    .diagram, section, table { break-inside: avoid; }
+    a { color: inherit; text-decoration: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="mast">
+    <h1 class="wordmark">Commons</h1>
+    <p class="deck">Core user-flow map — neighborhood plans, meant to be shared.</p>
+    <div class="meta">Product flow &middot; commons-v2 &middot; for dev + client review</div>
+  </header>
+
+  <p class="hint">Tip: open in a browser, then <strong>Print &rarr; Save as PDF</strong> to share. Diagrams render automatically (needs internet the first time to load the diagram library).</p>
+
+  <section>
+    <h2><span class="num">01</span>Entry &amp; Onboarding</h2>
+    <p class="sub">Phone sign-in via SMS code. Invite codes deep-link in and prefill on the phone step.</p>
+    <div class="diagram">
+      <pre class="mermaid">
+flowchart TD
+    A([Open Commons]) --> B{Signed in?}
+    B -- No --> C[Enter phone number]
+    C --> D[Enter SMS code]
+    D --> E{Admin phone?}
+    E -- Yes --> F[Admin choice]
+    F --> G{Onboarding complete?}
+    E -- No --> G
+    B -- Yes --> G
+    G -- No --> H[Pick neighborhoods]
+    H --> I[Pick interests min 2]
+    I --> J[Profile: name + avatar]
+    J --> K[Accept guidelines]
+    K --> L([Home / Feed])
+    G -- Yes --> L
+      </pre>
+    </div>
+    <p class="endpoints">POST /auth/request-code &middot; POST /auth/verify-code &middot; POST /auth/redeem-code &middot; GET·PATCH /auth/me &middot; GET /neighborhoods</p>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span>Navigation Shell</h2>
+    <p class="sub">Top bar: notifications, messages (unread badge), profile. Bottom nav: Home, the center + to create, Explore.</p>
+    <div class="diagram">
+      <pre class="mermaid">
+flowchart TD
+    Home([Home / Feed])
+    Home --> Notif[Notifications]
+    Home --> Msgs[Messages — unread badge]
+    Home --> Prof[Profile]
+    Home --> Explore[Explore]
+    Home --> New[New plan +]
+    Explore --> Near[Nearby places + venue search]
+    Explore --> Comm[Communities — soon]
+    Near --> New
+    Prof --> Menu{Profile menu}
+    Menu --> Network[Network]
+    Menu --> Invite[Invite friends]
+    Menu --> Settings[Settings]
+    Settings --> Theme[Appearance]
+    Settings --> NPrefs[Notification prefs]
+    Settings --> Account[Sign out / delete]
+    Home --> Scope{Feed scope}
+    Scope --> All[All plans]
+    Scope --> Mine[Mine — going/interested]
+    Home --> Filter[Filter: interest / area / day]
+      </pre>
+    </div>
+    <p class="endpoints">GET /plans &middot; GET /places/nearby|search &middot; GET /notifications &middot; GET /conversations &middot; GET /profile/:id</p>
+  </section>
+
+  <section>
+    <h2><span class="num">03</span>Plan Lifecycle — the core loop</h2>
+    <p class="sub">A plan is "looking-for" when any of date/time/place is flexible; otherwise standard. The host can lock it in to confirm.</p>
+    <div class="diagram">
+      <pre class="mermaid">
+flowchart TD
+    New[Create plan] --> Fields[Venue / area / date-time / interests / visibility / spots / flyer]
+    Fields --> Kind{Any field flexible?}
+    Kind -- Yes --> LF[Looking-for plan]
+    Kind -- No --> STD[Standard plan]
+    LF --> Feed[Shows in Feed + Explore]
+    STD --> Feed
+    Feed --> Detail([Plan detail])
+    Detail --> RSVP{RSVP}
+    RSVP --> Going[I am in — going]
+    RSVP --> Inter[Interested]
+    Going --> Thread[In the group chat]
+    Inter -. looking-for .-> Thread
+    Detail --> Suggest[Suggest a time / idea]
+    Detail --> GetThere[Get there — maps]
+    Detail --> Share[Share]
+    Detail --> HostQ{Am I the host?}
+    HostQ -- Yes --> Host[Host controls]
+    Host --> Lock[Lock it in — Confirmed]
+    Host --> Time[Propose / apply time]
+    Host --> Approve[Approve applicants]
+    Host --> InviteN[Invite network]
+    Host --> Transfer[Transfer host]
+    Host --> Cancel[Cancel]
+    Host --> Edit[Edit]
+    Thread --> Chat([Group chat])
+    Lock --> Happens([Event happens])
+    Happens --> FB[Feedback: up/down + host tags]
+    Happens --> Nudge[Network nudge: add people you met]
+      </pre>
+    </div>
+    <p class="endpoints">POST /plans &middot; GET /plans/:id &middot; PUT·DELETE /plans/:id/participation &middot; /lock &middot; /propose-time &middot; /apply-time &middot; /approve &middot; /invite &middot; /suggestions &middot; /transfer-host &middot; /cancel</p>
+  </section>
+
+  <section>
+    <h2><span class="num">04</span>Messaging</h2>
+    <p class="sub">Per-plan group chats plus a unified inbox of every chat you can reach (hosting / going / interested). In-plan chat still opens from the detail page.</p>
+    <div class="diagram">
+      <pre class="mermaid">
+flowchart LR
+    Inbox([Messages inbox]) --> Row[Row per accessible plan chat]
+    Row --> GC([Group chat])
+    Detail([Plan detail]) --> GC
+    GC --> Send[Send message — notifies others]
+    Inbox -. unread total .-> Badge[Top-bar badge]
+      </pre>
+    </div>
+    <p class="endpoints">GET /conversations &middot; GET /plans/:planId/conversation &middot; GET·POST /conversations/:id/messages</p>
+  </section>
+
+  <section>
+    <h2><span class="num">05</span>Social Graph</h2>
+    <p class="sub">One-way network adds, invite codes for growth, and a post-plan nudge to add the people you actually showed up with.</p>
+    <div class="diagram">
+      <pre class="mermaid">
+flowchart LR
+    Me([You]) --> Net[Network — one-way adds]
+    Net --> Others[Other profiles]
+    Others --> AddF[Add to network]
+    Others --> MakeW[Make a plan with them]
+    Me --> Codes[Invite codes x3 — SMS / share]
+    Codes --> NewU[New user onboarding]
+    Me --> NudgeAfter[Post-plan network nudge]
+    NudgeAfter --> Net
+      </pre>
+    </div>
+    <p class="endpoints">GET /auth/network &middot; POST /auth/friend-add|friend-remove &middot; GET /auth/network-prompt &middot; POST /auth/network-add|network-dismiss &middot; GET /auth/invite-codes</p>
+  </section>
+
+  <section>
+    <h2><span class="num">06</span>Feature Summary</h2>
+    <table>
+      <thead><tr><th>Area</th><th>Screen(s)</th><th>Core capability</th></tr></thead>
+      <tbody>
+        <tr><td>Auth &amp; onboarding</td><td><code>/onboarding</code></td><td>Phone sign-in, neighborhoods, interests, profile, guidelines, invite redemption</td></tr>
+        <tr><td>Feed</td><td><code>/</code></td><td>All vs Mine, filter by interest/area/day, just-posted pin</td></tr>
+        <tr><td>Explore</td><td><code>/explore</code></td><td>Nearby places by category, venue search, communities (soon)</td></tr>
+        <tr><td>Create plan</td><td><code>/plans/new</code></td><td>Venue picker, flexible toggles &rarr; looking-for, visibility, spots, flyer, invite</td></tr>
+        <tr><td>Plan detail</td><td><code>/plans/:id</code></td><td>RSVP, roster, host controls, lock-in, time proposals, get-there, share</td></tr>
+        <tr><td>Chat</td><td><code>/messages</code>, <code>/plans/:id/chat</code></td><td>Unified inbox + per-plan group chat with unread badge</td></tr>
+        <tr><td>Profile</td><td><code>/profile/:id</code></td><td>Hero, stats, interests, edit, plans calendar, menu</td></tr>
+        <tr><td>Network / Invite / Settings</td><td><code>/network</code> <code>/invite</code> <code>/settings</code></td><td>Network list, invite codes, theme, notification prefs, account</td></tr>
+        <tr><td>Notifications</td><td><code>/notifications</code></td><td>Activity feed, mark read</td></tr>
+        <tr><td>Feedback</td><td>post-plan prompt</td><td>Thumbs up/down + host tags</td></tr>
+        <tr><td>Admin</td><td><code>/admin</code></td><td>Summary dashboard (admin phones)</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>Commons / Core user flow &middot; generated from commons-v2 &middot; print to PDF to share</footer>
+
+</div>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({
+    startOnLoad: true,
+    securityLevel: "loose",
+    theme: "base",
+    fontFamily: "'Inter Tight', system-ui, sans-serif",
+    themeVariables: {
+      background: "#faf5ec",
+      primaryColor: "#faf5ec",
+      primaryBorderColor: "#14143a",
+      primaryTextColor: "#14143a",
+      lineColor: "#6b6b85",
+      secondaryColor: "#fde2e3",
+      tertiaryColor: "#ecdfc8",
+      fontSize: "15px"
+    },
+    flowchart: { useMaxWidth: true, htmlLabels: true, curve: "basis" }
+  });
+</script>
+</body>
+</html>
