@@ -11,7 +11,6 @@ import {
   VIBE_OPTIONS,
   type InterestTag,
   type JoinType,
-  type NeighborhoodDTO,
   type PlanVisibility,
   type PublicUser,
   type VibeIcon,
@@ -25,7 +24,6 @@ const today = (): string => {
 export function CreatePlanPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
-  const [neighborhoods, setNeighborhoods] = useState<NeighborhoodDTO[]>([]);
   const prefillName = searchParams.get("name") ?? "";
   const prefillAddress = searchParams.get("address") ?? "";
   const prefillTagParam = searchParams.get("tag");
@@ -104,10 +102,6 @@ export function CreatePlanPage() {
   });
   const navigate = useNavigate();
   const flyerRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    void api<NeighborhoodDTO[]>("/api/neighborhoods").then(setNeighborhoods).catch(() => undefined);
-  }, []);
 
   useEffect(() => {
     // Always load the user's network once — needed for both the
