@@ -305,6 +305,24 @@ function FriendButton({
     }
   }
 
+  // When already connected, show a clear status line plus an explicit
+  // "Remove from network" action (a bare "In your network" toggle read as a
+  // dead label, so people couldn't tell they could undo it).
+  if (inNet) {
+    return (
+      <div className="friend-button-connected" style={{ marginTop: 10 }}>
+        <span className="friend-connected-pill">✓ In your network</span>
+        <button
+          type="button"
+          className="btn-link friend-remove-btn"
+          onClick={() => void toggle()}
+          disabled={busy}
+        >
+          {busy ? "…" : "Remove from network"}
+        </button>
+      </div>
+    );
+  }
   return (
     <button
       type="button"
@@ -313,7 +331,7 @@ function FriendButton({
       disabled={busy}
       style={{ marginTop: 10 }}
     >
-      {busy ? "…" : inNet ? "In your network" : "Add to network"}
+      {busy ? "…" : "Add to network"}
     </button>
   );
 }

@@ -12,14 +12,42 @@ import { useAuth } from "../context/AuthContext";
 import { planHasEnded } from "../lib/planTime";
 import type { InterestTag, MeDTO, NeighborhoodDTO, NetworkPromptDTO, PlanDTO } from "../types/shared";
 
+// Feed filters persist across navigation + reload — losing "hide cancelled"
+// every time you left the feed was a papercut.
+const FEED_FILTERS_KEY = "commons.feedFilters.v1";
+
+type PersistedFilters = {
+  selectedTag: InterestTag | null;
+  selectedHoodId: string | null;
+  hideHappened: boolean;
+  hideCancelled: boolean;
+};
+
+const EMPTY_FILTERS: PersistedFilters = {
+  selectedTag: null,
+  selectedHoodId: null,
+  hideHappened: false,
+  hideCancelled: false,
+};
+
+function loadPersistedFilters(): PersistedFilters {
+  try {
+    const raw = localStorage.getItem(FEED_FILTERS_KEY);
+    if (raw) return { ...EMPTY_FILTERS, ...(JSON.parse(raw) as Partial<PersistedFilters>) };
+  } catch {
+    /* corrupt / unavailable storage — fall back to defaults */
+  }
+  return EMPTY_FILTERS;
+}
+
 export function FeedPage() {
   const [plans, setPlans] = useState<PlanDTO[] | null>(null);
   const [neighborhoods, setNeighborhoods] = useState<NeighborhoodDTO[]>([]);
   const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
-  const [selectedTag, setSelectedTag] = useState<InterestTag | null>(null);
-  const [selectedHoodId, setSelectedHoodId] = useState<string | null>(null);
-  const [hideHappened, setHideHappened] = useState(false);
-  const [hideCancelled, setHideCancelled] = useState(false);
+  const [selectedTag, setSelectedTag] = useState<InterestTag | null>(() => loadPersistedFilters().selectedTag);
+  const [selectedHoodId, setSelectedHoodId] = useState<string | null>(() => loadPersistedFilters().selectedHoodId);
+  const [hideHappened, setHideHappened] = useState(() => loadPersistedFilters().hideHappened);
+  const [hideCancelled, setHideCancelled] = useState(() => loadPersistedFilters().hideCancelled);
   const [filterOpen, setFilterOpen] = useState(false);
   const [view, setView] = useState<"all" | "mine">("all");
   const { user, setUser } = useAuth();
@@ -32,11 +60,48 @@ export function FeedPage() {
     navState?.openInviteForPlanId ?? null,
   );
 
+  const [refreshing, setRefreshing] = useState(false);
   const refreshPlans = () => void api<PlanDTO[]>("/api/plans").then(setPlans).catch(() => setPlans([]));
 
   useEffect(() => {
     refreshPlans();
     void api<NeighborhoodDTO[]>("/api/neighborhoods").then(setNeighborhoods).catch(() => undefined);
+  }, []);
+
+  // Pull-to-refresh: a downward drag while already scrolled to the top re-pulls
+  // the feed. Lightweight (no library) — fires once per gesture past threshold.
+  useEffect(() => {
+    let startY = 0;
+    let armed = false;
+    const onStart = (e: TouchEvent) => {
+      if (window.scrollY <= 0 && e.touches.length === 1) {
+        startY = e.touches[0]!.clientY;
+        armed = true;
+      } else {
+        armed = false;
+      }
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!armed) return;
+      const dy = e.touches[0]!.clientY - startY;
+      if (dy > 80) {
+        armed = false;
+        setRefreshing(true);
+        void api<PlanDTO[]>("/api/plans")
+          .then(setPlans)
+          .catch(() => undefined)
+          .finally(() => setTimeout(() => setRefreshing(false), 400));
+      }
+    };
+    const onEnd = () => { armed = false; };
+    window.addEventListener("touchstart", onStart, { passive: true });
+    window.addEventListener("touchmove", onMove, { passive: true });
+    window.addEventListener("touchend", onEnd, { passive: true });
+    return () => {
+      window.removeEventListener("touchstart", onStart);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onEnd);
+    };
   }, []);
 
   useEffect(() => {
@@ -62,6 +127,19 @@ export function FeedPage() {
       .then((r) => setNetworkPrompt(r.prompt))
       .catch(() => setNetworkPrompt(null));
   }, [plans, user?.notificationPrefs?.postPlanNetworkNudge]);
+
+  // Persist the sheet filters whenever they change (day selection stays
+  // transient — it's tied to the week strip, not a saved preference).
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        FEED_FILTERS_KEY,
+        JSON.stringify({ selectedTag, selectedHoodId, hideHappened, hideCancelled }),
+      );
+    } catch {
+      /* storage unavailable — non-fatal */
+    }
+  }, [selectedTag, selectedHoodId, hideHappened, hideCancelled]);
 
   const filteredPlans = useMemo(() => {
     let list = plans ?? [];
@@ -96,6 +174,7 @@ export function FeedPage() {
 
   return (
     <main className="app-shell app-shell--wide app-shell--with-nav app-shell--with-topbar">
+      {refreshing && <div className="feed-refreshing" role="status">Refreshing…</div>}
       <FeedbackPrompt />
 
       <WeekStrip

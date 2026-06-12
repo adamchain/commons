@@ -47,13 +47,13 @@ export function CreatePlanPage() {
     return opt?.id ?? null;
   }, [prefillTagParam]);
 
-  // Default vibes to the user's onboarding interests so the feed map starts
-  // pointed at the right communities.
+  // Interests start empty so the host consciously tags the plan — pre-checking
+  // their onboarding interests led to mis-tagged plans. A prefill from Explore
+  // (e.g. a venue's vibe) still seeds a single tag.
   const defaultVibes = useMemo<VibeIcon[]>(() => {
     if (prefillVibe) return [prefillVibe];
-    const userInterests = new Set(user?.interests ?? []);
-    return VIBE_OPTIONS.filter((o) => userInterests.has(o.tag)).map((o) => o.id);
-  }, [prefillVibe, user?.interests]);
+    return [];
+  }, [prefillVibe]);
 
   const [form, setForm] = useState({
     title: "",

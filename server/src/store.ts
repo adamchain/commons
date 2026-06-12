@@ -18,6 +18,7 @@ export interface UserRecord {
   /** `verify` = signed up via Twilio Verify; `seed` = demo data script only. */
   accountSource?: "verify" | "seed";
   firstName: string;
+  lastName?: string;
   /** Primary hood — mirrors first of neighborhoodIds when set. */
   neighborhoodId: string | null;
   /** Optional on legacy rows. */
@@ -172,6 +173,8 @@ export interface MessageRecord {
   createdAt: string;
   readBy: string[];
   kind?: "user" | "system";
+  /** Emoji → userIds who reacted (toggle). UI only offers ❤️ today. */
+  reactions?: Record<string, string[]>;
 }
 
 export interface PlanSuggestionRecord {
@@ -288,7 +291,8 @@ export interface NotificationRecord {
     | "weeklyFridayDigest"
     | "lookingForRecovery"
     | "planTimeProposed"
-    | "planTimeChanged";
+    | "planTimeChanged"
+    | "planInvite";
   body: string;
   planId?: string;
   conversationId?: string;
@@ -795,6 +799,17 @@ export const store = {
     mongoMirror.upsertConversation(conv);
     return conv;
   },
+  /** Remove a single participant from a group conversation (explicit "leave
+   *  chat"). Returns the updated conversation, or undefined if not found. */
+  removeConversationParticipant(convId: string, userId: string): ConversationRecord | undefined {
+    const conv = snapshot.conversations.find((c) => c.id === convId);
+    if (!conv) return undefined;
+    if (!conv.participantIds.includes(userId)) return conv;
+    conv.participantIds = conv.participantIds.filter((id) => id !== userId);
+    persist();
+    mongoMirror.upsertConversation(conv);
+    return conv;
+  },
   createDm(planId: string, a: string, b: string): ConversationRecord {
     const existing = this.findDmInPlan(planId, a, b);
     if (existing) return existing;
@@ -854,6 +869,26 @@ export const store = {
     persist();
     mongoMirror.upsertMessage(message);
     if (conv) mongoMirror.upsertConversation(conv);
+    return message;
+  },
+
+  /**
+   * Toggle a user's emoji reaction on a message. Adds the userId if absent,
+   * removes it if present. Empty emoji buckets are pruned. Returns the updated
+   * message (or undefined if not found).
+   */
+  toggleReaction(messageId: string, userId: string, emoji: string): MessageRecord | undefined {
+    const message = snapshot.messages.find((m) => m.id === messageId);
+    if (!message) return undefined;
+    const reactions: Record<string, string[]> = { ...(message.reactions ?? {}) };
+    const current = new Set(reactions[emoji] ?? []);
+    if (current.has(userId)) current.delete(userId);
+    else current.add(userId);
+    if (current.size === 0) delete reactions[emoji];
+    else reactions[emoji] = [...current];
+    message.reactions = reactions;
+    persist();
+    mongoMirror.upsertMessage(message);
     return message;
   },
 

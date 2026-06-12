@@ -10,7 +10,7 @@ import { ParticipationButtons } from "../components/ParticipationButtons";
 import { ShareSheet } from "../components/ShareSheet";
 import { useAuth } from "../context/AuthContext";
 import { formatPlaceAddress, formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
-import { INTEREST_LABELS, type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
+import { type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
 
 export function PlanDetailPage() {
   const { id = "" } = useParams();
@@ -223,14 +223,6 @@ export function PlanDetailPage() {
           )
         )}
 
-        {plan.tags.length > 0 && (
-          <div className="tag-chip-row">
-            {plan.tags.map((tag) => (
-              <span key={tag} className="tag-chip">{INTEREST_LABELS[tag] ?? tag}</span>
-            ))}
-          </div>
-        )}
-
         {showGroupPrompt && (
           <div className="lock-prompt" role="note">
             <p className="lock-prompt-headline">
@@ -253,19 +245,9 @@ export function PlanDetailPage() {
           </div>
         )}
 
-        {/* Non-host threshold nudge — same copy as the host prompt but no
-            CTA, since only the original poster can convert the looking_for
-            to a confirmed plan. */}
-        {groupAtThreshold && !isHosting && (
-          <div className="lock-prompt lock-prompt--soft" role="note">
-            <p className="lock-prompt-headline">
-              Looks like you&apos;ve got a group.
-            </p>
-            <p className="lock-prompt-soft">
-              Plans work best when someone locks it in early — {plan.creator.firstName} can set it up from here.
-            </p>
-          </div>
-        )}
+        {/* The "looks like you've got a group" nudge is intentionally
+            host-only (showGroupPrompt above). When viewing someone else's
+            idea you don't see it — they own the lock-in decision. */}
 
         {canLock && (plan.isFlexibleTime || plan.isFlexibleLocation || isLookingFor) && (
           <div
@@ -341,19 +323,26 @@ export function PlanDetailPage() {
           />
         )}
 
-        <div className="plan-actions-row plan-actions-row--triple">
-          <button type="button" className="action-btn action-btn--stack" onClick={() => setShowGetThere(true)}>
-            <span className="action-btn-icon" aria-hidden="true">📍</span>
-            <span className="action-btn-label">Get there</span>
-          </button>
+        {/* On your own plan you get the full toolkit. On someone else's, the
+            venue already links to Maps up top, so we only surface Invite —
+            bring your own people. */}
+        <div className={`plan-actions-row ${isHosting ? "plan-actions-row--triple" : "plan-actions-row--single"}`}>
+          {isHosting && (
+            <button type="button" className="action-btn action-btn--stack" onClick={() => setShowGetThere(true)}>
+              <span className="action-btn-icon" aria-hidden="true">📍</span>
+              <span className="action-btn-label">Get there</span>
+            </button>
+          )}
           <button type="button" className="action-btn action-btn--stack" onClick={() => setShowInvite(true)}>
             <span className="action-btn-icon" aria-hidden="true">＋</span>
             <span className="action-btn-label">Invite</span>
           </button>
-          <button type="button" className="action-btn action-btn--stack" onClick={() => setShowShare(true)}>
-            <span className="action-btn-icon" aria-hidden="true">↗</span>
-            <span className="action-btn-label">Share</span>
-          </button>
+          {isHosting && (
+            <button type="button" className="action-btn action-btn--stack" onClick={() => setShowShare(true)}>
+              <span className="action-btn-icon" aria-hidden="true">↗</span>
+              <span className="action-btn-label">Share</span>
+            </button>
+          )}
         </div>
 
         {plan.cancelledAt && (

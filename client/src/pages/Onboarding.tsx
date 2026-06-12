@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ReactNode, UIEvent } from "react";
 import { api } from "../api/http";
 import { setAuthToken } from "../api/authToken";
 import { Avatar } from "../components/Avatar";
@@ -283,6 +283,7 @@ export function OnboardingPage() {
           });
           setStep("interests");
         }}
+        onSkip={() => setStep("interests")}
       />
     );
   }
@@ -294,6 +295,7 @@ export function OnboardingPage() {
           await patchMe({ interests });
           setStep("profile");
         }}
+        onSkip={() => setStep("profile")}
       />
     );
   }
@@ -301,9 +303,10 @@ export function OnboardingPage() {
     return (
       <ProfileStep
         me={user}
-        onSave={async (firstName, avatarSeed, avatarStyle, avatarPhotoDataUrl, avatarParams) => {
+        onSave={async (firstName, lastName, avatarSeed, avatarStyle, avatarPhotoDataUrl, avatarParams) => {
           await patchMe({
             firstName,
+            lastName,
             avatarSeed,
             avatarStyle,
             avatarPhotoDataUrl: avatarPhotoDataUrl ?? undefined,
@@ -493,10 +496,12 @@ function LocationStep({
   coords,
   onCoords,
   onSave,
+  onSkip,
 }: {
   coords: { lat: number; lng: number } | null;
   onCoords: (c: { lat: number; lng: number } | null) => void;
   onSave: (neighborhoodIds: string[]) => Promise<void>;
+  onSkip: () => void;
 }) {
   const [neighborhoods, setNeighborhoods] = useState<NeighborhoodDTO[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -607,18 +612,28 @@ function LocationStep({
       >
         {selected.size > 0 ? `Continue · ${selected.size} picked` : "Continue"}
       </button>
+      <button className="btn-link" type="button" disabled={busy} onClick={onSkip}>
+        Skip for now
+      </button>
     </OnboardingShell>
   );
 }
 
 function GuidelinesStep({ onAgree }: { onAgree: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
+  // Gate the agree button until the user has actually scrolled the terms to
+  // the bottom — "make sure they scroll through it."
+  const [readToEnd, setReadToEnd] = useState(false);
+  const onScroll = (e: UIEvent<HTMLUListElement>) => {
+    const el = e.currentTarget;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 24) setReadToEnd(true);
+  };
   return (
     <OnboardingShell
       title="Before you hit the feed."
-      subtitle="A quick read. We mean it."
+      subtitle="A quick read. We mean it. Scroll through, then agree."
     >
-      <ul className="guidelines-list">
+      <ul className="guidelines-list guidelines-list--scroll" onScroll={onScroll}>
         <li>
           <span className="guidelines-icon" aria-hidden="true">🤝</span>
           <div>
@@ -654,11 +669,23 @@ function GuidelinesStep({ onAgree }: { onAgree: () => Promise<void> }) {
             <p>Support local spots, tip well, and leave places better than you found them.</p>
           </div>
         </li>
+        <li>
+          <span className="guidelines-icon" aria-hidden="true">📄</span>
+          <div>
+            <strong>Terms &amp; Conditions.</strong>
+            <p>
+              By continuing you agree to the Commons Terms of Service and Privacy Policy.
+              You’re responsible for your own safety when meeting people from the app; Commons
+              doesn’t vet members and isn’t liable for plans or interactions that happen offline.
+              Be 18+, keep it legal, and don’t use Commons to harm, harass, or deceive anyone.
+            </p>
+          </div>
+        </li>
       </ul>
       <button
         type="button"
         className="btn-primary btn-block"
-        disabled={busy}
+        disabled={busy || !readToEnd}
         onClick={async () => {
           setBusy(true);
           try {
@@ -668,14 +695,14 @@ function GuidelinesStep({ onAgree }: { onAgree: () => Promise<void> }) {
           }
         }}
       >
-        {busy ? "One sec…" : "I’m in — let’s go"}
+        {busy ? "One sec…" : readToEnd ? "I’m in — let’s go" : "Scroll to read the terms"}
       </button>
-      <p className="onboarding-fineprint">Tapping agree confirms you’ll follow the Commons guidelines.</p>
+      <p className="onboarding-fineprint">Tapping agree confirms you’ll follow the Commons guidelines and accept the Terms &amp; Conditions.</p>
     </OnboardingShell>
   );
 }
 
-function InterestsStep({ me, onSave }: { me: MeDTO; onSave: (interests: InterestTag[]) => Promise<void> }) {
+function InterestsStep({ me, onSave, onSkip }: { me: MeDTO; onSave: (interests: InterestTag[]) => Promise<void>; onSkip: () => void }) {
   const [picked, setPicked] = useState<InterestTag[]>(me.interests);
   const [busy, setBusy] = useState(false);
 
@@ -712,6 +739,9 @@ function InterestsStep({ me, onSave }: { me: MeDTO; onSave: (interests: Interest
       >
         Next · {picked.length} picked
       </button>
+      <button className="btn-link" type="button" disabled={busy} onClick={onSkip}>
+        Skip for now
+      </button>
     </OnboardingShell>
   );
 }
@@ -723,6 +753,7 @@ function ProfileStep({
   me: MeDTO;
   onSave: (
     firstName: string,
+    lastName: string,
     seed: string,
     style: AvatarStyle,
     photoDataUrl: string | null,
@@ -730,6 +761,7 @@ function ProfileStep({
   ) => Promise<void>;
 }) {
   const [firstName, setFirstName] = useState(me.firstName);
+  const [lastName, setLastName] = useState(me.lastName ?? "");
   const [photo, setPhoto] = useState<string | null>(me.avatarPhotoDataUrl ?? null);
   const [avatarParams, setAvatarParams] = useState<string | null>(me.avatarParams ?? null);
   const [busy, setBusy] = useState(false);
@@ -763,14 +795,20 @@ function ProfileStep({
         value={firstName}
         onChange={(e) => setFirstName(e.target.value)}
       />
+      <input
+        className="onboarding-input"
+        placeholder="Last name"
+        value={lastName}
+        onChange={(e) => setLastName(e.target.value)}
+      />
 
-      <details className="profile-photo-picker">
-        <summary>Upload a photo</summary>
+      {/* Photo is the primary, always-visible choice — we want a real face.
+          Characters are tucked behind a closed disclosure below. */}
+      <div className="profile-photo-picker profile-photo-picker--primary">
         {isNative() ? (
           <button
             type="button"
             className="btn-secondary btn-block"
-            style={{ marginTop: 8 }}
             onClick={async () => {
               try {
                 const dataUrl = await pickPhotoNative({ maxPx: 512, quality: 0.82 });
@@ -780,27 +818,31 @@ function ProfileStep({
               }
             }}
           >
-            Choose photo
+            📷 Add a photo
           </button>
         ) : (
-          <input
-            type="file"
-            accept="image/*"
-            className="onboarding-input"
-            style={{ marginTop: 8 }}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              void fileToResizedDataUrl(f).then(pickPhoto).catch(() => undefined);
-              e.target.value = "";
-            }}
-          />
+          <>
+            <label className="btn-secondary btn-block profile-photo-label">
+              📷 Add a photo
+              <input
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  void fileToResizedDataUrl(f).then(pickPhoto).catch(() => undefined);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          </>
         )}
-      </details>
+      </div>
 
-      <div className="profile-preset-block">
-        <p className="profile-emoji-label">Or pick a character</p>
-        <div className="profile-preset-grid">
+      <details className="profile-preset-disclosure">
+        <summary>Or pick a character</summary>
+        <div className="profile-preset-grid" style={{ marginTop: 10 }}>
           {AVATAR_PRESETS.map((p) => (
             <button
               key={p.id}
@@ -815,7 +857,7 @@ function ProfileStep({
             </button>
           ))}
         </div>
-      </div>
+      </details>
 
       <button
         type="button"
@@ -824,7 +866,7 @@ function ProfileStep({
         onClick={async () => {
           setBusy(true);
           try {
-            await onSave(firstName.trim(), me.avatarSeed, me.avatarStyle, photo, avatarParams);
+            await onSave(firstName.trim(), lastName.trim(), me.avatarSeed, me.avatarStyle, photo, avatarParams);
           } finally {
             setBusy(false);
           }

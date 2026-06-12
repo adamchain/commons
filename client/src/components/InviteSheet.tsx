@@ -6,8 +6,8 @@ import type { PublicUser } from "../types/shared";
 
 /**
  * Invite people to a plan — either via SMS share link, or by picking from the
- * viewer's existing network. Picked users get added as "interested" and dropped
- * into the group conversation.
+ * viewer's existing network. Picked users get a notification (they are NOT
+ * auto-RSVP'd — they decide to join from the plan).
  */
 export function InviteSheet({
   planId,
@@ -22,6 +22,7 @@ export function InviteSheet({
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(0);
+  const [hiddenWarn, setHiddenWarn] = useState(false);
 
   useEffect(() => {
     void api<{ users: PublicUser[] }>("/api/auth/network")
@@ -69,11 +70,12 @@ export function InviteSheet({
     if (picked.size === 0 || busy) return;
     setBusy(true);
     try {
-      const r = await api<{ invited: number }>(`/api/plans/${planId}/invite`, {
+      const r = await api<{ invited: number; hiddenForSome?: boolean }>(`/api/plans/${planId}/invite`, {
         method: "POST",
         body: JSON.stringify({ userIds: [...picked] }),
       });
       setSent(r.invited);
+      setHiddenWarn(Boolean(r.hiddenForSome));
       setPicked(new Set());
     } catch {
       /* swallow — could surface error toast */
@@ -140,7 +142,13 @@ export function InviteSheet({
 
         {sent > 0 && (
           <p className="form-help" style={{ marginTop: 10, color: "var(--accent)" }}>
-            Sent {sent} invite{sent === 1 ? "" : "s"}.
+            Sent {sent} invite{sent === 1 ? "" : "s"}. They'll get a notification.
+          </p>
+        )}
+        {hiddenWarn && (
+          <p className="form-help" style={{ marginTop: 6 }}>
+            Heads up: this plan is limited to your network, so anyone you invited who
+            hasn't added you won't see it until they do.
           </p>
         )}
 

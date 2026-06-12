@@ -581,9 +581,13 @@ plansRouter.delete("/:id/propose-time", requireAuth, async (req, res) => {
 });
 
 /**
- * Invite picked users to a plan. Adds them to the group conversation and
- * marks them as "interested" so the plan shows up in their notifications.
- * No-op for users who are already going/interested.
+ * Invite picked users to a plan. Sends each a notification (NOT an auto-RSVP):
+ * being invited should never silently enroll you — you decide to join from the
+ * notification/plan. No-op for users who are already going/interested.
+ *
+ * Network-only plans: if the invitee isn't in the creator's network, the plan
+ * is hidden from their feed. We still notify them and flag it so the client can
+ * tell them to add the host first.
  */
 plansRouter.post("/:id/invite", requireAuth, async (req, res) => {
   const userId = String(req.userId);
@@ -605,16 +609,35 @@ plansRouter.post("/:id/invite", requireAuth, async (req, res) => {
     res.status(403).json({ error: "You can't invite to this plan" });
     return;
   }
+  const inviterName = me.firstName || "Someone";
+  const creator = store.findUserById(plan.creatorId);
+  const creatorNet = new Set(creator?.networkIds ?? []);
+  const isNetworkOnly = (plan.visibility ?? "everyone") === "network";
+
   let invited = 0;
+  let hiddenForSome = false;
   for (const id of userIds) {
     if (id === userId) continue;
     const existing = store.findParticipation(planId, id);
-    if (existing) continue;
-    store.upsertParticipation(planId, id, "interested");
+    if (existing) continue; // already in — nothing to invite
+    // Hidden case: network-only plan, invitee not in the host's network and
+    // not the host themselves. They can't see it on the feed yet.
+    const hidden = isNetworkOnly && id !== plan.creatorId && !creatorNet.has(id);
+    if (hidden) hiddenForSome = true;
+    const body = hidden
+      ? `${inviterName} invited you to "${plan.title}" — it's private to ${creator?.firstName ?? "the host"}'s network, so add them to see it`
+      : `${inviterName} invited you to "${plan.title}"`;
+    await emit({
+      userId: id,
+      kind: "planInvite",
+      body,
+      planId: plan.id,
+      // One invite ping per (plan, invitee) — re-inviting won't spam.
+      dedupKey: `planInvite:${plan.id}:${id}`,
+    });
     invited++;
   }
-  store.ensureGroupConversation(planId, [plan.creatorId, ...userIds]);
-  res.json({ ok: true, invited });
+  res.json({ ok: true, invited, hiddenForSome });
 });
 
 plansRouter.post("/:id/suggestions", requireAuth, async (req, res) => {

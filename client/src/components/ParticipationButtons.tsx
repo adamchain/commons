@@ -123,16 +123,14 @@ export function ParticipationButtons({
         disabled={pending}
       >
         {interestedActive
-          ? loose
-            ? "I'm Interested"
-            : isApproveOnly
-              ? "Applied"
-              : "I'm interested"
+          ? isApproveOnly
+            ? "Withdraw application"
+            : "Drop out"
           : loose
             ? "I'm Interested"
             : isApproveOnly
               ? "Apply"
-              : "Interested"}
+              : "I'm interested"}
       </button>
       {error && <p className="onboarding-error" style={{ marginTop: 8 }}>{error}</p>}
     </div>

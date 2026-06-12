@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { LoadingScreen } from "../components/LoadingScreen";
@@ -13,6 +13,7 @@ const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
 export function ChatPage() {
   const { planId = "" } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [plan, setPlan] = useState<PlanDTO | null>(null);
   const [conv, setConv] = useState<ConversationDTO | null>(null);
@@ -73,6 +74,30 @@ export function ChatPage() {
     }
   }
 
+  async function leaveChat() {
+    if (!conv) return;
+    if (!window.confirm("Leave this chat? It'll disappear from your Messages. You stay on the plan.")) return;
+    try {
+      await api(`/api/conversations/${conv.id}/leave`, { method: "POST" });
+      navigate("/messages");
+    } catch {
+      /* swallow */
+    }
+  }
+
+  async function toggleHeart(messageId: string) {
+    if (!conv) return;
+    try {
+      const updated = await api<MessageDTO>(
+        `/api/conversations/${conv.id}/messages/${messageId}/react`,
+        { method: "POST", body: JSON.stringify({ emoji: "❤️" }) },
+      );
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? updated : m)));
+    } catch {
+      /* swallow — they can tap again */
+    }
+  }
+
   const visibleAvatars = conv.participants.slice(0, 4);
   const overflowCount = Math.max(0, conv.participants.length - visibleAvatars.length);
   const participantLabel =
@@ -89,8 +114,11 @@ export function ChatPage() {
 
   return (
     <main className="app-shell app-shell--chat">
-      <header className="app-header app-header--minimal">
+      <header className="app-header app-header--minimal chat-header-bar">
         <Link to={`/plans/${planId}`} className="detail-back">← Back to plan</Link>
+        <button type="button" className="btn-link chat-leave-btn" onClick={() => void leaveChat()}>
+          Leave chat
+        </button>
       </header>
 
       <div className="chat-shell">
@@ -183,6 +211,22 @@ export function ChatPage() {
                     )}
                     <div className="chat-bubble-body">{entry.body}</div>
                     <div className="chat-bubble-time">{formatTimeOnly(entry.createdAt)}</div>
+                    {(() => {
+                      const hearts = entry.reactions["❤️"] ?? [];
+                      const iReacted = hearts.includes(user.id);
+                      return (
+                        <button
+                          type="button"
+                          className={`chat-react-btn ${iReacted ? "is-reacted" : ""} ${hearts.length > 0 ? "has-count" : ""}`}
+                          onClick={() => void toggleHeart(entry.id)}
+                          aria-label={iReacted ? "Remove heart" : "React with heart"}
+                          aria-pressed={iReacted}
+                        >
+                          <span aria-hidden="true">❤️</span>
+                          {hearts.length > 0 && <span className="chat-react-count">{hearts.length}</span>}
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
               );
@@ -246,6 +290,7 @@ type GroupedEntry =
       body: string;
       createdAt: string;
       showAvatar: boolean;
+      reactions: Record<string, string[]>;
     };
 
 function groupMessages(msgs: MessageDTO[]): GroupedEntry[] {
@@ -279,6 +324,7 @@ function groupMessages(msgs: MessageDTO[]): GroupedEntry[] {
       body: m.body,
       createdAt: m.createdAt,
       showAvatar: !cont,
+      reactions: m.reactions ?? {},
     });
     lastUserSenderId = sender.id;
     lastUserAt = date.getTime();

@@ -11,6 +11,7 @@ const UserSchema = new mongoose.Schema<UserRecord>(
       default: "verify",
     },
     firstName: { type: String, default: "" },
+    lastName: { type: String, default: "" },
     neighborhoodId: { type: String, default: null },
     neighborhoodIds: { type: [String], default: [] },
     interests: [{ type: String }],

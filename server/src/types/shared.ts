@@ -66,6 +66,7 @@ export type ParticipationState = "interested" | "going";
 export interface PublicUser {
   id: string;
   firstName: string;
+  lastName?: string;
   neighborhoodId: string | null;
   avatarSeed: string;
   avatarStyle: AvatarStyle;
@@ -185,6 +186,8 @@ export interface MessageDTO {
   sender?: PublicUser;
   body: string;
   createdAt: string;
+  /** Emoji → userIds who reacted. Only ❤️ is offered in the UI for now. */
+  reactions?: Record<string, string[]>;
 }
 
 export interface FeedbackDTO {
@@ -215,6 +218,7 @@ export interface MeDTO {
   id: string;
   phoneNumber: string;
   firstName: string;
+  lastName?: string;
   neighborhoodId: string | null;
   neighborhoodIds?: string[];
   interests: InterestTag[];
@@ -275,7 +279,8 @@ export type NotificationKind =
   | "weeklyFridayDigest"
   | "lookingForRecovery"
   | "planTimeProposed"
-  | "planTimeChanged";
+  | "planTimeChanged"
+  | "planInvite";
 
 export interface NotificationDTO {
   id: string;

@@ -28,6 +28,8 @@ const PREF_KEY: Record<NotificationKind, keyof NotificationPrefs> = {
   // host actions that move the plan out from under participants.
   planTimeProposed: "planCancellation",
   planTimeChanged: "planCancellation",
+  // Invites ride on the "someone joined" toggle — both are person-to-plan pings.
+  planInvite: "someoneJoinedYourPlan",
 };
 
 export async function emit(input: {

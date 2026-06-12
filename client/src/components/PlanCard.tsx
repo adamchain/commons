@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "./Avatar";
@@ -87,7 +87,7 @@ export function PlanCard({
       : isFull && !hasEnded && !isCancelled
         ? `${goingCount} going · full`
         : showSpotsRemaining
-          ? `${goingCount} going · ${spotsRemaining} left`
+          ? `${goingCount} going · ${spotsRemaining} spot${spotsRemaining === 1 ? "" : "s"} left`
           : goingCount >= 1
             ? `${goingCount} going`
             : isLooking && interestedCount >= 1
@@ -229,6 +229,16 @@ export function PlanCard({
         </footer>
       </Link>
 
+      {!isHosting && !hasEnded && !isCancelled && plan.myState !== "going" && (
+        <QuickJoin
+          planId={plan.id}
+          isLooking={isLooking}
+          state={plan.myState ?? null}
+          disabled={isFull && !isLooking}
+          onPlanRefresh={onPlanRefresh}
+        />
+      )}
+
       {canChat && (
         <Link
           to={`/plans/${plan.id}/chat`}
@@ -272,6 +282,68 @@ export function PlanCard({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * On-card quick RSVP. Lets you commit straight from the feed without opening
+ * the plan. "I'm in" for standard plans, "I'm interested" for looking_for /
+ * tentative. Already-going cards don't render this (handled by the caller).
+ */
+function QuickJoin({
+  planId,
+  isLooking,
+  state,
+  disabled,
+  onPlanRefresh,
+}: {
+  planId: string;
+  isLooking: boolean;
+  state: "going" | "interested" | null;
+  disabled?: boolean;
+  onPlanRefresh?: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const target: "going" | "interested" = isLooking ? "interested" : "going";
+  const active = state === target;
+
+  async function commit(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (active) {
+        await api(`/api/plans/${planId}/participation`, { method: "DELETE" });
+      } else {
+        await api(`/api/plans/${planId}/participation`, {
+          method: "PUT",
+          body: JSON.stringify({ state: target }),
+        });
+      }
+      onPlanRefresh?.();
+    } catch {
+      /* surface nothing on the card — they can open the plan to retry */
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const label = active
+    ? "Drop out"
+    : isLooking
+      ? "I'm interested"
+      : "I'm in";
+
+  return (
+    <button
+      type="button"
+      className={`plan-card-quick-join ${active ? "is-active" : ""}`}
+      onClick={(e) => void commit(e)}
+      disabled={busy || disabled}
+    >
+      {busy ? "…" : label}
+    </button>
   );
 }
 

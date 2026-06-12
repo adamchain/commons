@@ -167,5 +167,7 @@ function iconFor(kind: NotificationKind): string {
       return "🕰️";
     case "planTimeChanged":
       return "🔄";
+    case "planInvite":
+      return "✉️";
   }
 }

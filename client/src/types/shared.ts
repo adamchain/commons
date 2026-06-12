@@ -151,6 +151,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
 export interface PublicUser {
   id: string;
   firstName: string;
+  lastName?: string;
   neighborhoodId: string | null;
   avatarSeed: string;
   avatarStyle: AvatarStyle;
@@ -279,6 +280,8 @@ export interface MessageDTO {
   sender?: PublicUser;
   body: string;
   createdAt: string;
+  /** Emoji → userIds who reacted. UI only offers ❤️ today. */
+  reactions?: Record<string, string[]>;
 }
 
 export interface FeedbackDTO {
@@ -308,6 +311,7 @@ export interface MeDTO {
   id: string;
   phoneNumber: string;
   firstName: string;
+  lastName?: string;
   /** @deprecated prefer neighborhoodIds — kept for older rows */
   neighborhoodId: string | null;
   /** Areas the user spends time in — feeds personalization. */
@@ -368,7 +372,8 @@ export type NotificationKind =
   | "weeklyFridayDigest"
   | "lookingForRecovery"
   | "planTimeProposed"
-  | "planTimeChanged";
+  | "planTimeChanged"
+  | "planInvite";
 
 export interface NotificationDTO {
   id: string;

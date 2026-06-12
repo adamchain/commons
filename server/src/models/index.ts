@@ -155,6 +155,8 @@ const MessageSchema = new Schema<MessageRecord>(
     createdAt: { type: String, required: true },
     readBy: { type: [String], default: [] },
     kind: { type: String, enum: ["user", "system"], default: "user" },
+    // emoji → userIds. Mixed since the key set is dynamic.
+    reactions: { type: Schema.Types.Mixed, default: {} },
   },
   { collection: "messages" },
 );

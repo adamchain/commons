@@ -32,6 +32,9 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
     const plan = store.findPlanById(planId);
     if (!plan) continue;
     const conv = store.findGroupConversationByPlan(planId);
+    // If a conversation exists but the user explicitly left it, keep it out of
+    // their inbox even though they're still on the plan.
+    if (conv && !conv.participantIds.includes(userId)) continue;
     const msgs = conv ? store.listMessagesForConversation(conv.id) : [];
     const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
     const hasRealChatter = msgs.some((m) => m.kind !== "system");
@@ -175,6 +178,46 @@ chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => 
   res.status(201).json(await toMessageDto(message));
 });
 
+// POST /api/conversations/:id/leave — drop yourself from a group chat. Works
+// any time, including after the event. You stay on the plan; the chat just
+// leaves your Messages inbox.
+chatRouter.post("/conversations/:id/leave", requireAuth, (req, res) => {
+  const convId = String(req.params.id);
+  const userId = String(req.userId);
+  const conv = store.findConversationById(convId);
+  if (!conv) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
+  store.removeConversationParticipant(convId, userId);
+  res.json({ ok: true });
+});
+
+// POST /api/conversations/:id/messages/:msgId/react { emoji }
+// Toggle the caller's reaction on a message. Only ❤️ is offered today, but the
+// store handles any emoji so the UI can grow.
+chatRouter.post("/conversations/:id/messages/:msgId/react", requireAuth, async (req, res) => {
+  const convId = String(req.params.id);
+  const msgId = String(req.params.msgId);
+  const userId = String(req.userId);
+  const emoji = String(req.body?.emoji ?? "❤️").slice(0, 8) || "❤️";
+  const conv = store.findConversationById(convId);
+  if (!conv) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
+  if (!conv.participantIds.includes(userId)) {
+    res.status(403).json({ error: "Not a participant" });
+    return;
+  }
+  const updated = store.toggleReaction(msgId, userId, emoji);
+  if (!updated || updated.conversationId !== convId) {
+    res.status(404).json({ error: "Message not found" });
+    return;
+  }
+  res.json(await toMessageDto(updated));
+});
+
 function truncate(s: string, n: number): string {
   return s.length <= n ? s : s.slice(0, n - 1) + "…";
 }
@@ -220,5 +263,6 @@ async function toMessageDto(m: ReturnType<typeof store.listMessagesForConversati
       : { id: m.senderId, firstName: "Unknown", neighborhoodId: null, avatarSeed: "missing", avatarStyle: "avataaars" },
     body: m.body,
     createdAt: m.createdAt,
+    reactions: m.reactions ?? {},
   };
 }
