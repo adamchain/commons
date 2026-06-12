@@ -26,6 +26,8 @@
 	<string>Commons uses the camera so you can add photos to your plans and profile.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Commons uses your location to show nearby plans and places.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Commons uses your location to show nearby plans and places.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Commons saves images you capture in the app to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
