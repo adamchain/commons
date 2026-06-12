@@ -885,6 +885,31 @@ label {
   font-weight: 700;
   font-size: 15px;
 }
+.who-row-view-all {
+  margin-left: auto;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 14px;
+  background: none;
+  border: none;
+  padding: 4px 0;
+}
+.who-row-view-all:hover { text-decoration: underline; }
+.who-row-name-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.who-row-name {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.who-row-name:hover { color: var(--accent); }
 .avatar-stack--md > * + * {
   margin-left: -10px;
 }
@@ -2433,6 +2458,16 @@ label {
 }
 .host-row strong {
   font-weight: 700;
+}
+.host-row-text {
+  flex: 1;
+  min-width: 0;
+}
+.host-row-chevron {
+  color: var(--text-muted);
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 300;
 }
 .plan-description {
   color: var(--text);

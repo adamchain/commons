@@ -28,6 +28,8 @@ export function PlanDetailPage() {
   const [lockTime, setLockTime] = useState("19:00");
   const [lockFlexTime, setLockFlexTime] = useState(false);
   const [lockBusy, setLockBusy] = useState(false);
+  const [showAllGoing, setShowAllGoing] = useState(false);
+  const [showAllInterested, setShowAllInterested] = useState(false);
   const lockFormRef = useRef<HTMLDivElement | null>(null);
 
   const load = async () => {
@@ -206,9 +208,10 @@ export function PlanDetailPage() {
           onClick={() => navigate(`/profile/${plan.creator.id}`)}
         >
           <Avatar seed={plan.creator.avatarSeed} style={plan.creator.avatarStyle} photoDataUrl={plan.creator.avatarPhotoDataUrl} params={plan.creator.avatarParams} size="md" />
-          <span>
+          <span className="host-row-text">
             Started by <strong>{plan.creator.firstName}</strong>
           </span>
+          <span className="host-row-chevron" aria-hidden="true">›</span>
         </button>
 
         {plan.description && (
@@ -388,30 +391,12 @@ export function PlanDetailPage() {
           {plan.participants.going.length === 0 ? (
             <p className="subtle" style={{ margin: 0 }}>Be the first to say "I'm in."</p>
           ) : (
-            <div className="who-row-body">
-              <div className="avatar-stack avatar-stack--md">
-                {plan.participants.going.slice(0, 5).map((person) => (
-                  <Link
-                    key={person.id}
-                    to={`/profile/${person.id}`}
-                    className="avatar-stack-link"
-                    aria-label={person.firstName}
-                  >
-                    <Avatar
-                      seed={person.avatarSeed}
-                      style={person.avatarStyle}
-                      photoDataUrl={person.avatarPhotoDataUrl}
-                      params={person.avatarParams}
-                      size="sm"
-                    />
-                  </Link>
-                ))}
-                {plan.participants.going.length > 5 && (
-                  <span className="avatar-stack-more">+{plan.participants.going.length - 5}</span>
-                )}
-              </div>
-              <span className="who-row-count">{plan.participants.going.length} going</span>
-            </div>
+            <ParticipantsRow
+              people={plan.participants.going}
+              expanded={showAllGoing}
+              onToggle={() => setShowAllGoing((v) => !v)}
+              countLabel={`${plan.participants.going.length} going`}
+            />
           )}
         </div>
 
@@ -456,30 +441,12 @@ export function PlanDetailPage() {
                 ))}
               </div>
             ) : (
-              <div className="who-row-body">
-                <div className="avatar-stack avatar-stack--md">
-                  {plan.participants.interested.slice(0, 5).map((person) => (
-                    <Link
-                      key={person.id}
-                      to={`/profile/${person.id}`}
-                      className="avatar-stack-link"
-                      aria-label={person.firstName}
-                    >
-                      <Avatar
-                        seed={person.avatarSeed}
-                        style={person.avatarStyle}
-                        photoDataUrl={person.avatarPhotoDataUrl}
-                        params={person.avatarParams}
-                        size="sm"
-                      />
-                    </Link>
-                  ))}
-                  {plan.participants.interested.length > 5 && (
-                    <span className="avatar-stack-more">+{plan.participants.interested.length - 5}</span>
-                  )}
-                </div>
-                <span className="who-row-count">{plan.participants.interested.length} interested</span>
-              </div>
+              <ParticipantsRow
+                people={plan.participants.interested}
+                expanded={showAllInterested}
+                onToggle={() => setShowAllInterested((v) => !v)}
+                countLabel={`${plan.participants.interested.length} interested`}
+              />
             )}
           </div>
         )}
@@ -491,6 +458,69 @@ export function PlanDetailPage() {
         <InviteSheet planId={plan.id} planTitle={plan.title} onClose={() => setShowInvite(false)} />
       )}
     </main>
+  );
+}
+
+/**
+ * Avatar stack + count + inline View all toggle. Default shows up to 5
+ * avatars; "View all" expands the row into a name list so users don't have
+ * to leave the plan to see who's coming.
+ */
+function ParticipantsRow({
+  people,
+  expanded,
+  onToggle,
+  countLabel,
+}: {
+  people: PublicUser[];
+  expanded: boolean;
+  onToggle: () => void;
+  countLabel: string;
+}) {
+  const visible = expanded ? people : people.slice(0, 5);
+  return (
+    <>
+      <div className="who-row-body">
+        <div className="avatar-stack avatar-stack--md">
+          {visible.map((person) => (
+            <Link
+              key={person.id}
+              to={`/profile/${person.id}`}
+              className="avatar-stack-link"
+              aria-label={person.firstName}
+            >
+              <Avatar
+                seed={person.avatarSeed}
+                style={person.avatarStyle}
+                photoDataUrl={person.avatarPhotoDataUrl}
+                params={person.avatarParams}
+                size="sm"
+              />
+            </Link>
+          ))}
+          {!expanded && people.length > 5 && (
+            <span className="avatar-stack-more">+{people.length - 5}</span>
+          )}
+        </div>
+        <span className="who-row-count">{countLabel}</span>
+        {people.length > 5 && (
+          <button type="button" className="who-row-view-all" onClick={onToggle}>
+            {expanded ? "Hide" : "View all"}
+          </button>
+        )}
+      </div>
+      {expanded && (
+        <ul className="who-row-name-list">
+          {people.map((person) => (
+            <li key={person.id}>
+              <Link to={`/profile/${person.id}`} className="who-row-name">
+                {person.firstName}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
 
