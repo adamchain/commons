@@ -177,14 +177,12 @@ export function PlanCard({
           <p className="plan-card-description">{plan.description}</p>
         )}
 
-        {plan.flyerLinkUrl && (plan.flyerLinkPreview || plan.flyerLinkUrl) && (
-          <a
-            href={plan.flyerLinkUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="link-preview link-preview--card"
-            onClick={(e) => e.stopPropagation()}
-          >
+        {/* Link preview rendered as a non-anchor block inside the card link to
+            avoid nesting <a> inside <a> (invalid HTML; in iOS WebView it can
+            collapse the wrapper Link and bounce navigation to /). The actual
+            external open happens via the sibling overlay anchor below. */}
+        {plan.flyerLinkUrl && (
+          <div className="link-preview link-preview--card" aria-hidden="true">
             {plan.flyerLinkPreview?.image && (
               <img src={plan.flyerLinkPreview.image} alt="" className="link-preview-image" />
             )}
@@ -201,7 +199,7 @@ export function PlanCard({
                 <div className="link-preview-desc">{plan.flyerLinkPreview.description}</div>
               )}
             </div>
-          </a>
+          </div>
         )}
 
         <footer className="plan-card-footer-row">

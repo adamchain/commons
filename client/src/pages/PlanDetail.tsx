@@ -172,7 +172,12 @@ export function PlanDetailPage() {
           const query = encodeURIComponent(
             [plan.location.name, plan.location.address].filter(Boolean).join(" "),
           );
-          const mapsHref = `https://www.google.com/maps/search/?api=1&query=${query}`;
+          // Prefer coordinates so Maps opens to the actual pin, not a generic
+          // center. Falls back to text query only when coords weren't captured.
+          const mapsHref =
+            plan.location.lat !== undefined && plan.location.lng !== undefined
+              ? `https://www.google.com/maps/search/?api=1&query=${plan.location.lat},${plan.location.lng}`
+              : `https://www.google.com/maps/search/?api=1&query=${query}`;
           return (
             <a
               className="plan-where plan-where--link"
