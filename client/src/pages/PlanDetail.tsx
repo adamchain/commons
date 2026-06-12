@@ -362,18 +362,20 @@ export function PlanDetailPage() {
 
         {isHosting && !plan.cancelledAt && (
           <div className="plan-host-actions">
-            <Link to={`/plans/${plan.id}/edit`} className="btn-link">Edit plan</Link>
-            <HostTransferControl
-              candidates={plan.participants.going.filter((p) => p.id !== user.id)}
-              onTransfer={(id, name) => void transferHost(id, name)}
-            />
+            <Link to={`/plans/${plan.id}/edit`} className="btn-secondary plan-host-action-btn">
+              Edit plan
+            </Link>
             <button
               type="button"
-              className="btn-link plan-cancel-link"
+              className="btn-secondary plan-host-action-btn plan-host-action-btn--danger"
               onClick={() => void cancelPlan()}
             >
               Cancel plan
             </button>
+            <HostTransferControl
+              candidates={plan.participants.going.filter((p) => p.id !== user.id)}
+              onTransfer={(id, name) => void transferHost(id, name)}
+            />
           </div>
         )}
       </section>

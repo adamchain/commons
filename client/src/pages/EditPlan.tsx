@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
+import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
@@ -14,6 +15,7 @@ import {
   type NeighborhoodDTO,
   type PlanDTO,
   type PlanVisibility,
+  type PublicUser,
   type VibeIcon,
 } from "../types/shared";
 
@@ -287,7 +289,7 @@ function EditForm({
       </header>
       <h1 className="brand" style={{ marginBottom: 8 }}>Edit plan</h1>
       <p className="brand-tagline" style={{ marginBottom: 24 }}>
-        Most edits save instantly · date/time goes through a proposal
+        Most edits save instantly · date and time changes go through a proposal
       </p>
 
       <form onSubmit={(e) => void save(e)} className="form-card">
@@ -561,14 +563,93 @@ function EditForm({
         )}
       </section>
 
+      <PassItOnControl
+        plan={plan}
+        onTransferred={() => navigate(`/plans/${plan.id}`)}
+      />
+
       <button
         type="button"
-        className="btn-link"
+        className="btn-secondary btn-block"
         style={{ marginTop: 16 }}
         onClick={() => navigate(`/plans/${plan.id}`)}
       >
         Done
       </button>
     </main>
+  );
+}
+
+/**
+ * "Pass it on" — host transfer surfaced from Edit so the host doesn't need
+ * to bounce back to plan detail to hand off. The candidate list is whoever
+ * is RSVP'd "going" minus the current host.
+ */
+function PassItOnControl({
+  plan,
+  onTransferred,
+}: {
+  plan: PlanDTO;
+  onTransferred: () => void;
+}) {
+  const { user } = useAuth();
+  const candidates: PublicUser[] = plan.participants.going.filter(
+    (p) => user && p.id !== user.id,
+  );
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  if (candidates.length === 0) return null;
+
+  async function handOff(c: PublicUser) {
+    if (!confirm(`Transfer hosting of "${plan.title}" to ${c.firstName}? You'll drop off the going list.`)) return;
+    setBusy(true);
+    try {
+      await api(`/api/plans/${plan.id}/transfer-host`, {
+        method: "POST",
+        body: JSON.stringify({ newHostId: c.id }),
+      });
+      onTransferred();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="form-card" style={{ marginTop: 16 }}>
+      <h2 className="who-block-heading" style={{ marginTop: 0 }}>Pass it on</h2>
+      <p className="form-help" style={{ marginTop: 0 }}>
+        Hand off to someone who&apos;s going.
+      </p>
+      {!open ? (
+        <button
+          type="button"
+          className="btn-secondary btn-block"
+          onClick={() => setOpen(true)}
+        >
+          Pick a new host
+        </button>
+      ) : (
+        <div className="plan-transfer-picker-list" style={{ marginTop: 8 }}>
+          {candidates.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className="plan-transfer-pick"
+              disabled={busy}
+              onClick={() => void handOff(c)}
+            >
+              <Avatar
+                seed={c.avatarSeed}
+                style={c.avatarStyle}
+                photoDataUrl={c.avatarPhotoDataUrl}
+                params={c.avatarParams}
+                size="sm"
+              />
+              <span>{c.firstName}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
