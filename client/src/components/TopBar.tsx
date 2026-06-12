@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Avatar } from "./Avatar";
+import wordmark from "../assets/wordmark.png";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
 import type { ConversationSummaryDTO } from "../types/shared";
@@ -58,7 +59,7 @@ export function TopBar() {
   return (
     <header className="top-bar" aria-label="Top navigation">
       <Link to="/" className="top-bar-brand" aria-label="Commons home">
-        COMMONS
+        <img src={wordmark} alt="COMMONS" className="top-bar-brand-img" />
       </Link>
       <div className="top-bar-actions">
         <Link to="/notifications" className="top-bar-icon-btn" aria-label="Notifications">
