@@ -44,6 +44,7 @@ const PlanSchema = new Schema<PlanRecord>(
   {
     id: { type: String, required: true },
     creatorId: { type: String, required: true },
+    coHostIds: { type: [String], default: undefined },
     title: { type: String, required: true },
     neighborhoodId: { type: String, required: true },
     location: {
@@ -70,6 +71,7 @@ const PlanSchema = new Schema<PlanRecord>(
     seriesId: { type: String, default: null },
     lockedAt: { type: String, default: null },
     cancelledAt: { type: String, default: null },
+    upForGrabsAt: { type: String, default: null },
     flyerDataUrl: { type: String },
     flyerLinkUrl: { type: String },
     flyerLinkPreview: {

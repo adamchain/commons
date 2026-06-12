@@ -96,6 +96,8 @@ export interface PlanDTO {
   id: string;
   title: string;
   creator: PublicUser;
+  /** Additional co-hosts beyond the primary creator. */
+  coHosts?: PublicUser[];
   neighborhoodId: string;
   location: { name: string; address: string; lat?: number; lng?: number };
   date: string;
@@ -125,6 +127,8 @@ export interface PlanDTO {
   lockedAt: string | null;
   /** ISO timestamp when the host cancelled this plan, or null if active. */
   cancelledAt: string | null;
+  /** ISO timestamp when hosting was put up for grabs, or null. */
+  upForGrabsAt?: string | null;
   /** Optional flyer image stored as data URL. */
   flyerDataUrl?: string;
   /** Optional shareable link (event page, ticket page, etc.). */

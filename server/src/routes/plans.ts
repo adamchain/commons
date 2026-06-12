@@ -95,6 +95,12 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
   }
 
   const creator = users.get(plan.creatorId);
+  const coHostIds = (plan.coHostIds ?? []).filter((id) => id !== plan.creatorId);
+  const coHostUsers = coHostIds.length ? await findUsersByIds(coHostIds) : new Map();
+  const coHosts: PublicUser[] = coHostIds
+    .map((id) => coHostUsers.get(id))
+    .filter((u): u is UserRecord => !!u)
+    .map((u) => userToPublic(u));
   const planKind = plan.planKind ?? "standard";
   const visibility = plan.visibility ?? "everyone";
   const suggestionRows = store.listPlanSuggestions(plan.id);
@@ -113,6 +119,7 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     id: plan.id,
     title: plan.title,
     creator: creator ? userToPublic(creator) : pu(plan.creatorId),
+    coHosts,
     neighborhoodId: plan.neighborhoodId,
     location: plan.location,
     date: plan.date,
@@ -133,6 +140,7 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     seriesId: plan.seriesId ?? null,
     lockedAt: plan.lockedAt ?? null,
     cancelledAt: plan.cancelledAt ?? null,
+    upForGrabsAt: plan.upForGrabsAt ?? null,
     flyerDataUrl: plan.flyerDataUrl,
     flyerLinkUrl: plan.flyerLinkUrl,
     flyerLinkPreview: plan.flyerLinkPreview,
@@ -277,6 +285,15 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   const rawJoinType = String(req.body?.joinType ?? "open");
   const joinType: JoinType = rawJoinType === "approve" ? "approve" : "open";
 
+  // Co-hosts — "make a plan with X" co-creates with the picked person. Validate
+  // they're real users, never include the creator, cap at a sane number.
+  const rawCoHosts = Array.isArray(req.body?.coHostIds) ? (req.body.coHostIds as unknown[]) : [];
+  const coHostIds = Array.from(
+    new Set(rawCoHosts.map(String).filter((id) => id && id !== userId)),
+  )
+    .filter((id) => Boolean(store.findUserById(id)))
+    .slice(0, 5);
+
   // Optional flyer upload — guard size so a runaway base64 string doesn't blow
   // up the JSON store. ~1.5MB data URL is plenty for a flyer screenshot.
   const rawFlyer = typeof req.body?.flyerDataUrl === "string" ? req.body.flyerDataUrl : "";
@@ -313,6 +330,7 @@ plansRouter.post("/", requireAuth, async (req, res) => {
 
   const plan = store.createPlan({
     creatorId: userId,
+    coHostIds: coHostIds.length ? coHostIds : undefined,
     title,
     neighborhoodId,
     location: { name: resolvedLocationName, address: resolvedAddress, lat, lng, placeId },
@@ -337,8 +355,20 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   });
 
   store.upsertParticipation(plan.id, userId, "going");
-  store.ensureGroupConversation(plan.id, [userId]);
-  store.log("plan_created", { planId: plan.id, creatorId: userId });
+  // Co-hosts are committed + dropped into the group chat, and pinged that
+  // they're hosting it together.
+  for (const coId of coHostIds) {
+    store.upsertParticipation(plan.id, coId, "going");
+    await emit({
+      userId: coId,
+      kind: "planInvite",
+      body: `${me.firstName || "Someone"} made you a co-host of "${title}"`,
+      planId: plan.id,
+      dedupKey: `coHost:${plan.id}:${coId}`,
+    });
+  }
+  store.ensureGroupConversation(plan.id, [userId, ...coHostIds]);
+  store.log("plan_created", { planId: plan.id, creatorId: userId, coHosts: coHostIds.length });
   void onPlanCreatedVenueNudge(plan).catch((err) => console.error("[nudge] venue", err));
 
   res.status(201).json(await planSummary(plan, userId));
@@ -963,6 +993,87 @@ plansRouter.post("/:id/transfer-host", requireAuth, async (req, res) => {
     dedupKey: `hostTransfer:${plan.id}:${newHostId}`,
   });
   res.json({ ok: true, newHostId });
+});
+
+// Host puts hosting "up for grabs" instead of cancelling — anyone who's in can
+// claim it. Notifies participants + drops a system message in the chat.
+plansRouter.post("/:id/up-for-grabs", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const planId = String(req.params.id);
+  const plan = store.findPlanById(planId);
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  if (plan.creatorId !== userId) {
+    res.status(403).json({ error: "Only the host can do this" });
+    return;
+  }
+  if (plan.cancelledAt) {
+    res.status(400).json({ error: "Plan was cancelled" });
+    return;
+  }
+  store.updatePlan(planId, { upForGrabsAt: new Date().toISOString() });
+  const host = await findUserById(userId);
+  const conv = store.ensureGroupConversation(planId, [plan.creatorId]);
+  store.createSystemMessage(
+    conv.id,
+    `${host?.firstName ?? "The host"} can't make it — this plan is up for grabs. Tap "Take over hosting" to keep it alive.`,
+  );
+  for (const p of store.listParticipationsForPlan(planId)) {
+    if (p.userId === userId) continue;
+    if (p.state !== "going" && p.state !== "interested") continue;
+    await emit({
+      userId: p.userId,
+      kind: "planInvite",
+      body: `"${plan.title}" needs a new host — take it over?`,
+      planId: plan.id,
+      dedupKey: `upForGrabs:${plan.id}:${p.userId}`,
+    });
+  }
+  store.log("plan_up_for_grabs", { planId, by: userId });
+  res.json(await planSummary(store.findPlanById(planId)!, userId));
+});
+
+// Any going/interested participant claims an up-for-grabs plan and becomes the
+// new host. The old host drops to a participant.
+plansRouter.post("/:id/claim-host", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const planId = String(req.params.id);
+  const plan = store.findPlanById(planId);
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  if (!plan.upForGrabsAt) {
+    res.status(400).json({ error: "This plan isn't up for grabs" });
+    return;
+  }
+  if (plan.creatorId === userId) {
+    res.status(400).json({ error: "You're already the host" });
+    return;
+  }
+  const part = store.findParticipation(planId, userId);
+  if (!part || (part.state !== "going" && part.state !== "interested")) {
+    res.status(403).json({ error: "Join the plan before taking it over" });
+    return;
+  }
+  const oldHostId = plan.creatorId;
+  store.updatePlan(planId, { creatorId: userId, upForGrabsAt: null });
+  store.upsertParticipation(planId, userId, "going");
+  store.ensureGroupConversation(planId, [userId]);
+  const newHost = await findUserById(userId);
+  const conv = store.ensureGroupConversation(planId, [userId]);
+  store.createSystemMessage(conv.id, `${newHost?.firstName ?? "Someone"} took over hosting. 🙌`);
+  await emit({
+    userId: oldHostId,
+    kind: "someoneJoinedYourPlan",
+    body: `${newHost?.firstName ?? "Someone"} took over hosting "${plan.title}"`,
+    planId: plan.id,
+    dedupKey: `claimHost:${plan.id}:${userId}`,
+  });
+  store.log("plan_host_claimed", { planId, from: oldHostId, to: userId });
+  res.json(await planSummary(store.findPlanById(planId)!, userId));
 });
 
 // Host-only plan cancellation. Marks the plan cancelled and notifies every

@@ -195,6 +195,9 @@ export function CreatePlanPage() {
           description: form.description.trim() || undefined,
           hostEmoji: VIBE_OPTIONS.find((o) => o.id === form.vibes[0])?.emoji ?? "✨",
           planKind,
+          // "Make a plan with X" (single seeded person) co-creates — they show
+          // as a co-host rather than just getting an invite.
+          coHostIds: inviteUserId ? [inviteUserId] : undefined,
           visibility: form.visibility,
           capacity: capacityNum,
           joinType: form.joinType,
@@ -204,11 +207,14 @@ export function CreatePlanPage() {
           flyerLinkPreview: form.flyerLinkPreview ?? undefined,
         }),
       });
-      if (invitedIds.size > 0) {
+      // The co-host (seeded inviteUser) is already added server-side — don't
+      // also fire a plain invite at them.
+      const inviteList = [...invitedIds].filter((id) => id !== inviteUserId);
+      if (inviteList.length > 0) {
         try {
           await api(`/api/plans/${created.id}/invite`, {
             method: "POST",
-            body: JSON.stringify({ userIds: [...invitedIds] }),
+            body: JSON.stringify({ userIds: inviteList }),
           });
         } catch {
           /* best-effort — user can invite again from the plan */

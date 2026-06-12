@@ -66,6 +66,8 @@ export interface NeighborhoodRecord {
 export interface PlanRecord {
   id: string;
   creatorId: string;
+  /** Additional hosts (e.g. "make a plan with X" co-creates). Optional. */
+  coHostIds?: string[];
   title: string;
   neighborhoodId: string;
   /**
@@ -139,6 +141,8 @@ export interface PlanRecord {
   };
   /** ISO timestamp when the host cancelled this plan. Null/absent = active. */
   cancelledAt?: string | null;
+  /** ISO timestamp when the host put hosting up for grabs (anyone can claim). */
+  upForGrabsAt?: string | null;
   createdAt: string;
 }
 

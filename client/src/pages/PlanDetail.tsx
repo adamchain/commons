@@ -108,6 +108,27 @@ export function PlanDetailPage() {
     }
   }
 
+  async function putUpForGrabs() {
+    if (!plan) return;
+    if (!confirm(`Put "${plan.title}" up for grabs? Anyone who's in can take over hosting instead of it being cancelled.`)) return;
+    try {
+      await api(`/api/plans/${plan.id}/up-for-grabs`, { method: "POST" });
+      await load();
+    } catch {
+      /* surface via reload */
+    }
+  }
+
+  async function claimHost() {
+    if (!plan) return;
+    try {
+      await api(`/api/plans/${plan.id}/claim-host`, { method: "POST" });
+      await load();
+    } catch {
+      /* surface via reload */
+    }
+  }
+
   async function transferHost(newHostId: string, newHostName: string) {
     if (!plan) return;
     if (!confirm(`Transfer hosting of "${plan.title}" to ${newHostName}? You'll drop off the going list.`)) return;
@@ -211,6 +232,9 @@ export function PlanDetailPage() {
           <Avatar seed={plan.creator.avatarSeed} style={plan.creator.avatarStyle} photoDataUrl={plan.creator.avatarPhotoDataUrl} params={plan.creator.avatarParams} size="md" />
           <span className="host-row-text">
             Started by <strong>{isHosting ? "you" : plan.creator.firstName}</strong>
+            {plan.coHosts && plan.coHosts.length > 0 && (
+              <> &amp; <strong>{plan.coHosts.map((h) => (h.id === user.id ? "you" : h.firstName)).join(" & ")}</strong></>
+            )}
           </span>
           <span className="host-row-chevron" aria-hidden="true">›</span>
         </button>
@@ -351,6 +375,25 @@ export function PlanDetailPage() {
           </div>
         )}
 
+        {plan.upForGrabsAt && !plan.cancelledAt && (
+          <div className="coordination-banner" role="note">
+            <strong>This plan needs a new host.</strong>{" "}
+            {isHosting
+              ? "You put it up for grabs — someone who's in can take over."
+              : "The original host can't make it."}
+            {!isHosting && (plan.myState === "going" || plan.myState === "interested") && (
+              <button
+                type="button"
+                className="btn-primary btn-block"
+                style={{ marginTop: 10 }}
+                onClick={() => void claimHost()}
+              >
+                Take over hosting
+              </button>
+            )}
+          </div>
+        )}
+
         {plan.pendingTimeProposal && !plan.cancelledAt && (
           <div className="coordination-banner" role="note">
             <strong>{isHosting ? "You proposed" : "Host proposed"} a new time:</strong>{" "}
@@ -376,6 +419,15 @@ export function PlanDetailPage() {
             >
               Cancel plan
             </button>
+            {!plan.upForGrabsAt && (
+              <button
+                type="button"
+                className="btn-secondary plan-host-action-btn"
+                onClick={() => void putUpForGrabs()}
+              >
+                Can't make it — put up for grabs
+              </button>
+            )}
             <HostTransferControl
               candidates={plan.participants.going.filter((p) => p.id !== user.id)}
               onTransfer={(id, name) => void transferHost(id, name)}
