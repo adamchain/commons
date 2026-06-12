@@ -82,14 +82,33 @@ export function ProfilePage() {
       </header>
 
       <section className="profile-hero">
-        <Avatar
-          seed={profile.user.avatarSeed}
-          style={profile.user.avatarStyle}
-          photoDataUrl={profile.user.avatarPhotoDataUrl}
-          params={profile.user.avatarParams}
-          name={profile.user.firstName}
-          size="xl"
-        />
+        {isSelf ? (
+          <button
+            type="button"
+            className="profile-hero-avatar-btn"
+            onClick={() => setEditing(true)}
+            aria-label="Update profile photo"
+          >
+            <Avatar
+              seed={profile.user.avatarSeed}
+              style={profile.user.avatarStyle}
+              photoDataUrl={profile.user.avatarPhotoDataUrl}
+              params={profile.user.avatarParams}
+              name={profile.user.firstName}
+              size="xl"
+            />
+            <span className="profile-hero-avatar-edit" aria-hidden="true">✎</span>
+          </button>
+        ) : (
+          <Avatar
+            seed={profile.user.avatarSeed}
+            style={profile.user.avatarStyle}
+            photoDataUrl={profile.user.avatarPhotoDataUrl}
+            params={profile.user.avatarParams}
+            name={profile.user.firstName}
+            size="xl"
+          />
+        )}
         <div className="profile-name">{profile.user.firstName || "Unnamed"}</div>
         {profile.neighborhood && (
           <div className="profile-neighborhood">📍 {profile.neighborhood.name}</div>
@@ -134,7 +153,7 @@ export function ProfilePage() {
         <div className="profile-stats" aria-label="Profile stats">
           <div className="profile-stat">
             <span className="profile-stat-num">{profile.stats.hosted}</span>
-            <span className="profile-stat-label">hosted</span>
+            <span className="profile-stat-label">started</span>
           </div>
           <div className="profile-stat">
             <span className="profile-stat-num">{profile.stats.joined}</span>
@@ -142,14 +161,14 @@ export function ProfilePage() {
           </div>
         </div>
 
-        {isSelf && (
+        {isSelf && !editing && (
           <button
             type="button"
             className="btn-secondary"
-            onClick={() => setEditing((v) => !v)}
+            onClick={() => setEditing(true)}
             style={{ marginTop: 14 }}
           >
-            {editing ? "Done editing" : "Edit profile"}
+            Edit profile
           </button>
         )}
 
@@ -182,7 +201,9 @@ export function ProfilePage() {
           onSaved={(me) => {
             setUser(me);
             reloadProfile();
+            setEditing(false);
           }}
+          onCancel={() => setEditing(false)}
         />
       )}
 
@@ -199,39 +220,17 @@ export function ProfilePage() {
         </section>
       )}
 
-      {isSelf && <ProfileMenu networkCount={network?.length ?? null} />}
+      {isSelf && <ProfileMenu network={network} />}
 
       {isSelf && <CondensedCalendar plans={feedPlans} />}
 
-      {profile.upcoming.length > 0 && (
-        <section className="profile-block">
-          <h3 className="who-block-heading">Hosting soon</h3>
-          <div className="profile-list">
-            {profile.upcoming.map((p) => (
-              <Link key={p.id} to={`/plans/${p.id}`} className="profile-list-row">
-                <span className="profile-list-emoji">{p.hostEmoji}</span>
-                <span className="profile-list-title">{p.title}</span>
-                <span className="profile-list-when">{formatPlanDate(p.date)}</span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {profile.past.length > 0 && (
-        <section className="profile-block">
-          <h3 className="who-block-heading">Past plans</h3>
-          <div className="profile-list">
-            {profile.past.map((p) => (
-              <Link key={p.id} to={`/plans/${p.id}`} className="profile-list-row">
-                <span className="profile-list-title">{p.title}</span>
-                <span className="profile-list-when">
-                  {formatPlanDate(p.date)} · {p.wentCount} went
-                </span>
-              </Link>
-            ))}
-          </div>
-        </section>
+      {(profile.upcoming.length > 0 || profile.past.length > 0) && (
+        <YourPlansBlock
+          upcoming={profile.upcoming}
+          past={profile.past}
+          isSelf={isSelf}
+          viewerId={user?.id}
+        />
       )}
 
       {profile.upcoming.length === 0 && profile.past.length === 0 && (
@@ -319,7 +318,15 @@ function FriendButton({
   );
 }
 
-function EditPanel({ me, onSaved }: { me: MeDTO; onSaved: (next: MeDTO) => void }) {
+function EditPanel({
+  me,
+  onSaved,
+  onCancel,
+}: {
+  me: MeDTO;
+  onSaved: (next: MeDTO) => void;
+  onCancel: () => void;
+}) {
   const [firstName, setFirstName] = useState(me.firstName);
   const [photo, setPhoto] = useState<string | null>(me.avatarPhotoDataUrl ?? null);
   const [avatarParams, setAvatarParams] = useState<string | null>(me.avatarParams ?? null);
@@ -468,15 +475,26 @@ function EditPanel({ me, onSaved }: { me: MeDTO; onSaved: (next: MeDTO) => void 
 
       {error && <p className="onboarding-error" style={{ marginTop: 8 }}>{error}</p>}
 
-      <button
-        type="button"
-        className="btn-primary btn-block"
-        style={{ marginTop: 16 }}
-        disabled={busy || !firstName.trim()}
-        onClick={() => void save()}
-      >
-        {busy ? "Saving…" : "Save changes"}
-      </button>
+      <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+        <button
+          type="button"
+          className="btn-secondary"
+          style={{ flex: 1 }}
+          onClick={onCancel}
+          disabled={busy}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="btn-primary"
+          style={{ flex: 2 }}
+          disabled={busy || !firstName.trim()}
+          onClick={() => void save()}
+        >
+          {busy ? "Saving…" : "Save changes"}
+        </button>
+      </div>
     </section>
   );
 }
@@ -590,19 +608,135 @@ function MonthCalendar({ plans }: { plans: PlanDTO[] }) {
   );
 }
 
-function ProfileMenu({ networkCount }: { networkCount: number | null }) {
+/**
+ * Combined "Your Plans" section — upcoming (collapsed to 3, "Show X more"),
+ * then a Past accordion. Upcoming rows tag each plan with YOUR PLAN (you
+ * started it) or INTERESTED so users see at a glance what their relationship
+ * to each plan is. Past rows tag HOSTED or WENT.
+ */
+function YourPlansBlock({
+  upcoming,
+  past,
+  isSelf,
+  viewerId,
+}: {
+  upcoming: PlanDTO[];
+  past: Array<{ id: string; title: string; date: string; wentCount: number }>;
+  isSelf: boolean;
+  viewerId: string | undefined;
+}) {
+  const [upcomingExpanded, setUpcomingExpanded] = useState(false);
+  const [pastOpen, setPastOpen] = useState(false);
+  const visibleUpcoming = upcomingExpanded ? upcoming : upcoming.slice(0, 3);
+  const hiddenCount = Math.max(0, upcoming.length - visibleUpcoming.length);
+  return (
+    <section className="profile-block">
+      <h3 className="who-block-heading">{isSelf ? "Your plans" : "Plans"}</h3>
+      <div className="profile-list">
+        {visibleUpcoming.map((p) => {
+          const youStarted = viewerId !== undefined && p.creator.id === viewerId;
+          const badge = youStarted ? "YOUR PLAN" : "INTERESTED";
+          return (
+            <Link
+              key={p.id}
+              to={`/plans/${p.id}`}
+              className={`profile-list-row ${youStarted ? "profile-list-row--hosting" : ""}`}
+            >
+              <span className="profile-list-emoji">{p.hostEmoji}</span>
+              <span className="profile-list-title">{p.title}</span>
+              <span className="profile-list-when">{formatPlanDate(p.date)}</span>
+              <span className={`profile-list-badge ${youStarted ? "is-host" : "is-interested"}`}>
+                {badge}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          className="profile-list-show-more"
+          onClick={() => setUpcomingExpanded(true)}
+        >
+          Show {hiddenCount} more
+        </button>
+      )}
+      {upcomingExpanded && upcoming.length > 3 && (
+        <button
+          type="button"
+          className="profile-list-show-more"
+          onClick={() => setUpcomingExpanded(false)}
+        >
+          Show less
+        </button>
+      )}
+
+      {past.length > 0 && (
+        <>
+          <button
+            type="button"
+            className="profile-past-toggle"
+            aria-expanded={pastOpen}
+            onClick={() => setPastOpen((v) => !v)}
+          >
+            <span>Past · {past.length}</span>
+            <span className={`profile-past-chevron ${pastOpen ? "is-open" : ""}`}>›</span>
+          </button>
+          {pastOpen && (
+            <div className="profile-list">
+              {past.map((p) => {
+                // Past payload doesn't carry creatorId today; treat any plan in
+                // your past list with wentCount > 0 as something you went to,
+                // and rely on the server to scope "hosted" via a future field.
+                // For now the badge defaults to WENT.
+                const badge = "WENT";
+                return (
+                  <Link key={p.id} to={`/plans/${p.id}`} className="profile-list-row">
+                    <span className="profile-list-title">{p.title}</span>
+                    <span className="profile-list-when">
+                      {formatPlanDate(p.date)} · {p.wentCount} went
+                    </span>
+                    <span className="profile-list-badge is-past">{badge}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function ProfileMenu({ network }: { network: PublicUser[] | null }) {
+  const networkCount = network?.length ?? null;
+  const firstFive = (network ?? []).slice(0, 5);
   const countLabel =
     networkCount === null
       ? "Your people"
       : `${networkCount} ${networkCount === 1 ? "person" : "people"}`;
   return (
     <nav className="profile-menu" aria-label="Profile menu">
-      <Link to="/network" className="profile-menu-row">
+      <Link to="/network" className="profile-menu-row profile-menu-row--with-stack">
         <span className="profile-menu-icon" aria-hidden="true">👥</span>
         <span className="profile-menu-text">
           <span className="profile-menu-label">Your network</span>
           <span className="profile-menu-sub">{countLabel}</span>
         </span>
+        {firstFive.length > 0 && (
+          <span className="profile-menu-avatar-stack avatar-stack avatar-stack--md">
+            {firstFive.map((u) => (
+              <Avatar
+                key={u.id}
+                seed={u.avatarSeed}
+                style={u.avatarStyle}
+                photoDataUrl={u.avatarPhotoDataUrl}
+                params={u.avatarParams}
+                size="xs"
+              />
+            ))}
+          </span>
+        )}
         <ChevronRight />
       </Link>
       <Link to="/invite" className="profile-menu-row">
@@ -617,7 +751,7 @@ function ProfileMenu({ networkCount }: { networkCount: number | null }) {
         <span className="profile-menu-icon" aria-hidden="true">⚙️</span>
         <span className="profile-menu-text">
           <span className="profile-menu-label">Settings</span>
-          <span className="profile-menu-sub">Notifications, appearance, account</span>
+          <span className="profile-menu-sub">Interests, notifications, invite codes, account</span>
         </span>
         <ChevronRight />
       </Link>

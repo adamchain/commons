@@ -6,7 +6,7 @@ import { formatRelative } from "../lib/format";
 import type { ConversationSummaryDTO } from "../types/shared";
 
 const ROLE_LABEL: Record<ConversationSummaryDTO["myRole"], string> = {
-  hosting: "Hosting",
+  hosting: "Started",
   going: "Going",
   interested: "Interested",
 };
@@ -28,7 +28,7 @@ export function MessagesPage() {
         Messages
       </h1>
       <p className="brand-tagline" style={{ marginBottom: 20 }}>
-        Group chats from plans you're hosting, going to, or interested in
+        Group chats from plans you've started, are going to, or are interested in
       </p>
 
       {items.length === 0 ? (
