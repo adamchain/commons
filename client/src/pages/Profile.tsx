@@ -649,7 +649,14 @@ function YourPlansBlock({
   const hiddenCount = Math.max(0, upcoming.length - visibleUpcoming.length);
   return (
     <section className="profile-block">
-      <h3 className="who-block-heading">{isSelf ? "Your plans" : "Plans"}</h3>
+      <div className="profile-block-heading-row">
+        <h3 className="who-block-heading">{isSelf ? "Your plans" : "Plans"}</h3>
+        {isSelf && (
+          <Link to="/my-plans" className="btn-link profile-block-see-all">
+            See all →
+          </Link>
+        )}
+      </div>
       <div className="profile-list">
         {visibleUpcoming.map((p) => {
           const youStarted = viewerId !== undefined && p.creator.id === viewerId;
@@ -709,13 +716,22 @@ function YourPlansBlock({
                 // For now the badge defaults to WENT.
                 const badge = "WENT";
                 return (
-                  <Link key={p.id} to={`/plans/${p.id}`} className="profile-list-row">
-                    <span className="profile-list-title">{p.title}</span>
-                    <span className="profile-list-when">
-                      {formatPlanDate(p.date)} · {p.wentCount} went
-                    </span>
-                    <span className="profile-list-badge is-past">{badge}</span>
-                  </Link>
+                  <div key={p.id} className="profile-list-row profile-list-row--past">
+                    <Link to={`/plans/${p.id}`} className="profile-list-row-main">
+                      <span className="profile-list-title">{p.title}</span>
+                      <span className="profile-list-when">
+                        {formatPlanDate(p.date)} · {p.wentCount} went
+                      </span>
+                      <span className="profile-list-badge is-past">{badge}</span>
+                    </Link>
+                    <Link
+                      to={`/plans/new?title=${encodeURIComponent(p.title)}`}
+                      className="btn-link profile-do-again"
+                      title="Plan this again"
+                    >
+                      🔁 Again
+                    </Link>
+                  </div>
                 );
               })}
             </div>

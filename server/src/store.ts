@@ -33,6 +33,8 @@ export interface UserRecord {
   createdAt: string;
   /** One-way network — people added after shared plans. */
   networkIds?: string[];
+  /** Plans the user saved/pinned — surfaced on the My Plans page. */
+  savedPlanIds?: string[];
   /** Plan ids where the user dismissed the post-event network prompt. */
   dismissedNetworkPromptPlanIds?: string[];
   /** Social links — only surfaced to viewers who share a past plan or DM. */

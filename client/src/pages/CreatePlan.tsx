@@ -26,6 +26,8 @@ export function CreatePlanPage() {
   const [searchParams] = useSearchParams();
   const prefillName = searchParams.get("name") ?? "";
   const prefillAddress = searchParams.get("address") ?? "";
+  // "Do it again" seeds the title from a past plan.
+  const prefillTitle = searchParams.get("title") ?? "";
   const prefillTagParam = searchParams.get("tag");
   const inviteUserId = searchParams.get("inviteUser");
   const inviteUserName = searchParams.get("inviteName");
@@ -56,7 +58,7 @@ export function CreatePlanPage() {
   }, [prefillVibe]);
 
   const [form, setForm] = useState({
-    title: "",
+    title: prefillTitle,
     locationName: prefillName,
     locationAddress: prefillAddress,
     locationLat: undefined as number | undefined,
@@ -91,7 +93,7 @@ export function CreatePlanPage() {
   // Skipped automatically when arriving with an invite seed.
   type Path = "choose" | "plan" | "idea";
   const [path, setPath] = useState<Path>(
-    inviteUserId || inviteUserIds.length > 0 ? "plan" : "choose",
+    inviteUserId || inviteUserIds.length > 0 || prefillTitle || prefillName ? "plan" : "choose",
   );
   const [network, setNetwork] = useState<PublicUser[] | null>(null);
   const [invitedIds, setInvitedIds] = useState<Set<string>>(() => {

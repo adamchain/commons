@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "./Avatar";
 import { useAuth } from "../context/AuthContext";
-import type { PlanDTO } from "../types/shared";
+import type { MeDTO, PlanDTO } from "../types/shared";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
 import { planHasEnded } from "../lib/planTime";
 import { useNeighborhoods } from "../lib/useNeighborhoods";
@@ -35,8 +35,28 @@ export function PlanCard({
   const suggestions = plan.suggestions ?? [];
   const [reply, setReply] = useState("");
   const [replyBusy, setReplyBusy] = useState(false);
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const isHosting = !!user && plan.creator.id === user.id;
+  const isSaved = !!user?.savedPlanIds?.includes(plan.id);
+  const [savePending, setSavePending] = useState(false);
+
+  async function toggleSave(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (savePending) return;
+    setSavePending(true);
+    try {
+      const r = await api<{ me: MeDTO }>("/api/auth/save-plan", {
+        method: "POST",
+        body: JSON.stringify({ planId: plan.id }),
+      });
+      setUser(r.me);
+    } catch {
+      /* swallow */
+    } finally {
+      setSavePending(false);
+    }
+  }
   const canChat =
     !!user &&
     (isHosting || plan.myState === "going" || plan.myState === "interested");
@@ -122,6 +142,19 @@ export function PlanCard({
           aria-label={isCancelled ? "Hide cancelled plans" : "Hide past plans"}
         >
           Hide {isCancelled ? "cancelled" : "past"}
+        </button>
+      )}
+      {user && (
+        <button
+          type="button"
+          className={`plan-card-save-btn ${isSaved ? "is-saved" : ""}`}
+          onClick={(e) => void toggleSave(e)}
+          disabled={savePending}
+          aria-pressed={isSaved}
+          aria-label={isSaved ? "Saved — tap to unsave" : "Save to My Plans"}
+          title={isSaved ? "Saved" : "Save"}
+        >
+          {isSaved ? "★" : "☆"}
         </button>
       )}
       <Link to={`/plans/${plan.id}`} className="plan-card plan-card-link plan-card--compact">

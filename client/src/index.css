@@ -3426,6 +3426,41 @@ label {
   padding: 8px 0;
 }
 
+/* My Plans page */
+.my-plans-section { margin-bottom: 24px; }
+.my-plans-section-title {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 10px;
+}
+.my-plans-section-count {
+  color: var(--accent);
+  margin-left: 4px;
+}
+.my-plans-past-item { display: flex; flex-direction: column; }
+.my-plans-do-again { margin-top: 6px; }
+
+/* Profile "Your plans" header row + do-again */
+.profile-block-heading-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.profile-block-see-all { font-size: 13px; }
+.profile-list-row--past { display: flex; align-items: center; gap: 8px; }
+.profile-list-row--past .profile-list-row-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  text-decoration: none;
+  color: inherit;
+}
+.profile-do-again { font-size: 12px; white-space: nowrap; }
+
 .chat-empty-card {
   margin: 32px auto;
   max-width: 320px;
@@ -4490,6 +4525,30 @@ label {
   background: var(--surface-2);
   color: var(--text);
 }
+
+/* Save / pin star — top-right of the card. */
+.plan-card-save-btn {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 120ms ease, transform 120ms ease;
+}
+.plan-card-save-btn:hover { transform: scale(1.12); }
+.plan-card-save-btn.is-saved { color: var(--accent); }
+/* When a hide button is present, nudge the star left so they don't overlap. */
+.plan-card-hide-btn ~ .plan-card-save-btn { right: 92px; }
 
 .plan-card-link.plan-card {
   border: none;

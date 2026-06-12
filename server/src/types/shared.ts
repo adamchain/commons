@@ -230,6 +230,8 @@ export interface MeDTO {
   createdAt: string;
   /** User ids in this person’s COMMONS network (one-way). */
   networkUserIds?: string[];
+  /** Plan ids the user saved/pinned for the My Plans page. */
+  savedPlanIds?: string[];
   /** Always present to self; only sent to others when visibility check passes. */
   socialLinks?: SocialLinks;
   /** True when this verified phone may use `/api/admin` and `/admin`. */

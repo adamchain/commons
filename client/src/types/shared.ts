@@ -324,6 +324,7 @@ export interface MeDTO {
   onboardingComplete: boolean;
   createdAt: string;
   networkUserIds?: string[];
+  savedPlanIds?: string[];
   socialLinks?: SocialLinks;
   /** True when this verified phone may use `/api/admin` and `/admin`. */
   canAccessAdmin?: boolean;

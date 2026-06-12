@@ -21,6 +21,7 @@ import { SettingsPage } from "./pages/Settings";
 import { SettingsInterestsPage } from "./pages/SettingsInterests";
 import { NotificationPrefsPage } from "./pages/NotificationPrefs";
 import { MessagesPage } from "./pages/Messages";
+import { MyPlansPage } from "./pages/MyPlans";
 
 const APP_BOOT_AT = Date.now();
 const MIN_BOOT_SPLASH_MS = 1500;
@@ -61,6 +62,7 @@ export default function App() {
         <Route path="/explore" element={<Protected><ExplorePage /></Protected>} />
         <Route path="/notifications" element={<Protected><NotificationsPage /></Protected>} />
         <Route path="/messages" element={<Protected><MessagesPage /></Protected>} />
+        <Route path="/my-plans" element={<Protected><MyPlansPage /></Protected>} />
         <Route path="/plans/new" element={<Protected><CreatePlanPage /></Protected>} />
         <Route path="/plans/:id/edit" element={<Protected><EditPlanPage /></Protected>} />
         <Route path="/plans/:id" element={<Protected><PlanDetailPage /></Protected>} />

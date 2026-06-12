@@ -74,6 +74,7 @@ function meFromUser(user: UserRecord): MeDTO {
     onboardingComplete: user.onboardingComplete,
     createdAt: user.createdAt,
     networkUserIds: user.networkIds?.length ? user.networkIds : [],
+    savedPlanIds: user.savedPlanIds?.length ? user.savedPlanIds : [],
     // Self always sees own social links — visibility check applies only to
     // other-viewer profile reads (see /api/profile).
     socialLinks: user.socialLinks,
@@ -431,6 +432,30 @@ authRouter.post("/friend-remove", requireAuth, async (req, res) => {
   }
   const me = await userToMe(userId);
   res.json({ ok: true, me });
+});
+
+/**
+ * Toggle a saved/pinned plan. Saving stashes a plan on the user's My Plans page
+ * without committing to it. Idempotent toggle keyed on planId.
+ */
+authRouter.post("/save-plan", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const planId = String(req.body?.planId ?? "");
+  if (!planId) {
+    res.status(400).json({ error: "planId required" });
+    return;
+  }
+  const viewer = await findUserById(userId);
+  if (!viewer) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  const saved = new Set(viewer.savedPlanIds ?? []);
+  if (saved.has(planId)) saved.delete(planId);
+  else saved.add(planId);
+  await updateUser(userId, { savedPlanIds: [...saved] });
+  const me = await userToMe(userId);
+  res.json({ ok: true, saved: saved.has(planId), me });
 });
 
 /** Resolve the viewer's network into PublicUser records for the invite picker. */
