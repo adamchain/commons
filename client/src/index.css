@@ -3185,10 +3185,14 @@ label {
 }
 .chat-bubble {
   max-width: 78%;
-  background: var(--surface);
+  /* Others' bubbles are deep ink-navy with paper-toned text so they read as
+     "someone else" at a glance, matching the chat spec. Mine override below
+     swaps to the signal red. */
+  background: var(--ink-800);
+  color: var(--paper-50);
   padding: 8px 12px 6px;
   border-radius: 16px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--ink-800);
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-elevate);
@@ -3208,7 +3212,9 @@ label {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  color: var(--accent);
+  /* Name sits above the bubble in paper-tinted muted ink so it's legible on
+     the navy bubble fill without competing with the message body. */
+  color: rgba(245, 239, 228, 0.72);
   margin-bottom: 2px;
 }
 .chat-bubble-body {
@@ -3219,7 +3225,9 @@ label {
 }
 .chat-bubble-time {
   font-size: 10px;
-  color: var(--text-subtle);
+  /* Same paper-tinted muted treatment as the author label so the timestamp
+     is legible on the navy bubble. */
+  color: rgba(245, 239, 228, 0.55);
   margin-top: 4px;
   align-self: flex-end;
 }
@@ -3930,6 +3938,44 @@ label {
 }
 .lock-prompt--soft .lock-prompt-headline {
   color: var(--text);
+}
+
+/* "Want to make this a regular thing?" CTA on concluded plan chats — one tap
+   into Make a Plan with the conversation's participants seeded as the
+   audience. */
+.chat-replan-cta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  margin: 8px 0 12px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 14px;
+  color: var(--text);
+  text-decoration: none;
+}
+.chat-replan-cta:hover { background: rgba(var(--accent-rgb), 0.16); }
+.chat-replan-emoji { font-size: 20px; }
+.chat-replan-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.chat-replan-text strong {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+}
+.chat-replan-text span {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.chat-replan-arrow {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 18px;
 }
 
 .plan-card-title {

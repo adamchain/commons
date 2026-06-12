@@ -31,6 +31,18 @@ export function CreatePlanPage() {
   const prefillTagParam = searchParams.get("tag");
   const inviteUserId = searchParams.get("inviteUser");
   const inviteUserName = searchParams.get("inviteName");
+  // Plural variant from the chat-to-plan re-plan flow — seeds multiple
+  // invitees at once. inviteNames is parallel to inviteUserIds.
+  const inviteUserIdsParam = searchParams.get("inviteUserIds") ?? "";
+  const inviteUserIds = useMemo(
+    () => inviteUserIdsParam.split(",").map((s) => s.trim()).filter(Boolean),
+    [inviteUserIdsParam],
+  );
+  const inviteNamesParam = searchParams.get("inviteNames") ?? "";
+  const inviteNames = useMemo(
+    () => inviteNamesParam.split(",").map((s) => s.trim()).filter(Boolean),
+    [inviteNamesParam],
+  );
   const prefillVibe: VibeIcon | null = useMemo(() => {
     if (!prefillTagParam) return null;
     const opt = VIBE_OPTIONS.find((o) => o.tag === prefillTagParam);
@@ -59,7 +71,7 @@ export function CreatePlanPage() {
     isFlexibleDate: false,
     vibes: defaultVibes,
     description: "",
-    visibility: (inviteUserId ? "network" : "everyone") as PlanVisibility,
+    visibility: (inviteUserId || inviteUserIds.length > 0 ? "network" : "everyone") as PlanVisibility,
     capacityOn: false,
     capacity: "6",
     joinType: "open" as JoinType,
@@ -79,11 +91,16 @@ export function CreatePlanPage() {
   // Step 1 — user picks Make a plan (full form) vs Just an idea (loose, looking_for).
   // Skipped automatically when arriving with an invite seed.
   type Path = "choose" | "plan" | "idea";
-  const [path, setPath] = useState<Path>(inviteUserId ? "plan" : "choose");
-  const [network, setNetwork] = useState<PublicUser[] | null>(null);
-  const [invitedIds, setInvitedIds] = useState<Set<string>>(() =>
-    inviteUserId ? new Set([inviteUserId]) : new Set(),
+  const [path, setPath] = useState<Path>(
+    inviteUserId || inviteUserIds.length > 0 ? "plan" : "choose",
   );
+  const [network, setNetwork] = useState<PublicUser[] | null>(null);
+  const [invitedIds, setInvitedIds] = useState<Set<string>>(() => {
+    const seed = new Set<string>();
+    if (inviteUserId) seed.add(inviteUserId);
+    for (const id of inviteUserIds) seed.add(id);
+    return seed;
+  });
   const navigate = useNavigate();
   const flyerRef = useRef<HTMLInputElement>(null);
 
@@ -351,15 +368,23 @@ export function CreatePlanPage() {
         Fill what you know · toggle what's flexible
       </p>
 
-      {inviteUserId && inviteUserName && (
+      {(inviteUserId && inviteUserName) || inviteNames.length > 0 ? (
         <div className="create-plan-invite-banner" role="note">
-          Inviting <strong>{inviteUserName}</strong>
-          {invitedIds.size > 1 && ` + ${invitedIds.size - 1} more`} once you post ·{" "}
+          Inviting{" "}
+          <strong>
+            {inviteUserName ?? inviteNames[0]}
+          </strong>
+          {(() => {
+            const total = invitedIds.size;
+            const extras = total - 1;
+            return extras > 0 ? ` + ${extras} more` : "";
+          })()}{" "}
+          once you post ·{" "}
           {form.visibility === "network"
             ? "Visible to your network"
             : "Visible to everyone on COMMONS"}
         </div>
-      )}
+      ) : null}
 
       <form onSubmit={(event) => void submit(event)} className="form-card">
         {/* Title */}

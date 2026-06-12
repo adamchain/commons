@@ -5,6 +5,7 @@ import { Avatar } from "../components/Avatar";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
+import { planHasEnded } from "../lib/planTime";
 import type { ConversationDTO, MessageDTO, PlanDTO, PublicUser } from "../types/shared";
 
 const POLL_MS = 4000;
@@ -77,6 +78,15 @@ export function ChatPage() {
   const participantLabel =
     conv.participants.length === 1 ? "1 person" : `${conv.participants.length} people`;
 
+  // "Want to make this a regular thing?" surfaces once the underlying plan is
+  // over (or cancelled) so the group chat doesn't just go cold. One tap into
+  // Make a Plan with this conversation's participants seeded as the audience.
+  const planConcluded = Boolean(plan.cancelledAt) || planHasEnded(plan);
+  const others = conv.participants.filter((p) => p.id !== user.id);
+  const inviteIds = others.map((p) => p.id).join(",");
+  const inviteNames = others.map((p) => p.firstName).join(",");
+  const replanHref = `/plans/new?inviteUserIds=${encodeURIComponent(inviteIds)}&inviteNames=${encodeURIComponent(inviteNames)}`;
+
   return (
     <main className="app-shell app-shell--chat">
       <header className="app-header app-header--minimal">
@@ -109,6 +119,17 @@ export function ChatPage() {
             )}
           </div>
         </Link>
+
+        {planConcluded && others.length > 0 && (
+          <Link to={replanHref} className="chat-replan-cta">
+            <span className="chat-replan-emoji" aria-hidden="true">🔁</span>
+            <span className="chat-replan-text">
+              <strong>Want to make this a regular thing?</strong>
+              <span>Post the next one.</span>
+            </span>
+            <span className="chat-replan-arrow" aria-hidden="true">→</span>
+          </Link>
+        )}
 
         <div ref={scrollRef} className="chat-messages">
           {grouped.length === 0 ? (
