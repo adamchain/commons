@@ -321,7 +321,7 @@ export function CreatePlanPage() {
           {/* "Just an idea" is the primary/first path. */}
           <button
             type="button"
-            className={`path-picker-card path-picker-card--accent ${pendingPath === "idea" ? "is-selected" : ""}`}
+            className={`path-picker-card ${pendingPath === "idea" ? "is-selected" : ""}`}
             onClick={() => setPendingPath("idea")}
             aria-pressed={pendingPath === "idea"}
           >

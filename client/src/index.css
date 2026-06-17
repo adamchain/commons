@@ -2466,13 +2466,6 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--accent-soft);
   box-shadow: 0 0 0 2px var(--accent);
 }
-.path-picker-card--accent {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-.path-picker-card--accent .path-picker-title {
-  color: var(--accent);
-}
 .path-picker-icon {
   display: inline-flex;
   align-items: center;
@@ -4450,8 +4443,104 @@ h1, h2, h3, h4, h5, h6 {
 
 .profile-avatar-preview {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
+  gap: 8px;
   margin-bottom: 12px;
+}
+
+/* Tappable avatar circle with a camera badge — replaces the "Add a photo"
+   button. Tap to open the library; tap again to re-select. */
+.profile-avatar-edit {
+  position: relative;
+  display: inline-flex;
+  border-radius: 50%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.profile-avatar-camera {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-on);
+  border: 3px solid var(--surface);
+}
+.profile-avatar-camera svg {
+  width: 17px;
+  height: 17px;
+}
+.profile-avatar-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Crop + confirm modal */
+.avatar-crop-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.avatar-crop-title {
+  margin: 0;
+  font-size: 18px;
+}
+.avatar-crop-sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.avatar-crop-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--surface-2);
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+.avatar-crop-stage:active {
+  cursor: grabbing;
+}
+.avatar-crop-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: none;
+  pointer-events: none;
+}
+/* Circular hole punched over the square stage to show the final crop. */
+.avatar-crop-mask {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45) inset;
+  -webkit-mask: radial-gradient(circle at center, transparent 49.5%, #000 50%);
+  mask: radial-gradient(circle at center, transparent 49.5%, #000 50%);
+  pointer-events: none;
+}
+.avatar-crop-zoom {
+  width: 100%;
+  max-width: 260px;
+  accent-color: var(--accent);
+}
+.avatar-crop-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  max-width: 260px;
 }
 
 .neighborhood-row.is-selected {
@@ -5224,6 +5313,10 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: space-between;
   margin: 12px 0 10px;
   gap: 12px;
+}
+/* When the bar holds only the Filters button (no count label), keep it right-aligned. */
+.page-filter-bar--end {
+  justify-content: flex-end;
 }
 
 .page-filter-bar-label {
@@ -6269,6 +6362,36 @@ h1, h2, h3, h4, h5, h6 {
 
 .bottom-nav > a:nth-child(1) { justify-self: start; }
 .bottom-nav > a:nth-child(3) { justify-self: end; }
+
+/* Five-slot layout: Home · Explore · + · Messages · Profile. Even columns,
+   each tab centered in its cell. */
+.bottom-nav--five {
+  grid-template-columns: repeat(2, 1fr) auto repeat(2, 1fr);
+}
+.bottom-nav--five > a:nth-child(1),
+.bottom-nav--five > a:nth-child(3) { justify-self: center; }
+
+.bottom-nav-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.bottom-nav-badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-on);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
 
 .bottom-nav-item {
   display: inline-flex;

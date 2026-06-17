@@ -222,10 +222,7 @@ export function FeedPage() {
         </button>
       </div>
 
-      <div className="page-filter-bar">
-        <span className="page-filter-bar-label">
-          {filteredPlans.length} plan{filteredPlans.length === 1 ? "" : "s"} this week
-        </span>
+      <div className="page-filter-bar page-filter-bar--end">
         <button
           type="button"
           className={`page-filter-btn ${activeFilterCount > 0 ? "page-filter-btn--active" : ""}`}

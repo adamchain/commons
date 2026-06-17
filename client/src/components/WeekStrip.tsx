@@ -20,19 +20,6 @@ function isoDay(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-// Parse/shift in local time. `new Date(iso).toISOString()` would shift the day
-// across UTC boundaries; this version stays in the user's calendar day.
-function parseLocalIso(iso: string): Date {
-  const [y, m, d] = iso.split("-").map(Number);
-  return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1);
-}
-
-function shiftIso(iso: string, days: number): string {
-  const date = parseLocalIso(iso);
-  date.setDate(date.getDate() + days);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
 /**
  * Compact 7-day strip. Tap a day to filter the feed; tap again to clear.
  * Pure calendar — no "X people in your network" nudge copy.
@@ -80,10 +67,6 @@ export function WeekStrip({
     return map;
   }, [plans]);
 
-  if (selectedDayIso) {
-    return <DayView iso={selectedDayIso} todayIso={week.todayIso} onSelectDay={onSelectDay} />;
-  }
-
   return (
     <section className="week-strip week-strip--scroll" aria-label="Calendar — scroll for more days">
       {week.days.map(({ iso, label, date, monthLabel }) => {
@@ -109,47 +92,3 @@ export function WeekStrip({
   );
 }
 
-function DayView({
-  iso,
-  todayIso,
-  onSelectDay,
-}: {
-  iso: string;
-  todayIso: string;
-  onSelectDay: (iso: string | null) => void;
-}) {
-  const date = parseLocalIso(iso);
-  const isToday = iso === todayIso;
-  const label = isToday
-    ? `Today · ${date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}`
-    : date.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
-
-  return (
-    <section className="day-view" aria-label={`Plans on ${label}`}>
-      <button
-        type="button"
-        className="day-view-nav"
-        onClick={() => onSelectDay(shiftIso(iso, -1))}
-        aria-label="Previous day"
-      >
-        ‹
-      </button>
-      <h2 className="day-view-label">{label}</h2>
-      <button
-        type="button"
-        className="day-view-nav"
-        onClick={() => onSelectDay(shiftIso(iso, 1))}
-        aria-label="Next day"
-      >
-        ›
-      </button>
-      <button
-        type="button"
-        className="day-view-week-btn"
-        onClick={() => onSelectDay(null)}
-      >
-        Week view
-      </button>
-    </section>
-  );
-}

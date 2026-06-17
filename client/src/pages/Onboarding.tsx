@@ -4,6 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { api } from "../api/http";
 import { setAuthToken } from "../api/authToken";
 import { Avatar } from "../components/Avatar";
+import { AvatarCropModal } from "../components/AvatarCropModal";
 import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
@@ -347,7 +348,7 @@ function pickInitial(user: MeDTO | null): Step {
   const hoods =
     user.neighborhoodIds?.length ? user.neighborhoodIds : user.neighborhoodId ? [user.neighborhoodId] : [];
   if (hoods.length === 0) return "location";
-  if (user.interests.length < 2) return "interests";
+  if (user.interests.length < 1) return "interests";
   if (!user.firstName.trim()) return "profile";
   if (!user.guidelinesAcknowledgedAt) return "guidelines";
   return "guidelines";
@@ -752,7 +753,7 @@ function InterestsStep({ me, onSave, onSkip, onBack }: { me: MeDTO; onSave: (int
       </div>
       <button
         className="btn-primary btn-block"
-        disabled={busy || picked.length < 2}
+        disabled={busy || picked.length < 1}
         onClick={async () => { setBusy(true); await onSave(picked); }}
       >
         Next · {picked.length} picked
@@ -785,6 +786,10 @@ function ProfileStep({
   const [photo, setPhoto] = useState<string | null>(me.avatarPhotoDataUrl ?? null);
   const [avatarParams, setAvatarParams] = useState<string | null>(me.avatarParams ?? null);
   const [busy, setBusy] = useState(false);
+  // Raw, uncropped image waiting on the crop+confirm step. Nothing is committed
+  // to `photo` until the user confirms the crop.
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Photo and preset are mutually exclusive — picking one clears the other.
   function pickPhoto(dataUrl: string) {
@@ -796,16 +801,59 @@ function ProfileStep({
     if (avatarParams !== params) setPhoto(null);
   }
 
+  // Tapping the circle opens the photo library. On native we get a data URL
+  // straight back; on web we trigger the hidden file input. Either way the raw
+  // image goes through the crop modal before it's locked in.
+  async function openPhotoPicker() {
+    if (isNative()) {
+      try {
+        const dataUrl = await pickPhotoNative({ maxPx: 1024, quality: 0.92 });
+        if (dataUrl) setCropSrc(dataUrl);
+      } catch {
+        /* user canceled */
+      }
+    } else {
+      fileInputRef.current?.click();
+    }
+  }
+
+  const hasAvatar = Boolean(photo || avatarParams);
+  const canContinue = Boolean(firstName.trim()) && hasAvatar;
+
   return (
-    <OnboardingShell title="Put a face to your name." subtitle="A photo, an avatar, or your initials — whatever feels like you." onBack={onBack}>
+    <OnboardingShell title="Put a face to your name." subtitle="Add a photo and your name to continue." onBack={onBack}>
       <div className="profile-avatar-preview">
-        <Avatar
-          seed={me.avatarSeed}
-          style={me.avatarStyle}
-          photoDataUrl={photo ?? undefined}
-          params={avatarParams ?? undefined}
-          name={firstName.trim() || undefined}
-          size="xl"
+        <button
+          type="button"
+          className="profile-avatar-edit"
+          onClick={() => void openPhotoPicker()}
+          aria-label={photo ? "Change photo" : "Add a photo"}
+        >
+          <Avatar
+            seed={me.avatarSeed}
+            style={me.avatarStyle}
+            photoDataUrl={photo ?? undefined}
+            params={avatarParams ?? undefined}
+            name={firstName.trim() || undefined}
+            size="xl"
+          />
+          <span className="profile-avatar-camera" aria-hidden="true">
+            <CameraIcon />
+          </span>
+        </button>
+        <span className="profile-avatar-hint">{photo ? "Tap to change photo" : "Tap to add a photo"}</span>
+        {/* Hidden web file input — opened via the circle button above. */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            void fileToResizedDataUrl(f, 1024, 0.92).then(setCropSrc).catch(() => undefined);
+            e.target.value = "";
+          }}
         />
       </div>
 
@@ -821,44 +869,6 @@ function ProfileStep({
         value={lastName}
         onChange={(e) => setLastName(e.target.value)}
       />
-
-      {/* Photo is the primary, always-visible choice — we want a real face.
-          Characters are tucked behind a closed disclosure below. */}
-      <div className="profile-photo-picker profile-photo-picker--primary">
-        {isNative() ? (
-          <button
-            type="button"
-            className="btn-secondary btn-block"
-            onClick={async () => {
-              try {
-                const dataUrl = await pickPhotoNative({ maxPx: 512, quality: 0.82 });
-                if (dataUrl) pickPhoto(dataUrl);
-              } catch {
-                /* user canceled */
-              }
-            }}
-          >
-            📷 Add a photo
-          </button>
-        ) : (
-          <>
-            <label className="btn-secondary btn-block profile-photo-label">
-              📷 Add a photo
-              <input
-                type="file"
-                accept="image/*"
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (!f) return;
-                  void fileToResizedDataUrl(f).then(pickPhoto).catch(() => undefined);
-                  e.target.value = "";
-                }}
-              />
-            </label>
-          </>
-        )}
-      </div>
 
       <details className="profile-preset-disclosure">
         <summary>Or pick an avatar</summary>
@@ -882,7 +892,7 @@ function ProfileStep({
       <button
         type="button"
         className="btn-primary btn-block"
-        disabled={busy || !firstName.trim()}
+        disabled={busy || !canContinue}
         onClick={async () => {
           setBusy(true);
           try {
@@ -894,8 +904,36 @@ function ProfileStep({
       >
         {busy ? "Saving…" : "Finish"}
       </button>
-      {!firstName.trim() && <p className="onboarding-fineprint">Add your first name to continue.</p>}
+      {!canContinue && (
+        <p className="onboarding-fineprint">
+          {!firstName.trim() && !hasAvatar
+            ? "Add your first name and a photo to continue."
+            : !firstName.trim()
+              ? "Add your first name to continue."
+              : "Add a photo or pick an avatar to continue."}
+        </p>
+      )}
+
+      {cropSrc && (
+        <AvatarCropModal
+          src={cropSrc}
+          onCancel={() => setCropSrc(null)}
+          onConfirm={(dataUrl) => {
+            pickPhoto(dataUrl);
+            setCropSrc(null);
+          }}
+        />
+      )}
     </OnboardingShell>
+  );
+}
+
+function CameraIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+      <circle cx="12" cy="13" r="4" />
+    </svg>
   );
 }
 
