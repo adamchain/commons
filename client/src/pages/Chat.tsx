@@ -269,6 +269,7 @@ export function ChatPage() {
                     author={m.sender!}
                     participants={conv.participants}
                     variant="pinned"
+                    showQuestion={openPolls.length > 1}
                     onVote={(optId) => void votePoll(m.id, optId)}
                     onClose={m.poll!.canClose ? () => void closePoll(m.id) : undefined}
                     busy={busyPollId === m.id}

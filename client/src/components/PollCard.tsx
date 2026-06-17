@@ -16,6 +16,8 @@ interface PollCardProps {
   onReopen?: () => void;
   /** "card" for the inline message stream, "pinned" for the compact top bar. */
   variant?: "card" | "pinned";
+  /** Hide the question header — used when a pinned dropdown already shows it. */
+  showQuestion?: boolean;
   /** Disables interaction while a request is in flight. */
   busy?: boolean;
 }
@@ -28,6 +30,7 @@ export function PollCard({
   onClose,
   onReopen,
   variant = "card",
+  showQuestion = true,
   busy = false,
 }: PollCardProps) {
   const byId = useMemo(() => {
@@ -43,10 +46,12 @@ export function PollCard({
 
   return (
     <div className={`poll-card poll-card--${variant} ${poll.closed ? "is-closed" : ""}`}>
-      <div className="poll-card-head">
-        <span className="poll-card-badge" aria-hidden="true">📊</span>
-        <div className="poll-card-question">{poll.question}</div>
-      </div>
+      {showQuestion && (
+        <div className="poll-card-head">
+          <span className="poll-card-badge" aria-hidden="true">📊</span>
+          <div className="poll-card-question">{poll.question}</div>
+        </div>
+      )}
 
       <ul className="poll-card-options">
         {poll.options.map((opt) => {

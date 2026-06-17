@@ -7220,10 +7220,17 @@ h1, h2, h3, h4, h5, h6 {
 .poll-card--card {
   max-width: 82%;
 }
+/* Inside the pinned dropdown the panel already supplies the accent surface, so
+   the card itself is chrome-less — no nested box. Multiple polls get a divider. */
 .poll-card--pinned {
-  background: rgba(var(--accent-rgb), 0.06);
-  border-color: rgba(var(--accent-rgb), 0.28);
-  padding: 12px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 4px 4px 8px;
+}
+.chat-pinned-polls-list > .poll-card--pinned + .poll-card--pinned {
+  border-top: 1px solid rgba(var(--accent-rgb), 0.22);
+  padding-top: 12px;
 }
 .poll-card.is-closed {
   opacity: 0.92;
