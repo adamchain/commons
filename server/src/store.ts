@@ -977,6 +977,17 @@ export const store = {
     return message;
   },
 
+  /** Re-open a closed poll so voting resumes. Permission is enforced by the caller. */
+  reopenPoll(messageId: string): MessageRecord | undefined {
+    const message = snapshot.messages.find((m) => m.id === messageId);
+    if (!message || message.kind !== "poll" || !message.poll) return undefined;
+    message.poll.closed = false;
+    delete message.poll.closedAt;
+    persist();
+    mongoMirror.upsertMessage(message);
+    return message;
+  },
+
   /**
    * Toggle a user's emoji reaction on a message. Adds the userId if absent,
    * removes it if present. Empty emoji buckets are pruned. Returns the updated

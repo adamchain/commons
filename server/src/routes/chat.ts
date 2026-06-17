@@ -291,6 +291,39 @@ chatRouter.post("/conversations/:id/messages/:msgId/close-poll", requireAuth, as
   res.json(await toMessageDto(updated, userId, hostId));
 });
 
+// POST /api/conversations/:id/messages/:msgId/reopen-poll
+// Mirror of close-poll: only the poll's author or the plan host can re-open it.
+chatRouter.post("/conversations/:id/messages/:msgId/reopen-poll", requireAuth, async (req, res) => {
+  const convId = String(req.params.id);
+  const msgId = String(req.params.msgId);
+  const userId = String(req.userId);
+  const conv = store.findConversationById(convId);
+  if (!conv) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
+  if (!conv.participantIds.includes(userId)) {
+    res.status(403).json({ error: "Not a participant" });
+    return;
+  }
+  const existing = store.findMessageById(msgId);
+  if (!existing || existing.conversationId !== convId || existing.kind !== "poll") {
+    res.status(404).json({ error: "Poll not found" });
+    return;
+  }
+  const hostId = store.findPlanById(conv.planId)?.creatorId ?? "";
+  if (userId !== existing.senderId && userId !== hostId) {
+    res.status(403).json({ error: "Only the poll's author or the host can re-open it" });
+    return;
+  }
+  const updated = store.reopenPoll(msgId);
+  if (!updated) {
+    res.status(404).json({ error: "Poll not found" });
+    return;
+  }
+  res.json(await toMessageDto(updated, userId, hostId));
+});
+
 // POST /api/conversations/:id/leave — drop yourself from a group chat. Works
 // any time, including after the event. You stay on the plan; the chat just
 // leaves your Messages inbox.

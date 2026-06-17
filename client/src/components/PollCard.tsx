@@ -12,6 +12,8 @@ interface PollCardProps {
   onVote: (optionId: string) => void;
   /** Present only when the viewer may close the poll (author or host). */
   onClose?: () => void;
+  /** Present only when the viewer may re-open a closed poll (author or host). */
+  onReopen?: () => void;
   /** "card" for the inline message stream, "pinned" for the compact top bar. */
   variant?: "card" | "pinned";
   /** Disables interaction while a request is in flight. */
@@ -24,6 +26,7 @@ export function PollCard({
   participants,
   onVote,
   onClose,
+  onReopen,
   variant = "card",
   busy = false,
 }: PollCardProps) {
@@ -101,6 +104,11 @@ export function PollCard({
         {!poll.closed && onClose && (
           <button type="button" className="poll-card-close" onClick={onClose} disabled={busy}>
             Close poll
+          </button>
+        )}
+        {poll.closed && onReopen && (
+          <button type="button" className="poll-card-close" onClick={onReopen} disabled={busy}>
+            Reopen poll
           </button>
         )}
       </div>

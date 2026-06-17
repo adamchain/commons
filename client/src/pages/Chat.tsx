@@ -26,6 +26,9 @@ export function ChatPage() {
   const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
   const [creatingPoll, setCreatingPoll] = useState(false);
   const [busyPollId, setBusyPollId] = useState<string | null>(null);
+  // Pinned active polls collapse into a single dropdown so an open poll doesn't
+  // render as a full card twice (pinned + inline in the thread).
+  const [pinnedPollsOpen, setPinnedPollsOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -157,6 +160,23 @@ export function ChatPage() {
     }
   }
 
+  async function reopenPoll(messageId: string) {
+    if (!conv) return;
+    if (!window.confirm("Reopen this poll? Voting starts again and results unlock.")) return;
+    setBusyPollId(messageId);
+    try {
+      const updated = await api<MessageDTO>(
+        `/api/conversations/${conv.id}/messages/${messageId}/reopen-poll`,
+        { method: "POST" },
+      );
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? updated : m)));
+    } catch {
+      /* swallow */
+    } finally {
+      setBusyPollId(null);
+    }
+  }
+
   const canSubmitPoll =
     pollQuestion.trim().length > 0 && pollOptions.filter((o) => o.trim()).length >= 2;
   const openPolls = messages.filter((m) => m.kind === "poll" && m.poll && !m.poll.closed);
@@ -223,21 +243,38 @@ export function ChatPage() {
         )}
 
         {openPolls.length > 0 && (
-          <div className="chat-pinned-polls" aria-label="Active polls">
-            {openPolls.slice(0, 2).map((m) => (
-              <PollCard
-                key={m.id}
-                poll={m.poll!}
-                author={m.sender!}
-                participants={conv.participants}
-                variant="pinned"
-                onVote={(optId) => void votePoll(m.id, optId)}
-                onClose={m.poll!.canClose ? () => void closePoll(m.id) : undefined}
-                busy={busyPollId === m.id}
-              />
-            ))}
-            {openPolls.length > 2 && (
-              <div className="chat-pinned-polls-more">+{openPolls.length - 2} more in the thread</div>
+          <div className={`chat-pinned-polls ${pinnedPollsOpen ? "is-open" : ""}`} aria-label="Active polls">
+            <button
+              type="button"
+              className="chat-pinned-polls-toggle"
+              onClick={() => setPinnedPollsOpen((v) => !v)}
+              aria-expanded={pinnedPollsOpen}
+            >
+              <span className="chat-pinned-polls-badge" aria-hidden="true">📊</span>
+              <span className="chat-pinned-polls-summary">
+                {openPolls.length === 1
+                  ? openPolls[0].poll!.question
+                  : `${openPolls.length} active polls`}
+              </span>
+              <span className="chat-pinned-polls-chevron" aria-hidden="true">
+                {pinnedPollsOpen ? "▾" : "▸"}
+              </span>
+            </button>
+            {pinnedPollsOpen && (
+              <div className="chat-pinned-polls-list">
+                {openPolls.map((m) => (
+                  <PollCard
+                    key={m.id}
+                    poll={m.poll!}
+                    author={m.sender!}
+                    participants={conv.participants}
+                    variant="pinned"
+                    onVote={(optId) => void votePoll(m.id, optId)}
+                    onClose={m.poll!.canClose ? () => void closePoll(m.id) : undefined}
+                    busy={busyPollId === m.id}
+                  />
+                ))}
+              </div>
             )}
           </div>
         )}
@@ -276,6 +313,7 @@ export function ChatPage() {
                       participants={conv.participants}
                       onVote={(optId) => void votePoll(msg.id, optId)}
                       onClose={msg.poll.canClose ? () => void closePoll(msg.id) : undefined}
+                      onReopen={msg.poll.canClose ? () => void reopenPoll(msg.id) : undefined}
                       busy={busyPollId === msg.id}
                     />
                   </div>
