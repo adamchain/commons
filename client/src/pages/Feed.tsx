@@ -55,7 +55,11 @@ export function FeedPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const navState = location.state as { justPostedId?: string; openInviteForPlanId?: string } | null;
-  const [justPostedId, setJustPostedId] = useState<string | null>(navState?.justPostedId ?? null);
+  // justPostedId pins the freshly-created plan to the very top for the whole
+  // feed session; highlightId drives the transient "Just posted" banner/glow
+  // and fades on its own a few seconds later.
+  const [justPostedId] = useState<string | null>(navState?.justPostedId ?? null);
+  const [highlightId, setHighlightId] = useState<string | null>(navState?.justPostedId ?? null);
   const [inviteForPlanId, setInviteForPlanId] = useState<string | null>(
     navState?.openInviteForPlanId ?? null,
   );
@@ -111,12 +115,13 @@ export function FeedPage() {
   }, [justPostedId, location.pathname, location.state, navigate]);
 
   useEffect(() => {
-    if (!justPostedId || plans === null) return;
-    const el = document.querySelector(`[data-plan-id="${justPostedId}"]`);
+    if (!highlightId || plans === null) return;
+    const el = document.querySelector(`[data-plan-id="${highlightId}"]`);
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
-    const t = setTimeout(() => setJustPostedId(null), 4500);
+    // Fade the banner/glow but keep the plan pinned to the top of the feed.
+    const t = setTimeout(() => setHighlightId(null), 4500);
     return () => clearTimeout(t);
-  }, [justPostedId, plans]);
+  }, [highlightId, plans]);
 
   useEffect(() => {
     if (user?.notificationPrefs && user.notificationPrefs.postPlanNetworkNudge === false) {
@@ -154,11 +159,24 @@ export function FeedPage() {
     // Happened = ended and not cancelled (mirrors PlanCard badge logic).
     if (hideHappened) list = list.filter((p) => p.cancelledAt || !planHasEnded(p));
     if (hideCancelled) list = list.filter((p) => !p.cancelledAt);
+    // Active plans first (soonest day at top); cancelled + past plans sink to
+    // the bottom, most-recent first, so the feed always leads with what's live.
+    const isInactive = (p: PlanDTO) => Boolean(p.cancelledAt) || planHasEnded(p);
+    list = [...list].sort((a, b) => {
+      const ia = isInactive(a) ? 1 : 0;
+      const ib = isInactive(b) ? 1 : 0;
+      if (ia !== ib) return ia - ib;
+      return ia === 0 ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date);
+    });
+    // A just-posted plan is pinned to the very top regardless of its date, so
+    // the user immediately sees what they created.
     if (justPostedId) {
-      const pinned = list.find((p) => p.id === justPostedId);
-      if (pinned) list = [pinned, ...list.filter((p) => p.id !== justPostedId)];
+      const idx = list.findIndex((p) => p.id === justPostedId);
+      if (idx > 0) {
+        const [pinned] = list.splice(idx, 1);
+        if (pinned) list.unshift(pinned);
+      }
     }
-    list = [...list].sort((a, b) => a.date.localeCompare(b.date));
     return list;
   }, [plans, view, selectedTag, selectedHoodId, selectedDayIso, hideHappened, hideCancelled, justPostedId]);
 
@@ -249,7 +267,7 @@ export function FeedPage() {
                 key={plan.id}
                 plan={plan}
                 onPlanRefresh={refreshPlans}
-                highlight={justPostedId === plan.id}
+                highlight={highlightId === plan.id}
                 onHideKind={(kind) => {
                   if (kind === "happened") setHideHappened(true);
                   else setHideCancelled(true);

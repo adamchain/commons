@@ -10,6 +10,10 @@ interface PendingItem {
 
 const ALL_TAGS: HostTag[] = ["great_host", "would_do_again", "made_me_feel_welcome"];
 
+// Once the user skips the prompt, we don't nag again until the next app
+// session. sessionStorage clears when the app process is killed/relaunched.
+const FEEDBACK_SKIPPED_KEY = "commons.feedbackSkipped.v1";
+
 export function FeedbackPrompt() {
   const [pending, setPending] = useState<PendingItem[]>([]);
   const [thumb, setThumb] = useState<"up" | "down" | null>(null);
@@ -18,6 +22,12 @@ export function FeedbackPrompt() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    // Skipped earlier this session — stay quiet until the next launch.
+    try {
+      if (sessionStorage.getItem(FEEDBACK_SKIPPED_KEY)) return;
+    } catch {
+      /* storage unavailable — fall through and fetch */
+    }
     void api<PendingItem[]>("/api/feedback/pending").then(setPending).catch(() => undefined);
   }, []);
 
@@ -33,7 +43,18 @@ export function FeedbackPrompt() {
   async function submit(skip = false) {
     setBusy(true);
     try {
-      if (!skip && thumb) {
+      if (skip) {
+        // Suppress the whole prompt for the rest of this session.
+        try {
+          sessionStorage.setItem(FEEDBACK_SKIPPED_KEY, "1");
+        } catch {
+          /* non-fatal */
+        }
+        setPending([]);
+        reset();
+        return;
+      }
+      if (thumb) {
         await api("/api/feedback", {
           method: "POST",
           body: JSON.stringify({ planId: current.planId, thumb, note: note.trim() || undefined, hostTags: tags }),

@@ -181,17 +181,38 @@ export interface ConversationSummaryDTO {
   myRole: "hosting" | "going" | "interested";
 }
 
+/** One option in a poll, with the ids of everyone who picked it. */
+export interface PollOptionDTO {
+  id: string;
+  text: string;
+  voterIds: string[];
+}
+
+export interface PollDTO {
+  question: string;
+  options: PollOptionDTO[];
+  closed: boolean;
+  /** Distinct voters across all options. */
+  totalVotes: number;
+  /** The option the viewer chose, or null. */
+  myVote: string | null;
+  /** Viewer may close this poll (its author or the plan host). */
+  canClose: boolean;
+}
+
 export interface MessageDTO {
   id: string;
   conversationId: string;
   /** Defaults to `user` when omitted (legacy rows). */
-  kind?: "user" | "system";
-  /** Present for user messages; omitted for system lines. */
+  kind?: "user" | "system" | "poll";
+  /** Present for user + poll messages; omitted for system lines. */
   sender?: PublicUser;
   body: string;
   createdAt: string;
   /** Emoji → userIds who reacted. Only ❤️ is offered in the UI for now. */
   reactions?: Record<string, string[]>;
+  /** Present only on `poll` messages. */
+  poll?: PollDTO;
 }
 
 export interface FeedbackDTO {

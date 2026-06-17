@@ -112,8 +112,11 @@ export function ProfilePage() {
           />
         )}
         <div className="profile-name">{profile.user.firstName || "Unnamed"}</div>
+        {/* Age + location on a single line directly under the name/photo. Age is
+            not captured at signup yet — it slots in here once a birthdate field
+            is added; until then we show location alone. */}
         {profile.neighborhood && (
-          <div className="profile-neighborhood">📍 {profile.neighborhood.name}</div>
+          <div className="profile-meta-line">📍 {profile.neighborhood.name}</div>
         )}
         {profile.socialLinks?.instagram && (
           <a
@@ -224,14 +227,13 @@ export function ProfilePage() {
 
       {isSelf && <ProfileMenu network={network} />}
 
-      {isSelf && <CondensedCalendar plans={feedPlans} />}
-
       {(profile.upcoming.length > 0 || profile.past.length > 0) && (
         <YourPlansBlock
           upcoming={profile.upcoming}
           past={profile.past}
           isSelf={isSelf}
           viewerId={user?.id}
+          calendarPlans={isSelf ? feedPlans : profile.upcoming}
         />
       )}
 
@@ -492,7 +494,7 @@ function EditPanel({
         </div>
       </div>
 
-      <p className="profile-emoji-label" style={{ marginTop: 12 }}>Or pick a character</p>
+      <p className="profile-emoji-label" style={{ marginTop: 12 }}>Or pick an avatar</p>
       <div className="profile-preset-grid">
         {AVATAR_PRESETS.map((p) => (
           <button
@@ -547,64 +549,6 @@ function EditPanel({
           {busy ? "Saving…" : "Save changes"}
         </button>
       </div>
-    </section>
-  );
-}
-
-function CondensedCalendar({ plans }: { plans: PlanDTO[] }) {
-  const [expanded, setExpanded] = useState(false);
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-
-  // Week strip: today + next 6 days
-  const week: { iso: string; dow: string; dom: number; isToday: boolean }[] = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(year, month, now.getDate() + i);
-    week.push({
-      iso: d.toISOString().slice(0, 10),
-      dow: ["S", "M", "T", "W", "T", "F", "S"][d.getDay()] ?? "",
-      dom: d.getDate(),
-      isToday: i === 0,
-    });
-  }
-  const byIso = new Map<string, PlanDTO[]>();
-  for (const p of plans) {
-    const key = p.date.slice(0, 10);
-    if (!byIso.has(key)) byIso.set(key, []);
-    byIso.get(key)!.push(p);
-  }
-
-  return (
-    <section className="profile-calendar" aria-label="Your plans">
-      <div className="profile-calendar-header">
-        <h3 className="who-block-heading">Your plans</h3>
-        <button type="button" className="btn-link" onClick={() => setExpanded((v) => !v)}>
-          {expanded ? "Hide month" : "Show month"}
-        </button>
-      </div>
-      {!expanded && (
-        <div className="profile-week-strip">
-          {week.map((d) => {
-            const dayPlans = byIso.get(d.iso) ?? [];
-            return (
-              <div
-                key={d.iso}
-                className={`profile-week-cell ${dayPlans.length > 0 ? "has-plans" : ""} ${d.isToday ? "is-today" : ""}`}
-              >
-                <div className="profile-week-dow">{d.dow}</div>
-                <div className="profile-week-num">{d.dom}</div>
-                {dayPlans.length > 0 && (
-                  <div className="profile-week-dot" aria-hidden="true">
-                    {dayPlans[0]!.hostEmoji}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {expanded && <MonthCalendar plans={plans} />}
     </section>
   );
 }
@@ -671,26 +615,62 @@ function YourPlansBlock({
   past,
   isSelf,
   viewerId,
+  calendarPlans,
 }: {
   upcoming: PlanDTO[];
   past: Array<{ id: string; title: string; date: string; wentCount: number }>;
   isSelf: boolean;
   viewerId: string | undefined;
+  calendarPlans: PlanDTO[];
 }) {
   const [upcomingExpanded, setUpcomingExpanded] = useState(false);
   const [pastOpen, setPastOpen] = useState(false);
+  // List is the default; calendar is an opt-in toggle (not the default view).
+  const [view, setView] = useState<"list" | "calendar">("list");
   const visibleUpcoming = upcomingExpanded ? upcoming : upcoming.slice(0, 3);
   const hiddenCount = Math.max(0, upcoming.length - visibleUpcoming.length);
   return (
     <section className="profile-block">
       <div className="profile-block-heading-row">
         <h3 className="who-block-heading">{isSelf ? "Your plans" : "Plans"}</h3>
-        {isSelf && (
-          <Link to="/my-plans" className="btn-link profile-block-see-all">
-            See all →
-          </Link>
-        )}
+        <div className="profile-plans-toggle" role="tablist" aria-label="Plans view">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "list"}
+            className={view === "list" ? "is-active" : ""}
+            onClick={() => setView("list")}
+          >
+            List
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "calendar"}
+            className={view === "calendar" ? "is-active" : ""}
+            onClick={() => setView("calendar")}
+          >
+            Calendar
+          </button>
+        </div>
       </div>
+
+      {view === "calendar" ? (
+        <>
+          <MonthCalendar plans={calendarPlans} />
+          {isSelf && (
+            <Link to="/my-plans" className="btn-link profile-block-see-all" style={{ display: "inline-block", marginTop: 10 }}>
+              See all →
+            </Link>
+          )}
+        </>
+      ) : (
+      <>
+      {isSelf && (
+        <Link to="/my-plans" className="btn-link profile-block-see-all">
+          See all →
+        </Link>
+      )}
       <div className="profile-list">
         {visibleUpcoming.map((p) => {
           const youStarted = viewerId !== undefined && p.creator.id === viewerId;
@@ -742,7 +722,7 @@ function YourPlansBlock({
             <span className={`profile-past-chevron ${pastOpen ? "is-open" : ""}`}>›</span>
           </button>
           {pastOpen && (
-            <div className="profile-list">
+            <div className="profile-list profile-list--past-group">
               {past.map((p) => {
                 // Past payload doesn't carry creatorId today; treat any plan in
                 // your past list with wentCount > 0 as something you went to,
@@ -771,6 +751,8 @@ function YourPlansBlock({
             </div>
           )}
         </>
+      )}
+      </>
       )}
     </section>
   );

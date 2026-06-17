@@ -62,7 +62,18 @@ export const VIBE_TAGS = ALL_INTERESTS;
  * existing tag set. Multiple emojis can collapse to the same tag (Martini and
  * Burger both → food_drinks); the resolved tag list de-duplicates.
  */
-export type VibeIcon = "coffee" | "martini" | "burger" | "music" | "book" | "paint" | "dice" | "disco" | "workout";
+export type VibeIcon =
+  | "coffee"
+  | "cowork"
+  | "events"
+  | "drinks"
+  | "food"
+  | "music"
+  | "books"
+  | "arts"
+  | "games"
+  | "dancing"
+  | "workouts";
 
 export interface VibeOption {
   id: VibeIcon;
@@ -72,15 +83,17 @@ export interface VibeOption {
 }
 
 export const VIBE_OPTIONS: VibeOption[] = [
-  { id: "coffee",  emoji: "☕", label: "Coffee",  tag: "coffee_cowork" },
-  { id: "martini", emoji: "🍸", label: "Drinks",  tag: "food_drinks" },
-  { id: "burger",  emoji: "🍔", label: "Food",    tag: "food_drinks" },
-  { id: "music",   emoji: "🎵", label: "Music",   tag: "music_nightlife" },
-  { id: "book",    emoji: "📖", label: "Book",    tag: "arts_culture" },
-  { id: "paint",   emoji: "🎨", label: "Paint",   tag: "arts_culture" },
-  { id: "dice",    emoji: "🎲", label: "Dice",    tag: "local_events" },
-  { id: "disco",   emoji: "💃", label: "Disco",   tag: "music_nightlife" },
-  { id: "workout", emoji: "💪", label: "Workout", tag: "fitness_outdoors" },
+  { id: "coffee",   emoji: "☕", label: "Coffee",     tag: "coffee_cowork" },
+  { id: "cowork",   emoji: "💻", label: "Co-Work",    tag: "coffee_cowork" },
+  { id: "events",   emoji: "🎉", label: "Events",     tag: "local_events" },
+  { id: "drinks",   emoji: "🍸", label: "Drinks",     tag: "food_drinks" },
+  { id: "food",     emoji: "🍔", label: "Food",       tag: "food_drinks" },
+  { id: "music",    emoji: "🎵", label: "Music",      tag: "music_nightlife" },
+  { id: "books",    emoji: "📚", label: "Book Clubs", tag: "arts_culture" },
+  { id: "arts",     emoji: "🎨", label: "Arts",       tag: "arts_culture" },
+  { id: "games",    emoji: "🎲", label: "Games",      tag: "local_events" },
+  { id: "dancing",  emoji: "💃", label: "Dancing",    tag: "music_nightlife" },
+  { id: "workouts", emoji: "💪", label: "Workouts",   tag: "fitness_outdoors" },
 ];
 
 export type PlanKind = "standard" | "looking_for";
@@ -275,15 +288,36 @@ export interface ConversationSummaryDTO {
   myRole: "hosting" | "going" | "interested";
 }
 
+/** One option in a poll, with the ids of everyone who picked it. */
+export interface PollOptionDTO {
+  id: string;
+  text: string;
+  voterIds: string[];
+}
+
+export interface PollDTO {
+  question: string;
+  options: PollOptionDTO[];
+  closed: boolean;
+  /** Distinct voters across all options. */
+  totalVotes: number;
+  /** The option the viewer chose, or null. */
+  myVote: string | null;
+  /** Viewer may close this poll (its author or the plan host). */
+  canClose: boolean;
+}
+
 export interface MessageDTO {
   id: string;
   conversationId: string;
-  kind?: "user" | "system";
+  kind?: "user" | "system" | "poll";
   sender?: PublicUser;
   body: string;
   createdAt: string;
   /** Emoji → userIds who reacted. UI only offers ❤️ today. */
   reactions?: Record<string, string[]>;
+  /** Present only on `poll` messages. */
+  poll?: PollDTO;
 }
 
 export interface FeedbackDTO {

@@ -173,6 +173,21 @@ export interface ConversationRecord {
   lastMessageAt: string;
 }
 
+export interface PollOption {
+  id: string;
+  text: string;
+}
+
+/** Poll attached to a message of kind "poll". Single-choice, named voters. */
+export interface PollData {
+  question: string;
+  options: PollOption[];
+  /** optionId → userIds who picked it. Single-choice: a user is in at most one. */
+  votes: Record<string, string[]>;
+  closed: boolean;
+  closedAt?: string;
+}
+
 export interface MessageRecord {
   id: string;
   conversationId: string;
@@ -180,9 +195,11 @@ export interface MessageRecord {
   body: string;
   createdAt: string;
   readBy: string[];
-  kind?: "user" | "system";
+  kind?: "user" | "system" | "poll";
   /** Emoji → userIds who reacted (toggle). UI only offers ❤️ today. */
   reactions?: Record<string, string[]>;
+  /** Present only on `poll` messages. */
+  poll?: PollData;
 }
 
 export interface PlanSuggestionRecord {
@@ -846,6 +863,9 @@ export const store = {
       .filter((m) => m.conversationId === conversationId)
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   },
+  findMessageById(messageId: string): MessageRecord | undefined {
+    return snapshot.messages.find((m) => m.id === messageId);
+  },
   createMessage(conversationId: string, senderId: string, body: string): MessageRecord {
     const message: MessageRecord = {
       id: randomUUID(),
@@ -881,6 +901,79 @@ export const store = {
     persist();
     mongoMirror.upsertMessage(message);
     if (conv) mongoMirror.upsertConversation(conv);
+    return message;
+  },
+
+  /**
+   * Post a poll into a conversation. The poll question doubles as the message
+   * `body` so inbox previews and notifications work without poll-specific
+   * branching. Options get stable ids so votes survive edits.
+   */
+  createPollMessage(
+    conversationId: string,
+    senderId: string,
+    question: string,
+    optionTexts: string[],
+  ): MessageRecord {
+    const message: MessageRecord = {
+      id: randomUUID(),
+      conversationId,
+      senderId,
+      body: question,
+      createdAt: new Date().toISOString(),
+      readBy: [senderId],
+      kind: "poll",
+      poll: {
+        question,
+        options: optionTexts.map((text) => ({ id: randomUUID(), text })),
+        votes: {},
+        closed: false,
+      },
+    };
+    snapshot.messages.push(message);
+    const conv = snapshot.conversations.find((c) => c.id === conversationId);
+    if (conv) conv.lastMessageAt = message.createdAt;
+    persist();
+    mongoMirror.upsertMessage(message);
+    if (conv) mongoMirror.upsertConversation(conv);
+    return message;
+  },
+
+  /**
+   * Cast (or change) a user's vote on a poll. Single-choice: the user is first
+   * removed from every option, then added to `optionId` — unless they tapped the
+   * option they already held, which clears their vote (toggle off). No-op on a
+   * closed poll or unknown option. Returns the updated message, or undefined if
+   * the message isn't a votable poll.
+   */
+  votePoll(messageId: string, userId: string, optionId: string): MessageRecord | undefined {
+    const message = snapshot.messages.find((m) => m.id === messageId);
+    if (!message || message.kind !== "poll" || !message.poll) return undefined;
+    const poll = message.poll;
+    if (poll.closed) return message;
+    if (!poll.options.some((o) => o.id === optionId)) return undefined;
+
+    const hadVote = (poll.votes[optionId] ?? []).includes(userId);
+    const votes: Record<string, string[]> = {};
+    for (const [oid, users] of Object.entries(poll.votes)) {
+      const kept = users.filter((u) => u !== userId);
+      if (kept.length) votes[oid] = kept;
+    }
+    if (!hadVote) votes[optionId] = [...(votes[optionId] ?? []), userId];
+    poll.votes = votes;
+    persist();
+    mongoMirror.upsertMessage(message);
+    return message;
+  },
+
+  /** Freeze a poll's results. Permission is enforced by the caller. */
+  closePoll(messageId: string): MessageRecord | undefined {
+    const message = snapshot.messages.find((m) => m.id === messageId);
+    if (!message || message.kind !== "poll" || !message.poll) return undefined;
+    message.poll.closed = true;
+    message.poll.closedAt = new Date().toISOString();
+    persist();
+    mongoMirror.upsertMessage(message);
     return message;
   },
 

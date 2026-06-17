@@ -328,7 +328,7 @@ export function PlanDetailPage() {
               </>
             )}
             <button type="button" className="btn-primary btn-block" disabled={lockBusy || !lockVenue.trim() || !lockDate} onClick={() => void lockIn()}>
-              {lockBusy ? "Saving…" : isLookingFor ? "Make it a plan" : "Lock it in"}
+              {lockBusy ? "Saving…" : "Lock it in"}
             </button>
           </div>
         )}

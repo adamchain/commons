@@ -4,7 +4,7 @@ import { store } from "../store.js";
 import { findUserById, findUsersByIds } from "../userRepo.js";
 import { userToPublic } from "./plans.js";
 import { emit } from "../lib/notify.js";
-import type { ConversationDTO, ConversationSummaryDTO, MessageDTO } from "../types/shared.js";
+import type { ConversationDTO, ConversationSummaryDTO, MessageDTO, PollDTO } from "../types/shared.js";
 
 export const chatRouter = Router();
 
@@ -54,7 +54,11 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
       planDate: plan.date,
       conversationId: conv?.id ?? null,
       lastMessageAt: conv && msgs.length ? conv.lastMessageAt : null,
-      lastMessagePreview: lastMsg ? truncate(lastMsg.body, 80) : null,
+      lastMessagePreview: lastMsg
+        ? lastMsg.kind === "poll"
+          ? `📊 ${truncate(lastMsg.body, 78)}`
+          : truncate(lastMsg.body, 80)
+        : null,
       unreadCount: conv ? msgs.filter((m) => !m.readBy.includes(userId)).length : 0,
       participantCount,
       myRole,
@@ -130,8 +134,9 @@ chatRouter.get("/conversations/:id/messages", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Not a participant" });
     return;
   }
+  const hostId = store.findPlanById(conv.planId)?.creatorId ?? "";
   const raw = store.listMessagesForConversation(convId);
-  const messages = await Promise.all(raw.map((m) => toMessageDto(m)));
+  const messages = await Promise.all(raw.map((m) => toMessageDto(m, userId, hostId)));
   res.json(messages);
 });
 
@@ -175,7 +180,115 @@ chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => 
       });
     }
   }
-  res.status(201).json(await toMessageDto(message));
+  res.status(201).json(await toMessageDto(message, userId));
+});
+
+// POST /api/conversations/:id/polls { question, options: string[] }
+// Any participant can post a poll. The question doubles as the message body so
+// it flows through inbox previews + notifications like a normal message.
+chatRouter.post("/conversations/:id/polls", requireAuth, async (req, res) => {
+  const convId = String(req.params.id);
+  const userId = String(req.userId);
+  const question = String(req.body?.question ?? "").trim();
+  const rawOptions = Array.isArray(req.body?.options) ? req.body.options : [];
+  const options = rawOptions
+    .map((o: unknown) => String(o ?? "").trim())
+    .filter((o: string) => o.length > 0)
+    .slice(0, 6);
+  if (!question) {
+    res.status(400).json({ error: "Poll question required" });
+    return;
+  }
+  if (options.length < 2) {
+    res.status(400).json({ error: "Add at least two options" });
+    return;
+  }
+  const conv = store.findConversationById(convId);
+  if (!conv) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
+  if (!conv.participantIds.includes(userId)) {
+    res.status(403).json({ error: "Not a participant" });
+    return;
+  }
+  const message = store.createPollMessage(convId, userId, question, options);
+  if (conv.type === "group") {
+    const sender = await findUserById(userId);
+    const senderName = sender?.firstName || "Someone";
+    const plan = store.findPlanById(conv.planId);
+    const planTitle = plan?.title ?? "your plan";
+    for (const recipientId of conv.participantIds) {
+      if (recipientId === userId) continue;
+      await emit({
+        userId: recipientId,
+        kind: "newGroupChatMessage",
+        body: `${senderName} posted a poll in "${planTitle}": ${truncate(question, 70)}`,
+        planId: conv.planId,
+        conversationId: convId,
+        dedupKey: `newGroupChatMessage:${message.id}:${recipientId}`,
+      });
+    }
+  }
+  const hostId = store.findPlanById(conv.planId)?.creatorId ?? "";
+  res.status(201).json(await toMessageDto(message, userId, hostId));
+});
+
+// POST /api/conversations/:id/messages/:msgId/vote { optionId }
+chatRouter.post("/conversations/:id/messages/:msgId/vote", requireAuth, async (req, res) => {
+  const convId = String(req.params.id);
+  const msgId = String(req.params.msgId);
+  const userId = String(req.userId);
+  const optionId = String(req.body?.optionId ?? "");
+  const conv = store.findConversationById(convId);
+  if (!conv) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
+  if (!conv.participantIds.includes(userId)) {
+    res.status(403).json({ error: "Not a participant" });
+    return;
+  }
+  const updated = store.votePoll(msgId, userId, optionId);
+  if (!updated || updated.conversationId !== convId) {
+    res.status(404).json({ error: "Poll not found" });
+    return;
+  }
+  const hostId = store.findPlanById(conv.planId)?.creatorId ?? "";
+  res.json(await toMessageDto(updated, userId, hostId));
+});
+
+// POST /api/conversations/:id/messages/:msgId/close-poll
+// Only the poll's author or the plan host can freeze results.
+chatRouter.post("/conversations/:id/messages/:msgId/close-poll", requireAuth, async (req, res) => {
+  const convId = String(req.params.id);
+  const msgId = String(req.params.msgId);
+  const userId = String(req.userId);
+  const conv = store.findConversationById(convId);
+  if (!conv) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
+  if (!conv.participantIds.includes(userId)) {
+    res.status(403).json({ error: "Not a participant" });
+    return;
+  }
+  const existing = store.findMessageById(msgId);
+  if (!existing || existing.conversationId !== convId || existing.kind !== "poll") {
+    res.status(404).json({ error: "Poll not found" });
+    return;
+  }
+  const hostId = store.findPlanById(conv.planId)?.creatorId ?? "";
+  if (userId !== existing.senderId && userId !== hostId) {
+    res.status(403).json({ error: "Only the poll's author or the host can close it" });
+    return;
+  }
+  const updated = store.closePoll(msgId);
+  if (!updated) {
+    res.status(404).json({ error: "Poll not found" });
+    return;
+  }
+  res.json(await toMessageDto(updated, userId, hostId));
 });
 
 // POST /api/conversations/:id/leave — drop yourself from a group chat. Works
@@ -236,14 +349,18 @@ async function toConversationDto(
       const u = users.get(id);
       return u
         ? userToPublic(u)
-        : { id, firstName: "Unknown", neighborhoodId: null, avatarSeed: "missing", avatarStyle: "avataaars" as const };
+        : { id, firstName: "Former member", neighborhoodId: null, avatarSeed: id, avatarStyle: "avataaars" as const };
     }),
     lastMessageAt: conv.lastMessageAt,
     unreadCount: messages.filter((m) => !m.readBy.includes(_viewerId)).length,
   };
 }
 
-async function toMessageDto(m: ReturnType<typeof store.listMessagesForConversation>[number]): Promise<MessageDTO> {
+async function toMessageDto(
+  m: ReturnType<typeof store.listMessagesForConversation>[number],
+  viewerId = "",
+  hostId = "",
+): Promise<MessageDTO> {
   if (m.kind === "system") {
     return {
       id: m.id,
@@ -254,15 +371,53 @@ async function toMessageDto(m: ReturnType<typeof store.listMessagesForConversati
     };
   }
   const sender = await findUserById(m.senderId);
+  const senderPublic = sender
+    ? userToPublic(sender)
+    : { id: m.senderId, firstName: "Former member", neighborhoodId: null, avatarSeed: m.senderId, avatarStyle: "avataaars" as const };
+
+  if (m.kind === "poll" && m.poll) {
+    return {
+      id: m.id,
+      conversationId: m.conversationId,
+      kind: "poll",
+      sender: senderPublic,
+      body: m.body,
+      createdAt: m.createdAt,
+      poll: pollToDto(m.poll, m.senderId, viewerId, hostId),
+    };
+  }
+
   return {
     id: m.id,
     conversationId: m.conversationId,
     kind: "user",
-    sender: sender
-      ? userToPublic(sender)
-      : { id: m.senderId, firstName: "Unknown", neighborhoodId: null, avatarSeed: "missing", avatarStyle: "avataaars" },
+    sender: senderPublic,
     body: m.body,
     createdAt: m.createdAt,
     reactions: m.reactions ?? {},
+  };
+}
+
+function pollToDto(
+  poll: NonNullable<ReturnType<typeof store.listMessagesForConversation>[number]["poll"]>,
+  authorId: string,
+  viewerId: string,
+  hostId: string,
+): PollDTO {
+  const voters = new Set<string>();
+  let myVote: string | null = null;
+  const options = poll.options.map((o) => {
+    const voterIds = poll.votes[o.id] ?? [];
+    for (const v of voterIds) voters.add(v);
+    if (voterIds.includes(viewerId)) myVote = o.id;
+    return { id: o.id, text: o.text, voterIds };
+  });
+  return {
+    question: poll.question,
+    options,
+    closed: poll.closed,
+    totalVotes: voters.size,
+    myVote,
+    canClose: viewerId === authorId || viewerId === hostId,
   };
 }

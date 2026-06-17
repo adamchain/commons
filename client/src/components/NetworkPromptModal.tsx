@@ -6,9 +6,9 @@ import type { MeDTO, NetworkPromptDTO } from "../types/shared";
 
 /**
  * Post-plan network seed prompt. Fires after a plan's end time passes for
- * anyone who RSVP'd. The whole interaction is two taps — one to add the group
- * to your network, one to skip — no per-person checkboxes or search. The
- * shared real-world experience is the entire filtering signal.
+ * anyone who RSVP'd. Nobody is pre-selected — the user actively taps the one
+ * or two people they actually want to keep, then adds. Tapping nobody and
+ * hitting "Not now" dismisses.
  */
 export function NetworkPromptModal({
   prompt,
@@ -21,18 +21,30 @@ export function NetworkPromptModal({
 }) {
   const { setUser } = useAuth();
   const [busy, setBusy] = useState(false);
+  // Default: no one selected — the user chooses who to keep.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const count = prompt.others.length;
   const names = prompt.others.map((o) => o.firstName).join(", ");
 
-  async function addAll() {
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function addSelected() {
+    if (selected.size === 0) return;
     setBusy(true);
     try {
       const res = await api<{ ok: boolean; me: MeDTO }>("/api/auth/network-add", {
         method: "POST",
         body: JSON.stringify({
           planId: prompt.planId,
-          userIds: prompt.others.map((o) => o.id),
+          userIds: [...selected],
         }),
       });
       setUser(res.me);
@@ -56,6 +68,8 @@ export function NetworkPromptModal({
     }
   }
 
+  const selectedCount = selected.size;
+
   return (
     <div className="network-prompt-overlay" role="dialog" aria-modal="true" aria-labelledby="network-prompt-title">
       <div className="network-prompt-card">
@@ -64,21 +78,41 @@ export function NetworkPromptModal({
         </h2>
         <p className="network-prompt-body">
           You went to <strong>{prompt.planTitle}</strong> with {count} {count === 1 ? "person" : "people"}.
-          Want to add them to your network?
+          Tap anyone you'd like to add to your network.
         </p>
 
         <div className="network-prompt-avatars" aria-label={names}>
-          {prompt.others.map((o) => (
-            <span key={o.id} className="network-prompt-avatar" title={o.firstName}>
-              <Avatar seed={o.avatarSeed} style={o.avatarStyle} photoDataUrl={o.avatarPhotoDataUrl} params={o.avatarParams} name={o.firstName} size="lg" />
-              <span className="network-prompt-avatar-name">{o.firstName}</span>
-            </span>
-          ))}
+          {prompt.others.map((o) => {
+            const isOn = selected.has(o.id);
+            return (
+              <button
+                key={o.id}
+                type="button"
+                className={`network-prompt-avatar network-prompt-avatar--pick ${isOn ? "is-selected" : ""}`}
+                title={o.firstName}
+                onClick={() => toggle(o.id)}
+                aria-pressed={isOn}
+              >
+                <Avatar seed={o.avatarSeed} style={o.avatarStyle} photoDataUrl={o.avatarPhotoDataUrl} params={o.avatarParams} name={o.firstName} size="lg" />
+                {isOn && <span className="network-prompt-avatar-check" aria-hidden="true">✓</span>}
+                <span className="network-prompt-avatar-name">{o.firstName}</span>
+              </button>
+            );
+          })}
         </div>
 
         <div className="network-prompt-actions">
-          <button type="button" className="btn-primary btn-block" disabled={busy} onClick={() => void addAll()}>
-            {busy ? "Saving…" : `Add ${count === 1 ? "to" : "all to"} my network`}
+          <button
+            type="button"
+            className="btn-primary btn-block"
+            disabled={busy || selectedCount === 0}
+            onClick={() => void addSelected()}
+          >
+            {busy
+              ? "Saving…"
+              : selectedCount === 0
+                ? "Select someone to add"
+                : `Add ${selectedCount} to my network`}
           </button>
           <button type="button" className="btn-link btn-block" disabled={busy} onClick={() => void dismiss()}>
             Not now

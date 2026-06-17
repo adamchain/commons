@@ -46,15 +46,27 @@ export function WeekStrip({
   selectedDayIso: string | null;
   onSelectDay: (iso: string | null) => void;
 }) {
+  // Render a long, horizontally scrollable run of days — from the start of
+  // this week through ~5 weeks out — so the user can swipe left/right to see
+  // the rest of the month instead of being capped at a single 7-day window.
+  const DAYS_TO_SHOW = 35;
   const week = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const mon = startOfWeekMonday(today);
-    const dow = ["M", "T", "W", "T", "F", "S", "S"];
+    const dowLabels = ["M", "T", "W", "T", "F", "S", "S"];
     const days = [];
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < DAYS_TO_SHOW; i++) {
       const date = addDays(mon, i);
-      days.push({ date, iso: isoDay(date), label: dow[i] ?? "" });
+      days.push({
+        date,
+        iso: isoDay(date),
+        label: dowLabels[date.getDay() === 0 ? 6 : date.getDay() - 1] ?? "",
+        // Mark the first day of each month so the scroll has month context.
+        monthLabel: date.getDate() === 1 || i === 0
+          ? date.toLocaleDateString(undefined, { month: "short" })
+          : null,
+      });
     }
     return { todayIso: isoDay(today), days };
   }, []);
@@ -73,8 +85,8 @@ export function WeekStrip({
   }
 
   return (
-    <section className="week-strip" aria-label="Week">
-      {week.days.map(({ iso, label, date }) => {
+    <section className="week-strip week-strip--scroll" aria-label="Calendar — scroll for more days">
+      {week.days.map(({ iso, label, date, monthLabel }) => {
         const hasPlans = (byDay.get(iso) ?? 0) > 0;
         const isToday = iso === week.todayIso;
         const isSelected = iso === selectedDayIso;
@@ -87,6 +99,7 @@ export function WeekStrip({
             onClick={() => onSelectDay(isSelected ? null : iso)}
             aria-pressed={isSelected}
           >
+            {monthLabel && <span className="week-strip-month">{monthLabel}</span>}
             <span className="week-strip-dow">{label}</span>
             <span className="week-strip-num">{date.getDate()}</span>
           </button>

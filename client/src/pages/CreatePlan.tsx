@@ -21,6 +21,11 @@ const today = (): string => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
+// Recurrence cadence for the "Repeats" dropdown (Zoom-style). Maps to the
+// existing `isRecurring` boolean on the plan; finer cadence is sent as
+// `recurrence` for forward-compat.
+type Recurrence = "none" | "weekly" | "biweekly" | "monthly";
+
 export function CreatePlanPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -76,7 +81,7 @@ export function CreatePlanPage() {
     capacityOn: false,
     capacity: "6",
     joinType: "open" as JoinType,
-    isRecurring: false,
+    recurrence: "none" as Recurrence,
     flyerDataUrl: null as string | null,
     flyerLinkUrl: "",
     flyerLinkPreview: null as null | {
@@ -95,6 +100,9 @@ export function CreatePlanPage() {
   const [path, setPath] = useState<Path>(
     inviteUserId || inviteUserIds.length > 0 || prefillTitle || prefillName ? "plan" : "choose",
   );
+  // The path selector now requires an explicit pick + Continue rather than
+  // navigating on the first tap.
+  const [pendingPath, setPendingPath] = useState<"plan" | "idea" | null>(null);
   const [network, setNetwork] = useState<PublicUser[] | null>(null);
   const [invitedIds, setInvitedIds] = useState<Set<string>>(() => {
     const seed = new Set<string>();
@@ -201,7 +209,8 @@ export function CreatePlanPage() {
           visibility: form.visibility,
           capacity: capacityNum,
           joinType: form.joinType,
-          isRecurring: form.isRecurring,
+          isRecurring: form.recurrence !== "none",
+          recurrence: form.recurrence,
           flyerDataUrl: form.flyerDataUrl ?? undefined,
           flyerLinkUrl: form.flyerLinkUrl.trim() || undefined,
           flyerLinkPreview: form.flyerLinkPreview ?? undefined,
@@ -309,19 +318,35 @@ export function CreatePlanPage() {
           Got something in mind?
         </h1>
         <div className="path-picker">
+          {/* "Just an idea" is the primary/first path. */}
           <button
             type="button"
-            className="path-picker-card"
-            onClick={() => setPath("plan")}
+            className={`path-picker-card path-picker-card--accent ${pendingPath === "idea" ? "is-selected" : ""}`}
+            onClick={() => setPendingPath("idea")}
+            aria-pressed={pendingPath === "idea"}
+          >
+            <span className="path-picker-icon path-picker-icon--accent" aria-hidden="true">💡</span>
+            <span className="path-picker-title">Just an idea</span>
+            <span className="path-picker-sub">Just a thought. See who&apos;s down.</span>
+          </button>
+          <button
+            type="button"
+            className={`path-picker-card ${pendingPath === "plan" ? "is-selected" : ""}`}
+            onClick={() => setPendingPath("plan")}
+            aria-pressed={pendingPath === "plan"}
           >
             <span className="path-picker-icon path-picker-icon--neutral" aria-hidden="true">📅</span>
             <span className="path-picker-title">Make a plan</span>
             <span className="path-picker-sub">Know what you want to do? Start here.</span>
           </button>
-          <button
-            type="button"
-            className="path-picker-card path-picker-card--accent"
-            onClick={() => {
+        </div>
+        <button
+          type="button"
+          className="btn btn-primary btn-block"
+          style={{ marginTop: 20 }}
+          disabled={!pendingPath}
+          onClick={() => {
+            if (pendingPath === "idea") {
               // "Just an idea" pre-flexes the constraints so the resulting plan
               // posts as a looking_for and the host can fill in the rest later.
               setForm((f) => ({
@@ -331,13 +356,13 @@ export function CreatePlanPage() {
                 isFlexibleDate: true,
               }));
               setPath("idea");
-            }}
-          >
-            <span className="path-picker-icon path-picker-icon--accent" aria-hidden="true">💡</span>
-            <span className="path-picker-title">Just an idea</span>
-            <span className="path-picker-sub">Just a thought. See who&apos;s down.</span>
-          </button>
-        </div>
+            } else if (pendingPath === "plan") {
+              setPath("plan");
+            }
+          }}
+        >
+          Continue
+        </button>
       </main>
     );
   }
@@ -571,6 +596,7 @@ export function CreatePlanPage() {
         </section>
 
         {/* Advanced options — collapsed by default to keep the form short */}
+        <p className="form-optional-label">Optional</p>
         <button
           type="button"
           className="create-more-toggle"
@@ -578,9 +604,9 @@ export function CreatePlanPage() {
           aria-expanded={showMore}
         >
           <span className="create-more-toggle-main">
-            {showMore ? "Fewer details" : "Additional details"}
+            {showMore ? "Hide extra options" : "Add extra options"}
           </span>
-          <span className="create-more-toggle-sub">Spots, flyer, link.</span>
+          <span className="create-more-toggle-sub">Spots, repeats, flyer, link.</span>
           <ChevronIcon open={showMore} />
         </button>
 
@@ -638,16 +664,20 @@ export function CreatePlanPage() {
               )}
             </section>
 
-            {/* Repeats weekly */}
+            {/* Repeats — Zoom-style cadence dropdown */}
             <section className="form-section">
-              <label className="flex-toggle">
-                <input
-                  type="checkbox"
-                  checked={form.isRecurring}
-                  onChange={(e) => setForm((f) => ({ ...f, isRecurring: e.target.checked }))}
-                />
-                Repeats weekly
-              </label>
+              <label className="form-question" htmlFor="repeats">Repeats</label>
+              <select
+                id="repeats"
+                className="form-select"
+                value={form.recurrence}
+                onChange={(e) => setForm((f) => ({ ...f, recurrence: e.target.value as Recurrence }))}
+              >
+                <option value="none">Doesn't repeat</option>
+                <option value="weekly">Weekly</option>
+                <option value="biweekly">Every 2 weeks</option>
+                <option value="monthly">Monthly</option>
+              </select>
             </section>
 
             {/* Flyer — image upload OR link with preview */}
@@ -819,7 +849,7 @@ type FormShape = {
   capacityOn: boolean;
   capacity: string;
   joinType: JoinType;
-  isRecurring: boolean;
+  recurrence: Recurrence;
   flyerDataUrl: string | null;
   flyerLinkUrl: string;
   flyerLinkPreview: null | {
@@ -851,8 +881,9 @@ function IdeaForm({
   error: string | null;
   onBack: () => void;
 }) {
-  const [contextOpen, setContextOpen] = useState(false);
-  const [visibilityOpen, setVisibilityOpen] = useState(false);
+  // Both "a little context" and visibility now live behind one optional
+  // disclosure, hidden by default so the field is just the open text box.
+  const [detailsOpen, setDetailsOpen] = useState(false);
   return (
     <main className="app-shell app-shell--mid">
       <header className="app-header app-header--minimal">
@@ -880,53 +911,42 @@ function IdeaForm({
         <button
           type="button"
           className="idea-disclosure"
-          aria-expanded={contextOpen}
-          onClick={() => setContextOpen((v) => !v)}
+          aria-expanded={detailsOpen}
+          onClick={() => setDetailsOpen((v) => !v)}
         >
-          <span>A little context</span>
-          <span className={`idea-disclosure-chevron ${contextOpen ? "is-open" : ""}`}>›</span>
+          <span>Add details</span>
+          <span className={`idea-disclosure-chevron ${detailsOpen ? "is-open" : ""}`}>›</span>
         </button>
-        {contextOpen && (
-          <textarea
-            className="idea-context"
-            placeholder="Anything else worth knowing? (optional)"
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-            rows={3}
-          />
-        )}
-
-        <button
-          type="button"
-          className="idea-disclosure"
-          aria-expanded={visibilityOpen}
-          onClick={() => setVisibilityOpen((v) => !v)}
-        >
-          <span>
-            Visibility · <em className="idea-disclosure-value">
-              {form.visibility === "network" ? "Your Network" : "Everyone on COMMONS"}
-            </em>
-          </span>
-          <span className={`idea-disclosure-chevron ${visibilityOpen ? "is-open" : ""}`}>›</span>
-        </button>
-        {visibilityOpen && (
-          <div className="visibility-options" style={{ marginTop: 6 }}>
-            <button
-              type="button"
-              className={`visibility-option ${form.visibility === "everyone" ? "is-active" : ""}`}
-              onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
-              aria-pressed={form.visibility === "everyone"}
-            >
-              <span className="visibility-option-title">Everyone on COMMONS</span>
-            </button>
-            <button
-              type="button"
-              className={`visibility-option ${form.visibility === "network" ? "is-active" : ""}`}
-              onClick={() => setForm((f) => ({ ...f, visibility: "network" }))}
-              aria-pressed={form.visibility === "network"}
-            >
-              <span className="visibility-option-title">Your Network</span>
-            </button>
+        {detailsOpen && (
+          <div className="idea-details">
+            <label className="form-question" htmlFor="idea-context">A little context</label>
+            <textarea
+              id="idea-context"
+              className="idea-context"
+              placeholder="Anything else worth knowing? (optional)"
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              rows={3}
+            />
+            <label className="form-question" style={{ marginTop: 12 }}>Visibility</label>
+            <div className="visibility-options" style={{ marginTop: 6 }}>
+              <button
+                type="button"
+                className={`visibility-option ${form.visibility === "everyone" ? "is-active" : ""}`}
+                onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
+                aria-pressed={form.visibility === "everyone"}
+              >
+                <span className="visibility-option-title">Everyone on COMMONS</span>
+              </button>
+              <button
+                type="button"
+                className={`visibility-option ${form.visibility === "network" ? "is-active" : ""}`}
+                onClick={() => setForm((f) => ({ ...f, visibility: "network" }))}
+                aria-pressed={form.visibility === "network"}
+              >
+                <span className="visibility-option-title">Your Network</span>
+              </button>
+            </div>
           </div>
         )}
 

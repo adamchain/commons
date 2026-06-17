@@ -87,9 +87,9 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
       ? userToPublic(u)
       : {
           id: uid,
-          firstName: "Unknown",
+          firstName: "Former member",
           neighborhoodId: null,
-          avatarSeed: "missing",
+          avatarSeed: uid,
           avatarStyle: "avataaars",
         };
   }

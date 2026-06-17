@@ -39,9 +39,9 @@
   /* Radius scale */
   --r-sm: 8px; --r-md: 14px; --r-lg: 22px; --r-xl: 32px; --r-pill: 999px;
 
-  /* Fonts — display for the COMMONS wordmark, ui everywhere else. */
-  --font-display: "Archivo Black", "Arial Black", system-ui, sans-serif;
-  --font-ui: "Inter Tight", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Fonts — Montserrat for headings/display, Poppins for body copy. */
+  --font-display: "Montserrat", "Arial Black", system-ui, sans-serif;
+  --font-ui: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   /* Legacy alias — any title that requested the old serif now reads as UI. */
   --font-serif: var(--font-ui);
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -68,6 +68,8 @@
   --success-bg: rgba(47, 143, 85, 0.14);
   --success-border: rgba(47, 143, 85, 0.28);
   --warning: #c97a1a;
+  /* Looking For accent — design-system orange left border. */
+  --looking-orange: #f5821f;
   --danger: var(--signal-500);
   --shadow-card: 0 1px 0 rgba(20, 20, 58, 0.03);
   --shadow-elevate: 0 1px 2px rgba(20, 20, 58, 0.06);
@@ -120,6 +122,7 @@
   --success-bg: rgba(76, 175, 114, 0.14);
   --success-border: rgba(76, 175, 114, 0.30);
   --warning: #e0962f;
+  --looking-orange: #f5821f;
   --danger: var(--signal-500);
   --shadow-card: 0 1px 0 rgba(0, 0, 0, 0.18);
   --shadow-elevate: 0 1px 2px rgba(0, 0, 0, 0.28);
@@ -135,6 +138,10 @@
 
 * {
   box-sizing: border-box;
+  /* Kill the iOS WebView tap-highlight flash (showed as a red/grey flash when
+     tapping buttons like the visibility options). Components draw their own
+     active states. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 html,
@@ -148,9 +155,12 @@ body,
   background: var(--bg);
   /* Hard guard against horizontal scrolling. Any child that grows past the
      viewport width gets clipped at the root rather than introducing a sideways
-     scroll the user can't escape. */
+     scroll the user can't escape. Opt-in scrollers (e.g. the week strip) set
+     their own overflow-x and are unaffected. */
+  width: 100%;
   max-width: 100vw;
   overflow-x: hidden;
+  overscroll-behavior-x: none;
 }
 
 body {
@@ -269,10 +279,15 @@ label {
 
 /* Page header text — large medium-weight Inter Tight. The COMMONS wordmark
    itself stays on var(--font-display) via .top-bar-brand / .loader-wordmark. */
+/* All headings render in Montserrat (display); body copy stays Poppins. */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+}
+
 .brand {
-  font-family: var(--font-ui);
+  font-family: var(--font-display);
   font-size: 34px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.02em;
   margin: 0;
   line-height: 1.1;
@@ -1594,7 +1609,7 @@ label {
   /* Side-by-side from the smallest screen so phones don't get a stacked
      date+time layout, per wireframe. */
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 16px;
 }
 .form-when-cell {
   display: grid;
@@ -1685,6 +1700,17 @@ label {
 }
 
 /* ----- Create plan: advanced disclosure ----- */
+.form-optional-label {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--text-subtle, var(--text-muted));
+  margin: 4px 0 6px;
+}
+.idea-details {
+  margin-top: 8px;
+}
 .create-more-toggle {
   display: flex;
   align-items: center;
@@ -2033,6 +2059,62 @@ label {
   align-items: center;
   justify-content: center;
   padding: 24px;
+  position: relative;
+}
+
+/* Step back button — top-left, lets users return to the previous step. */
+.onboarding-back {
+  position: absolute;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  left: 16px;
+  z-index: 3;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.onboarding-back:hover {
+  color: var(--text);
+}
+
+/* Guidelines agree checkbox + legal links. */
+.guidelines-agree {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 16px 0 14px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  cursor: pointer;
+}
+.guidelines-agree input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  accent-color: var(--accent);
+}
+.guidelines-agree a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.onboarding-guidelines-links {
+  margin-top: 14px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.onboarding-guidelines-links a {
+  color: var(--text-muted);
+  text-decoration: underline;
 }
 /* Landing/login variant: full-bleed b&w hero photo with white type stacked
    over a subtle top/bottom darkening gradient for legibility. */
@@ -2149,11 +2231,11 @@ label {
   text-align: center;
 }
 .onboarding-title {
-  font-family: var(--font-ui);
+  font-family: var(--font-display);
   font-size: 34px;
   margin: 0;
   text-align: center;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.1;
 }
@@ -2325,8 +2407,8 @@ label {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 50dvh;
-  overflow-y: auto;
+  /* No inner scroll box — every neighborhood is visible/accessible; the page
+     scrolls naturally if the list is long. */
   border: 1px solid var(--border);
   border-radius: 12px;
 }
@@ -2378,6 +2460,11 @@ label {
 }
 .path-picker-card:hover {
   border-color: var(--border-strong);
+}
+.path-picker-card.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 2px var(--accent);
 }
 .path-picker-card--accent {
   border-color: var(--accent);
@@ -2470,7 +2557,7 @@ label {
   flex-shrink: 0;
 }
 .plan-title-row h1 {
-  font-family: var(--font-ui);
+  font-family: var(--font-display);
   font-size: 26px;
   line-height: 1.15;
   letter-spacing: -0.01em;
@@ -2692,6 +2779,12 @@ label {
 }
 .profile-name { font-size: 24px; font-weight: 700; }
 .profile-neighborhood { color: var(--text-muted); }
+/* Age · location, single line directly under the profile name/photo. */
+.profile-meta-line {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-top: 2px;
+}
 .profile-tags {
   display: flex;
   gap: 8px;
@@ -3204,9 +3297,13 @@ label {
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--text);
-  white-space: nowrap;
+  /* Short names show in full; long names wrap to two lines then ellipsize,
+     rather than getting chopped mid-word on a single line. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.2;
 }
 .chat-header-meta {
   font-size: 12px;
@@ -3297,10 +3394,12 @@ label {
   display: flex;
   gap: 8px;
   align-items: flex-end;
-  margin-top: 8px;
+  /* Extra room beneath each row so the heart-react chip (which floats below
+     the bubble) never collides with the next message. */
+  margin-top: 20px;
 }
 .chat-bubble-row.is-cont {
-  margin-top: 2px;
+  margin-top: 12px;
 }
 .chat-bubble-row.is-mine {
   justify-content: flex-end;
@@ -3367,8 +3466,10 @@ label {
    then fills in and shows the count. */
 .chat-react-btn {
   position: absolute;
-  bottom: -10px;
-  right: 8px;
+  /* Tuck the chip just outside the bubble's bottom-right corner so it reads as
+     attached to its own bubble without overlapping the body or neighbours. */
+  bottom: -14px;
+  right: -2px;
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -3380,6 +3481,7 @@ label {
   border-radius: 999px;
   cursor: pointer;
   opacity: 0.5;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
   transition: opacity 120ms ease, transform 120ms ease;
 }
 .chat-bubble { position: relative; }
@@ -3450,6 +3552,29 @@ label {
   justify-content: space-between;
 }
 .profile-block-see-all { font-size: 13px; }
+
+/* List / Calendar view toggle inside the Your Plans block. */
+.profile-plans-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.profile-plans-toggle button {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-radius: 999px;
+  background: transparent;
+}
+.profile-plans-toggle button.is-active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-card);
+}
 .profile-list-row--past { display: flex; align-items: center; gap: 8px; }
 .profile-list-row--past .profile-list-row-main {
   display: flex;
@@ -3840,9 +3965,11 @@ label {
   background: var(--surface);
 }
 
+/* Looking For — orange left border per design system (was a full red border). */
 .plan-card--looking > .plan-card {
-  background: transparent;
-  border: 1.5px solid var(--accent);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--looking-orange);
   box-shadow: none;
 }
 
@@ -3851,8 +3978,12 @@ label {
   border-color: var(--success);
   border-width: 2px;
 }
+/* Network + Looking For keeps the orange left rail, green for the rest. */
 .plan-card--network.plan-card--looking > .plan-card {
-  border-left-color: var(--success);
+  border-top-color: var(--success);
+  border-right-color: var(--success);
+  border-bottom-color: var(--success);
+  border-left-color: var(--looking-orange);
 }
 
 .plan-card-kind-pill {
@@ -3872,7 +4003,16 @@ label {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  /* Reserve room on the right for the floating save star so the kind pill
+     (Looking For / Cancelled / etc.) never tucks under it. */
+  padding-right: 34px;
+}
+/* Past + cancelled cards also carry a "Hide" button top-right, which pushes
+   the star further left — give the pill even more clearance there. */
+.plan-card--happened .plan-card-poster-row,
+.plan-card--cancelled .plan-card-poster-row {
+  padding-right: 126px;
 }
 .plan-card-poster-row .plan-card-kind-pill {
   margin-left: auto;
@@ -3936,7 +4076,7 @@ label {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 .plan-card-attendees {
   display: flex;
@@ -4039,9 +4179,11 @@ label {
   line-height: 1;
 }
 
-/* Past-plan ("this happened") treatment — dimmed, muted, no border accent. */
+/* Past-plan ("this happened") treatment — greyed out + deprioritised so active
+   plans clearly lead. */
 .plan-card--happened > .plan-card {
-  opacity: 0.75;
+  opacity: 0.6;
+  filter: grayscale(0.35);
   border-color: var(--border);
   background: var(--surface-2);
 }
@@ -4052,9 +4194,15 @@ label {
   border-left-color: var(--border-strong);
 }
 
+/* Cancelled — fully greyed (no red accent), matching the muted past treatment. */
 .plan-card--cancelled > .plan-card {
-  opacity: 0.75;
-  border-color: var(--danger-border, #f1c1c1);
+  opacity: 0.6;
+  filter: grayscale(0.35);
+  border-color: var(--border);
+  background: var(--surface-2);
+}
+.plan-card--cancelled.plan-card--looking > .plan-card {
+  border-left-color: var(--border-strong);
 }
 .plan-card--cancelled .plan-card-title {
   text-decoration: line-through;
@@ -4745,6 +4893,42 @@ label {
   font-weight: 600;
 }
 
+/* Tappable picker variant — nobody selected by default; tap to choose. */
+.network-prompt-avatar--pick {
+  position: relative;
+  background: none;
+  border: none;
+  padding: 4px;
+  border-radius: var(--r-lg);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+.network-prompt-avatar--pick:active {
+  transform: scale(0.96);
+}
+.network-prompt-avatar--pick.is-selected {
+  opacity: 1;
+}
+.network-prompt-avatar--pick.is-selected .avatar {
+  box-shadow: 0 0 0 3px var(--accent);
+  border-radius: 999px;
+}
+.network-prompt-avatar-check {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .network-prompt-actions {
   display: flex;
   flex-direction: column;
@@ -4904,7 +5088,9 @@ label {
 }
 
 .app-shell--with-topbar {
-  padding-top: calc(var(--topbar-height, 56px) + 16px);
+  /* Include the safe-area inset the fixed top bar reserves, otherwise on
+     notched iPhones the page's back button slides up under the COMMONS logo. */
+  padding-top: calc(var(--topbar-height, 56px) + env(safe-area-inset-top, 0px) + 16px);
 }
 
 .app-header--minimal {
@@ -4926,7 +5112,18 @@ label {
   padding: calc(10px + env(safe-area-inset-top, 0px)) 18px 10px;
   min-height: var(--topbar-height, 56px);
   box-sizing: border-box;
-  background: transparent;
+  /* Solid at the top, fading to transparent — masks page content (e.g. a page's
+     own "← Back" button) so it never visibly overlaps the COMMONS logo, while
+     keeping the airy floating-bar look below. */
+  background: linear-gradient(
+    to bottom,
+    var(--bg) 0%,
+    var(--bg) 62%,
+    color-mix(in srgb, var(--bg) 55%, transparent) 85%,
+    transparent 100%
+  );
+  backdrop-filter: saturate(120%) blur(2px);
+  -webkit-backdrop-filter: saturate(120%) blur(2px);
   border-bottom: none;
 }
 
@@ -5217,6 +5414,26 @@ label {
   margin: 6px 0 14px;
 }
 
+/* Scrollable variant — swipe left/right through the rest of the month. */
+.week-strip--scroll {
+  display: flex;
+  grid-template-columns: none;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.week-strip--scroll::-webkit-scrollbar {
+  display: none;
+}
+.week-strip--scroll .week-strip-day {
+  flex: 0 0 auto;
+  width: 44px;
+  padding-top: 18px;
+  scroll-snap-align: start;
+}
+
 .week-strip-day {
   display: flex;
   flex-direction: column;
@@ -5230,6 +5447,17 @@ label {
   color: var(--text);
   transition: background 120ms ease, border-color 120ms ease;
   position: relative;
+}
+
+.week-strip-month {
+  position: absolute;
+  top: 5px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: var(--accent);
+  line-height: 1;
 }
 
 .week-strip-day:hover {
@@ -5336,22 +5564,23 @@ label {
   background: var(--surface-2);
 }
 
-/* Compact plan card — title, time, details only */
+/* Compact plan card — title, time, details only. Tightened to cut the empty
+   space that was making cards feel too tall. */
 .plan-card--compact {
-  padding: 14px 16px;
+  padding: 12px 14px;
 }
 
 .plan-card--compact .plan-card-title {
-  font-family: var(--font-ui);
-  font-size: 22px;
+  font-family: var(--font-display);
+  font-size: 19px;
   font-weight: 700;
   letter-spacing: -0.01em;
   line-height: 1.15;
-  margin: 0 0 8px;
+  margin: 0 0 4px;
 }
 
 .plan-card--compact .plan-card-posted-by {
-  margin: 0 0 6px;
+  margin: 0;
   font-size: 12px;
   color: var(--text-muted);
 }
@@ -5524,6 +5753,45 @@ label {
   border: 1px solid var(--border);
   border-radius: 14px;
   margin-bottom: 14px;
+}
+
+/* Locked "Coming Soon" Explore — keeps the designed shell but inert. */
+.explore-locked .explore-search--disabled,
+.explore-locked .explore-cats {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.explore-coming-soon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 32px 22px;
+  margin-bottom: 8px;
+  background: var(--surface);
+  border: 1px dashed var(--border-strong);
+  border-radius: 18px;
+}
+.explore-coming-soon h2 {
+  margin: 4px 0 0;
+  font-size: 20px;
+}
+.explore-coming-soon p {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: 14px;
+  max-width: 36ch;
+}
+.explore-coming-soon-badge {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 4px 12px;
+  border-radius: 999px;
 }
 
 .explore-search svg {
@@ -6747,4 +7015,243 @@ label {
   background: var(--surface-alt, var(--surface));
   color: var(--text);
   font: inherit;
+}
+
+/* ---- Polls ---- */
+.chat-composer-poll {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-left: -8px;
+  transition: color 120ms ease, background 120ms ease;
+}
+.chat-composer-poll:hover {
+  color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.10);
+}
+
+.chat-pinned-polls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.chat-pinned-polls-more {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.chat-poll-row {
+  display: flex;
+  margin: 4px 0;
+}
+
+.poll-card {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 14px;
+}
+.poll-card--card {
+  max-width: 82%;
+}
+.poll-card--pinned {
+  background: rgba(var(--accent-rgb), 0.06);
+  border-color: rgba(var(--accent-rgb), 0.28);
+  padding: 12px;
+}
+.poll-card.is-closed {
+  opacity: 0.92;
+}
+
+.poll-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.poll-card-badge {
+  font-size: 16px;
+  line-height: 1.3;
+  flex-shrink: 0;
+}
+.poll-card-question {
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.poll-card-options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.poll-option {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  text-align: left;
+  overflow: hidden;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.poll-option:not(:disabled):hover {
+  border-color: var(--accent);
+}
+.poll-option.is-mine {
+  border-color: var(--accent);
+}
+.poll-option:disabled {
+  cursor: default;
+}
+.poll-option-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgba(var(--accent-rgb), 0.16);
+  z-index: 0;
+  transition: width 240ms ease;
+}
+.poll-option.is-mine .poll-option-fill {
+  background: rgba(var(--accent-rgb), 0.26);
+}
+.poll-option-label {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.poll-option-check {
+  color: var(--accent);
+  font-weight: 700;
+}
+.poll-option-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.poll-option-stats {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.poll-option-voters {
+  display: inline-flex;
+}
+.poll-option-voter {
+  margin-left: -6px;
+  border-radius: 50%;
+  border: 1.5px solid var(--surface);
+  display: inline-flex;
+}
+.poll-option-voter:first-child {
+  margin-left: 0;
+}
+.poll-option-pct {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.poll-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+.poll-card-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.poll-card-close {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.poll-card-close:disabled {
+  opacity: 0.5;
+}
+
+/* Poll creation modal */
+.poll-modal-title {
+  margin: 0 0 2px;
+  font-size: 18px;
+}
+.poll-modal-sub {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.poll-modal-question {
+  width: 100%;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+.poll-modal-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.poll-modal-option-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.poll-modal-option-row input {
+  flex: 1;
+  min-width: 0;
+}
+.poll-modal-remove {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.poll-modal-remove:hover {
+  color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.10);
+}
+.poll-modal-add {
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.poll-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 18px;
 }

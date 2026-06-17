@@ -169,7 +169,7 @@ export function PlanCard({
             style={plan.creator.avatarStyle}
             photoDataUrl={plan.creator.avatarPhotoDataUrl}
             params={plan.creator.avatarParams}
-            size="sm"
+            size="md"
           />
           <span className="plan-card-posted-by">
             Posted by <strong>{plan.creator.firstName}</strong>

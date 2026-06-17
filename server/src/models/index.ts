@@ -156,9 +156,11 @@ const MessageSchema = new Schema<MessageRecord>(
     body: { type: String, required: true },
     createdAt: { type: String, required: true },
     readBy: { type: [String], default: [] },
-    kind: { type: String, enum: ["user", "system"], default: "user" },
+    kind: { type: String, enum: ["user", "system", "poll"], default: "user" },
     // emoji → userIds. Mixed since the key set is dynamic.
     reactions: { type: Schema.Types.Mixed, default: {} },
+    // Present only on poll messages: { question, options, votes, closed }.
+    poll: { type: Schema.Types.Mixed, default: undefined },
   },
   { collection: "messages" },
 );

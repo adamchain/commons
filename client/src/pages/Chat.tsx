@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { PollCard } from "../components/PollCard";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
 import { planHasEnded } from "../lib/planTime";
@@ -20,6 +21,11 @@ export function ChatPage() {
   const [messages, setMessages] = useState<MessageDTO[]>([]);
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+  const [pollModalOpen, setPollModalOpen] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState("");
+  const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
+  const [creatingPoll, setCreatingPoll] = useState(false);
+  const [busyPollId, setBusyPollId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -98,7 +104,64 @@ export function ChatPage() {
     }
   }
 
-  const visibleAvatars = conv.participants.slice(0, 4);
+  async function createPoll() {
+    if (!conv) return;
+    const question = pollQuestion.trim();
+    const options = pollOptions.map((o) => o.trim()).filter(Boolean);
+    if (!question || options.length < 2) return;
+    setCreatingPoll(true);
+    try {
+      const msg = await api<MessageDTO>(`/api/conversations/${conv.id}/polls`, {
+        method: "POST",
+        body: JSON.stringify({ question, options }),
+      });
+      setMessages((prev) => [...prev, msg]);
+      setPollModalOpen(false);
+      setPollQuestion("");
+      setPollOptions(["", ""]);
+    } finally {
+      setCreatingPoll(false);
+    }
+  }
+
+  async function votePoll(messageId: string, optionId: string) {
+    if (!conv) return;
+    setBusyPollId(messageId);
+    try {
+      const updated = await api<MessageDTO>(
+        `/api/conversations/${conv.id}/messages/${messageId}/vote`,
+        { method: "POST", body: JSON.stringify({ optionId }) },
+      );
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? updated : m)));
+    } catch {
+      /* swallow — they can tap again */
+    } finally {
+      setBusyPollId(null);
+    }
+  }
+
+  async function closePoll(messageId: string) {
+    if (!conv) return;
+    if (!window.confirm("Close this poll? Results will be final and voting stops.")) return;
+    setBusyPollId(messageId);
+    try {
+      const updated = await api<MessageDTO>(
+        `/api/conversations/${conv.id}/messages/${messageId}/close-poll`,
+        { method: "POST" },
+      );
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? updated : m)));
+    } catch {
+      /* swallow */
+    } finally {
+      setBusyPollId(null);
+    }
+  }
+
+  const canSubmitPoll =
+    pollQuestion.trim().length > 0 && pollOptions.filter((o) => o.trim()).length >= 2;
+  const openPolls = messages.filter((m) => m.kind === "poll" && m.poll && !m.poll.closed);
+
+  const visibleAvatars = conv.participants.slice(0, 3);
   const overflowCount = Math.max(0, conv.participants.length - visibleAvatars.length);
   const participantLabel =
     conv.participants.length === 1 ? "1 person" : `${conv.participants.length} people`;
@@ -159,6 +222,26 @@ export function ChatPage() {
           </Link>
         )}
 
+        {openPolls.length > 0 && (
+          <div className="chat-pinned-polls" aria-label="Active polls">
+            {openPolls.slice(0, 2).map((m) => (
+              <PollCard
+                key={m.id}
+                poll={m.poll!}
+                author={m.sender!}
+                participants={conv.participants}
+                variant="pinned"
+                onVote={(optId) => void votePoll(m.id, optId)}
+                onClose={m.poll!.canClose ? () => void closePoll(m.id) : undefined}
+                busy={busyPollId === m.id}
+              />
+            ))}
+            {openPolls.length > 2 && (
+              <div className="chat-pinned-polls-more">+{openPolls.length - 2} more in the thread</div>
+            )}
+          </div>
+        )}
+
         <div ref={scrollRef} className="chat-messages">
           {grouped.length === 0 ? (
             <div className="chat-empty-card">
@@ -180,6 +263,22 @@ export function ChatPage() {
               if (entry.kind === "system") {
                 return (
                   <div key={entry.id} className="chat-system-line">{entry.body}</div>
+                );
+              }
+              if (entry.kind === "poll") {
+                const msg = entry.message;
+                if (!msg.poll || !msg.sender) return null;
+                return (
+                  <div key={entry.id} className="chat-poll-row">
+                    <PollCard
+                      poll={msg.poll}
+                      author={msg.sender}
+                      participants={conv.participants}
+                      onVote={(optId) => void votePoll(msg.id, optId)}
+                      onClose={msg.poll.canClose ? () => void closePoll(msg.id) : undefined}
+                      busy={busyPollId === msg.id}
+                    />
+                  </div>
                 );
               }
               const mine = entry.sender.id === user.id;
@@ -241,6 +340,15 @@ export function ChatPage() {
             void send();
           }}
         >
+          <button
+            type="button"
+            className="chat-composer-poll"
+            onClick={() => setPollModalOpen(true)}
+            aria-label="Create a poll"
+            title="Create a poll"
+          >
+            <PollIcon />
+          </button>
           <input
             type="text"
             className="chat-composer-input"
@@ -258,7 +366,87 @@ export function ChatPage() {
           </button>
         </form>
       </div>
+
+      {pollModalOpen && (
+        <div className="modal-backdrop" onClick={() => !creatingPoll && setPollModalOpen(false)}>
+          <div className="modal-card poll-modal" onClick={(e) => e.stopPropagation()}>
+            <h2 className="poll-modal-title">New poll</h2>
+            <p className="poll-modal-sub">Everyone in the chat can vote on one option.</p>
+            <input
+              type="text"
+              className="poll-modal-question"
+              placeholder="Ask a question…"
+              value={pollQuestion}
+              maxLength={140}
+              autoFocus
+              onChange={(e) => setPollQuestion(e.target.value)}
+            />
+            <div className="poll-modal-options">
+              {pollOptions.map((opt, i) => (
+                <div key={i} className="poll-modal-option-row">
+                  <input
+                    type="text"
+                    placeholder={`Option ${i + 1}`}
+                    value={opt}
+                    maxLength={80}
+                    onChange={(e) =>
+                      setPollOptions((prev) => prev.map((o, j) => (j === i ? e.target.value : o)))
+                    }
+                  />
+                  {pollOptions.length > 2 && (
+                    <button
+                      type="button"
+                      className="poll-modal-remove"
+                      aria-label={`Remove option ${i + 1}`}
+                      onClick={() => setPollOptions((prev) => prev.filter((_, j) => j !== i))}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {pollOptions.length < 6 && (
+              <button
+                type="button"
+                className="poll-modal-add"
+                onClick={() => setPollOptions((prev) => [...prev, ""])}
+              >
+                + Add option
+              </button>
+            )}
+            <div className="poll-modal-actions">
+              <button
+                type="button"
+                className="btn-link"
+                onClick={() => setPollModalOpen(false)}
+                disabled={creatingPoll}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => void createPoll()}
+                disabled={!canSubmitPoll || creatingPoll}
+              >
+                {creatingPoll ? "Posting…" : "Post poll"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
+  );
+}
+
+function PollIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="4" y="10" width="3.6" height="9" rx="1" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="10.2" y="5" width="3.6" height="14" rx="1" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="16.4" y="13" width="3.6" height="6" rx="1" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
   );
 }
 
@@ -283,6 +471,7 @@ function formatTimeOnly(iso: string): string {
 type GroupedEntry =
   | { kind: "day"; key: string; label: string }
   | { kind: "system"; id: string; body: string }
+  | { kind: "poll"; id: string; message: MessageDTO }
   | {
       kind: "user";
       id: string;
@@ -310,6 +499,12 @@ function groupMessages(msgs: MessageDTO[]): GroupedEntry[] {
     }
     if (m.kind === "system") {
       out.push({ kind: "system", id: m.id, body: m.body });
+      lastUserSenderId = "";
+      lastUserAt = 0;
+      continue;
+    }
+    if (m.kind === "poll") {
+      out.push({ kind: "poll", id: m.id, message: m });
       lastUserSenderId = "";
       lastUserAt = 0;
       continue;

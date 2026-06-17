@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { CSSProperties, ReactNode, UIEvent } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { api } from "../api/http";
 import { setAuthToken } from "../api/authToken";
 import { Avatar } from "../components/Avatar";
@@ -19,6 +19,10 @@ import {
   type MeDTO,
   type NeighborhoodDTO,
 } from "../types/shared";
+
+// Public legal docs — update these to the live URLs before launch.
+const TERMS_URL = "https://jointhecommons.com/terms";
+const PRIVACY_URL = "https://jointhecommons.com/privacy";
 
 type Step =
   | "phone"
@@ -296,6 +300,7 @@ export function OnboardingPage() {
           setStep("profile");
         }}
         onSkip={() => setStep("profile")}
+        onBack={() => setStep("location")}
       />
     );
   }
@@ -314,12 +319,14 @@ export function OnboardingPage() {
           });
           setStep("guidelines");
         }}
+        onBack={() => setStep("interests")}
       />
     );
   }
   if (step === "guidelines") {
     return (
       <GuidelinesStep
+        onBack={() => setStep("profile")}
         onAgree={async () => {
           await api<MeDTO>("/api/auth/me", {
             method: "PATCH",
@@ -449,15 +456,23 @@ function OnboardingShell({
   subtitle,
   children,
   landing = false,
+  onBack,
 }: {
   title: string;
   subtitle: string;
   children?: React.ReactNode;
   /** Login/phone-entry styling — floating icons + big wordmark, like LoadingScreen. */
   landing?: boolean;
+  /** When provided, renders a back arrow to return to the previous step. */
+  onBack?: () => void;
 }) {
   return (
     <div className={`onboarding-shell ${landing ? "onboarding-shell--landing" : ""}`}>
+      {onBack && (
+        <button type="button" className="onboarding-back" onClick={onBack} aria-label="Back">
+          ← Back
+        </button>
+      )}
       {landing && (
         <div className="loader-icons" aria-hidden="true">
           {ONBOARDING_ICONS.map((icon) => {
@@ -619,21 +634,17 @@ function LocationStep({
   );
 }
 
-function GuidelinesStep({ onAgree }: { onAgree: () => Promise<void> }) {
+function GuidelinesStep({ onAgree, onBack }: { onAgree: () => Promise<void>; onBack?: () => void }) {
   const [busy, setBusy] = useState(false);
-  // Gate the agree button until the user has actually scrolled the terms to
-  // the bottom — "make sure they scroll through it."
-  const [readToEnd, setReadToEnd] = useState(false);
-  const onScroll = (e: UIEvent<HTMLUListElement>) => {
-    const el = e.currentTarget;
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 24) setReadToEnd(true);
-  };
+  // Explicit agreement gate — the user must tick the box before continuing.
+  const [agreed, setAgreed] = useState(false);
   return (
     <OnboardingShell
       title="Before you hit the feed."
-      subtitle="A quick read. We mean it. Scroll through, then agree."
+      subtitle="A quick read. We mean it."
+      onBack={onBack}
     >
-      <ul className="guidelines-list guidelines-list--scroll" onScroll={onScroll}>
+      <ul className="guidelines-list">
         <li>
           <span className="guidelines-icon" aria-hidden="true">🤝</span>
           <div>
@@ -659,7 +670,7 @@ function GuidelinesStep({ onAgree }: { onAgree: () => Promise<void> }) {
           <span className="guidelines-icon" aria-hidden="true">🛟</span>
           <div>
             <strong>Look out for each other.</strong>
-            <p>Meet in public for first plans. Report anything that feels off.</p>
+            <p>Meet in public for first plans. Report anything that feels off. Be 18+ and keep it legal.</p>
           </div>
         </li>
         <li>
@@ -669,23 +680,25 @@ function GuidelinesStep({ onAgree }: { onAgree: () => Promise<void> }) {
             <p>Support local spots, tip well, and leave places better than you found them.</p>
           </div>
         </li>
-        <li>
-          <span className="guidelines-icon" aria-hidden="true">📄</span>
-          <div>
-            <strong>Terms &amp; Conditions.</strong>
-            <p>
-              By continuing you agree to the Commons Terms of Service and Privacy Policy.
-              You’re responsible for your own safety when meeting people from the app; Commons
-              doesn’t vet members and isn’t liable for plans or interactions that happen offline.
-              Be 18+, keep it legal, and don’t use Commons to harm, harass, or deceive anyone.
-            </p>
-          </div>
-        </li>
       </ul>
+
+      <label className="guidelines-agree">
+        <input
+          type="checkbox"
+          checked={agreed}
+          onChange={(e) => setAgreed(e.target.checked)}
+        />
+        <span>
+          I agree to the Commons community guidelines, and the{" "}
+          <a href={TERMS_URL} target="_blank" rel="noreferrer">Terms &amp; Conditions</a>{" "}
+          and <a href={PRIVACY_URL} target="_blank" rel="noreferrer">Privacy Policy</a>.
+        </span>
+      </label>
+
       <button
         type="button"
         className="btn-primary btn-block"
-        disabled={busy || !readToEnd}
+        disabled={busy || !agreed}
         onClick={async () => {
           setBusy(true);
           try {
@@ -695,14 +708,19 @@ function GuidelinesStep({ onAgree }: { onAgree: () => Promise<void> }) {
           }
         }}
       >
-        {busy ? "One sec…" : readToEnd ? "I’m in — let’s go" : "Scroll to read the terms"}
+        {busy ? "One sec…" : "Agree & continue"}
       </button>
-      <p className="onboarding-fineprint">Tapping agree confirms you’ll follow the Commons guidelines and accept the Terms &amp; Conditions.</p>
+
+      <p className="onboarding-guidelines-links">
+        <a href={TERMS_URL} target="_blank" rel="noreferrer">Terms &amp; Conditions</a>
+        <span aria-hidden="true"> · </span>
+        <a href={PRIVACY_URL} target="_blank" rel="noreferrer">Privacy Policy</a>
+      </p>
     </OnboardingShell>
   );
 }
 
-function InterestsStep({ me, onSave, onSkip }: { me: MeDTO; onSave: (interests: InterestTag[]) => Promise<void>; onSkip: () => void }) {
+function InterestsStep({ me, onSave, onSkip, onBack }: { me: MeDTO; onSave: (interests: InterestTag[]) => Promise<void>; onSkip: () => void; onBack?: () => void }) {
   const [picked, setPicked] = useState<InterestTag[]>(me.interests);
   const [busy, setBusy] = useState(false);
 
@@ -715,7 +733,7 @@ function InterestsStep({ me, onSave, onSkip }: { me: MeDTO; onSave: (interests: 
   }
 
   return (
-    <OnboardingShell title="What are you into?" subtitle="Pick what you’re into. Your feed does the rest.">
+    <OnboardingShell title="What are you into?" subtitle="Pick what you’re into. Your feed does the rest." onBack={onBack}>
       <div className="interest-grid">
         {ALL_INTERESTS.map((t) => {
           const isPicked = picked.includes(t);
@@ -749,6 +767,7 @@ function InterestsStep({ me, onSave, onSkip }: { me: MeDTO; onSave: (interests: 
 function ProfileStep({
   me,
   onSave,
+  onBack,
 }: {
   me: MeDTO;
   onSave: (
@@ -759,6 +778,7 @@ function ProfileStep({
     photoDataUrl: string | null,
     avatarParams: string | null,
   ) => Promise<void>;
+  onBack?: () => void;
 }) {
   const [firstName, setFirstName] = useState(me.firstName);
   const [lastName, setLastName] = useState(me.lastName ?? "");
@@ -777,7 +797,7 @@ function ProfileStep({
   }
 
   return (
-    <OnboardingShell title="Put a face to your name." subtitle="A photo, a character, or your initials — whatever feels like you.">
+    <OnboardingShell title="Put a face to your name." subtitle="A photo, an avatar, or your initials — whatever feels like you." onBack={onBack}>
       <div className="profile-avatar-preview">
         <Avatar
           seed={me.avatarSeed}
@@ -841,7 +861,7 @@ function ProfileStep({
       </div>
 
       <details className="profile-preset-disclosure">
-        <summary>Or pick a character</summary>
+        <summary>Or pick an avatar</summary>
         <div className="profile-preset-grid" style={{ marginTop: 10 }}>
           {AVATAR_PRESETS.map((p) => (
             <button
