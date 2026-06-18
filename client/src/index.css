@@ -5703,10 +5703,10 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .plan-card-flyer {
-  margin: -14px -16px 12px;
+  margin: -12px -14px 12px;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  border-radius: 14px 14px 0 0;
+  border-radius: 19px 19px 0 0;
   background: var(--surface-2);
 }
 

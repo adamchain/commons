@@ -10,6 +10,26 @@ import { planHasEnded } from "../lib/planTime";
 import { useNeighborhoods } from "../lib/useNeighborhoods";
 
 /**
+ * Test cover images — we're trialing photo cards, so every plan without its own
+ * uploaded flyer gets one of these four stand-ins. Pick is deterministic on the
+ * plan id (stable across re-renders, varied across the feed). Swap for real
+ * per-plan cover photos once the feature graduates from testing.
+ */
+const TEST_COVER_IMAGES = [
+  "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=800&q=60",
+  "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=800&q=60",
+  "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=60",
+  "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=800&q=60",
+];
+
+function coverImageFor(plan: PlanDTO): string {
+  if (plan.flyerDataUrl) return plan.flyerDataUrl;
+  let h = 0;
+  for (let i = 0; i < plan.id.length; i++) h = (h * 31 + plan.id.charCodeAt(i)) >>> 0;
+  return TEST_COVER_IMAGES[h % TEST_COVER_IMAGES.length];
+}
+
+/**
  * Compact event card — title, time, details. Card type (confirmed / looking_for /
  * plan_created) still drives shading and the reply form, but the dense metadata
  * row (avatars, posted-by, distance) is gone per the simplified spec.
@@ -158,11 +178,9 @@ export function PlanCard({
         </button>
       )}
       <Link to={`/plans/${plan.id}`} className="plan-card plan-card-link plan-card--compact">
-        {plan.flyerDataUrl && (
-          <div className="plan-card-flyer">
-            <img src={plan.flyerDataUrl} alt="" />
-          </div>
-        )}
+        <div className="plan-card-flyer">
+          <img src={coverImageFor(plan)} alt="" loading="lazy" />
+        </div>
         <header className="plan-card-poster-row">
           <Avatar
             seed={plan.creator.avatarSeed}
