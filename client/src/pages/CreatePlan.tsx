@@ -26,6 +26,17 @@ const today = (): string => {
 // `recurrence` for forward-compat.
 type Recurrence = "none" | "weekly" | "biweekly" | "monthly";
 
+// Single-letter labels for the weekly day picker, indexed Sun..Sat to match
+// Date.getDay().
+const DAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
+
+// Day-of-week (0=Sun) for a YYYY-MM-DD string, parsed in local time to avoid
+// the UTC-midnight off-by-one that `new Date("2026-06-23")` produces.
+const weekdayOf = (iso: string) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).getDay();
+};
+
 export function CreatePlanPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -82,6 +93,9 @@ export function CreatePlanPage() {
     capacity: "6",
     joinType: "open" as JoinType,
     recurrence: "none" as Recurrence,
+    // Weekdays (0=Sun) the plan repeats on, Zoom-style. Seeded from the start
+    // date; only used when recurrence is weekly/biweekly.
+    repeatDays: [weekdayOf(today())] as number[],
     flyerDataUrl: null as string | null,
     flyerLinkUrl: "",
     flyerLinkPreview: null as null | {
@@ -211,6 +225,10 @@ export function CreatePlanPage() {
           joinType: form.joinType,
           isRecurring: form.recurrence !== "none",
           recurrence: form.recurrence,
+          repeatDays:
+            form.recurrence === "weekly" || form.recurrence === "biweekly"
+              ? form.repeatDays
+              : undefined,
           flyerDataUrl: form.flyerDataUrl ?? undefined,
           flyerLinkUrl: form.flyerLinkUrl.trim() || undefined,
           flyerLinkPreview: form.flyerLinkPreview ?? undefined,
@@ -678,6 +696,32 @@ export function CreatePlanPage() {
                 <option value="biweekly">Every 2 weeks</option>
                 <option value="monthly">Monthly</option>
               </select>
+              {(form.recurrence === "weekly" || form.recurrence === "biweekly") && (
+                <div className="repeat-days" role="group" aria-label="Repeats on">
+                  {DAY_LABELS.map((label, i) => {
+                    const on = form.repeatDays.includes(i);
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        className={on ? "repeat-day is-active" : "repeat-day"}
+                        aria-pressed={on}
+                        aria-label={["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][i]}
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            repeatDays: f.repeatDays.includes(i)
+                              ? f.repeatDays.filter((d) => d !== i)
+                              : [...f.repeatDays, i].sort((a, b) => a - b),
+                          }))
+                        }
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </section>
 
             {/* Flyer — image upload OR link with preview */}
@@ -850,6 +894,7 @@ type FormShape = {
   capacity: string;
   joinType: JoinType;
   recurrence: Recurrence;
+  repeatDays: number[];
   flyerDataUrl: string | null;
   flyerLinkUrl: string;
   flyerLinkPreview: null | {

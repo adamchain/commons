@@ -4695,6 +4695,36 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 13px;
 }
 
+/* Zoom-style weekday picker shown under the Repeats dropdown. */
+.repeat-days {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.repeat-day {
+  flex: 1;
+  min-width: 0;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.repeat-day.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .coordination-banner {
   background: var(--surface-2);
   border: 1px dashed var(--border-strong);
@@ -4783,6 +4813,10 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   overflow: hidden;
+  /* Only as tall as its content — without this, grid's default stretch makes a
+     card match a taller row-sibling and the inner link's height:100% leaves an
+     empty white gap below the details. */
+  align-self: start;
 }
 
 .plan-card-hide-btn {

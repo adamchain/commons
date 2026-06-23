@@ -138,11 +138,9 @@ export function PlanCard({
     <div
       data-plan-id={plan.id}
       className={`plan-card-outer ${
-        isPlanCreated
-          ? "plan-card--plan-created"
-          : isLooking
-            ? "plan-card--looking"
-            : "plan-card--confirmed"
+        isLooking && !isPlanCreated
+          ? "plan-card--looking"
+          : "plan-card--confirmed"
       } ${highlight ? "plan-card--just-posted" : ""} ${hasEnded ? "plan-card--happened" : ""} ${isCancelled ? "plan-card--cancelled" : ""} ${plan.visibility === "network" ? "plan-card--network" : ""}`}
     >
       {highlight && (
@@ -196,9 +194,11 @@ export function PlanCard({
             <span className="plan-card-kind-pill is-cancelled">Cancelled</span>
           ) : hasEnded ? (
             <span className="plan-card-kind-pill is-happened">Happened</span>
-          ) : isPlanCreated ? (
-            <span className="plan-card-kind-pill is-plan-created">Plan created</span>
-          ) : isLooking ? (
+          ) : isLooking && !isPlanCreated ? (
+            // Once a Looking For locks into a real plan it sheds the "Plan
+            // created" pill and lives on the feed as a regular confirmed plan —
+            // the conversion is announced once (SMS to interested), not lingered
+            // as a permanent badge.
             <span className="plan-card-kind-pill is-looking">Looking For</span>
           ) : null}
         </header>
