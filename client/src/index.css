@@ -1522,6 +1522,10 @@ h1, h2, h3, h4, h5, h6 {
 .place-picker {
   position: relative;
   display: grid;
+  /* Cap the column at the container width — without this the single auto
+     column sizes to the long placeholder's max-content and spills the field
+     out of its flex cell, painting over the Flexible toggle beside it. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
 }
 .place-picker-field {
