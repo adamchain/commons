@@ -198,6 +198,12 @@ select {
   outline: none;
   transition: border-color 120ms ease, background-color 120ms ease;
   width: 100%;
+  /* iOS WKWebView gives form controls — especially type=date/time — a large
+     fixed intrinsic width via the default `min-width: auto`, which ignores
+     `width: 100%` and blows the field (and its grid/flex parent) past the
+     screen. Forcing min-width:0 lets the width:100% actually shrink them. */
+  min-width: 0;
+  max-width: 100%;
 }
 
 input:focus,
@@ -1403,6 +1409,9 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: var(--shadow-card);
   padding: 22px;
   display: grid;
+  /* Cap the single implicit column at the container width so no wide child
+     (e.g. an iOS date/time field) can stretch the whole card off-screen. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 22px;
 }
 
@@ -1488,6 +1497,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .form-section {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
 }
 
@@ -1607,8 +1617,9 @@ h1, h2, h3, h4, h5, h6 {
 .form-when-grid {
   display: grid;
   /* Side-by-side from the smallest screen so phones don't get a stacked
-     date+time layout, per wireframe. */
-  grid-template-columns: 1fr 1fr;
+     date+time layout, per wireframe. minmax(0,…) keeps the native iOS
+     date/time pickers from forcing each track past half the row. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
 }
 .form-when-cell {
@@ -1627,16 +1638,43 @@ h1, h2, h3, h4, h5, h6 {
   text-align: left;
   width: 100%;
 }
+/* Native iOS date/time pickers keep an intrinsic content width that ignores
+   width:100% / min-width:0 until their native appearance is stripped — which
+   is what spills them past the cell + screen edge. appearance:none lets the
+   box honor the grid track; the inner value still renders + taps open the
+   picker. */
+.form-when-cell input[type="date"],
+.form-when-cell input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+}
+.form-when-cell input[type="date"]::-webkit-date-and-time-value,
+.form-when-cell input[type="time"]::-webkit-date-and-time-value {
+  text-align: left;
+  /* Stop the value pseudo from reserving its own wide intrinsic width. */
+  margin: 0;
+  min-width: 0;
+}
 
 /* WHERE row: input takes the row, flex toggle sits beside it */
 .form-where-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
 }
 .form-where-row-main {
   flex: 1;
   min-width: 0;
+}
+/* The shared .flex-toggle-btn carries a margin-top:26px to clear the sublabel
+   in the stacked Date/Time cells. Beside the single-line Where field that
+   margin drops the pill under the input (where the relative-positioned picker
+   paints over it). Reset it and keep the pill from being squeezed. */
+.form-where-row .flex-toggle-btn {
+  margin-top: 0;
+  flex-shrink: 0;
 }
 
 /* Idea form — minimal-by-default flow */
