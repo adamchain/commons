@@ -10,11 +10,11 @@
 
   /* --- Primitives --- */
   --paper-50:  #faf5ec;
-  --paper-100: #f5efe6;
+  --paper-100: #ede8e0;
   --paper-200: #ecdfc8;
   --paper-300: #d9c9aa;
 
-  --ink-900: #14143a;
+  --ink-900: #1a1a2e;
   --ink-800: #1c1c4a;
   --ink-700: #2a2a5e;
   --ink-600: #4a4a72;
@@ -23,7 +23,7 @@
 
   --signal-100: #fbe1e1;
   --signal-300: #e89a9b;
-  --signal-500: #c02b2b;
+  --signal-500: #c13b3b;
   --signal-600: #a62525;
   --signal-700: #8c1e1e;
 
@@ -36,23 +36,23 @@
   --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px;
   --s-6: 32px; --s-7: 48px; --s-8: 64px; --s-9: 96px;
 
-  /* Radius scale */
-  --r-sm: 8px; --r-md: 14px; --r-lg: 22px; --r-xl: 32px; --r-pill: 999px;
+  /* Radius scale — cards sit on --r-lg (20px) per brand spec. */
+  --r-sm: 8px; --r-md: 14px; --r-lg: 20px; --r-xl: 32px; --r-pill: 999px;
 
-  /* Fonts — Montserrat for headings/display, Poppins for body copy. */
+  /* Fonts — Montserrat for headings/display, Inter for UI/body copy. */
   --font-display: "Montserrat", "Arial Black", system-ui, sans-serif;
-  --font-ui: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-ui: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   /* Legacy alias — any title that requested the old serif now reads as UI. */
   --font-serif: var(--font-ui);
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
   /* --- Semantic mapping: default = PAPER (light) --- */
-  --accent-rgb: 192, 43, 43;
+  --accent-rgb: 193, 59, 59;
   --bg: var(--paper-100);
   --bg-gradient: var(--bg);
-  /* Cards/surfaces sit on the warm paper background as crisp white.
-     Surface-2 stays as a sand tint for hovers + secondary fills. */
-  --surface: #ffffff;
+  /* Cards/surfaces sit on the warm paper background as a warm off-white
+     (never pure white, per brand). Surface-2 stays a sand tint for hovers. */
+  --surface: #fdfaf7;
   --surface-2: var(--paper-200);
   --surface-hover: var(--paper-300);
   --border: var(--hairline);
@@ -285,7 +285,7 @@ label {
 
 /* Page header text — large medium-weight Inter Tight. The COMMONS wordmark
    itself stays on var(--font-display) via .top-bar-brand / .loader-wordmark. */
-/* All headings render in Montserrat (display); body copy stays Poppins. */
+/* All headings render in Montserrat (display); body copy is Inter. */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
 }
@@ -5301,6 +5301,9 @@ h1, h2, h3, h4, h5, h6 {
   height: 28px;
   width: auto;
   display: block;
+  /* PNG wordmark blends into the warm paper surface so its white matte drops
+     out instead of sitting as a bright rectangle on the off-white background. */
+  mix-blend-mode: multiply;
 }
 /* Dark mode: black ink would disappear on the navy background. Drop the
    wordmark to solid paper-tone (loses the red squiggle accent — ship a
