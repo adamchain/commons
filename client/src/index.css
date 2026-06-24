@@ -3660,6 +3660,12 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid var(--border);
   border-radius: 999px;
   transition: border-color 120ms ease, background 120ms ease;
+  /* Pin the input to the bottom of the viewport so it's always visible without
+     a little page scroll. Clears the iOS home indicator via the safe-area inset
+     and sits above any messages that scroll behind it. */
+  position: sticky;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+  z-index: 5;
 }
 .chat-composer:focus-within {
   border-color: var(--accent);
@@ -6119,6 +6125,18 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   gap: 12px;
   margin-bottom: 8px;
+}
+
+/* "Text the link" takes the row; "Copy link" keeps its natural width on one
+   line instead of being crushed into the right edge and wrapping. */
+.invite-sheet-row .btn-block {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+.invite-sheet-row .btn-link {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .invite-people-list {
