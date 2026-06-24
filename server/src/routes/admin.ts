@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { Request, Response, NextFunction } from "express";
 import { verifySessionToken } from "../lib/jwt.js";
 import { isAdminPhone } from "../lib/adminPhones.js";
+import { isGcsConfigured, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
 import { store } from "../store.js";
 import { listAllUsers, findUserById } from "../userRepo.js";
 
@@ -246,14 +247,25 @@ adminRouter.get("/summary", async (_req, res) => {
 
 // ---- Event-card image library ----
 // Admins curate the cover images used on event cards without a code deploy.
-// Images are stored as either an external URL or a self-contained data URL.
+// File uploads go to Google Cloud Storage (when GCS_BUCKET is set); we store
+// the resulting public URL. External URLs are stored as-is. When GCS isn't
+// configured (local dev), uploads fall back to inline data URLs.
 
-const MAX_CARD_IMAGE_BYTES = 1_500_000; // ~1.5MB — keeps the JSON snapshot lean.
+const MAX_CARD_IMAGE_BYTES = 1_500_000; // ~1.5MB — fallback inline cap.
+
+/** The built-in stand-ins the feed uses before any are curated. */
+const DEFAULT_CARD_IMAGES: { url: string; label: string }[] = [
+  { url: "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=800&q=60", label: "Celebration" },
+  { url: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=800&q=60", label: "Dinner" },
+  { url: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=60", label: "Party" },
+  { url: "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=800&q=60", label: "Gathering" },
+];
 
 adminRouter.get("/card-images", (_req, res) => {
-  res.json({ images: store.listCardImages() });
+  res.json({ images: store.listCardImages(), gcsConfigured: isGcsConfigured() });
 });
 
+// Add by external URL (stored as-is — already hosted elsewhere).
 adminRouter.post("/card-images", (req, res) => {
   const body = (req.body ?? {}) as { url?: unknown; label?: unknown };
   const url = typeof body.url === "string" ? body.url.trim() : "";
@@ -272,6 +284,52 @@ adminRouter.post("/card-images", (req, res) => {
 
   const row = store.addCardImage({ url, label });
   res.status(201).json({ image: row });
+});
+
+// Upload a file: bytes arrive as a data URL, get pushed to GCS, and we store
+// the public URL. Falls back to inline storage when GCS isn't configured.
+adminRouter.post("/card-images/upload", async (req, res) => {
+  const body = (req.body ?? {}) as { dataUrl?: unknown; label?: unknown };
+  const dataUrl = typeof body.dataUrl === "string" ? body.dataUrl : "";
+  const label = typeof body.label === "string" ? body.label.trim() || undefined : undefined;
+
+  const parsed = parseDataUrl(dataUrl);
+  if (!parsed) {
+    res.status(400).json({ error: "Expected a base64 image data URL (png/jpeg/gif/webp/avif)." });
+    return;
+  }
+
+  if (isGcsConfigured()) {
+    try {
+      const publicUrl = await uploadCardImage(parsed.buffer, parsed.contentType);
+      const row = store.addCardImage({ url: publicUrl, label });
+      res.status(201).json({ image: row });
+    } catch (err) {
+      console.error("[admin] card image GCS upload failed", err);
+      res.status(502).json({ error: "Upload to storage failed — check GCS config / permissions." });
+    }
+    return;
+  }
+
+  // No GCS — store inline, but enforce the snapshot-size cap.
+  if (dataUrl.length > MAX_CARD_IMAGE_BYTES) {
+    res.status(413).json({ error: "GCS isn't configured, so uploads are stored inline — keep this under ~1MB." });
+    return;
+  }
+  const row = store.addCardImage({ url: dataUrl, label });
+  res.status(201).json({ image: row });
+});
+
+// One-click: add the built-in default covers (idempotent — skips ones already
+// present by URL). Lets admins start from the current art instead of blank.
+adminRouter.post("/card-images/seed-defaults", (_req, res) => {
+  const existing = new Set(store.listCardImages().map((c) => c.url));
+  const added = [];
+  for (const def of DEFAULT_CARD_IMAGES) {
+    if (existing.has(def.url)) continue;
+    added.push(store.addCardImage(def));
+  }
+  res.json({ added: added.length, images: store.listCardImages() });
 });
 
 adminRouter.delete("/card-images/:id", (req, res) => {

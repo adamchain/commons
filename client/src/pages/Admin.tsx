@@ -125,6 +125,7 @@ function fileToDataUrl(file: File, maxW = 1200, quality = 0.82): Promise<string>
  */
 function CardImagesManager() {
   const [images, setImages] = useState<CardImage[] | null>(null);
+  const [gcsConfigured, setGcsConfigured] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [url, setUrl] = useState("");
   const [label, setLabel] = useState("");
@@ -133,8 +134,9 @@ function CardImagesManager() {
 
   const load = useCallback(async () => {
     try {
-      const r = await api<{ images: CardImage[] }>("/api/admin/card-images");
+      const r = await api<{ images: CardImage[]; gcsConfigured?: boolean }>("/api/admin/card-images");
       setImages(r.images);
+      setGcsConfigured(r.gcsConfigured !== false);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load images");
@@ -175,11 +177,36 @@ function CardImagesManager() {
   }
 
   async function addByFile(file: File) {
+    setBusy(true);
+    setError(null);
     try {
       const dataUrl = await fileToDataUrl(file);
-      await submit({ url: dataUrl, label: label.trim() || file.name });
+      await api<{ image: CardImage }>("/api/admin/card-images/upload", {
+        method: "POST",
+        body: JSON.stringify({ dataUrl, label: label.trim() || file.name }),
+      });
+      setLabel("");
+      if (fileRef.current) fileRef.current.value = "";
+      await load();
+      invalidateCardImages();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not process image");
+      setError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Could not upload image");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function seedDefaults() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api<{ added: number }>("/api/admin/card-images/seed-defaults", { method: "POST" });
+      await load();
+      invalidateCardImages();
+    } catch (e) {
+      setError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Could not load defaults");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -202,7 +229,15 @@ function CardImagesManager() {
       <div className="admin-card">
         <p className="admin-muted" style={{ margin: "0 0 0.85rem" }}>
           Cover art shown on event cards for plans without their own flyer. Add an image URL or
-          upload a file; changes go live for everyone right away.
+          upload a file{gcsConfigured ? " (uploads go to cloud storage)" : ""}; changes go live for
+          everyone right away.
+          {!gcsConfigured ? (
+            <>
+              {" "}
+              <strong>Cloud storage isn't configured</strong> — uploads are stored inline (set{" "}
+              <code>GCS_BUCKET</code> to enable GCS).
+            </>
+          ) : null}
         </p>
 
         <div className="admin-cardimg-form">
@@ -257,9 +292,14 @@ function CardImagesManager() {
             Loading…
           </p>
         ) : images.length === 0 ? (
-          <p className="admin-muted" style={{ marginTop: "0.85rem" }}>
-            No images yet — the app falls back to its built-in stand-ins until you add some.
-          </p>
+          <div style={{ marginTop: "0.85rem", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.75rem" }}>
+            <p className="admin-muted" style={{ margin: 0 }}>
+              No images yet — the app falls back to its built-in stand-ins until you add some.
+            </p>
+            <button type="button" className="admin-btn" onClick={() => void seedDefaults()} disabled={busy}>
+              Load default images
+            </button>
+          </div>
         ) : (
           <div className="admin-cardimg-grid">
             {images.map((img) => (
