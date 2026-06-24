@@ -5,6 +5,7 @@
 
 import { isMongoConnected } from "./lib/db.js";
 import {
+  CardImageModel,
   ConversationModel,
   DeclineModel,
   DropoutModel,
@@ -43,6 +44,7 @@ export async function hydrateSnapshotFromMongo(): Promise<void> {
       notifications,
       relationships,
       inviteCodes,
+      cardImages,
     ] = await Promise.all([
       UserModel.find({}).lean(),
       NeighborhoodModel.find({}).lean(),
@@ -58,6 +60,7 @@ export async function hydrateSnapshotFromMongo(): Promise<void> {
       NotificationModel.find({}).sort({ createdAt: -1 }).limit(2000).lean(),
       RelationshipModel.find({}).lean(),
       InviteCodeModel.find({}).lean(),
+      CardImageModel.find({}).lean(),
     ]);
 
     // `reset` replaces the snapshot wholesale. We bypass mirror here — Mongo
@@ -78,6 +81,7 @@ export async function hydrateSnapshotFromMongo(): Promise<void> {
       notifications,
       relationships,
       inviteCodes,
+      cardImages,
     });
 
     console.log(

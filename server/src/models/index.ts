@@ -8,6 +8,7 @@
 
 import mongoose, { Schema, type Model } from "mongoose";
 import type {
+  CardImageRecord,
   ConversationRecord,
   DeclineRecord,
   DropoutRecord,
@@ -230,3 +231,18 @@ const LogSchema = new Schema<LogRecord>(
 LogSchema.index({ id: 1 }, { unique: true });
 LogSchema.index({ createdAt: -1 });
 export const LogModel = compile<LogRecord>("Log", LogSchema);
+
+// Card images — admin-curated cover art for event cards. Tiny collection, but
+// durable so the library survives restarts and isn't tied to a code deploy.
+const CardImageSchema = new Schema<CardImageRecord>(
+  {
+    id: { type: String, required: true },
+    url: { type: String, required: true },
+    label: { type: String },
+    sortOrder: { type: Number, required: true, default: 0 },
+    createdAt: { type: String, required: true },
+  },
+  { collection: "cardImages" },
+);
+CardImageSchema.index({ id: 1 }, { unique: true });
+export const CardImageModel = compile<CardImageRecord>("CardImage", CardImageSchema);

@@ -8,6 +8,7 @@ import { connectMongo } from "./lib/db.js";
 import { hydrateSnapshotFromMongo } from "./hydrate.js";
 import { adminRouter } from "./routes/admin.js";
 import { authRouter } from "./routes/auth.js";
+import { cardImagesRouter } from "./routes/cardImages.js";
 import { chatRouter } from "./routes/chat.js";
 import { devicesRouter } from "./routes/devices.js";
 import { feedbackRouter } from "./routes/feedback.js";
@@ -57,6 +58,7 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/admin", adminRouter);
 app.use("/api/auth", authRouter);
+app.use("/api/card-images", cardImagesRouter);
 app.use("/api/devices", devicesRouter);
 app.use("/api/plans", plansRouter);
 app.use("/api/places", placesRouter);

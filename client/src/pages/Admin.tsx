@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/http";
+import { invalidateCardImages } from "../lib/cardImages";
 import { INTEREST_LABELS, type InterestTag } from "../types/shared";
 import "./Admin.css";
 
@@ -91,6 +92,198 @@ function Sparkline({ series, color }: { series: { date: string; count: number }[
 }
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+type CardImage = { id: string; url: string; label?: string; sortOrder: number; createdAt: string };
+
+/** Downscale + re-encode an uploaded image so the stored data URL stays small. */
+function fileToDataUrl(file: File, maxW = 1200, quality = 0.82): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Could not read file"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Could not load image"));
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("Canvas unsupported"));
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Event-card image library — admins add/remove the cover art used on plan
+ * cards (for plans without their own flyer) without touching the codebase.
+ */
+function CardImagesManager() {
+  const [images, setImages] = useState<CardImage[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [url, setUrl] = useState("");
+  const [label, setLabel] = useState("");
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await api<{ images: CardImage[] }>("/api/admin/card-images");
+      setImages(r.images);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load images");
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const submit = useCallback(
+    async (payload: { url: string; label?: string }) => {
+      setBusy(true);
+      setError(null);
+      try {
+        await api<{ image: CardImage }>("/api/admin/card-images", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        setUrl("");
+        setLabel("");
+        if (fileRef.current) fileRef.current.value = "";
+        await load();
+        invalidateCardImages();
+      } catch (e) {
+        setError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Could not add image");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [load],
+  );
+
+  async function addByUrl() {
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    await submit({ url: trimmed, label: label.trim() || undefined });
+  }
+
+  async function addByFile(file: File) {
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      await submit({ url: dataUrl, label: label.trim() || file.name });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not process image");
+    }
+  }
+
+  async function remove(id: string) {
+    setBusy(true);
+    try {
+      await api(`/api/admin/card-images/${id}`, { method: "DELETE" });
+      await load();
+      invalidateCardImages();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not remove image");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="admin-section">
+      <h2 className="admin-section-title">Event card images</h2>
+      <div className="admin-card">
+        <p className="admin-muted" style={{ margin: "0 0 0.85rem" }}>
+          Cover art shown on event cards for plans without their own flyer. Add an image URL or
+          upload a file; changes go live for everyone right away.
+        </p>
+
+        <div className="admin-cardimg-form">
+          <input
+            className="admin-search"
+            style={{ margin: 0, flex: "2 1 240px" }}
+            placeholder="Image URL (https://…)"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void addByUrl();
+            }}
+          />
+          <input
+            className="admin-search"
+            style={{ margin: 0, flex: "1 1 140px" }}
+            placeholder="Label (optional)"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+          <button type="button" className="admin-btn" onClick={() => void addByUrl()} disabled={busy || !url.trim()}>
+            Add URL
+          </button>
+          <button
+            type="button"
+            className="admin-btn admin-btn--ghost"
+            onClick={() => fileRef.current?.click()}
+            disabled={busy}
+          >
+            Upload…
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void addByFile(f);
+            }}
+          />
+        </div>
+
+        {error ? (
+          <p className="admin-err" style={{ margin: "0.75rem 0 0" }}>
+            {error}
+          </p>
+        ) : null}
+
+        {images === null ? (
+          <p className="admin-muted" style={{ marginTop: "0.85rem" }}>
+            Loading…
+          </p>
+        ) : images.length === 0 ? (
+          <p className="admin-muted" style={{ marginTop: "0.85rem" }}>
+            No images yet — the app falls back to its built-in stand-ins until you add some.
+          </p>
+        ) : (
+          <div className="admin-cardimg-grid">
+            {images.map((img) => (
+              <figure key={img.id} className="admin-cardimg">
+                <img src={img.url} alt={img.label ?? "Card image"} loading="lazy" />
+                <figcaption className="admin-cardimg-cap">{img.label ?? "—"}</figcaption>
+                <button
+                  type="button"
+                  className="admin-cardimg-del"
+                  onClick={() => void remove(img.id)}
+                  disabled={busy}
+                  aria-label="Remove image"
+                  title="Remove"
+                >
+                  ✕
+                </button>
+              </figure>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
 
 export function AdminPage() {
   const [summary, setSummary] = useState<AdminSummary | null>(null);
@@ -348,6 +541,8 @@ export function AdminPage() {
                 )}
               </div>
             </section>
+
+            <CardImagesManager />
 
             <section className="admin-section">
               <h2 className="admin-section-title">Users</h2>

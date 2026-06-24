@@ -13,6 +13,7 @@
 
 import { isMongoConnected } from "./lib/db.js";
 import {
+  CardImageModel,
   ConversationModel,
   DeclineModel,
   DropoutModel,
@@ -29,6 +30,7 @@ import { NotificationModel } from "./models/Notification.js";
 import { RelationshipModel } from "./models/Relationship.js";
 import { UserModel } from "./models/User.js";
 import type {
+  CardImageRecord,
   ConversationRecord,
   DeclineRecord,
   DropoutRecord,
@@ -138,6 +140,14 @@ export const mongoMirror = {
       .exec()
       .catch((err) => fail(`deleteRelationshipsTouching ${userId}`, err));
     track(p);
+  },
+
+  // Card images (admin-managed event-card art)
+  upsertCardImage(c: CardImageRecord): void {
+    upsert(CardImageModel as never, c, `upsertCardImage ${c.id}`);
+  },
+  deleteCardImage(id: string): void {
+    removeById(CardImageModel as never, id, `deleteCardImage ${id}`);
   },
 
   // Neighborhoods

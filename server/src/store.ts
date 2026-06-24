@@ -331,6 +331,20 @@ export interface NotificationRecord {
   readAt: string | null;
 }
 
+/**
+ * Admin-curated cover image used on event cards. `url` is either an external
+ * image URL or a self-contained data URL (admin-uploaded file). Admins manage
+ * the library from the dashboard so the stand-in art can change without a code
+ * deploy. `sortOrder` controls display/pick order (lower first).
+ */
+export interface CardImageRecord {
+  id: string;
+  url: string;
+  label?: string;
+  sortOrder: number;
+  createdAt: string;
+}
+
 interface Snapshot {
   users: UserRecord[];
   neighborhoods: NeighborhoodRecord[];
@@ -347,6 +361,7 @@ interface Snapshot {
   notifications: NotificationRecord[];
   relationships: RelationshipRecord[];
   inviteCodes: InviteCodeRecord[];
+  cardImages: CardImageRecord[];
 }
 
 const DATA_PATH = resolve(process.cwd(), "data.json");
@@ -368,6 +383,7 @@ function emptySnapshot(): Snapshot {
     notifications: [],
     relationships: [],
     inviteCodes: [],
+    cardImages: [],
   };
 }
 
@@ -403,6 +419,7 @@ function load(): Snapshot {
       relationships: parsed.relationships ?? [],
       inviteCodes: parsed.inviteCodes ?? [],
       dropouts: parsed.dropouts ?? [],
+      cardImages: parsed.cardImages ?? [],
     };
   } catch {
     return emptySnapshot();
@@ -1243,5 +1260,32 @@ export const store = {
   },
   listAllNotifications(): NotificationRecord[] {
     return [...snapshot.notifications];
+  },
+
+  // ---- Event-card image library (admin-managed) ----
+  listCardImages(): CardImageRecord[] {
+    return [...snapshot.cardImages].sort((a, b) => a.sortOrder - b.sortOrder);
+  },
+  addCardImage(input: { url: string; label?: string }): CardImageRecord {
+    const maxOrder = snapshot.cardImages.reduce((m, c) => Math.max(m, c.sortOrder), -1);
+    const row: CardImageRecord = {
+      id: randomUUID(),
+      url: input.url,
+      label: input.label?.trim() || undefined,
+      sortOrder: maxOrder + 1,
+      createdAt: new Date().toISOString(),
+    };
+    snapshot.cardImages.push(row);
+    persist();
+    mongoMirror.upsertCardImage(row);
+    return row;
+  },
+  removeCardImage(id: string): boolean {
+    const before = snapshot.cardImages.length;
+    snapshot.cardImages = snapshot.cardImages.filter((c) => c.id !== id);
+    if (snapshot.cardImages.length === before) return false;
+    persist();
+    mongoMirror.deleteCardImage(id);
+    return true;
   },
 };

@@ -364,3 +364,70 @@
     font-size: 1.15rem;
   }
 }
+
+/* ---- Event card image library ---- */
+.admin-cardimg-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-cardimg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.admin-cardimg {
+  position: relative;
+  margin: 0;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-2, #f0f0f0);
+}
+
+.admin-cardimg img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.admin-cardimg-cap {
+  padding: 6px 8px;
+  font-size: 0.72rem;
+  color: var(--text-muted, #666);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-cardimg-del {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+}
+
+.admin-cardimg-del:hover {
+  background: rgba(192, 43, 43, 0.92);
+}
+
+.admin-cardimg-del:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

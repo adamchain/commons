@@ -244,4 +244,43 @@ adminRouter.get("/summary", async (_req, res) => {
   });
 });
 
+// ---- Event-card image library ----
+// Admins curate the cover images used on event cards without a code deploy.
+// Images are stored as either an external URL or a self-contained data URL.
+
+const MAX_CARD_IMAGE_BYTES = 1_500_000; // ~1.5MB — keeps the JSON snapshot lean.
+
+adminRouter.get("/card-images", (_req, res) => {
+  res.json({ images: store.listCardImages() });
+});
+
+adminRouter.post("/card-images", (req, res) => {
+  const body = (req.body ?? {}) as { url?: unknown; label?: unknown };
+  const url = typeof body.url === "string" ? body.url.trim() : "";
+  const label = typeof body.label === "string" ? body.label.trim() : undefined;
+
+  const isHttp = /^https?:\/\/\S+$/i.test(url);
+  const isDataImage = /^data:image\/(png|jpe?g|gif|webp|avif);base64,/i.test(url);
+  if (!isHttp && !isDataImage) {
+    res.status(400).json({ error: "Provide an http(s) image URL or an uploaded image." });
+    return;
+  }
+  if (isDataImage && url.length > MAX_CARD_IMAGE_BYTES) {
+    res.status(413).json({ error: "Image is too large — keep uploads under ~1MB." });
+    return;
+  }
+
+  const row = store.addCardImage({ url, label });
+  res.status(201).json({ image: row });
+});
+
+adminRouter.delete("/card-images/:id", (req, res) => {
+  const ok = store.removeCardImage(req.params.id);
+  if (!ok) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  res.json({ ok: true });
+});
+
 export { adminRouter };
