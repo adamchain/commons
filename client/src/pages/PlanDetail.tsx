@@ -9,6 +9,7 @@ import { LoadingScreen } from "../components/LoadingScreen";
 import { ParticipationButtons } from "../components/ParticipationButtons";
 import { ShareSheet } from "../components/ShareSheet";
 import { useAuth } from "../context/AuthContext";
+import { useCardImages, pickCoverImage } from "../lib/cardImages";
 import { formatPlaceAddress, formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
 import { type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
 
@@ -16,6 +17,7 @@ export function PlanDetailPage() {
   const { id = "" } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const coverPool = useCardImages();
   const [plan, setPlan] = useState<PlanDTO | null>(null);
   const [showShare, setShowShare] = useState(false);
   const [showGetThere, setShowGetThere] = useState(false);
@@ -174,6 +176,13 @@ export function PlanDetailPage() {
       </header>
 
       <section className="plan-hero">
+        <div className="plan-hero-cover">
+          <img
+            src={plan.flyerDataUrl ?? pickCoverImage(coverPool, plan.id)}
+            alt=""
+            loading="lazy"
+          />
+        </div>
         <div className="plan-title-row">
           <span className="plan-title-emoji">{plan.hostEmoji}</span>
           <h1>{sentenceCaseTitle(plan.title)}</h1>

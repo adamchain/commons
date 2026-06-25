@@ -986,6 +986,23 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: none;
 }
 
+/* Full-bleed cover at the top of the detail hero — mirrors the feed card. The
+   negative margins cancel the hero padding so the image meets the rounded top
+   edge; the grid gap handles the space below it. */
+.plan-hero-cover {
+  margin: -22px -22px 0;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 19px 19px 0 0;
+  background: var(--surface-2);
+}
+.plan-hero-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .plan-hero h1 {
   font-size: 26px;
   font-weight: 700;
@@ -998,6 +1015,9 @@ h1, h2, h3, h4, h5, h6 {
 @media (min-width: 720px) {
   .plan-hero {
     padding: 28px;
+  }
+  .plan-hero-cover {
+    margin: -28px -28px 0;
   }
   .plan-hero h1 {
     font-size: 32px;
