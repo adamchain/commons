@@ -251,6 +251,21 @@ export function ProfilePage() {
       )}
 
       {isSelf && (
+        <a
+          className="settings-feedback"
+          href="https://docs.google.com/forms/u/0/d/e/1FAIpQLSfiQUov1e2K9wUlgvIR26Qxnm9MPhQ88MHgophxKS4AClZwZQ/viewform"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <FeedbackGlyph />
+          <span className="settings-feedback-text">
+            Share beta feedback
+            <span className="settings-feedback-sub">Tell us what's working and what's not</span>
+          </span>
+        </a>
+      )}
+
+      {isSelf && (
         <button
           type="button"
           className="settings-signout"
@@ -275,6 +290,14 @@ function SignOutGlyph() {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />
       <path d="M10 17 5 12l5-5M5 12h11" />
+    </svg>
+  );
+}
+
+function FeedbackGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
     </svg>
   );
 }
