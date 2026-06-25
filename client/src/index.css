@@ -1003,6 +1003,18 @@ h1, h2, h3, h4, h5, h6 {
   display: block;
 }
 
+/* Past-event actions — "Do it again" + open the (persisted) group chat. */
+.plan-past-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+.plan-past-note {
+  margin: 0 0 2px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
 .plan-hero h1 {
   font-size: 26px;
   font-weight: 700;
@@ -2753,6 +2765,21 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid var(--border);
 }
 .chat-entry-arrow { color: var(--text-muted); }
+/* Prominent variant — surfaced up top once you've committed, so the group
+   chat reads as the main next action. */
+.chat-entry--prominent {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
+  margin-top: 6px;
+}
+.chat-entry--prominent .chat-entry-arrow { color: var(--accent); }
+
+/* Drop-out toggle parked at the bottom of a committed plan. */
+.plan-dropout-row {
+  margin-top: 22px;
+}
+.plan-dropout-row .participation { margin-top: 0; }
 
 /* Sheet */
 .sheet-backdrop {
@@ -3276,6 +3303,7 @@ h1, h2, h3, h4, h5, h6 {
   gap: 10px;
 }
 .feedback-prompt-title { font-weight: 700; }
+.feedback-prompt-sub { margin: 4px 0 0; font-size: 13px; color: var(--text-muted); }
 .feedback-thumbs { display: flex; gap: 12px; align-items: center; }
 .feedback-thumb {
   font-size: 24px;
@@ -6140,23 +6168,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Invite sheet */
-.invite-sheet-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-/* "Text the link" takes the row; "Copy link" keeps its natural width on one
-   line instead of being crushed into the right edge and wrapping. */
-.invite-sheet-row .btn-block {
-  flex: 1;
-  width: auto;
-  min-width: 0;
-}
-.invite-sheet-row .btn-link {
-  flex-shrink: 0;
-  white-space: nowrap;
+/* Share actions stack full-width so "Text the link" and "Copy link" each get a
+   clean, tappable row instead of being crammed side-by-side. */
+.invite-sheet-actions {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .invite-people-list {

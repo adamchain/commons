@@ -42,8 +42,10 @@ export function CreatePlanPage() {
   const [searchParams] = useSearchParams();
   const prefillName = searchParams.get("name") ?? "";
   const prefillAddress = searchParams.get("address") ?? "";
-  // "Do it again" seeds the title from a past plan.
+  // "Do it again" seeds the title from a past plan, and carries that plan's
+  // crew + group chat forward via fromPlanId (handled server-side on create).
   const prefillTitle = searchParams.get("title") ?? "";
+  const fromPlanId = searchParams.get("fromPlanId");
   const prefillTagParam = searchParams.get("tag");
   const inviteUserId = searchParams.get("inviteUser");
   const inviteUserName = searchParams.get("inviteName");
@@ -232,6 +234,7 @@ export function CreatePlanPage() {
           flyerDataUrl: form.flyerDataUrl ?? undefined,
           flyerLinkUrl: form.flyerLinkUrl.trim() || undefined,
           flyerLinkPreview: form.flyerLinkPreview ?? undefined,
+          fromPlanId: fromPlanId ?? undefined,
         }),
       });
       // The co-host (seeded inviteUser) is already added server-side — don't

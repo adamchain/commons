@@ -746,31 +746,18 @@ function YourPlansBlock({
           </button>
           {pastOpen && (
             <div className="profile-list profile-list--past-group">
-              {past.map((p) => {
-                // Past payload doesn't carry creatorId today; treat any plan in
-                // your past list with wentCount > 0 as something you went to,
-                // and rely on the server to scope "hosted" via a future field.
-                // For now the badge defaults to WENT.
-                const badge = "WENT";
-                return (
-                  <div key={p.id} className="profile-list-row profile-list-row--past">
-                    <Link to={`/plans/${p.id}`} className="profile-list-row-main">
-                      <span className="profile-list-title">{p.title}</span>
-                      <span className="profile-list-when">
-                        {formatPlanDate(p.date)} · {p.wentCount} went
-                      </span>
-                      <span className="profile-list-badge is-past">{badge}</span>
-                    </Link>
-                    <Link
-                      to={`/plans/new?title=${encodeURIComponent(p.title)}`}
-                      className="btn-link profile-do-again"
-                      title="Plan this again"
-                    >
-                      🔁 Again
-                    </Link>
-                  </div>
-                );
-              })}
+              {past.map((p) => (
+                // Past events are just a record: title + date. "Do it again"
+                // lives on the event page itself, not as a per-row button.
+                <Link
+                  key={p.id}
+                  to={`/plans/${p.id}`}
+                  className="profile-list-row profile-list-row--past"
+                >
+                  <span className="profile-list-title">{p.title}</span>
+                  <span className="profile-list-when">{formatPlanDate(p.date)}</span>
+                </Link>
+              ))}
             </div>
           )}
         </>

@@ -922,6 +922,34 @@ export const store = {
   },
 
   /**
+   * Copy every message from one conversation into another (new ids, same
+   * sender/body/timestamp/kind/reactions/poll). Used by "Do it again" so the
+   * re-planned event's group chat carries the previous thread's history.
+   * Returns how many messages were cloned.
+   */
+  cloneConversationMessages(fromConversationId: string, toConversationId: string): number {
+    const src = snapshot.messages
+      .filter((m) => m.conversationId === fromConversationId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    let lastAt = "";
+    for (const m of src) {
+      const copy: MessageRecord = { ...m, id: randomUUID(), conversationId: toConversationId };
+      snapshot.messages.push(copy);
+      mongoMirror.upsertMessage(copy);
+      if (m.createdAt > lastAt) lastAt = m.createdAt;
+    }
+    if (src.length > 0) {
+      const conv = snapshot.conversations.find((c) => c.id === toConversationId);
+      if (conv && lastAt > (conv.lastMessageAt ?? "")) {
+        conv.lastMessageAt = lastAt;
+        mongoMirror.upsertConversation(conv);
+      }
+      persist();
+    }
+    return src.length;
+  },
+
+  /**
    * Post a poll into a conversation. The poll question doubles as the message
    * `body` so inbox previews and notifications work without poll-specific
    * branching. Options get stable ids so votes survive edits.

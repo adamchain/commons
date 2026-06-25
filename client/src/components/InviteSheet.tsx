@@ -23,6 +23,7 @@ export function InviteSheet({
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(0);
   const [hiddenWarn, setHiddenWarn] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     void api<{ users: PublicUser[] }>("/api/auth/network")
@@ -52,6 +53,8 @@ export function InviteSheet({
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(planUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
     } catch {
       window.prompt("Copy this link", planUrl);
     }
@@ -94,12 +97,12 @@ export function InviteSheet({
           </button>
         </div>
 
-        <div className="invite-sheet-row">
-          <button type="button" className="btn-secondary btn-block" onClick={() => void shareSms()}>
+        <div className="invite-sheet-actions">
+          <button type="button" className="btn-primary btn-block" onClick={() => void shareSms()}>
             Text the link
           </button>
-          <button type="button" className="btn-link" onClick={() => void copyLink()}>
-            Copy link
+          <button type="button" className="btn-secondary btn-block" onClick={() => void copyLink()}>
+            {copied ? "Copied ✓" : "Copy link"}
           </button>
         </div>
 

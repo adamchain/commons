@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api/http";
-import { HOST_TAG_LABELS, type HostTag } from "../types/shared";
 
 interface PendingItem {
   planId: string;
@@ -8,23 +8,22 @@ interface PendingItem {
   hostId: string;
 }
 
-const ALL_TAGS: HostTag[] = ["great_host", "would_do_again", "made_me_feel_welcome"];
+// Once dismissed, stay quiet until the next app session. sessionStorage clears
+// when the app process is killed/relaunched.
+const DISMISS_KEY = "commons.postEventNudge.v1";
 
-// Once the user skips the prompt, we don't nag again until the next app
-// session. sessionStorage clears when the app process is killed/relaunched.
-const FEEDBACK_SKIPPED_KEY = "commons.feedbackSkipped.v1";
-
+/**
+ * Post-event nudge. When a plan you attended wraps, surface a tappable card
+ * that drops you into its group chat — instead of the old thumbs-up/down host
+ * rating. Keeps the conversation going after the event rather than asking for
+ * a score.
+ */
 export function FeedbackPrompt() {
   const [pending, setPending] = useState<PendingItem[]>([]);
-  const [thumb, setThumb] = useState<"up" | "down" | null>(null);
-  const [note, setNote] = useState("");
-  const [tags, setTags] = useState<HostTag[]>([]);
-  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    // Skipped earlier this session — stay quiet until the next launch.
     try {
-      if (sessionStorage.getItem(FEEDBACK_SKIPPED_KEY)) return;
+      if (sessionStorage.getItem(DISMISS_KEY)) return;
     } catch {
       /* storage unavailable — fall through and fetch */
     }
@@ -34,78 +33,27 @@ export function FeedbackPrompt() {
   if (pending.length === 0) return null;
   const current = pending[0];
 
-  function reset() {
-    setThumb(null);
-    setNote("");
-    setTags([]);
-  }
-
-  async function submit(skip = false) {
-    setBusy(true);
+  function dismiss() {
     try {
-      if (skip) {
-        // Suppress the whole prompt for the rest of this session.
-        try {
-          sessionStorage.setItem(FEEDBACK_SKIPPED_KEY, "1");
-        } catch {
-          /* non-fatal */
-        }
-        setPending([]);
-        reset();
-        return;
-      }
-      if (thumb) {
-        await api("/api/feedback", {
-          method: "POST",
-          body: JSON.stringify({ planId: current.planId, thumb, note: note.trim() || undefined, hostTags: tags }),
-        });
-      }
-      setPending((rest) => rest.slice(1));
-      reset();
-    } finally {
-      setBusy(false);
+      sessionStorage.setItem(DISMISS_KEY, "1");
+    } catch {
+      /* non-fatal */
     }
+    setPending([]);
   }
 
   return (
     <div className="feedback-prompt">
-      <div className="feedback-prompt-title">How was "{current.planTitle}"?</div>
-
-      {thumb === null ? (
-        <div className="feedback-thumbs">
-          <button className="feedback-thumb" onClick={() => setThumb("up")}>👍</button>
-          <button className="feedback-thumb" onClick={() => setThumb("down")}>👎</button>
-          <button className="btn-link" onClick={() => void submit(true)}>Skip</button>
-        </div>
-      ) : (
-        <>
-          <textarea
-            className="feedback-note"
-            placeholder="Anything to call out? (optional)"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            rows={2}
-          />
-          <div className="feedback-tags">
-            {ALL_TAGS.map((t) => (
-              <button
-                key={t}
-                type="button"
-                className={`feedback-tag ${tags.includes(t) ? "is-active" : ""}`}
-                onClick={() =>
-                  setTags((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]))
-                }
-              >
-                {HOST_TAG_LABELS[t]}
-              </button>
-            ))}
-          </div>
-          <div className="feedback-actions">
-            <button className="btn-link" disabled={busy} onClick={() => void submit(true)}>Skip</button>
-            <button className="btn-primary" disabled={busy} onClick={() => void submit(false)}>Done</button>
-          </div>
-        </>
-      )}
+      <div className="feedback-prompt-title">How'd "{current.planTitle}" go?</div>
+      <p className="feedback-prompt-sub">Catch up with everyone in the group chat.</p>
+      <div className="feedback-actions">
+        <button className="btn-link" onClick={dismiss}>
+          Dismiss
+        </button>
+        <Link className="btn-primary" to={`/plans/${current.planId}/chat`} onClick={dismiss}>
+          💬 Open group chat
+        </Link>
+      </div>
     </div>
   );
 }

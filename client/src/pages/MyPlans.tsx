@@ -88,7 +88,7 @@ export function MyPlansPage() {
               <div key={plan.id} className="my-plans-past-item">
                 <PlanCard plan={plan} onPlanRefresh={load} />
                 <Link
-                  to={`/plans/new?title=${encodeURIComponent(plan.title)}`}
+                  to={`/plans/new?fromPlanId=${plan.id}&title=${encodeURIComponent(plan.title)}`}
                   className="btn-secondary btn-block my-plans-do-again"
                 >
                   🔁 Do it again

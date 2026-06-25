@@ -193,7 +193,8 @@ export function ChatPage() {
   const others = conv.participants.filter((p) => p.id !== user.id);
   const inviteIds = others.map((p) => p.id).join(",");
   const inviteNames = others.map((p) => p.firstName).join(",");
-  const replanHref = `/plans/new?inviteUserIds=${encodeURIComponent(inviteIds)}&inviteNames=${encodeURIComponent(inviteNames)}`;
+  // fromPlanId carries this plan's crew + chat history into the new event.
+  const replanHref = `/plans/new?fromPlanId=${planId}&title=${encodeURIComponent(plan.title)}&inviteUserIds=${encodeURIComponent(inviteIds)}&inviteNames=${encodeURIComponent(inviteNames)}`;
 
   return (
     <main className="app-shell app-shell--chat">

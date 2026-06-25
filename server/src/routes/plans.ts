@@ -223,6 +223,9 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   const hostEmoji = String(req.body?.hostEmoji ?? "").trim() || "✨";
   const neighborhoodId = String(req.body?.neighborhoodId ?? userHoods(me)[0] ?? "").trim();
   const planKind = (req.body?.planKind === "looking_for" ? "looking_for" : "standard") as PlanKind;
+  // "Do it again": when set, carry the previous event's crew + group chat into
+  // this new plan.
+  const fromPlanId = req.body?.fromPlanId ? String(req.body.fromPlanId).trim() : "";
   const rawVis = String(req.body?.visibility ?? "everyone");
   const visibility = (["everyone", "community", "network"].includes(rawVis) ? rawVis : "everyone") as PlanVisibility;
   const isRecurring = Boolean(req.body?.isRecurring);
@@ -367,7 +370,49 @@ plansRouter.post("/", requireAuth, async (req, res) => {
       dedupKey: `coHost:${plan.id}:${coId}`,
     });
   }
-  store.ensureGroupConversation(plan.id, [userId, ...coHostIds]);
+  const conv = store.ensureGroupConversation(plan.id, [userId, ...coHostIds]);
+
+  // "Do it again": pull the previous event's attendees + group chat forward so
+  // the crew and their conversation carry into the new plan.
+  if (fromPlanId) {
+    const prevPlan = store.findPlanById(fromPlanId);
+    // Only the previous host or an attendee may re-plan from it.
+    const prevPart = store.findParticipation(fromPlanId, userId);
+    const mayReplan = prevPlan && (prevPlan.creatorId === userId || Boolean(prevPart));
+    if (prevPlan && mayReplan) {
+      const prevAttendees = store
+        .listParticipationsForPlan(fromPlanId)
+        .filter((p) => p.state === "going" && p.userId !== userId)
+        .map((p) => p.userId);
+
+      // Carry the prior crew into the new conversation so the group persists.
+      if (prevAttendees.length > 0) {
+        store.ensureGroupConversation(plan.id, [userId, ...coHostIds, ...prevAttendees]);
+      }
+      // Persist the previous group chat history into the new thread.
+      const prevConv = store.findGroupConversationByPlan(fromPlanId);
+      if (prevConv) store.cloneConversationMessages(prevConv.id, conv.id);
+
+      // Announce the re-plan in the carried-over thread + ping everyone who came.
+      const whenLabel = isFlexibleTime || !time ? dateInput : `${dateInput} at ${time}`;
+      store.createSystemMessage(
+        conv.id,
+        `🔁 ${me.firstName || "The host"} planned "${title}" again — ${whenLabel}. Same crew, new date.`,
+      );
+      for (const attId of prevAttendees) {
+        await emit({
+          userId: attId,
+          kind: "planInvite",
+          body: `${me.firstName || "Someone"} is doing "${title}" again — you're in the group`,
+          planId: plan.id,
+          conversationId: conv.id,
+          dedupKey: `replan:${plan.id}:${attId}`,
+        });
+      }
+      store.log("plan_replanned", { planId: plan.id, fromPlanId, carried: prevAttendees.length });
+    }
+  }
+
   store.log("plan_created", { planId: plan.id, creatorId: userId, coHosts: coHostIds.length });
   void onPlanCreatedVenueNudge(plan).catch((err) => console.error("[nudge] venue", err));
 

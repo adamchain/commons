@@ -10,6 +10,7 @@ import { ParticipationButtons } from "../components/ParticipationButtons";
 import { ShareSheet } from "../components/ShareSheet";
 import { useAuth } from "../context/AuthContext";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
+import { planHasEnded } from "../lib/planTime";
 import { formatPlaceAddress, formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
 import { type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
 
@@ -86,6 +87,9 @@ export function PlanDetailPage() {
 
   const isHosting = plan.creator.id === user.id;
   const isLookingFor = plan.planKind === "looking_for";
+  // Past events become a record: no RSVP / host coordination — just "Do it
+  // again" (which carries the crew + chat forward) and the group chat.
+  const isPast = planHasEnded(plan);
   // Looking-For lifecycle: only the original poster can lock the plan in.
   // Other interested folks coordinate via the group chat until the host
   // commits to a venue + day.
@@ -98,6 +102,11 @@ export function PlanDetailPage() {
   const showGroupPrompt = groupAtThreshold && isHosting;
   const canChat =
     isHosting || plan.myState === "going" || plan.myState === "interested";
+  // Once a non-host has committed (interested/going), the group chat becomes the
+  // primary thing — surface it up top and demote the drop-out toggle to the
+  // very bottom of the page.
+  const committed = plan.myState === "going" || plan.myState === "interested";
+  const showDropoutBottom = !isPast && committed && !isHosting;
 
   async function cancelPlan() {
     if (!plan) return;
@@ -256,7 +265,25 @@ export function PlanDetailPage() {
           )
         )}
 
-        {showGroupPrompt && (
+        {isPast && (
+          <div className="plan-past-actions">
+            <p className="plan-past-note">This one's a wrap. Want to run it back?</p>
+            <button
+              type="button"
+              className="btn-primary btn-block"
+              onClick={() =>
+                navigate(`/plans/new?fromPlanId=${plan.id}&title=${encodeURIComponent(plan.title)}`)
+              }
+            >
+              🔁 Do it again
+            </button>
+            <Link to={`/plans/${plan.id}/chat`} className="btn-secondary btn-block">
+              💬 Open group chat
+            </Link>
+          </div>
+        )}
+
+        {!isPast && showGroupPrompt && (
           <div className="lock-prompt" role="note">
             <p className="lock-prompt-headline">
               Looks like you've got a group. Ready to lock it in?
@@ -282,7 +309,7 @@ export function PlanDetailPage() {
             host-only (showGroupPrompt above). When viewing someone else's
             idea you don't see it — they own the lock-in decision. */}
 
-        {canLock && (plan.isFlexibleTime || plan.isFlexibleLocation || isLookingFor) && (
+        {!isPast && canLock && (plan.isFlexibleTime || plan.isFlexibleLocation || isLookingFor) && (
           <div
             ref={lockFormRef}
             className="coordination-banner coordination-banner--expanded"
@@ -342,7 +369,17 @@ export function PlanDetailPage() {
           </div>
         )}
 
-        {!(isHosting && isLookingFor) && (
+        {/* Group chat, pulled up top once you can access it. */}
+        {!isPast && canChat && (
+          <Link to={`/plans/${plan.id}/chat`} className="chat-entry chat-entry--prominent">
+            💬 Group chat ({plan.participants.going.length + plan.participants.interested.length})
+            <span className="chat-entry-arrow">→</span>
+          </Link>
+        )}
+
+        {/* Commit choices — only while you haven't committed yet. Once you have,
+            the drop-out toggle moves to the bottom of the page. */}
+        {!isPast && !showDropoutBottom && !(isHosting && isLookingFor) && (
           <ParticipationButtons
             planId={plan.id}
             initialState={plan.myState}
@@ -358,7 +395,8 @@ export function PlanDetailPage() {
 
         {/* On your own plan you get the full toolkit. On someone else's, the
             venue already links to Maps up top, so we only surface Invite —
-            bring your own people. */}
+            bring your own people. Hidden once the event is over. */}
+        {!isPast && (
         <div className={`plan-actions-row ${isHosting ? "plan-actions-row--triple" : "plan-actions-row--single"}`}>
           {isHosting && (
             <button type="button" className="action-btn action-btn--stack" onClick={() => setShowGetThere(true)}>
@@ -377,6 +415,7 @@ export function PlanDetailPage() {
             </button>
           )}
         </div>
+        )}
 
         {plan.cancelledAt && (
           <div className="plan-cancelled-banner" role="alert">
@@ -384,7 +423,7 @@ export function PlanDetailPage() {
           </div>
         )}
 
-        {plan.upForGrabsAt && !plan.cancelledAt && (
+        {!isPast && plan.upForGrabsAt && !plan.cancelledAt && (
           <div className="coordination-banner" role="note">
             <strong>This plan needs a new host.</strong>{" "}
             {isHosting
@@ -403,7 +442,7 @@ export function PlanDetailPage() {
           </div>
         )}
 
-        {plan.pendingTimeProposal && !plan.cancelledAt && (
+        {!isPast && plan.pendingTimeProposal && !plan.cancelledAt && (
           <div className="coordination-banner" role="note">
             <strong>{isHosting ? "You proposed" : "Host proposed"} a new time:</strong>{" "}
             {formatPlanDate(plan.pendingTimeProposal.date)} ·{" "}
@@ -416,7 +455,7 @@ export function PlanDetailPage() {
           </div>
         )}
 
-        {isHosting && !plan.cancelledAt && (
+        {!isPast && isHosting && !plan.cancelledAt && (
           <div className="plan-host-actions">
             <Link to={`/plans/${plan.id}/edit`} className="btn-secondary plan-host-action-btn">
               Edit plan
@@ -445,12 +484,8 @@ export function PlanDetailPage() {
         )}
       </section>
 
-      {canChat && (
-        <Link to={`/plans/${plan.id}/chat`} className="chat-entry">
-          💬 Group chat ({plan.participants.going.length + plan.participants.interested.length})
-          <span className="chat-entry-arrow">→</span>
-        </Link>
-      )}
+      {/* For hosts (committed but kept inline above) the chat already shows up
+          top; uncommitted non-hosts can't chat yet, so nothing renders here. */}
 
       <section className="who-block">
         <div className="who-row">
@@ -518,6 +553,24 @@ export function PlanDetailPage() {
           </div>
         )}
       </section>
+
+      {/* Drop-out / withdraw lives at the very bottom once you've committed —
+          out of the way so the chat + roster lead. */}
+      {showDropoutBottom && (
+        <div className="plan-dropout-row">
+          <ParticipationButtons
+            planId={plan.id}
+            initialState={plan.myState}
+            onChange={onStateChange}
+            planKind={plan.planKind}
+            capacity={plan.capacity}
+            goingCount={plan.participants.going.length}
+            joinType={plan.joinType}
+            isHosting={isHosting}
+            onJustMarkedInterested={() => setShowInvite(true)}
+          />
+        </div>
+      )}
 
       {showShare && <ShareSheet plan={plan} onClose={() => setShowShare(false)} />}
       {showGetThere && <GetThereSheet plan={plan} onClose={() => setShowGetThere(false)} />}

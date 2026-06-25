@@ -83,6 +83,11 @@ function canAccessPlanGroupChat(planId: string, userId: string): boolean {
   const part = store.findParticipation(planId, userId);
   if (part?.state === "going") return true;
   if (part?.state === "interested") return true;
+  // Carried-over group members (e.g. a "Do it again" re-plan that brought the
+  // previous crew along) already belong to the conversation before they RSVP —
+  // let them read the persisted thread.
+  const conv = store.findGroupConversationByPlan(planId);
+  if (conv?.participantIds.includes(userId)) return true;
   return false;
 }
 
