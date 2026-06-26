@@ -9,6 +9,9 @@
 //                           Identity on Cloud Run / GKE).
 //   GCS_PUBLIC_BASE_URL   — optional CDN / custom-domain base. Defaults to
 //                           https://storage.googleapis.com/<bucket>.
+//   GCS_DEFAULTS_PREFIX   — optional folder holding the standard placeholder
+//                           library images. Defaults to `defaults/`. "Load
+//                           default images" lists this folder and seeds it.
 //
 // When GCS_BUCKET is unset, `isGcsConfigured()` returns false and callers fall
 // back to storing the image inline (data URL) — so local dev works with no GCS.
@@ -84,4 +87,34 @@ export async function uploadCardImage(buffer: Buffer, contentType: string): Prom
   }
 
   return publicUrl(bucketName, objectPath);
+}
+
+/** Turn `defaults/summer-bbq.jpg` into a friendly label like "Summer Bbq". */
+function labelFromObjectName(objectName: string): string {
+  const base = objectName.split("/").pop() ?? objectName;
+  const stem = base.replace(/\.[a-z0-9]+$/i, "").replace(/[-_]+/g, " ").trim();
+  if (!stem) return "";
+  return stem.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * List the standard placeholder images stored under `GCS_DEFAULTS_PREFIX`
+ * (default `defaults/`) in the bucket, as `{ url, label }` pairs sorted by name.
+ * Returns `[]` if GCS isn't configured or the folder is empty. Throws on a real
+ * storage/permission error so callers can surface it.
+ */
+export async function listDefaultImages(): Promise<{ url: string; label: string }[]> {
+  const bucketName = process.env.GCS_BUCKET?.trim();
+  if (!bucketName) return [];
+
+  const rawPrefix = process.env.GCS_DEFAULTS_PREFIX?.trim() || "defaults/";
+  const prefix = rawPrefix.endsWith("/") ? rawPrefix : `${rawPrefix}/`;
+
+  const [files] = await client().bucket(bucketName).getFiles({ prefix });
+  return files
+    .map((f) => f.name)
+    // Keep only real image objects — skips the folder placeholder & stray files.
+    .filter((name) => name !== prefix && /\.(png|jpe?g|gif|webp|avif)$/i.test(name))
+    .sort((a, b) => a.localeCompare(b))
+    .map((name) => ({ url: publicUrl(bucketName, name), label: labelFromObjectName(name) }));
 }

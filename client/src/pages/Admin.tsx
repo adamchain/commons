@@ -297,7 +297,7 @@ function CardImagesManager() {
               No images yet — the app falls back to its built-in stand-ins until you add some.
             </p>
             <button type="button" className="admin-btn" onClick={() => void seedDefaults()} disabled={busy}>
-              Load default images
+              {gcsConfigured ? "Load standard library from storage" : "Load default images"}
             </button>
           </div>
         ) : (

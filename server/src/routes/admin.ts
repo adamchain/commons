@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { Request, Response, NextFunction } from "express";
 import { verifySessionToken } from "../lib/jwt.js";
 import { isAdminPhone } from "../lib/adminPhones.js";
-import { isGcsConfigured, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
+import { isGcsConfigured, listDefaultImages, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
 import { store } from "../store.js";
 import { listAllUsers, findUserById } from "../userRepo.js";
 
@@ -325,7 +325,8 @@ adminRouter.get("/users/:id", async (req, res) => {
 
 const MAX_CARD_IMAGE_BYTES = 1_500_000; // ~1.5MB — fallback inline cap.
 
-/** The built-in stand-ins the feed uses before any are curated. */
+/** Last-resort stand-ins, used only when GCS isn't configured (local dev). The
+ *  real standard library lives in the bucket's defaults folder (see GCS_DEFAULTS_PREFIX). */
 const DEFAULT_CARD_IMAGES: { url: string; label: string }[] = [
   { url: "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=800&q=60", label: "Celebration" },
   { url: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=800&q=60", label: "Dinner" },
@@ -392,12 +393,26 @@ adminRouter.post("/card-images/upload", async (req, res) => {
   res.status(201).json({ image: row });
 });
 
-// One-click: add the built-in default covers (idempotent — skips ones already
-// present by URL). Lets admins start from the current art instead of blank.
-adminRouter.post("/card-images/seed-defaults", (_req, res) => {
+// One-click: seed the standard placeholder library. When GCS is configured, the
+// defaults come from the bucket's defaults folder (GCS_DEFAULTS_PREFIX) so admins
+// can curate them without a deploy; otherwise we fall back to the built-in
+// stand-ins. Idempotent — skips images already present by URL.
+adminRouter.post("/card-images/seed-defaults", async (_req, res) => {
+  let defaults = DEFAULT_CARD_IMAGES;
+  if (isGcsConfigured()) {
+    try {
+      const fromBucket = await listDefaultImages();
+      if (fromBucket.length > 0) defaults = fromBucket;
+    } catch (err) {
+      console.error("[admin] listing default card images from GCS failed", err);
+      res.status(502).json({ error: "Could not read the defaults folder from storage — check GCS config / permissions." });
+      return;
+    }
+  }
+
   const existing = new Set(store.listCardImages().map((c) => c.url));
   const added = [];
-  for (const def of DEFAULT_CARD_IMAGES) {
+  for (const def of defaults) {
     if (existing.has(def.url)) continue;
     added.push(store.addCardImage(def));
   }
