@@ -431,3 +431,69 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ---- Clickable user rows + drill-down modal ---- */
+.admin-row-clickable {
+  cursor: pointer;
+}
+.admin-row-clickable:hover {
+  background: var(--surface-2, rgba(0, 0, 0, 0.03));
+}
+
+.admin-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 5vh 1rem;
+  z-index: 100;
+  overflow-y: auto;
+}
+.admin-modal {
+  background: var(--surface, #fff);
+  color: var(--text, #14143a);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 640px;
+  padding: 1.25rem 1.25rem 1.5rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+.admin-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.admin-user-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.admin-user-name {
+  font-weight: 700;
+  font-size: 1.15rem;
+}
+.admin-user-meta {
+  margin: 1rem 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.5rem 1rem;
+}
+.admin-user-meta > div {
+  margin: 0;
+}
+.admin-user-meta dt {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #888);
+  font-weight: 700;
+}
+.admin-user-meta dd {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  word-break: break-word;
+}

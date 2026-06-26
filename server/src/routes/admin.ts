@@ -245,6 +245,78 @@ adminRouter.get("/summary", async (_req, res) => {
   });
 });
 
+// ---- Single user: full profile + activity (admin drill-down) ----
+adminRouter.get("/users/:id", async (req, res) => {
+  const id = String(req.params.id);
+  const u = await findUserById(id);
+  if (!u) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  const hoodName = new Map(store.listNeighborhoods().map((n) => [n.id, n.name]));
+  const hoodIds = u.neighborhoodIds?.length
+    ? u.neighborhoodIds
+    : u.neighborhoodId
+      ? [u.neighborhoodId]
+      : [];
+
+  const allPlans = store.listPlans();
+  const hosted = allPlans
+    .filter((p) => p.creatorId === id)
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .map((p) => ({
+      id: p.id,
+      title: p.title,
+      date: p.date,
+      cancelled: Boolean(p.cancelledAt),
+      goingCount: store.listParticipationsForPlan(p.id).filter((q) => q.state === "going").length,
+    }));
+
+  const parts = store.listParticipationsForUser(id);
+  const participations: { planId: string; title: string; date: string; state: string }[] = [];
+  for (const pa of parts) {
+    const plan = store.findPlanById(pa.planId);
+    if (!plan || plan.creatorId === id) continue; // hosting shown separately
+    participations.push({ planId: plan.id, title: plan.title, date: plan.date, state: pa.state });
+  }
+  participations.sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  const messagesCount = store
+    .listAllMessages()
+    .filter((m) => m.senderId === id && m.kind === "user").length;
+
+  res.json({
+    user: {
+      id: u.id,
+      firstName: u.firstName || "",
+      lastName: u.lastName ?? null,
+      phoneNumber: u.phoneNumber,
+      neighborhoodIds: hoodIds,
+      neighborhoodNames: hoodIds.map((h) => hoodName.get(h) ?? h),
+      interests: u.interests ?? [],
+      avatarSeed: u.avatarSeed,
+      avatarStyle: u.avatarStyle,
+      avatarPhotoDataUrl: u.avatarPhotoDataUrl ?? null,
+      avatarParams: u.avatarParams ?? null,
+      accountSource: u.accountSource ?? "verify",
+      onboardingComplete: u.onboardingComplete,
+      createdAt: u.createdAt,
+      networkSize: u.networkIds?.length ?? 0,
+      guidelinesAcknowledgedAt: u.guidelinesAcknowledgedAt ?? null,
+      socialLinks: u.socialLinks ?? null,
+    },
+    activity: {
+      hostedCount: hosted.length,
+      rsvpCount: parts.length,
+      goingCount: parts.filter((p) => p.state === "going").length,
+      interestedCount: parts.filter((p) => p.state === "interested").length,
+      messagesCount,
+      hosted,
+      participations,
+    },
+  });
+});
+
 // ---- Event-card image library ----
 // Admins curate the cover images used on event cards without a code deploy.
 // File uploads go to Google Cloud Storage (when GCS_BUCKET is set); we store

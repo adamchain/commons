@@ -325,11 +325,183 @@ function CardImagesManager() {
   );
 }
 
+type AdminUserDetail = {
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string | null;
+    phoneNumber: string;
+    neighborhoodNames: string[];
+    interests: string[];
+    accountSource: string;
+    onboardingComplete: boolean;
+    createdAt: string;
+    networkSize: number;
+    guidelinesAcknowledgedAt: string | null;
+    socialLinks: { instagram?: string } | null;
+  };
+  activity: {
+    hostedCount: number;
+    rsvpCount: number;
+    goingCount: number;
+    interestedCount: number;
+    messagesCount: number;
+    hosted: { id: string; title: string; date: string; cancelled: boolean; goingCount: number }[];
+    participations: { planId: string; title: string; date: string; state: string }[];
+  };
+};
+
+/** Admin drill-down: a user's full profile details + activity. */
+function AdminUserDetailModal({ userId, onClose }: { userId: string; onClose: () => void }) {
+  const [data, setData] = useState<AdminUserDetail | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    api<AdminUserDetail>(`/api/admin/users/${userId}`)
+      .then((d) => active && setData(d))
+      .catch((e) => active && setError(e instanceof Error ? e.message : "Failed to load"));
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+
+  const interestLabel = (t: string) => (INTEREST_LABELS as Record<string, string>)[t] ?? t;
+
+  return (
+    <div className="admin-modal-backdrop" onClick={onClose}>
+      <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="admin-modal-head">
+          <h2 className="admin-section-title" style={{ margin: 0 }}>User detail</h2>
+          <button type="button" className="admin-btn admin-btn--ghost" onClick={onClose}>
+            Close
+          </button>
+        </div>
+
+        {error ? (
+          <p className="admin-err">{error}</p>
+        ) : !data ? (
+          <p className="admin-muted">Loading…</p>
+        ) : (
+          <>
+            <div className="admin-user-head">
+              <div>
+                <div className="admin-user-name">
+                  {data.user.firstName || "—"} {data.user.lastName ?? ""}
+                </div>
+                <div className="admin-muted">{data.user.phoneNumber}</div>
+              </div>
+              <Link className="admin-link" to={`/profile/${data.user.id}`}>
+                View in app →
+              </Link>
+            </div>
+
+            <div className="admin-kpis" style={{ marginTop: "0.75rem" }}>
+              {[
+                ["Hosted", data.activity.hostedCount],
+                ["RSVPs", data.activity.rsvpCount],
+                ["Going", data.activity.goingCount],
+                ["Interested", data.activity.interestedCount],
+                ["Messages", data.activity.messagesCount],
+                ["Network", data.user.networkSize],
+              ].map(([label, value]) => (
+                <div key={label} className="admin-kpi">
+                  <div className="admin-kpi-label">{label}</div>
+                  <div className="admin-kpi-value">{value}</div>
+                </div>
+              ))}
+            </div>
+
+            <dl className="admin-user-meta">
+              <div>
+                <dt>Neighborhood</dt>
+                <dd>{data.user.neighborhoodNames.join(", ") || "—"}</dd>
+              </div>
+              <div>
+                <dt>Interests</dt>
+                <dd>{data.user.interests.map(interestLabel).join(", ") || "—"}</dd>
+              </div>
+              <div>
+                <dt>Joined</dt>
+                <dd>{new Date(data.user.createdAt).toLocaleString()}</dd>
+              </div>
+              <div>
+                <dt>Onboarded</dt>
+                <dd>{data.user.onboardingComplete ? "Yes" : "No"}</dd>
+              </div>
+              <div>
+                <dt>Source</dt>
+                <dd>{data.user.accountSource}</dd>
+              </div>
+              <div>
+                <dt>Guidelines</dt>
+                <dd>
+                  {data.user.guidelinesAcknowledgedAt
+                    ? new Date(data.user.guidelinesAcknowledgedAt).toLocaleDateString()
+                    : "—"}
+                </dd>
+              </div>
+              {data.user.socialLinks?.instagram ? (
+                <div>
+                  <dt>Instagram</dt>
+                  <dd>@{data.user.socialLinks.instagram}</dd>
+                </div>
+              ) : null}
+            </dl>
+
+            <h3 className="admin-section-title" style={{ marginBottom: "0.4rem" }}>
+              Hosted · {data.activity.hosted.length}
+            </h3>
+            {data.activity.hosted.length === 0 ? (
+              <p className="admin-muted">No plans hosted.</p>
+            ) : (
+              <ul className="admin-log-list">
+                {data.activity.hosted.map((p) => (
+                  <li key={p.id}>
+                    <Link to={`/plans/${p.id}`} className="admin-link">
+                      {p.title}
+                    </Link>
+                    <span className="admin-muted" style={{ marginLeft: "auto" }}>
+                      {new Date(p.date).toLocaleDateString()} · {p.goingCount} going
+                      {p.cancelled ? " · cancelled" : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <h3 className="admin-section-title" style={{ marginBottom: "0.4rem" }}>
+              Attending / interested · {data.activity.participations.length}
+            </h3>
+            {data.activity.participations.length === 0 ? (
+              <p className="admin-muted">No RSVPs to others' plans.</p>
+            ) : (
+              <ul className="admin-log-list">
+                {data.activity.participations.map((p) => (
+                  <li key={p.planId}>
+                    <Link to={`/plans/${p.planId}`} className="admin-link">
+                      {p.title}
+                    </Link>
+                    <span className="admin-muted" style={{ marginLeft: "auto" }}>
+                      {new Date(p.date).toLocaleDateString()} · {p.state}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function AdminPage() {
   const [summary, setSummary] = useState<AdminSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userQuery, setUserQuery] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -608,7 +780,11 @@ export function AdminPage() {
                     </thead>
                     <tbody>
                       {filteredUsers.map((u) => (
-                        <tr key={u.id}>
+                        <tr
+                          key={u.id}
+                          className="admin-row-clickable"
+                          onClick={() => setSelectedUserId(u.id)}
+                        >
                           <td>
                             <div style={{ fontWeight: 600 }}>{u.firstName || "—"}</div>
                             <div className="admin-muted" style={{ fontSize: "0.7rem" }}>
@@ -645,7 +821,11 @@ export function AdminPage() {
                 </h3>
                 <ul className="admin-log-list">
                   {summary.recentUsers.map((u) => (
-                    <li key={u.id}>
+                    <li
+                      key={u.id}
+                      className="admin-row-clickable"
+                      onClick={() => setSelectedUserId(u.id)}
+                    >
                       <span>
                         <strong>{u.firstName}</strong>{" "}
                         <span className="admin-muted">{maskPhone(u.phoneNumber)}</span>
@@ -678,6 +858,9 @@ export function AdminPage() {
           </>
         ) : null}
       </div>
+      {selectedUserId && (
+        <AdminUserDetailModal userId={selectedUserId} onClose={() => setSelectedUserId(null)} />
+      )}
     </div>
   );
 }
