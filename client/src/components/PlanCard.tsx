@@ -103,7 +103,16 @@ export function PlanCard({
   const showSpotsRemaining =
     spotsRemaining !== null && plan.capacity !== null && spotsRemaining > 0 && spotsRemaining <= 3;
   const isFull = plan.capacity !== null && goingCount >= plan.capacity;
-  const socialProof = almostPlan
+  const locationLine = plan.isFlexibleLocation
+    ? "Flexible location"
+    : hoodName
+      ? `${plan.location.name} · ${hoodName}`
+      : plan.location.name;
+  const metaLine = `${whenLine} · ${locationLine}`;
+
+  const goingLabel = `${goingCount} going`;
+  const interestedLabel = interestedCount > 0 ? ` · ${interestedCount} interested` : "";
+  const footerCount = almostPlan
     ? `${totalRsvps} interested · almost a plan`
     : hasEnded && goingCount >= 1
       ? `${goingCount} went`
@@ -111,11 +120,9 @@ export function PlanCard({
         ? `${goingCount} going · full`
         : showSpotsRemaining
           ? `${goingCount} going · ${spotsRemaining} spot${spotsRemaining === 1 ? "" : "s"} left`
-          : goingCount >= 1
-            ? `${goingCount} going`
-            : isLooking && interestedCount >= 1
-              ? `${interestedCount} interested`
-              : null;
+          : goingCount >= 1 || interestedCount >= 1
+            ? `${goingLabel}${interestedLabel}`
+            : null;
 
   return (
     <div
@@ -159,48 +166,30 @@ export function PlanCard({
         </button>
       )}
       <Link to={`/plans/${plan.id}`} className="plan-card plan-card-link plan-card--compact">
-        <div className="plan-card-flyer">
-          <img src={coverImage} alt="" loading="lazy" />
-        </div>
+        {!isLooking || isPlanCreated ? (
+          <div className="plan-card-flyer">
+            <img src={coverImage} alt="" loading="lazy" />
+          </div>
+        ) : null}
         <header className="plan-card-poster-row">
           <Avatar
             seed={plan.creator.avatarSeed}
             style={plan.creator.avatarStyle}
             photoDataUrl={plan.creator.avatarPhotoDataUrl}
             params={plan.creator.avatarParams}
-            size="md"
+            size="xs"
           />
-          <span className="plan-card-posted-by">
-            Posted by <strong>{plan.creator.firstName}</strong>
-          </span>
+          <span className="plan-card-posted-by">{plan.creator.firstName}</span>
           {isCancelled ? (
             <span className="plan-card-kind-pill is-cancelled">Cancelled</span>
           ) : hasEnded ? (
             <span className="plan-card-kind-pill is-happened">Happened</span>
           ) : isLooking && !isPlanCreated ? (
-            // Once a Looking For locks into a real plan it sheds the "Plan
-            // created" pill and lives on the feed as a regular confirmed plan —
-            // the conversion is announced once (SMS to interested), not lingered
-            // as a permanent badge.
             <span className="plan-card-kind-pill is-looking">Looking For</span>
           ) : null}
         </header>
         <h3 className="plan-card-title">{title}</h3>
-        <p className="plan-card-meta-line">
-          <span className="plan-card-meta-icon" aria-hidden="true">
-            <ClockGlyph />
-          </span>
-          {whenLine}
-        </p>
-        <p className="plan-card-meta-line">
-          <span className="plan-card-meta-icon" aria-hidden="true">
-            <PinGlyph />
-          </span>
-          {plan.isFlexibleLocation ? "Flexible location" : plan.location.name}
-          {hoodName && (
-            <span className="plan-card-meta-sub"> · {hoodName}</span>
-          )}
-        </p>
+        <p className="plan-card-meta-line plan-card-meta-line--single">{metaLine}</p>
         {plan.description && (
           <p className="plan-card-description">{plan.description}</p>
         )}
@@ -248,30 +237,21 @@ export function PlanCard({
                   ))}
               </div>
             )}
-            {socialProof && (
-              <span className="plan-card-going-count">{socialProof}</span>
+            {footerCount && (
+              <span className="plan-card-going-count">{footerCount}</span>
             )}
           </div>
-          {plan.myState === "going" && (
-            <span className="plan-card-state-pill plan-card-state-pill--in">
-              <span aria-hidden="true">✓</span> You&apos;re in
-            </span>
-          )}
-          {plan.myState === "interested" && (
-            <span className="plan-card-state-pill plan-card-state-pill--interested">Interested</span>
+          {!isHosting && !hasEnded && !isCancelled && (
+            <QuickJoin
+              planId={plan.id}
+              isLooking={isLooking}
+              state={plan.myState ?? null}
+              disabled={isFull && !isLooking}
+              onPlanRefresh={onPlanRefresh}
+            />
           )}
         </footer>
       </Link>
-
-      {!isHosting && !hasEnded && !isCancelled && plan.myState !== "going" && (
-        <QuickJoin
-          planId={plan.id}
-          isLooking={isLooking}
-          state={plan.myState ?? null}
-          disabled={isFull && !isLooking}
-          onPlanRefresh={onPlanRefresh}
-        />
-      )}
 
       {canChat && (
         <Link
@@ -364,10 +344,12 @@ function QuickJoin({
   }
 
   const label = active
-    ? "Drop out"
+    ? target === "going"
+      ? "✓ You're in"
+      : "Interested"
     : isLooking
-      ? "I'm interested"
-      : "I'm in";
+      ? "Interested"
+      : "Join";
 
   return (
     <button
@@ -378,23 +360,5 @@ function QuickJoin({
     >
       {busy ? "…" : label}
     </button>
-  );
-}
-
-function ClockGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 2" />
-    </svg>
-  );
-}
-
-function PinGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-      <circle cx="12" cy="10" r="3" />
-    </svg>
   );
 }

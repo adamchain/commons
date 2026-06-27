@@ -201,28 +201,29 @@ export function FeedPage() {
         onSelectDay={setSelectedDayIso}
       />
 
-      <div className="segmented segmented-feed-view" role="tablist" aria-label="Feed scope">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === "all"}
-          className={view === "all" ? "is-active" : ""}
-          onClick={() => setView("all")}
-        >
-          All plans
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === "mine"}
-          className={view === "mine" ? "is-active" : ""}
-          onClick={() => setView("mine")}
-        >
-          My plans
-        </button>
-      </div>
+      <div className="feed-divider" />
 
-      <div className="page-filter-bar page-filter-bar--end">
+      <div className="feed-toolbar">
+        <div className="segmented segmented-feed-view" role="tablist" aria-label="Feed scope">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "all"}
+            className={view === "all" ? "is-active" : ""}
+            onClick={() => setView("all")}
+          >
+            All plans
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "mine"}
+            className={view === "mine" ? "is-active" : ""}
+            onClick={() => setView("mine")}
+          >
+            My plans
+          </button>
+        </div>
         <button
           type="button"
           className={`page-filter-btn ${activeFilterCount > 0 ? "page-filter-btn--active" : ""}`}

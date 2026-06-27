@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Avatar } from "./Avatar";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
 import type { ConversationSummaryDTO } from "../types/shared";
@@ -61,7 +60,11 @@ export function BottomNav() {
         className={({ isActive }) => `bottom-nav-item ${isActive ? "is-active" : ""}`}
         aria-label="Home"
       >
-        <HomeIcon />
+        <span className="bottom-nav-icon-wrap">
+          <HomeIcon />
+        </span>
+        <span className="bottom-nav-label">Home</span>
+        <span className="bottom-nav-dot" aria-hidden="true" />
       </NavLink>
 
       <NavLink
@@ -69,7 +72,11 @@ export function BottomNav() {
         className={({ isActive }) => `bottom-nav-item ${isActive ? "is-active" : ""}`}
         aria-label="Explore"
       >
-        <SearchIcon />
+        <span className="bottom-nav-icon-wrap">
+          <SearchIcon />
+        </span>
+        <span className="bottom-nav-label">Explore</span>
+        <span className="bottom-nav-dot" aria-hidden="true" />
       </NavLink>
 
       <NavLink to="/plans/new" className="bottom-nav-cta" aria-label="Make a plan">
@@ -79,7 +86,7 @@ export function BottomNav() {
       <NavLink
         to="/messages"
         className={({ isActive }) => `bottom-nav-item ${isActive ? "is-active" : ""}`}
-        aria-label={unreadMessages > 0 ? `Messages, ${unreadMessages} unread` : "Messages"}
+        aria-label={unreadMessages > 0 ? `Chats, ${unreadMessages} unread` : "Chats"}
       >
         <span className="bottom-nav-icon-wrap">
           <ChatIcon />
@@ -87,25 +94,20 @@ export function BottomNav() {
             <span className="bottom-nav-badge">{unreadMessages > 9 ? "9+" : unreadMessages}</span>
           )}
         </span>
+        <span className="bottom-nav-label">Chats</span>
+        <span className="bottom-nav-dot" aria-hidden="true" />
       </NavLink>
 
-      <NavLink
+        <NavLink
         to={profileTo}
         className={({ isActive }) => `bottom-nav-item ${isActive ? "is-active" : ""}`}
         aria-label="Your profile"
       >
-        {user ? (
-          <Avatar
-            seed={user.avatarSeed}
-            style={user.avatarStyle}
-            photoDataUrl={user.avatarPhotoDataUrl}
-            params={user.avatarParams}
-            name={user.firstName || undefined}
-            size="sm"
-          />
-        ) : (
+        <span className="bottom-nav-icon-wrap">
           <UserIcon />
-        )}
+        </span>
+        <span className="bottom-nav-label">Profile</span>
+        <span className="bottom-nav-dot" aria-hidden="true" />
       </NavLink>
     </nav>
   );

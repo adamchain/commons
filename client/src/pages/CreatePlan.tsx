@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
+import { useCardImages } from "../lib/cardImages";
 import {
   VIBE_OPTIONS,
   type InterestTag,
@@ -128,6 +129,8 @@ export function CreatePlanPage() {
   });
   const navigate = useNavigate();
   const flyerRef = useRef<HTMLInputElement>(null);
+  const coverPool = useCardImages();
+  const [showCoverLib, setShowCoverLib] = useState(false);
 
   useEffect(() => {
     // Always load the user's network once — needed for both the
@@ -328,6 +331,7 @@ export function CreatePlanPage() {
   };
 
   if (path === "choose") {
+    const firstName = user?.firstName || "there";
     return (
       <main className="app-shell app-shell--mid">
         <header className="app-header app-header--minimal">
@@ -335,20 +339,26 @@ export function CreatePlanPage() {
             ← Back
           </Link>
         </header>
-        <h1 className="brand" style={{ marginBottom: 18 }}>
-          Got something in mind?
+        <h1 className="path-picker-intent-head">
+          Hey {firstName},<br />what&apos;s on your mind?
         </h1>
+        <p className="path-picker-intent-sub">
+          Drop something in, you never know who&apos;s down.
+        </p>
+        <div className="path-picker-divider" />
         <div className="path-picker">
-          {/* "Just an idea" is the primary/first path. */}
           <button
             type="button"
-            className={`path-picker-card ${pendingPath === "idea" ? "is-selected" : ""}`}
+            className={`path-picker-card path-picker-card--idea ${pendingPath === "idea" ? "is-selected" : ""}`}
             onClick={() => setPendingPath("idea")}
             aria-pressed={pendingPath === "idea"}
           >
-            <span className="path-picker-icon path-picker-icon--accent" aria-hidden="true">💡</span>
+            <span className="path-picker-eyebrow path-picker-eyebrow--accent">Casual</span>
             <span className="path-picker-title">Just an idea</span>
-            <span className="path-picker-sub">Just a thought. See who&apos;s down.</span>
+            <span className="path-picker-sub">
+              A casual thought — see who&apos;s down before committing to anything.
+            </span>
+            <span className="path-picker-chip path-picker-chip--accent">Share the vibe →</span>
           </button>
           <button
             type="button"
@@ -356,20 +366,21 @@ export function CreatePlanPage() {
             onClick={() => setPendingPath("plan")}
             aria-pressed={pendingPath === "plan"}
           >
-            <span className="path-picker-icon path-picker-icon--neutral" aria-hidden="true">📅</span>
+            <span className="path-picker-eyebrow path-picker-eyebrow--muted">Committed</span>
             <span className="path-picker-title">Make a plan</span>
-            <span className="path-picker-sub">Know what you want to do? Start here.</span>
+            <span className="path-picker-sub">
+              Know what you want to do. Set the details, post it, and see who&apos;s in.
+            </span>
+            <span className="path-picker-chip path-picker-chip--neutral">Set the details →</span>
           </button>
         </div>
+        <div className="path-picker-divider" />
         <button
           type="button"
           className="btn btn-primary btn-block"
-          style={{ marginTop: 20 }}
           disabled={!pendingPath}
           onClick={() => {
             if (pendingPath === "idea") {
-              // "Just an idea" pre-flexes the constraints so the resulting plan
-              // posts as a looking_for and the host can fill in the rest later.
               setForm((f) => ({
                 ...f,
                 isFlexibleLocation: true,
@@ -407,16 +418,21 @@ export function CreatePlanPage() {
   }
 
   return (
-    <main className="app-shell app-shell--mid">
-      <header className="app-header app-header--minimal">
+    <main className="app-shell app-shell--mid create-plan">
+      <header className="app-header create-header">
         <button type="button" className="detail-back" onClick={() => setPath("choose")}>
           ← Back
         </button>
+        <span className="create-header-title">New plan</span>
+        <button
+          type="submit"
+          form="create-plan-form"
+          className="create-header-post"
+          disabled={submitting}
+        >
+          {submitting ? "Posting…" : "Post it"}
+        </button>
       </header>
-      <h1 className="brand" style={{ marginBottom: 8 }}>New plan</h1>
-      <p className="brand-tagline" style={{ marginBottom: 24 }}>
-        Fill what you know · toggle what's flexible
-      </p>
 
       {(inviteUserId && inviteUserName) || inviteNames.length > 0 ? (
         <div className="create-plan-invite-banner" role="note">
@@ -436,31 +452,118 @@ export function CreatePlanPage() {
         </div>
       ) : null}
 
-      <form onSubmit={(event) => void submit(event)} className="form-card">
-        {/* Title */}
-        <section className="form-section">
-          <label className="form-question" htmlFor="title">
-            Title
-          </label>
-          <input
-            id="title"
-            placeholder="Trivia at National Mechanics"
-            value={form.title}
-            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-          />
-        </section>
+      <form id="create-plan-form" onSubmit={(event) => void submit(event)} className="create-form">
+        {/* Cover image — prominent at the top, per New Plan handoff. */}
+        {form.flyerDataUrl ? (
+          <div className="cover-picker cover-picker--filled">
+            <img src={form.flyerDataUrl} alt="" className="cover-picker-img" />
+            <div className="cover-picker-overlay">
+              <button type="button" className="cover-chip" onClick={() => setShowCoverLib(true)}>
+                Change
+              </button>
+              <button
+                type="button"
+                className="cover-chip"
+                onClick={() => setForm((f) => ({ ...f, flyerDataUrl: null }))}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="cover-picker">
+            <span className="cover-picker-title">Add a cover image</span>
+            <span className="cover-picker-sub">Make your plan stand out</span>
+            <div className="cover-picker-buttons">
+              <button type="button" className="cover-btn" onClick={() => setShowCoverLib(true)}>
+                <LibraryIcon />
+                Choose from library
+              </button>
+              <button type="button" className="cover-btn" onClick={() => void openFlyerPicker()}>
+                <UploadIcon />
+                Upload
+              </button>
+            </div>
+          </div>
+        )}
+        <input
+          ref={flyerRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) onFlyerPick(f);
+            if (flyerRef.current) flyerRef.current.value = "";
+          }}
+        />
 
-        {/* Where — venue picker, with Flexible toggle inline. Neighborhood is
-            no longer asked: when a Google Place is picked we keep the user's
-            default neighborhood on the plan; isFlexibleLocation supersedes. */}
-        <section className="form-section">
-          <label className="form-question">Where</label>
-          <div className="form-where-row">
-            <div className="form-where-row-main">
+        {/* Plan name */}
+        <input
+          id="title"
+          className="create-title-input"
+          placeholder="Plan name"
+          value={form.title}
+          onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+        />
+
+        {/* When — Date + Time as Luma-style rows, each with its own Flexible
+            pill. Borderless rows on the card, hairline-divided. */}
+        <div className="luma-card">
+          <div className="luma-row">
+            <span className="luma-label">Date</span>
+            <div className="luma-value">
+              {!form.isFlexibleDate ? (
+                <input
+                  id="date"
+                  type="date"
+                  className="luma-input"
+                  value={form.date}
+                  onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                />
+              ) : (
+                <span className="luma-flex-text">Flexible day</span>
+              )}
+              <FlexToggle
+                active={form.isFlexibleDate}
+                onClick={() => setForm((f) => ({ ...f, isFlexibleDate: !f.isFlexibleDate }))}
+                label="Flexible"
+              />
+            </div>
+          </div>
+          <div className="luma-row">
+            <span className="luma-label">Time</span>
+            <div className="luma-value">
+              {!form.isFlexibleTime ? (
+                <input
+                  id="time"
+                  type="time"
+                  className="luma-input"
+                  value={form.time}
+                  onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
+                />
+              ) : (
+                <span className="luma-flex-text">Flexible time</span>
+              )}
+              <FlexToggle
+                active={form.isFlexibleTime}
+                onClick={() => setForm((f) => ({ ...f, isFlexibleTime: !f.isFlexibleTime }))}
+                label="Flexible"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Location — single row, Google-Places-backed, flexible toggle inline.
+            Neighborhood is kept from the user's default when a place is picked;
+            isFlexibleLocation supersedes. */}
+        <div className="luma-card">
+          <div className="location-row">
+            <div className="location-row-main">
               <PlacePicker
                 value={form.locationName}
                 address={form.locationAddress}
-                placeholder="Drinker's Pub, La Colombe, Lloyd Hall…"
+                placeholder="Choose location"
                 onChange={(name) =>
                   setForm((f) => ({
                     ...f,
@@ -498,138 +601,84 @@ export function CreatePlanPage() {
               label="Flexible"
             />
           </div>
-        </section>
+        </div>
 
-        {/* When — date + time side by side, flex toggle under each. Group
-            heading "Anything flexible?" sits above as a single eyebrow. */}
-        <section className="form-section">
-          <label className="form-question">When</label>
-          <div className="form-when-grid">
-            <div className="form-when-cell">
-              <span className="form-sublabel">Date</span>
-              {!form.isFlexibleDate ? (
-                <input
-                  id="date"
-                  type="date"
-                  value={form.date}
-                  onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-                />
-              ) : (
-                <div className="form-flex-placeholder">Flexible day</div>
-              )}
-              <FlexToggle
-                active={form.isFlexibleDate}
-                onClick={() => setForm((f) => ({ ...f, isFlexibleDate: !f.isFlexibleDate }))}
-                label="Flexible"
-              />
+        {/* Description */}
+        <textarea
+          id="description"
+          className="create-desc-input"
+          placeholder="Add a description — vibes, what to bring, who it's for…"
+          value={form.description}
+          onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+        />
+
+        {/* Interests — wrapping pills. */}
+        <p className="form-eyebrow">Interests</p>
+        <div className="vibe-grid">
+          {VIBE_OPTIONS.map((opt) => {
+            const selected = form.vibes.includes(opt.id);
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                className={`vibe-tile ${selected ? "is-selected" : ""}`}
+                onClick={() => toggleVibe(opt.id)}
+                aria-pressed={selected}
+              >
+                <span className="vibe-tile-emoji" aria-hidden="true">{opt.emoji}</span>
+                <span className="vibe-tile-label">{opt.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Settings — visibility segmented toggle + optional extras. */}
+        <p className="form-eyebrow">Settings</p>
+        <div className="settings-card">
+          <div className="settings-row">
+            <span className="settings-row-label">Visibility</span>
+            <div className="seg-toggle" role="group" aria-label="Visibility">
+              <button
+                type="button"
+                className={`seg-toggle-btn ${form.visibility === "everyone" ? "is-active" : ""}`}
+                onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
+                aria-pressed={form.visibility === "everyone"}
+              >
+                Everyone
+              </button>
+              <button
+                type="button"
+                className={`seg-toggle-btn ${form.visibility === "network" ? "is-active" : ""}`}
+                onClick={() => setForm((f) => ({ ...f, visibility: "network" }))}
+                aria-pressed={form.visibility === "network"}
+              >
+                Network
+              </button>
             </div>
-            <div className="form-when-cell">
-              <span className="form-sublabel">Time</span>
-              {!form.isFlexibleTime ? (
-                <input
-                  id="time"
-                  type="time"
-                  value={form.time}
-                  onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
-                />
-              ) : (
-                <div className="form-flex-placeholder">Flexible time</div>
-              )}
-              <FlexToggle
-                active={form.isFlexibleTime}
-                onClick={() => setForm((f) => ({ ...f, isFlexibleTime: !f.isFlexibleTime }))}
-                label="Flexible"
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* Interests — defaults to the user's onboarding interests. */}
-        <section className="form-section">
-          <label className="form-question">Interests</label>
-          <div className="vibe-grid">
-            {VIBE_OPTIONS.map((opt) => {
-              const selected = form.vibes.includes(opt.id);
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  className={`vibe-tile ${selected ? "is-selected" : ""}`}
-                  onClick={() => toggleVibe(opt.id)}
-                  aria-pressed={selected}
-                >
-                  <span className="vibe-tile-emoji" aria-hidden="true">{opt.emoji}</span>
-                  <span className="vibe-tile-label">{opt.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* Details */}
-        <section className="form-section">
-          <label className="form-question" htmlFor="description">
-            Details
-          </label>
-          <textarea
-            id="description"
-            placeholder="Anything else — vibes, dress code, who else is invited…"
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-          />
-        </section>
-
-        {/* Visibility — promoted out of "More options" because it's the
-            primary audience decision and was getting missed when hidden. */}
-        <section className="form-section">
-          <label className="form-question">Who can see this?</label>
-          <div className="visibility-options">
-            <button
-              type="button"
-              className={`visibility-option ${form.visibility === "everyone" ? "is-active" : ""}`}
-              onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
-              aria-pressed={form.visibility === "everyone"}
-            >
-              <span className="visibility-option-title">Everyone on COMMONS</span>
-              <span className="visibility-option-sub">Open to anyone in your neighborhood</span>
-            </button>
-            <button
-              type="button"
-              className={`visibility-option ${form.visibility === "network" ? "is-active" : ""}`}
-              onClick={() => setForm((f) => ({ ...f, visibility: "network" }))}
-              aria-pressed={form.visibility === "network"}
-            >
-              <span className="visibility-option-title">Your Network</span>
-              <span className="visibility-option-sub">Only people you've added show up</span>
-            </button>
           </div>
 
-          {/* Granular hand-pick inside Your Network — when the host wants to
-              narrow it from "everyone in my network" to a specific group.
-              Empty list = the plan still goes to the full network. */}
+          {/* Granular hand-pick inside Your Network. Empty list = full network. */}
           {form.visibility === "network" && (
-            <NetworkHandPick
-              network={network}
-              invitedIds={invitedIds}
-              onToggle={toggleInvited}
-            />
+            <div className="settings-handpick">
+              <NetworkHandPick
+                network={network}
+                invitedIds={invitedIds}
+                onToggle={toggleInvited}
+              />
+            </div>
           )}
-        </section>
 
-        {/* Advanced options — collapsed by default to keep the form short */}
-        <p className="form-optional-label">Optional</p>
-        <button
-          type="button"
-          className="create-more-toggle"
-          onClick={() => setShowMore((s) => !s)}
-          aria-expanded={showMore}
-        >
-          <span className="create-more-toggle-main">
-            {showMore ? "Hide extra options" : "Add extra options"}
-          </span>
-          <span className="create-more-toggle-sub">Spots, repeats, flyer, link.</span>
-          <ChevronIcon open={showMore} />
-        </button>
+          {/* Options — spots, repeats, link. Collapsed to keep the form short. */}
+          <button
+            type="button"
+            className="settings-options-toggle"
+            onClick={() => setShowMore((s) => !s)}
+            aria-expanded={showMore}
+          >
+            <span className="settings-row-label">Options</span>
+            <span className="settings-options-hint">Spots, repeats, link</span>
+            <ChevronIcon open={showMore} />
+          </button>
 
         {showMore && (
           <div className="create-more">
@@ -727,47 +776,13 @@ export function CreatePlanPage() {
               )}
             </section>
 
-            {/* Flyer — image upload OR link with preview */}
+            {/* Link — paste a URL to show a preview on the card. The cover
+                image at the top of the form handles uploads. */}
             <section className="form-section">
-              <label className="form-question">Flyer (optional)</label>
-              <p className="form-help">Upload a screenshot or paste a link — it'll show on the card.</p>
-              <div className="flyer-uploader">
-            {form.flyerDataUrl ? (
-              <div className="flyer-preview">
-                <img src={form.flyerDataUrl} alt="" />
-                <button
-                  type="button"
-                  className="btn-link"
-                  onClick={() => setForm((f) => ({ ...f, flyerDataUrl: null }))}
-                >
-                  Remove
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="btn-secondary btn-block"
-                onClick={() => void openFlyerPicker()}
-              >
-                Upload flyer
-              </button>
-            )}
-            <input
-              ref={flyerRef}
-              type="file"
-              accept="image/*"
-              style={{ display: "none" }}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) onFlyerPick(f);
-                if (flyerRef.current) flyerRef.current.value = "";
-              }}
-            />
-          </div>
-
-          <label className="form-question" htmlFor="flyer-link" style={{ marginTop: 12 }}>
-            Or paste a link
-          </label>
+              <label className="form-question" htmlFor="flyer-link">
+                Add a link
+              </label>
+              <p className="form-help">Paste a link — it'll show as a preview on the card.</p>
           <input
             id="flyer-link"
             type="url"
@@ -807,6 +822,7 @@ export function CreatePlanPage() {
             </section>
           </div>
         )}
+        </div>
 
         {inviteUserId && (
           <section className="form-section">
@@ -873,6 +889,45 @@ export function CreatePlanPage() {
           Run clubs, book clubs, recurring crews.
         </p>
       </form>
+
+      {showCoverLib && (
+        <div
+          className="cover-lib-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Choose a cover image"
+          onClick={() => setShowCoverLib(false)}
+        >
+          <div className="cover-lib" onClick={(e) => e.stopPropagation()}>
+            <div className="cover-lib-head">
+              <span className="cover-lib-title">Choose a cover</span>
+              <button
+                type="button"
+                className="cover-lib-close"
+                onClick={() => setShowCoverLib(false)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="cover-lib-grid">
+              {coverPool.map((url) => (
+                <button
+                  key={url}
+                  type="button"
+                  className="cover-lib-tile"
+                  onClick={() => {
+                    setForm((f) => ({ ...f, flyerDataUrl: url }));
+                    setShowCoverLib(false);
+                  }}
+                >
+                  <img src={url} alt="" loading="lazy" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -1281,6 +1336,26 @@ function PinIcon() {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
       <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+function LibraryIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <path d="m21 15-5-5L5 21" />
+    </svg>
+  );
+}
+
+function UploadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 16V4" />
+      <path d="m7 9 5-5 5 5" />
+      <path d="M5 20h14" />
     </svg>
   );
 }

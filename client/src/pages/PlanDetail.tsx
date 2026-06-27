@@ -178,73 +178,37 @@ export function PlanDetailPage() {
     }
   }
 
-  return (
-    <main className="app-shell app-shell--wide app-shell--with-nav">
-      <header className="app-header app-header--minimal">
-        <Link to="/" className="detail-back">← Back</Link>
-      </header>
+  const coverSrc = plan.flyerDataUrl ?? pickCoverImage(coverPool, plan.id);
+  const prettyAddress = formatPlaceAddress(plan.location.address);
+  const showAddressLine = prettyAddress && prettyAddress !== plan.location.name;
+  const mapsQuery = encodeURIComponent(
+    [plan.location.name, plan.location.address].filter(Boolean).join(" "),
+  );
+  const mapsHref =
+    plan.location.lat !== undefined && plan.location.lng !== undefined
+      ? `https://www.google.com/maps/search/?api=1&query=${plan.location.lat},${plan.location.lng}`
+      : `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
 
-      <section className="plan-hero">
-        <div className="plan-hero-cover">
-          <img
-            src={plan.flyerDataUrl ?? pickCoverImage(coverPool, plan.id)}
-            alt=""
-            loading="lazy"
-          />
-        </div>
-        <div className="plan-title-row">
-          <span className="plan-title-emoji">{plan.hostEmoji}</span>
+  return (
+    <main className="app-shell app-shell--wide app-shell--with-nav plan-detail-page">
+      <div className="plan-detail-hero">
+        <img src={coverSrc} alt="" loading="lazy" />
+        <div className="plan-detail-hero-overlay" aria-hidden="true" />
+        <Link to="/" className="plan-detail-back" aria-label="Back">
+          ←
+        </Link>
+        <div className="plan-detail-hero-text">
+          <div className="plan-detail-hero-when">
+            {formatPlanDate(plan.date)} · {formatPlanTime(plan.time, plan.isFlexibleTime)}
+          </div>
           <h1>{sentenceCaseTitle(plan.title)}</h1>
         </div>
+      </div>
 
-        <div className="plan-when">
-          {formatPlanDate(plan.date)} · {formatPlanTime(plan.time, plan.isFlexibleTime)}
-        </div>
-        {(() => {
-          const pretty = formatPlaceAddress(plan.location.address);
-          const showAddressLine = pretty && pretty !== plan.location.name;
-          if (plan.isFlexibleLocation) {
-            return (
-              <div className="plan-where">
-                <strong>{plan.location.name}</strong>
-                {showAddressLine && <div className="meta-secondary">{pretty}</div>}
-              </div>
-            );
-          }
-          const query = encodeURIComponent(
-            [plan.location.name, plan.location.address].filter(Boolean).join(" "),
-          );
-          // Prefer coordinates so Maps opens to the actual pin, not a generic
-          // center. Falls back to text query only when coords weren't captured.
-          const mapsHref =
-            plan.location.lat !== undefined && plan.location.lng !== undefined
-              ? `https://www.google.com/maps/search/?api=1&query=${plan.location.lat},${plan.location.lng}`
-              : `https://www.google.com/maps/search/?api=1&query=${query}`;
-          return (
-            <a
-              className="plan-where plan-where--link"
-              href={mapsHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`Open ${plan.location.name} in Google Maps`}
-            >
-              <strong>
-                {plan.location.name}
-                {!showAddressLine && <span className="plan-where-arrow" aria-hidden="true"> ↗</span>}
-              </strong>
-              {showAddressLine && (
-                <div className="meta-secondary">
-                  {pretty}
-                  <span className="plan-where-arrow" aria-hidden="true"> ↗</span>
-                </div>
-              )}
-            </a>
-          );
-        })()}
-
+      <div className="plan-detail-body">
         <button
           type="button"
-          className="host-row"
+          className="host-row plan-detail-card"
           onClick={() => navigate(`/profile/${plan.creator.id}`)}
         >
           <Avatar seed={plan.creator.avatarSeed} style={plan.creator.avatarStyle} photoDataUrl={plan.creator.avatarPhotoDataUrl} params={plan.creator.avatarParams} size="md" />
@@ -258,11 +222,13 @@ export function PlanDetailPage() {
         </button>
 
         {plan.description && (
-          plan.planKind === "looking_for" ? (
-            <p className="plan-description plan-description-quote">&ldquo;{plan.description}&rdquo;</p>
-          ) : (
-            <p className="plan-description">{plan.description}</p>
-          )
+          <div className="plan-detail-card">
+            {plan.planKind === "looking_for" ? (
+              <p className="plan-description plan-description-quote" style={{ margin: 0 }}>&ldquo;{plan.description}&rdquo;</p>
+            ) : (
+              <p className="plan-description" style={{ margin: 0 }}>{plan.description}</p>
+            )}
+          </div>
         )}
 
         {isPast && (
@@ -369,16 +335,6 @@ export function PlanDetailPage() {
           </div>
         )}
 
-        {/* Group chat, pulled up top once you can access it. */}
-        {!isPast && canChat && (
-          <Link to={`/plans/${plan.id}/chat`} className="chat-entry chat-entry--prominent">
-            💬 Group chat ({plan.participants.going.length + plan.participants.interested.length})
-            <span className="chat-entry-arrow">→</span>
-          </Link>
-        )}
-
-        {/* Commit choices — only while you haven't committed yet. Once you have,
-            the drop-out toggle moves to the bottom of the page. */}
         {!isPast && !showDropoutBottom && !(isHosting && isLookingFor) && (
           <ParticipationButtons
             planId={plan.id}
@@ -392,6 +348,54 @@ export function PlanDetailPage() {
             onJustMarkedInterested={() => setShowInvite(true)}
           />
         )}
+
+        {!isPast && canChat && (
+          <Link to={`/plans/${plan.id}/chat`} className="chat-entry chat-entry--prominent plan-detail-card">
+            <span className="chat-entry-icon" aria-hidden="true">💬</span>
+            <span className="chat-entry-text">
+              Group chat ({plan.participants.going.length + plan.participants.interested.length})
+            </span>
+            <span className="chat-entry-arrow">›</span>
+          </Link>
+        )}
+
+        <div className="plan-meta-card">
+          <div className="plan-meta-row">
+            <span className="plan-meta-icon" aria-hidden="true">🕒</span>
+            <div className="plan-meta-text">
+              <span className="plan-meta-label">Date &amp; time</span>
+              <span className="plan-meta-value">
+                {formatPlanDate(plan.date)} · {formatPlanTime(plan.time, plan.isFlexibleTime)}
+              </span>
+            </div>
+          </div>
+          {plan.isFlexibleLocation ? (
+            <div className="plan-meta-row">
+              <span className="plan-meta-icon" aria-hidden="true">📍</span>
+              <div className="plan-meta-text">
+                <span className="plan-meta-label">Location</span>
+                <span className="plan-meta-value">{plan.location.name}</span>
+                {showAddressLine && <span className="plan-meta-sub">{prettyAddress}</span>}
+              </div>
+            </div>
+          ) : (
+            <a
+              className="plan-meta-row plan-meta-row--link"
+              href={mapsHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Open ${plan.location.name} in Google Maps`}
+            >
+              <span className="plan-meta-icon" aria-hidden="true">📍</span>
+              <div className="plan-meta-text">
+                <span className="plan-meta-label">Location</span>
+                <span className="plan-meta-value">{plan.location.name}</span>
+                {showAddressLine && <span className="plan-meta-sub">{prettyAddress}</span>}
+                <span className="plan-meta-maps">Tap to open maps ↗</span>
+              </div>
+            </a>
+          )}
+        </div>
 
         {/* On your own plan you get the full toolkit. On someone else's, the
             venue already links to Maps up top, so we only surface Invite —
@@ -470,7 +474,7 @@ export function PlanDetailPage() {
             {!plan.upForGrabsAt && (
               <button
                 type="button"
-                className="btn-secondary plan-host-action-btn"
+                className="btn-secondary plan-host-action-btn plan-host-action-btn--full"
                 onClick={() => void putUpForGrabs()}
               >
                 Can't make it — put up for grabs
@@ -482,12 +486,9 @@ export function PlanDetailPage() {
             />
           </div>
         )}
-      </section>
+      </div>
 
-      {/* For hosts (committed but kept inline above) the chat already shows up
-          top; uncommitted non-hosts can't chat yet, so nothing renders here. */}
-
-      <section className="who-block">
+      <section className="who-block plan-detail-card" style={{ margin: "0 14px 32px" }}>
         <div className="who-row">
           <h3 className="who-block-heading">Going · {plan.participants.going.length}</h3>
           {plan.participants.going.length === 0 ? (

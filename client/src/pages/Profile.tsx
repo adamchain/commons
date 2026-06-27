@@ -79,45 +79,58 @@ export function ProfilePage() {
 
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">
-      <header className="app-header app-header--minimal">
-        <Link to="/" className="detail-back">← Back</Link>
-      </header>
+      {!isSelf && (
+        <header className="app-header app-header--minimal">
+          <Link to="/" className="detail-back">← Back</Link>
+        </header>
+      )}
 
       <section className="profile-hero">
-        {isSelf ? (
-          <button
-            type="button"
-            className="profile-hero-avatar-btn"
-            onClick={() => setEditing(true)}
-            aria-label="Update profile photo"
-          >
-            <Avatar
-              seed={profile.user.avatarSeed}
-              style={profile.user.avatarStyle}
-              photoDataUrl={profile.user.avatarPhotoDataUrl}
-              params={profile.user.avatarParams}
-              name={profile.user.firstName}
-              size="xl"
-            />
-            <span className="profile-hero-avatar-edit" aria-hidden="true">✎</span>
-          </button>
-        ) : (
-          <Avatar
-            seed={profile.user.avatarSeed}
-            style={profile.user.avatarStyle}
-            photoDataUrl={profile.user.avatarPhotoDataUrl}
-            params={profile.user.avatarParams}
-            name={profile.user.firstName}
-            size="xl"
-          />
-        )}
-        <div className="profile-name">{profile.user.firstName || "Unnamed"}</div>
-        {/* Age + location on a single line directly under the name/photo. Age is
-            not captured at signup yet — it slots in here once a birthdate field
-            is added; until then we show location alone. */}
-        {profile.neighborhood && (
-          <div className="profile-meta-line">📍 {profile.neighborhood.name}</div>
-        )}
+        <div className="profile-hero-top">
+          <div className="profile-hero-main">
+            {isSelf ? (
+              <button
+                type="button"
+                className="profile-hero-avatar-btn"
+                onClick={() => setEditing(true)}
+                aria-label="Update profile photo"
+              >
+                <Avatar
+                  seed={profile.user.avatarSeed}
+                  style={profile.user.avatarStyle}
+                  photoDataUrl={profile.user.avatarPhotoDataUrl}
+                  params={profile.user.avatarParams}
+                  name={profile.user.firstName}
+                  size="xl"
+                />
+                <span className="profile-hero-avatar-edit" aria-hidden="true">✎</span>
+              </button>
+            ) : (
+              <Avatar
+                seed={profile.user.avatarSeed}
+                style={profile.user.avatarStyle}
+                photoDataUrl={profile.user.avatarPhotoDataUrl}
+                params={profile.user.avatarParams}
+                name={profile.user.firstName}
+                size="xl"
+              />
+            )}
+            <div className="profile-hero-text">
+              <div className="profile-name">{profile.user.firstName || "Unnamed"}</div>
+              {profile.neighborhood && (
+                <div className="profile-meta-line">
+                  <PinIcon />
+                  {profile.neighborhood.name}
+                </div>
+              )}
+            </div>
+          </div>
+          {isSelf && !editing && (
+            <button type="button" className="profile-edit-btn" onClick={() => setEditing(true)}>
+              Edit
+            </button>
+          )}
+        </div>
         {profile.socialLinks?.instagram && (
           <a
             className="profile-social-link"
@@ -155,27 +168,18 @@ export function ProfilePage() {
           </div>
         )}
 
+        <div className="profile-divider" />
+
         <div className="profile-stats" aria-label="Profile stats">
           <div className="profile-stat">
             <span className="profile-stat-num">{profile.stats.hosted}</span>
-            <span className="profile-stat-label">started</span>
+            <span className="profile-stat-label">Started</span>
           </div>
           <div className="profile-stat">
             <span className="profile-stat-num">{profile.stats.joined}</span>
-            <span className="profile-stat-label">joined</span>
+            <span className="profile-stat-label">Joined</span>
           </div>
         </div>
-
-        {isSelf && !editing && (
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => setEditing(true)}
-            style={{ marginTop: 14 }}
-          >
-            Edit profile
-          </button>
-        )}
 
         {!isSelf && (
           <Link
@@ -214,7 +218,7 @@ export function ProfilePage() {
 
       {profile.interests.length > 0 && (
         <section className="profile-block">
-          <h3 className="who-block-heading">Interests</h3>
+          <h3 className="profile-section-label">Interests</h3>
           <div className="profile-interests">
             {profile.interests.map((t) => (
               <span key={t} className="profile-interest-chip">
@@ -290,6 +294,15 @@ function SignOutGlyph() {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />
       <path d="M10 17 5 12l5-5M5 12h11" />
+    </svg>
+  );
+}
+
+function PinIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" width="11" height="11">
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
     </svg>
   );
 }

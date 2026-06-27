@@ -24,11 +24,9 @@ export function MessagesPage() {
 
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">
-      <h1 className="brand" style={{ marginBottom: 4 }}>
-        Messages
-      </h1>
-      <p className="brand-tagline" style={{ marginBottom: 20 }}>
-        Group chats from plans you've started, are going to, or are interested in
+      <h1 className="messages-page-title">Messages</h1>
+      <p className="messages-page-sub">
+        Group chats from plans you&apos;ve started, are going to, or are interested in.
       </p>
 
       {items.length === 0 ? (
@@ -39,9 +37,10 @@ export function MessagesPage() {
           </Link>
         </div>
       ) : (
-        <div className="messages-list">
-          {items.map((c) => (
-            <Link key={c.planId} to={`/plans/${c.planId}/chat`} className="messages-row">
+        <div className="messages-card">
+          <div className="messages-list">
+            {items.map((c) => (
+              <Link key={c.planId} to={`/plans/${c.planId}/chat`} className="messages-row">
               <span className="messages-row-emoji" aria-hidden="true">
                 {c.hostEmoji}
               </span>
@@ -66,7 +65,8 @@ export function MessagesPage() {
                 </span>
               )}
             </Link>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </main>
