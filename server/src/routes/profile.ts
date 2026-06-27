@@ -3,11 +3,8 @@ import { requireAuth } from "../middleware/requireAuth.js";
 import { store } from "../store.js";
 import { findUserById } from "../userRepo.js";
 import { planSummary, userToPublic } from "./plans.js";
-import type { HostTag } from "../types/shared.js";
 
 export const profileRouter = Router();
-
-const HOST_TAGS: HostTag[] = ["great_host", "would_do_again", "made_me_feel_welcome"];
 
 // GET /api/profile/:userId — public-facing host profile
 profileRouter.get("/:userId", requireAuth, async (req, res) => {
@@ -21,18 +18,6 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
   const neighborhood = target.neighborhoodId
     ? store.findNeighborhoodById(target.neighborhoodId)
     : null;
-  // Tag counts from feedback
-  const feedback = store.listFeedbackForHost(targetId);
-  const tagCounts: Record<HostTag, number> = {
-    great_host: 0,
-    would_do_again: 0,
-    made_me_feel_welcome: 0,
-  };
-  for (const f of feedback) {
-    for (const t of f.hostTags) {
-      if (HOST_TAGS.includes(t)) tagCounts[t]++;
-    }
-  }
   // Plans authored
   const allPlans = store.listPlansByCreator(targetId);
   const today = new Date();
@@ -84,7 +69,6 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
     user: userToPublic(target),
     interests: target.interests ?? [],
     neighborhood: neighborhood ? { id: neighborhood.id, name: neighborhood.name, metro: neighborhood.metro } : null,
-    tagCounts,
     stats: {
       hosted: allPlans.length,
       joined: joinedCount,

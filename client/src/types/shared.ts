@@ -327,20 +327,12 @@ export interface FeedbackDTO {
   toHostId: string;
   thumb: "up" | "down";
   note?: string;
-  hostTags: HostTag[];
   createdAt: string;
 }
 
-export type HostTag = "great_host" | "would_do_again" | "made_me_feel_welcome";
-
-export const HOST_TAG_LABELS: Record<HostTag, string> = {
-  great_host: "⭐ great host",
-  would_do_again: "🔄 would do again",
-  made_me_feel_welcome: "🤝 made me feel welcome",
-};
-
 export interface SocialLinks {
   instagram?: string;
+  tiktok?: string;
 }
 
 export interface MeDTO {

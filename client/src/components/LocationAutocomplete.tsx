@@ -93,7 +93,13 @@ export function LocationAutocomplete({
         setLoading(false);
         return;
       }
-      const url = `${NOMINATIM_URL}?format=jsonv2&addressdetails=1&limit=6&q=${encodeURIComponent(term)}`;
+      // Keep the OSM fallback in the US and biased toward the Philly area —
+      // without countrycodes/viewbox it returns worldwide matches, surfacing
+      // venues in other countries.
+      const url =
+        `${NOMINATIM_URL}?format=jsonv2&addressdetails=1&limit=6` +
+        `&countrycodes=us&viewbox=-75.60,40.20,-74.90,39.70&bounded=0` +
+        `&q=${encodeURIComponent(term)}`;
       fetch(url, {
         signal: controller.signal,
         headers: { Accept: "application/json" },

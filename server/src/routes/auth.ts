@@ -221,7 +221,11 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
   }
   if (req.body?.socialLinks && typeof req.body.socialLinks === "object") {
     const ig = String(req.body.socialLinks.instagram ?? "").replace(/^@/, "").trim();
-    patch.socialLinks = ig ? { instagram: ig } : undefined;
+    const tt = String(req.body.socialLinks.tiktok ?? "").replace(/^@/, "").trim();
+    const links: { instagram?: string; tiktok?: string } = {};
+    if (ig) links.instagram = ig;
+    if (tt) links.tiktok = tt;
+    patch.socialLinks = ig || tt ? links : undefined;
   }
   if (req.body?.notificationPrefs && typeof req.body.notificationPrefs === "object") {
     const incoming = req.body.notificationPrefs as Record<string, unknown>;

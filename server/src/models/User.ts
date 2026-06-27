@@ -29,7 +29,7 @@ const UserSchema = new mongoose.Schema<UserRecord>(
     incomingNetworkRequests: { type: [String], default: undefined },
     savedPlanIds: { type: [String], default: undefined },
     dismissedNetworkPromptPlanIds: { type: [String], default: undefined },
-    socialLinks: { type: { instagram: { type: String } }, default: undefined },
+    socialLinks: { type: { instagram: { type: String }, tiktok: { type: String } }, default: undefined },
     guidelinesAcknowledgedAt: { type: String, default: null },
     notificationPrefs: {
       type: {

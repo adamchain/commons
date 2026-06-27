@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
-import { FeedbackPrompt } from "../components/FeedbackPrompt";
 import { FilterSheet } from "../components/FilterSheet";
 import { InviteSheet } from "../components/InviteSheet";
 import { LoadingScreen } from "../components/LoadingScreen";
@@ -193,7 +192,6 @@ export function FeedPage() {
   return (
     <main className="app-shell app-shell--wide app-shell--with-nav app-shell--with-topbar">
       {refreshing && <div className="feed-refreshing" role="status">Refreshing…</div>}
-      <FeedbackPrompt />
 
       <WeekStrip
         plans={plans}

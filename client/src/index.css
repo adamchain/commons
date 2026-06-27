@@ -1659,6 +1659,11 @@ h1, h2, h3, h4, h5, h6 {
   grid-template-columns: minmax(0, 1fr);
   gap: 6px;
 }
+/* Lift the whole picker above neighbouring form rows while it's active so the
+   results dropdown isn't painted over by later sections/toggles. */
+.place-picker:focus-within {
+  z-index: 70;
+}
 .place-picker-field {
   display: flex;
   align-items: center;
@@ -1920,9 +1925,50 @@ h1, h2, h3, h4, h5, h6 {
 .create-more-chevron.is-open {
   transform: rotate(180deg);
 }
+/* Options content lives inside the settings card — render each block as a
+   divided row so it reads as a continuation of the Visibility row above,
+   instead of free-floating form sections. */
 .create-more {
-  display: grid;
-  gap: 22px;
+  display: block;
+}
+.create-more .form-section {
+  gap: 8px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+}
+/* Labels + help match the settings-row label/sub scale, not the heavier
+   stand-alone form-question style. */
+.create-more .form-question {
+  font-size: 15px;
+  font-weight: 500;
+  margin-bottom: 0;
+}
+.create-more .form-help {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+/* Keep the label/help + control on one line like the Visibility row. */
+.create-more .form-row-flex {
+  align-items: center;
+  margin-bottom: 0;
+}
+/* "Set cap" matches the compact muted "Flexible" pill used elsewhere. */
+.create-more .flex-toggle-btn {
+  margin-top: 0;
+  padding: 5px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--surface-2);
+  border-color: transparent;
+}
+.create-more .flex-toggle-btn svg {
+  display: none;
+}
+.create-more .flex-toggle-btn.is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .form-grid-2 {
@@ -1941,6 +1987,10 @@ h1, h2, h3, h4, h5, h6 {
 
 .location-autocomplete {
   position: relative;
+}
+/* Lift above sibling form fields while open so the dropdown sits on top. */
+.location-autocomplete:focus-within {
+  z-index: 70;
 }
 
 .location-suggestions {
@@ -3302,20 +3352,6 @@ h1, h2, h3, h4, h5, h6 {
     grid-template-columns: 1fr;
   }
 }
-.profile-tags {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin: 8px 0;
-}
-.profile-tag {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 13px;
-}
 .profile-block {
   margin-top: 24px;
 }
@@ -3619,52 +3655,6 @@ h1, h2, h3, h4, h5, h6 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-/* Feedback prompt */
-.feedback-prompt {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--accent, #2c2c2c);
-  padding: 16px;
-  border-radius: 14px;
-  margin-bottom: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.feedback-prompt-title { font-weight: 700; }
-.feedback-prompt-sub { margin: 4px 0 0; font-size: 13px; color: var(--text-muted); }
-.feedback-thumbs { display: flex; gap: 12px; align-items: center; }
-.feedback-thumb {
-  font-size: 24px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  width: 56px;
-  height: 56px;
-  cursor: pointer;
-}
-.feedback-note {
-  width: 100%;
-  padding: 10px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  font-family: inherit;
-}
-.feedback-tags { display: flex; gap: 6px; flex-wrap: wrap; }
-.feedback-tag {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  padding: 4px 10px;
-  border-radius: 999px;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--text);
-}
-.feedback-tag.is-active { background: var(--text); color: var(--bg); }
-.feedback-actions { display: flex; justify-content: flex-end; gap: 12px; align-items: center; }
 
 /* Chat */
 .app-shell--chat {
@@ -5751,10 +5741,11 @@ h1, h2, h3, h4, h5, h6 {
 .app-shell--with-topbar {
   padding-top: calc(var(--topbar-height, 56px) + 18px + env(safe-area-inset-top, 0px));
 }
-/* PlanDetail's own back-link header is the first content — give it breathing
-   room from the status bar / notch, but no extra reserved topbar height. */
+/* PlanDetail's hero cover image is the first content and bleeds edge-to-edge to
+   the very top (the back button is overlaid and handles its own safe-area inset),
+   so no top padding — otherwise a blank band sits above the image. */
 .app-shell--wide.app-shell--with-nav:not(.app-shell--with-topbar) {
-  padding-top: calc(20px + env(safe-area-inset-top, 0px));
+  padding-top: 0;
 }
 
 /* keep onboarding/admin clean — they hide topbar */
@@ -6843,15 +6834,45 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 18px;
 }
 
-.profile-social-link {
-  display: inline-block;
-  margin-top: 6px;
+.profile-social-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.social-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--paper-200);
+  color: var(--accent);
   font-size: 13px;
   font-weight: 600;
-  color: var(--accent);
   text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-.profile-social-link:hover { text-decoration: underline; }
+.social-pill svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.social-pill.is-active:active { transform: scale(0.97); }
+/* Empty pill — icon only, muted, dashed outline as an "add me" affordance. */
+.social-pill.is-empty {
+  width: 38px;
+  padding: 0;
+  justify-content: center;
+  background: transparent;
+  border-color: var(--border);
+  border-style: dashed;
+  color: var(--text-subtle);
+}
+.social-pill.is-empty:active { transform: scale(0.97); }
 
 .profile-social-locked {
   margin-top: 6px;
@@ -7784,6 +7805,13 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-card);
   overflow: hidden;
+}
+/* While a field inside is focused (e.g. the venue picker), let its results
+   dropdown escape the card's clip and lift above the following card. */
+.luma-card:focus-within {
+  overflow: visible;
+  position: relative;
+  z-index: 70;
 }
 .luma-row {
   display: flex;

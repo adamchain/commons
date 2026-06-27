@@ -193,7 +193,6 @@ const FeedbackSchema = new Schema<FeedbackRecord>(
     toHostId: { type: String, required: true },
     thumb: { type: String, enum: ["up", "down"], required: true },
     note: { type: String },
-    hostTags: { type: [String], default: [] },
     createdAt: { type: String, required: true },
   },
   { collection: "feedback" },

@@ -4,7 +4,6 @@ import { dirname, resolve } from "node:path";
 import { mongoMirror } from "./mongoMirror.js";
 import type {
   AvatarStyle,
-  HostTag,
   InterestTag,
   JoinType,
   ParticipationState,
@@ -40,7 +39,7 @@ export interface UserRecord {
   /** Plan ids where the user dismissed the post-event network prompt. */
   dismissedNetworkPromptPlanIds?: string[];
   /** Social links — only surfaced to viewers who share a past plan or DM. */
-  socialLinks?: { instagram?: string };
+  socialLinks?: { instagram?: string; tiktok?: string };
   /** ISO timestamp the user tapped through the community-guidelines acknowledgment. */
   guidelinesAcknowledgedAt?: string | null;
   /** Notification toggles. Stored as a partial — missing keys default to true at the boundary. */
@@ -217,7 +216,6 @@ export interface FeedbackRecord {
   toHostId: string;
   thumb: "up" | "down";
   note?: string;
-  hostTags: HostTag[];
   createdAt: string;
 }
 

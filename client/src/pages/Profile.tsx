@@ -11,9 +11,7 @@ import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
 import {
   AVATAR_PRESETS,
-  HOST_TAG_LABELS,
   INTEREST_LABELS,
-  type HostTag,
   type InterestTag,
   type MeDTO,
   type PlanDTO,
@@ -24,13 +22,12 @@ interface ProfilePayload {
   user: PublicUser;
   interests: InterestTag[];
   neighborhood: { id: string; name: string; metro: string } | null;
-  tagCounts: Record<HostTag, number>;
   stats: { hosted: number; joined: number };
   upcoming: PlanDTO[];
   past: Array<{ id: string; title: string; date: string; wentCount: number }>;
   sharedPlanId: string | null;
   /** Null until viewer earns visibility (shared completed plan or in network). */
-  socialLinks: { instagram?: string } | null;
+  socialLinks: { instagram?: string; tiktok?: string } | null;
   network: {
     inMyNetwork: boolean;
     requestSent?: boolean;
@@ -71,11 +68,6 @@ export function ProfilePage() {
   }, [isSelf, user?.networkUserIds?.length]);
 
   if (!profile) return <LoadingScreen tagline="Loading profile" />;
-
-  const topTags: Array<[HostTag, number]> = (Object.entries(profile.tagCounts) as Array<[HostTag, number]>)
-    .filter(([, count]) => count > 0)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3);
 
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">
@@ -131,16 +123,12 @@ export function ProfilePage() {
             </button>
           )}
         </div>
-        {profile.socialLinks?.instagram && (
-          <a
-            className="profile-social-link"
-            href={`https://instagram.com/${profile.socialLinks.instagram}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            @{profile.socialLinks.instagram} on Instagram
-          </a>
-        )}
+        <SocialPills
+          isSelf={isSelf}
+          instagram={profile.socialLinks?.instagram}
+          tiktok={profile.socialLinks?.tiktok}
+          onEdit={() => setEditing(true)}
+        />
         {!isSelf && profile.socialLinks === null && (
           <p className="profile-social-locked">
             Add to your network to see more — face and interests stay public.
@@ -192,16 +180,6 @@ export function ProfilePage() {
         )}
 
         {!isSelf && <FriendButton profile={profile} onUpdated={reloadProfile} />}
-
-        {topTags.length > 0 && (
-          <div className="profile-tags">
-            {topTags.map(([tag, count]) => (
-              <span key={tag} className="profile-tag">
-                {HOST_TAG_LABELS[tag]} ×{count}
-              </span>
-            ))}
-          </div>
-        )}
       </section>
 
       {isSelf && editing && user && (
@@ -303,6 +281,91 @@ function PinIcon() {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" width="11" height="11">
       <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
       <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+/**
+ * Instagram + TikTok handles rendered as pills. Active pills (handle set) link
+ * out; empty pills show just the brand icon. On your own profile empty pills are
+ * always shown as a prompt and open the editor; on others' profiles empty pills
+ * are hidden — no value in surfacing a stranger's missing handle.
+ */
+function SocialPills({
+  isSelf,
+  instagram,
+  tiktok,
+  onEdit,
+}: {
+  isSelf: boolean;
+  instagram?: string;
+  tiktok?: string;
+  onEdit: () => void;
+}) {
+  const items = [
+    {
+      key: "instagram",
+      label: "Instagram",
+      handle: instagram,
+      href: (h: string) => `https://instagram.com/${h}`,
+      Icon: InstagramGlyph,
+    },
+    {
+      key: "tiktok",
+      label: "TikTok",
+      handle: tiktok,
+      href: (h: string) => `https://tiktok.com/@${h}`,
+      Icon: TikTokGlyph,
+    },
+  ];
+  const visible = isSelf ? items : items.filter((it) => it.handle);
+  if (visible.length === 0) return null;
+
+  return (
+    <div className="profile-social-pills">
+      {visible.map(({ key, label, handle, href, Icon }) =>
+        handle ? (
+          <a
+            key={key}
+            className={`social-pill social-pill--${key} is-active`}
+            href={href(handle)}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`@${handle} on ${label}`}
+          >
+            <Icon />
+            <span className="social-pill-handle">@{handle}</span>
+          </a>
+        ) : (
+          <button
+            key={key}
+            type="button"
+            className={`social-pill social-pill--${key} is-empty`}
+            onClick={onEdit}
+            aria-label={`Add your ${label}`}
+          >
+            <Icon />
+          </button>
+        ),
+      )}
+    </div>
+  );
+}
+
+function InstagramGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="2" width="20" height="20" rx="5.5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37Z" />
+      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+    </svg>
+  );
+}
+
+function TikTokGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07Z" />
     </svg>
   );
 }
@@ -421,6 +484,7 @@ function EditPanel({
   const [photo, setPhoto] = useState<string | null>(me.avatarPhotoDataUrl ?? null);
   const [avatarParams, setAvatarParams] = useState<string | null>(me.avatarParams ?? null);
   const [instagram, setInstagram] = useState(me.socialLinks?.instagram ?? "");
+  const [tiktok, setTiktok] = useState(me.socialLinks?.tiktok ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -444,7 +508,10 @@ function EditPanel({
           firstName: firstName.trim(),
           avatarPhotoDataUrl: photo ?? null,
           avatarParams: avatarParams ?? null,
-          socialLinks: { instagram: instagram.trim().replace(/^@/, "") },
+          socialLinks: {
+            instagram: instagram.trim().replace(/^@/, ""),
+            tiktok: tiktok.trim().replace(/^@/, ""),
+          },
         }),
       });
       onSaved(next);
@@ -560,6 +627,18 @@ function EditPanel({
         value={instagram}
         placeholder="@yourhandle"
         onChange={(e) => setInstagram(e.target.value)}
+        maxLength={40}
+      />
+
+      <label className="form-question" htmlFor="profile-edit-tt" style={{ marginTop: 14 }}>
+        TikTok
+      </label>
+      <input
+        id="profile-edit-tt"
+        className="onboarding-input"
+        value={tiktok}
+        placeholder="@yourhandle"
+        onChange={(e) => setTiktok(e.target.value)}
         maxLength={40}
       />
 

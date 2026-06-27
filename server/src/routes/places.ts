@@ -3,13 +3,25 @@ import { requireAuth } from "../middleware/requireAuth.js";
 
 export const placesRouter = Router();
 
-const PHILLY = "39.9526,-75.1652";
+// Philly metro — used to bias all lookups toward where the app lives.
+const PHILLY_LAT = 39.9526;
+const PHILLY_LNG = -75.1652;
+const BIAS_RADIUS_M = 40000;
+
+const PLACES_BASE = "https://places.googleapis.com/v1";
 
 function googleKey(): string | undefined {
   return process.env.GOOGLE_MAPS_API_KEY?.trim() || process.env.GOOGLE_PLACES_API_KEY?.trim();
 }
 
-/** Legacy Places Autocomplete — key stays on server. */
+function phillyCircle(radius = BIAS_RADIUS_M) {
+  return { circle: { center: { latitude: PHILLY_LAT, longitude: PHILLY_LNG }, radius } };
+}
+
+/**
+ * Autocomplete (Places API New). Returns { predictions: [{ placeId, name, address }] }
+ * — the same shape the legacy endpoint returned, so the client is unchanged.
+ */
 placesRouter.get("/autocomplete", requireAuth, async (req, res) => {
   const key = googleKey();
   const input = String(req.query.q ?? "").trim();
@@ -21,32 +33,40 @@ placesRouter.get("/autocomplete", requireAuth, async (req, res) => {
     res.json({ predictions: [] });
     return;
   }
-  const url = new URL("https://maps.googleapis.com/maps/api/place/autocomplete/json");
-  url.searchParams.set("input", input);
-  url.searchParams.set("key", key);
-  url.searchParams.set("location", PHILLY);
-  url.searchParams.set("radius", "40000");
-  url.searchParams.set("types", "establishment");
   try {
-    const r = await fetch(url);
+    const r = await fetch(`${PLACES_BASE}/places:autocomplete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": key },
+      body: JSON.stringify({
+        input,
+        includedRegionCodes: ["us"],
+        locationBias: phillyCircle(),
+      }),
+    });
     const data = (await r.json()) as {
-      predictions?: Array<{
-        description: string;
-        place_id: string;
-        structured_formatting?: { main_text: string; secondary_text?: string };
+      suggestions?: Array<{
+        placePrediction?: {
+          placeId: string;
+          text?: { text?: string };
+          structuredFormat?: { mainText?: { text?: string } };
+        };
       }>;
-      status: string;
+      error?: { message?: string };
     };
-    if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
-      console.error("[places] autocomplete", data.status);
+    if (!r.ok) {
+      console.error("[places] autocomplete", data.error?.message ?? r.status);
       res.status(502).json({ error: "Places lookup failed", predictions: [] });
       return;
     }
-    const predictions = (data.predictions ?? []).slice(0, 8).map((p) => ({
-      placeId: p.place_id,
-      name: p.structured_formatting?.main_text ?? p.description.split(",")[0]?.trim() ?? "",
-      address: p.description,
-    }));
+    const predictions = (data.suggestions ?? [])
+      .map((s) => s.placePrediction)
+      .filter((p): p is NonNullable<typeof p> => Boolean(p))
+      .slice(0, 8)
+      .map((p) => ({
+        placeId: p.placeId,
+        name: p.structuredFormat?.mainText?.text ?? p.text?.text?.split(",")[0]?.trim() ?? "",
+        address: p.text?.text ?? "",
+      }));
     res.json({ predictions });
   } catch (e) {
     console.error("[places] autocomplete fetch", e);
@@ -54,9 +74,31 @@ placesRouter.get("/autocomplete", requireAuth, async (req, res) => {
   }
 });
 
+interface NewPlace {
+  id: string;
+  displayName?: { text?: string };
+  formattedAddress?: string;
+  shortFormattedAddress?: string;
+  location?: { latitude?: number; longitude?: number };
+  photos?: Array<{ name: string }>;
+  rating?: number;
+  userRatingCount?: number;
+  currentOpeningHours?: { openNow?: boolean };
+}
+
+const SEARCH_FIELD_MASK = [
+  "places.id",
+  "places.displayName",
+  "places.formattedAddress",
+  "places.location",
+  "places.photos",
+  "places.rating",
+  "places.userRatingCount",
+].join(",");
+
 /**
- * Text Search — used by Explore's location search box. Returns a few candidate
- * venues with a photo reference we can re-fetch via /photo.
+ * Text Search (Places API New) — Explore's location search box. Same response
+ * shape as before. Foreign hits are dropped (US addresses end with "USA").
  */
 placesRouter.get("/search", requireAuth, async (req, res) => {
   const key = googleKey();
@@ -69,39 +111,33 @@ placesRouter.get("/search", requireAuth, async (req, res) => {
     res.json({ results: [] });
     return;
   }
-  const url = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
-  url.searchParams.set("query", query);
-  url.searchParams.set("location", PHILLY);
-  url.searchParams.set("radius", "40000");
-  url.searchParams.set("key", key);
   try {
-    const r = await fetch(url);
-    const data = (await r.json()) as {
-      results?: Array<{
-        place_id: string;
-        name: string;
-        formatted_address?: string;
-        geometry?: { location?: { lat: number; lng: number } };
-        photos?: Array<{ photo_reference: string }>;
-        rating?: number;
-        user_ratings_total?: number;
-      }>;
-      status: string;
-    };
-    if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
-      console.error("[places] search", data.status);
+    const r = await fetch(`${PLACES_BASE}/places:searchText`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": key,
+        "X-Goog-FieldMask": SEARCH_FIELD_MASK,
+      },
+      body: JSON.stringify({ textQuery: query, regionCode: "us", locationBias: phillyCircle() }),
+    });
+    const data = (await r.json()) as { places?: NewPlace[]; error?: { message?: string } };
+    if (!r.ok) {
+      console.error("[places] search", data.error?.message ?? r.status);
       res.status(502).json({ error: "Places search failed", results: [] });
       return;
     }
-    const results = (data.results ?? []).slice(0, 12).map((r) => ({
-      placeId: r.place_id,
-      name: r.name,
-      address: r.formatted_address ?? "",
-      lat: r.geometry?.location?.lat,
-      lng: r.geometry?.location?.lng,
-      photoRef: r.photos?.[0]?.photo_reference,
-      rating: r.rating,
-      ratings: r.user_ratings_total,
+    const raw = data.places ?? [];
+    const usOnly = raw.filter((p) => /,\s*USA$/.test(p.formattedAddress ?? ""));
+    const results = (usOnly.length ? usOnly : raw).slice(0, 12).map((p) => ({
+      placeId: p.id,
+      name: p.displayName?.text ?? "",
+      address: p.formattedAddress ?? "",
+      lat: p.location?.latitude,
+      lng: p.location?.longitude,
+      photoRef: p.photos?.[0]?.name,
+      rating: p.rating,
+      ratings: p.userRatingCount,
     }));
     res.json({ results });
   } catch (e) {
@@ -111,18 +147,38 @@ placesRouter.get("/search", requireAuth, async (req, res) => {
 });
 
 /** Google place types we allow as Explore category filters. */
-const NEARBY_TYPES = new Set([
-  "cafe",
-  "restaurant",
-  "bar",
-  "gym",
-  "park",
-  "tourist_attraction",
-]);
+const NEARBY_TYPES = new Set(["cafe", "restaurant", "bar", "gym", "park", "tourist_attraction"]);
+
+const NEARBY_FIELD_MASK = [
+  "places.id",
+  "places.displayName",
+  "places.formattedAddress",
+  "places.shortFormattedAddress",
+  "places.location",
+  "places.photos",
+  "places.rating",
+  "places.userRatingCount",
+  "places.currentOpeningHours.openNow",
+].join(",");
+
+function mapNearbyPlace(p: NewPlace) {
+  return {
+    placeId: p.id,
+    name: p.displayName?.text ?? "",
+    address: p.shortFormattedAddress ?? p.formattedAddress ?? "",
+    lat: p.location?.latitude,
+    lng: p.location?.longitude,
+    photoRef: p.photos?.[0]?.name,
+    rating: p.rating,
+    ratings: p.userRatingCount,
+    openNow: p.currentOpeningHours?.openNow,
+  };
+}
 
 /**
- * Nearby Search — powers Explore's default "near you" list (no search term
- * needed). Returns the same shape as /search so the place tiles are reused.
+ * Nearby (Places API New). Without a keyword we use Nearby Search; with one we
+ * fall back to Text Search biased to the point (Nearby Search New has no
+ * free-text keyword). Same response shape as the legacy endpoint.
  */
 placesRouter.get("/nearby", requireAuth, async (req, res) => {
   const key = googleKey();
@@ -140,65 +196,62 @@ placesRouter.get("/nearby", requireAuth, async (req, res) => {
   const typeParam = String(req.query.type ?? "").trim();
   const type = NEARBY_TYPES.has(typeParam) ? typeParam : "";
   const keyword = String(req.query.q ?? "").trim();
+  const circle = { center: { latitude: lat, longitude: lng }, radius };
 
-  const url = new URL("https://maps.googleapis.com/maps/api/place/nearbysearch/json");
-  url.searchParams.set("location", `${lat},${lng}`);
-  url.searchParams.set("radius", String(radius));
-  if (type) url.searchParams.set("type", type);
-  if (keyword) url.searchParams.set("keyword", keyword);
-  url.searchParams.set("key", key);
   try {
-    const r = await fetch(url);
-    const data = (await r.json()) as {
-      results?: Array<{
-        place_id: string;
-        name: string;
-        vicinity?: string;
-        formatted_address?: string;
-        geometry?: { location?: { lat: number; lng: number } };
-        photos?: Array<{ photo_reference: string }>;
-        rating?: number;
-        user_ratings_total?: number;
-        opening_hours?: { open_now?: boolean };
-      }>;
-      status: string;
-    };
-    if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
-      console.error("[places] nearby", data.status);
+    let r: Response;
+    if (keyword) {
+      r = await fetch(`${PLACES_BASE}/places:searchText`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": key,
+          "X-Goog-FieldMask": NEARBY_FIELD_MASK,
+        },
+        body: JSON.stringify({ textQuery: keyword, locationBias: { circle }, maxResultCount: 20 }),
+      });
+    } else {
+      r = await fetch(`${PLACES_BASE}/places:searchNearby`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": key,
+          "X-Goog-FieldMask": NEARBY_FIELD_MASK,
+        },
+        body: JSON.stringify({
+          ...(type ? { includedTypes: [type] } : {}),
+          maxResultCount: 20,
+          locationRestriction: { circle },
+        }),
+      });
+    }
+    const data = (await r.json()) as { places?: NewPlace[]; error?: { message?: string } };
+    if (!r.ok) {
+      console.error("[places] nearby", data.error?.message ?? r.status);
       res.status(502).json({ error: "Nearby lookup failed", results: [] });
       return;
     }
-    const results = (data.results ?? []).slice(0, 20).map((r) => ({
-      placeId: r.place_id,
-      name: r.name,
-      address: r.vicinity ?? r.formatted_address ?? "",
-      lat: r.geometry?.location?.lat,
-      lng: r.geometry?.location?.lng,
-      photoRef: r.photos?.[0]?.photo_reference,
-      rating: r.rating,
-      ratings: r.user_ratings_total,
-      openNow: r.opening_hours?.open_now,
-    }));
-    res.json({ results });
+    res.json({ results: (data.places ?? []).slice(0, 20).map(mapNearbyPlace) });
   } catch (e) {
     console.error("[places] nearby fetch", e);
     res.status(502).json({ error: "Nearby lookup failed", results: [] });
   }
 });
 
-/** Proxy a Places Photo so the API key never leaves the server. */
+/**
+ * Proxy a Place Photo (Places API New media endpoint) so the API key never
+ * leaves the server. `ref` is the photo resource name, e.g.
+ * "places/XXX/photos/YYY".
+ */
 placesRouter.get("/photo", requireAuth, async (req, res) => {
   const key = googleKey();
-  const photoRef = String(req.query.ref ?? "").trim();
+  const photoName = String(req.query.ref ?? "").trim();
   const maxwidth = Math.min(1024, Math.max(64, Number(req.query.w ?? 400) || 400));
-  if (!key || !photoRef) {
+  if (!key || !photoName.startsWith("places/")) {
     res.status(400).end();
     return;
   }
-  const url = new URL("https://maps.googleapis.com/maps/api/place/photo");
-  url.searchParams.set("photo_reference", photoRef);
-  url.searchParams.set("maxwidth", String(maxwidth));
-  url.searchParams.set("key", key);
+  const url = `${PLACES_BASE}/${photoName}/media?maxWidthPx=${maxwidth}&key=${encodeURIComponent(key)}`;
   try {
     const r = await fetch(url, { redirect: "follow" });
     if (!r.ok || !r.body) {
@@ -215,6 +268,7 @@ placesRouter.get("/photo", requireAuth, async (req, res) => {
   }
 });
 
+/** Place Details (Places API New). Same response shape as before. */
 placesRouter.get("/details", requireAuth, async (req, res) => {
   const key = googleKey();
   const placeId = String(req.query.placeId ?? "").trim();
@@ -226,30 +280,29 @@ placesRouter.get("/details", requireAuth, async (req, res) => {
     res.status(400).json({ error: "placeId required" });
     return;
   }
-  const url = new URL("https://maps.googleapis.com/maps/api/place/details/json");
-  url.searchParams.set("place_id", placeId);
-  url.searchParams.set("fields", "name,formatted_address,geometry");
-  url.searchParams.set("key", key);
   try {
-    const r = await fetch(url);
+    const r = await fetch(`${PLACES_BASE}/places/${encodeURIComponent(placeId)}`, {
+      headers: {
+        "X-Goog-Api-Key": key,
+        "X-Goog-FieldMask": "displayName,formattedAddress,location",
+      },
+    });
     const data = (await r.json()) as {
-      result?: {
-        name?: string;
-        formatted_address?: string;
-        geometry?: { location?: { lat: number; lng: number } };
-      };
-      status: string;
+      displayName?: { text?: string };
+      formattedAddress?: string;
+      location?: { latitude?: number; longitude?: number };
+      error?: { message?: string };
     };
-    if (data.status !== "OK" || !data.result) {
+    if (!r.ok) {
+      console.error("[places] details", data.error?.message ?? r.status);
       res.status(404).json({ error: "Place not found" });
       return;
     }
-    const { result } = data;
     res.json({
-      name: result.name ?? "",
-      address: result.formatted_address ?? "",
-      lat: result.geometry?.location?.lat,
-      lng: result.geometry?.location?.lng,
+      name: data.displayName?.text ?? "",
+      address: data.formattedAddress ?? "",
+      lat: data.location?.latitude,
+      lng: data.location?.longitude,
     });
   } catch (e) {
     console.error("[places] details fetch", e);
