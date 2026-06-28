@@ -12,6 +12,8 @@ import { ExplorePage } from "./pages/Explore";
 import { FeedPage } from "./pages/Feed";
 import { NotificationsPage } from "./pages/Notifications";
 import { OnboardingPage } from "./pages/Onboarding";
+import { LandingPage } from "./pages/Landing";
+import { isNative } from "./lib/platform";
 import { PlanDetailPage } from "./pages/PlanDetail";
 import { AdminPage } from "./pages/Admin";
 import { ProfilePage } from "./pages/Profile";
@@ -44,7 +46,9 @@ function Protected({
     return () => clearTimeout(t);
   }, [bootSplashDone]);
   if (loading || !bootSplashDone) return <LoadingScreen tagline="A place for plans meant to be shared." />;
-  if (!user) return <Navigate to="/onboarding" replace />;
+  // The app is iOS-only; on the web there's nothing to sign into, so send
+  // unauthenticated web visitors to the marketing landing instead of onboarding.
+  if (!user) return <Navigate to={isNative() ? "/onboarding" : "/welcome"} replace />;
   if (!allowIncomplete && !user.onboardingComplete) return <Navigate to="/onboarding" replace />;
   return <>{children}</>;
 }
@@ -54,6 +58,7 @@ export default function App() {
     <>
       <TopBar />
       <Routes>
+        <Route path="/welcome" element={<LandingPage />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/login" element={<Navigate to="/onboarding" replace />} />

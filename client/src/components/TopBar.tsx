@@ -16,6 +16,7 @@ export function TopBar() {
   const [hasUnread, setHasUnread] = useState(false);
 
   const hide =
+    pathname.startsWith("/welcome") ||
     pathname.startsWith("/onboarding") ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/admin") ||

@@ -43,6 +43,7 @@ export function BottomNav() {
   }, [user?.id, pathname]);
 
   const hide =
+    pathname.startsWith("/welcome") ||
     pathname.startsWith("/admin") ||
     pathname.startsWith("/onboarding") ||
     pathname.startsWith("/login") ||
