@@ -3659,13 +3659,27 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Chat */
+/* Lock the chat to exactly one viewport: the message list scrolls
+   internally, the page itself never does. The shell is the flex column;
+   the header bar takes its natural height and .chat-shell fills the rest.
+   (The old approach put a fixed calc(100dvh - 80px) on .chat-shell, which
+   double-counted the shell's own top/bottom padding and the header bar and
+   let the whole page scroll a few px — more on mobile, where the base
+   min-height:100vh fought this 100dvh.) */
 .app-shell--chat {
-  padding-bottom: 16px;
+  height: 100dvh;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  overflow: hidden;
 }
 .chat-shell {
   display: flex;
   flex-direction: column;
-  height: calc(100dvh - 80px);
+  flex: 1;
+  min-height: 0;
   gap: 14px;
 }
 
@@ -3770,6 +3784,10 @@ h1, h2, h3, h4, h5, h6 {
 
 .chat-messages {
   flex: 1;
+  /* min-height:0 lets this flex item shrink below its content height so it
+     actually scrolls internally; without it the list grows to fit every
+     message and shoves the composer off the bottom of the viewport. */
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -6599,8 +6617,10 @@ h1, h2, h3, h4, h5, h6 {
   justify-items: center;
   align-items: center;
   gap: 12px;
-  padding: 8px 0 18px;
-  padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  padding: 8px 0;
+  /* Just the home-indicator inset below the labels — the old 18px base on top
+     of the safe-area inset left a tall empty strip under the bar on iOS. */
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
   background: var(--bg);
   border-top: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow: none;
@@ -8295,31 +8315,45 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ============================================================
    Public marketing landing (/welcome) — the web front door.
-   Full-bleed page (rendered outside .app-shell). Two-phone hero
-   with floating member avatars. Mirrors the paper/ink/signal brand.
+   Styled after anthropic.com: warm light-tan paper, type-forward
+   hero, a three-step card grid, a screenshot showcase, and a
+   multi-column footer. Uses the Commons paper/ink/signal tokens —
+   the clay accent becomes our signal red, the page a lighter tan.
+   Full-bleed (rendered outside .app-shell).
    ============================================================ */
 .lp-page {
-  --lp-max: 1180px;
+  /* Local tokens so the landing can run a lighter, more "ivory" tan than the
+     app's warmer --bg without touching the rest of the product. */
+  --lp-max: 1140px;
+  --lp-bg: #f7f3ea;
+  --lp-card: #fffdf8;
+  --lp-ink: var(--ink-900);
+  --lp-line: rgba(20, 20, 58, 0.08);
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  background:
-    radial-gradient(120% 90% at 85% -10%, rgba(var(--accent-rgb), 0.10), transparent 55%),
-    radial-gradient(90% 70% at -10% 110%, rgba(219, 105, 35, 0.08), transparent 55%),
-    var(--bg);
-  color: var(--text);
+  background: var(--lp-bg);
+  color: var(--lp-ink);
+  font-family: var(--font-ui);
+}
+.lp-page a {
+  text-decoration: none;
 }
 
-/* --- Top nav --- */
+/* --- Top nav: wordmark left, links center-right, a dark CTA pill right --- */
 .lp-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   width: 100%;
-  max-width: var(--lp-max);
   margin: 0 auto;
-  padding: 24px clamp(20px, 5vw, 48px);
+  padding: 18px clamp(20px, 5vw, 56px);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 24px;
+  gap: clamp(16px, 4vw, 40px);
+  background: color-mix(in srgb, var(--lp-bg) 86%, transparent);
+  backdrop-filter: saturate(140%) blur(10px);
+  border-bottom: 1px solid var(--lp-line);
 }
 .lp-nav-brand {
   display: inline-flex;
@@ -8333,106 +8367,135 @@ h1, h2, h3, h4, h5, h6 {
 .lp-nav-links {
   display: flex;
   align-items: center;
-  gap: clamp(16px, 3vw, 32px);
+  gap: clamp(18px, 3vw, 34px);
+  margin-left: auto;
 }
 .lp-nav-links a {
   font-size: 14px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-decoration: none;
+  font-weight: 500;
+  color: var(--ink-700);
   transition: color 160ms ease;
 }
 .lp-nav-links a:hover {
-  color: var(--text);
+  color: var(--lp-ink);
+}
+.lp-nav-cta {
+  flex-shrink: 0;
+  padding: 9px 18px;
+  border-radius: var(--r-pill);
+  background: var(--lp-ink);
+  color: var(--paper-50);
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 160ms ease, transform 120ms ease;
+}
+.lp-nav-cta:hover {
+  background: #000;
+  transform: translateY(-1px);
 }
 
-/* --- Main: hero text + phone stage --- */
 .lp-main {
   flex: 1;
   width: 100%;
   max-width: var(--lp-max);
   margin: 0 auto;
-  padding: clamp(24px, 5vw, 56px) clamp(20px, 5vw, 48px) clamp(40px, 6vw, 80px);
-  display: grid;
-  grid-template-columns: 1.05fr 1fr;
-  align-items: center;
-  gap: clamp(32px, 5vw, 72px);
+  padding: 0 clamp(20px, 5vw, 56px);
 }
 
+/* --- Hero --- */
 .lp-hero {
-  max-width: 540px;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  align-items: center;
+  gap: clamp(32px, 5vw, 72px);
+  padding: clamp(48px, 8vw, 104px) 0 clamp(40px, 6vw, 88px);
+}
+.lp-hero-text {
+  max-width: 560px;
 }
 .lp-eyebrow {
-  margin: 0 0 16px;
+  margin: 0 0 18px;
   font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--accent);
 }
 .lp-headline {
-  margin: 0 0 20px;
-  font-size: clamp(38px, 5.4vw, 62px);
-  line-height: 1.04;
-  letter-spacing: -0.03em;
-  font-weight: 800;
-  color: var(--text);
+  margin: 0 0 22px;
+  font-size: clamp(40px, 5.6vw, 68px);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  font-weight: 600;
+  color: var(--lp-ink);
 }
 .lp-headline span {
   color: var(--accent);
 }
 .lp-sub {
-  margin: 0 0 24px;
-  font-size: clamp(16px, 1.6vw, 19px);
-  line-height: 1.55;
-  color: var(--text-muted);
+  margin: 0 0 30px;
+  font-size: clamp(16px, 1.55vw, 19px);
+  line-height: 1.6;
+  color: var(--ink-600);
+}
+.lp-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 13px 24px;
+  border-radius: var(--r-pill);
+  font-size: 15px;
+  font-weight: 600;
+  transition: transform 120ms ease, background 160ms ease, border-color 160ms ease;
+}
+.lp-btn--primary {
+  background: var(--lp-ink);
+  color: var(--paper-50);
+}
+.lp-btn--primary:hover {
+  background: #000;
+  transform: translateY(-1px);
+}
+.lp-btn--ghost {
+  background: transparent;
+  color: var(--lp-ink);
+  border: 1px solid var(--border-strong);
+}
+.lp-btn--ghost:hover {
+  border-color: var(--lp-ink);
+  transform: translateY(-1px);
 }
 .lp-caption {
   margin: 0;
   font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-weight: 500;
   color: var(--text-subtle);
 }
 
-/* --- Phone stage --- */
-.lp-stage {
+/* --- Hero phone visual --- */
+.lp-hero-visual {
   position: relative;
-  min-height: 540px;
+  min-height: 520px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.lp-avatars {
-  position: absolute;
-  inset: -4% -6%;
-  pointer-events: none;
-}
-.lp-avatar {
-  position: absolute;
-  display: block;
-  border-radius: var(--r-pill);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
-  animation-name: lp-float;
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-  animation-direction: alternate;
-}
-@keyframes lp-float {
-  from { transform: translateY(-7px); }
-  to   { transform: translateY(7px); }
-}
-
 .lp-phone {
   position: absolute;
-  width: clamp(200px, 22vw, 268px);
+  width: clamp(196px, 21vw, 256px);
   aspect-ratio: 9 / 19.5;
   border-radius: 38px;
   background: #0c0a1e;
-  padding: 10px;
+  padding: 9px;
   box-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.2),
-    0 30px 60px rgba(20, 17, 48, 0.32),
+    0 2px 4px rgba(0, 0, 0, 0.18),
+    0 34px 64px rgba(20, 17, 48, 0.26),
     inset 0 0 0 2px rgba(255, 255, 255, 0.06);
 }
 .lp-phone-notch {
@@ -8440,8 +8503,8 @@ h1, h2, h3, h4, h5, h6 {
   top: 18px;
   left: 50%;
   transform: translateX(-50%);
-  width: 34%;
-  height: 22px;
+  width: 32%;
+  height: 20px;
   border-radius: var(--r-pill);
   background: #0c0a1e;
   z-index: 2;
@@ -8450,81 +8513,237 @@ h1, h2, h3, h4, h5, h6 {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 28px;
+  border-radius: 30px;
   display: block;
 }
 .lp-phone--back {
-  transform: translate(28%, -6%) rotate(7deg);
+  transform: translate(26%, -6%) rotate(6deg);
   z-index: 1;
 }
 .lp-phone--front {
-  transform: translate(-28%, 6%) rotate(-5deg);
+  transform: translate(-26%, 6%) rotate(-5deg);
   z-index: 3;
+}
+
+/* --- Section scaffolding --- */
+.lp-section {
+  padding: clamp(48px, 7vw, 96px) 0;
+  border-top: 1px solid var(--lp-line);
+}
+.lp-section-head {
+  max-width: 640px;
+  margin-bottom: clamp(28px, 4vw, 48px);
+}
+.lp-section-title {
+  margin: 0;
+  font-size: clamp(28px, 3.4vw, 42px);
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  font-weight: 600;
+  color: var(--lp-ink);
+}
+.lp-section-sub {
+  margin: 14px 0 0;
+  font-size: clamp(15px, 1.4vw, 18px);
+  line-height: 1.55;
+  color: var(--ink-600);
+}
+
+/* --- How-it-works card grid --- */
+.lp-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(16px, 2vw, 24px);
+}
+.lp-feature-card {
+  background: var(--lp-card);
+  border: 1px solid var(--lp-line);
+  border-radius: var(--r-lg);
+  padding: clamp(22px, 2.4vw, 32px);
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+.lp-feature-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-strong);
+  box-shadow: 0 12px 30px rgba(20, 17, 48, 0.07);
+}
+.lp-feature-num {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  margin-bottom: 18px;
+}
+.lp-feature-title {
+  margin: 0 0 10px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--lp-ink);
+}
+.lp-feature-body {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-600);
+}
+
+/* --- Showcase: copy + a single framed screenshot --- */
+.lp-showcase {
+  display: grid;
+  grid-template-columns: 1fr 0.85fr;
+  align-items: center;
+  gap: clamp(32px, 6vw, 80px);
+  padding: clamp(48px, 7vw, 96px) 0;
+  border-top: 1px solid var(--lp-line);
+}
+.lp-showcase-list {
+  list-style: none;
+  margin: 24px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.lp-showcase-list li {
+  position: relative;
+  padding-left: 28px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink-700);
+}
+.lp-showcase-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.5em;
+  width: 14px;
+  height: 8px;
+  border-left: 2px solid var(--accent);
+  border-bottom: 2px solid var(--accent);
+  transform: rotate(-45deg);
+}
+.lp-showcase-frame {
+  position: relative;
+  justify-self: center;
+  width: clamp(220px, 28vw, 300px);
+  aspect-ratio: 9 / 19.5;
+  border-radius: 42px;
+  background: #0c0a1e;
+  padding: 10px;
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.18),
+    0 34px 64px rgba(20, 17, 48, 0.22);
 }
 
 /* --- Footer --- */
 .lp-footer {
+  border-top: 1px solid var(--lp-line);
+  background: color-mix(in srgb, var(--lp-bg) 70%, #ece4d4);
+}
+.lp-footer-top {
   width: 100%;
   max-width: var(--lp-max);
   margin: 0 auto;
-  padding: 28px clamp(20px, 5vw, 48px) 40px;
-  border-top: 1px solid var(--hairline);
+  padding: clamp(40px, 5vw, 64px) clamp(20px, 5vw, 56px) clamp(28px, 3vw, 40px);
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
   flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 40px;
 }
-.lp-footer-copy {
-  font-size: 13px;
-  color: var(--text-subtle);
+.lp-footer-brand {
+  max-width: 280px;
 }
-.lp-footer-links {
+.lp-footer-brand img {
+  height: 22px;
+  width: auto;
+  display: block;
+  margin-bottom: 14px;
+}
+.lp-footer-brand p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-600);
+}
+.lp-footer-cols {
   display: flex;
-  align-items: center;
-  gap: 20px;
+  flex-wrap: wrap;
+  gap: clamp(32px, 5vw, 72px);
 }
-.lp-footer-links a {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-decoration: none;
+.lp-footer-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.lp-footer-head {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+  margin-bottom: 2px;
+}
+.lp-footer-col a {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-700);
   transition: color 160ms ease;
 }
-.lp-footer-links a:hover {
-  color: var(--text);
+.lp-footer-col a:hover {
+  color: var(--lp-ink);
 }
 .lp-footer-admin {
   color: var(--text-subtle) !important;
 }
+.lp-footer-bottom {
+  max-width: var(--lp-max);
+  margin: 0 auto;
+  padding: 18px clamp(20px, 5vw, 56px) 32px;
+  border-top: 1px solid var(--lp-line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-subtle);
+}
 
-/* --- Responsive: stack below the two-column breakpoint --- */
-@media (max-width: 860px) {
-  .lp-main {
+/* --- Responsive --- */
+@media (max-width: 900px) {
+  .lp-hero,
+  .lp-showcase {
     grid-template-columns: 1fr;
-    text-align: center;
-    gap: clamp(40px, 8vw, 64px);
   }
   .lp-hero {
-    max-width: 540px;
-    margin: 0 auto;
+    gap: clamp(36px, 8vw, 56px);
   }
-  .lp-stage {
-    min-height: clamp(420px, 100vw, 520px);
+  .lp-hero-text {
+    max-width: 600px;
+  }
+  .lp-hero-visual {
+    min-height: clamp(420px, 96vw, 520px);
   }
   .lp-nav-links {
     display: none;
   }
 }
-@media (max-width: 480px) {
-  .lp-phone {
-    width: clamp(168px, 46vw, 220px);
+@media (max-width: 640px) {
+  .lp-feature-grid {
+    grid-template-columns: 1fr;
   }
-  .lp-phone--back { transform: translate(24%, -5%) rotate(6deg); }
+  .lp-phone {
+    width: clamp(176px, 48vw, 224px);
+  }
+  .lp-phone--back { transform: translate(24%, -5%) rotate(5deg); }
   .lp-phone--front { transform: translate(-24%, 5%) rotate(-4deg); }
 }
 
-/* Respect reduced-motion: hold the avatars still. */
 @media (prefers-reduced-motion: reduce) {
-  .lp-avatar { animation: none; }
+  .lp-btn,
+  .lp-nav-cta,
+  .lp-feature-card {
+    transition: none;
+  }
 }
