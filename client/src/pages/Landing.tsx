@@ -288,7 +288,7 @@ function Hero({ onSignup }: { onSignup: () => void }) {
           </div>
           <p style={{ fontFamily: B, fontSize: 11, color: MUTED, letterSpacing: "0.05em" }}>Invite-only · Built for iOS</p>
         </div>
-        <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+        <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }} className="hero-previews">
           <div style={{ flex: 1, paddingTop: 36 }}><FloatingFeed /></div>
           <div style={{ flex: 1 }}><FloatingPathSelector /></div>
         </div>
@@ -423,6 +423,20 @@ export function LandingPage() {
         @media (max-width: 920px) {
           .hero-grid, .pathways-header-grid, .pathway-grid, .how-grid {
             grid-template-columns: 1fr !important;
+          }
+          /* Let the hero previews breathe nearly wall-to-wall on narrow screens
+             so the two floating columns keep sitting side by side. */
+          .hero-grid {
+            padding: 48px 16px 64px !important;
+            gap: 44px !important;
+          }
+        }
+        @media (max-width: 520px) {
+          .hero-grid {
+            padding: 36px 10px 52px !important;
+          }
+          .hero-previews {
+            gap: 8px !important;
           }
         }
       `}</style>
