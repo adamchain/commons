@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, FormEvent, ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import wordmark from "../assets/wordmark.png";
 
@@ -22,6 +22,12 @@ const WHITE = "#FFFFFF";
 const MUTED = "rgba(20,17,48,0.46)";
 const D = "'Plus Jakarta Sans', sans-serif";
 const B = "'Poppins', sans-serif";
+
+// Mailchimp embedded-form action URL. Get it from Mailchimp:
+// Audience → Signup forms → Embedded forms → copy the URL inside <form action="…">.
+// It looks like: https://<something>.us21.list-manage.com/subscribe/post?u=XXXX&id=YYYY
+// The modal below turns this into a JSONP call so signups happen inline (no redirect).
+const MAILCHIMP_ACTION = "";
 
 // Served from client/public — referenced by root-absolute URL, not imported.
 const shadowsImg = "/landing/photo-shadows.jpg";
@@ -71,6 +77,91 @@ function Pill({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * Branded email-capture popup. Submits to Mailchimp via JSONP (the standard
+ * `post-json?...&c=callback` pattern) so the signup happens inline without
+ * redirecting off the landing page. Opened from the hero CTA and the buttons
+ * under "Post a plan two ways" and "How it works".
+ */
+function WaitlistModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "ok" | "err">("idle");
+  const [msg, setMsg] = useState("");
+  if (!open) return null;
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!MAILCHIMP_ACTION) {
+      setStatus("err");
+      setMsg("Signup isn't connected yet — add your Mailchimp form URL.");
+      return;
+    }
+    setStatus("loading");
+    const cb = `mcCallback${Math.floor(Math.random() * 1e9)}`;
+    const url = MAILCHIMP_ACTION.replace("/post?", "/post-json?");
+    const script = document.createElement("script");
+    (window as unknown as Record<string, unknown>)[cb] = (data: { result: string; msg: string }) => {
+      const clean = data.msg ? data.msg.replace(/<[^>]*>/g, "") : "";
+      if (data.result === "success") {
+        setStatus("ok");
+        setMsg("You're on the list — we'll be in touch.");
+      } else {
+        setStatus("err");
+        setMsg(clean || "Something went wrong. Try again.");
+      }
+      delete (window as unknown as Record<string, unknown>)[cb];
+      script.remove();
+    };
+    script.src = `${url}&EMAIL=${encodeURIComponent(email)}&c=${cb}`;
+    document.body.appendChild(script);
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(20,17,48,0.55)", backdropFilter: "blur(3px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ position: "relative", background: WHITE, borderRadius: 24, padding: "44px 40px 40px", width: "100%", maxWidth: 420, boxShadow: "0 24px 80px rgba(20,17,48,0.32)" }}
+      >
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          style={{ position: "absolute", top: 18, right: 18, background: "transparent", border: "none", fontSize: 22, lineHeight: 1, color: MUTED, cursor: "pointer", padding: 4 }}
+        >
+          ×
+        </button>
+        <p style={{ fontFamily: B, fontWeight: 600, fontSize: 11, color: RED, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 12 }}>Invite-only · iOS</p>
+        <h3 style={{ fontFamily: D, fontWeight: 800, fontSize: 28, color: NAVY, letterSpacing: "-0.035em", lineHeight: 1.1, marginBottom: 10 }}>Join the waitlist</h3>
+        <p style={{ fontFamily: B, fontSize: 14, color: MUTED, lineHeight: 1.65, marginBottom: 24 }}>
+          Be first to know when Commons opens up in your city.
+        </p>
+        {status === "ok" ? (
+          <p style={{ fontFamily: B, fontSize: 15, color: NAVY, fontWeight: 500, lineHeight: 1.6 }}>{msg}</p>
+        ) : (
+          <form onSubmit={submit}>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@email.com"
+              style={{ width: "100%", boxSizing: "border-box", fontFamily: B, fontSize: 15, color: NAVY, padding: "14px 18px", borderRadius: 9999, border: `1.5px solid rgba(20,17,48,0.16)`, outline: "none", marginBottom: 12 }}
+            />
+            <Pill onClick={() => {}} style={{ width: "100%", padding: "14px 26px", fontSize: 15, opacity: status === "loading" ? 0.6 : 1 }}>
+              {status === "loading" ? "Joining…" : "Join the waitlist"}
+            </Pill>
+            {status === "err" && (
+              <p style={{ fontFamily: B, fontSize: 12, color: RED, marginTop: 12, lineHeight: 1.5 }}>{msg}</p>
+            )}
+          </form>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -175,7 +266,7 @@ function Nav({ onStart }: { onStart: () => void }) {
   );
 }
 
-function Hero() {
+function Hero({ onSignup }: { onSignup: () => void }) {
   return (
     <section style={{ background: BEIGE }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "96px 48px 88px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 72, alignItems: "center" }} className="hero-grid">
@@ -188,9 +279,10 @@ function Hero() {
           <p style={{ fontFamily: B, fontSize: 16, color: MUTED, lineHeight: 1.8, marginBottom: 44, maxWidth: 400 }}>
             COMMONS is where women actually make plans — find someone to do it with, or bring your people together. Either way, something happens.
           </p>
-          <div style={{ display: "flex", alignItems: "center", gap: 28, flexWrap: "wrap", marginBottom: 22 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap", marginBottom: 22 }}>
+            <Pill onClick={onSignup}>Join the waitlist</Pill>
             <a href="#how" style={{ textDecoration: "none" }}>
-              <Pill>See how it works</Pill>
+              <Pill variant="ghost">See how it works</Pill>
             </a>
             <a href="#pathways" style={{ fontFamily: B, fontWeight: 500, fontSize: 14, color: NAVY, textDecoration: "none", borderBottom: `1px solid rgba(20,17,48,0.3)`, paddingBottom: 2 }}>Peek inside</a>
           </div>
@@ -219,7 +311,7 @@ function PhotoStrip() {
   );
 }
 
-function TwoPathways() {
+function TwoPathways({ onSignup }: { onSignup: () => void }) {
   const [sel, setSel] = useState<"casual" | "committed">("casual");
   const cards = [
     { id: "casual" as const, label: "Casual", title: "Just an idea.", body: "Something's on your mind but you're not sure yet. Toss it out — see who's around and interested before you commit to anything.", cta: "Share the vibe →", ctaStyle: { background: RED, color: WHITE } as CSSProperties },
@@ -246,12 +338,15 @@ function TwoPathways() {
             </div>
           ))}
         </div>
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 44 }}>
+          <Pill onClick={onSignup} style={{ padding: "14px 32px", fontSize: 15 }}>Join the waitlist</Pill>
+        </div>
       </div>
     </section>
   );
 }
 
-function HowItWorks() {
+function HowItWorks({ onSignup }: { onSignup: () => void }) {
   const steps = [
     { n: "01", title: "Post the plan", body: "Float a casual idea or lock in the details — a time, a place, a vibe. No endless back-and-forth just to get something on the calendar." },
     { n: "02", title: "Find your people", body: "Discover women nearby doing the same thing, or share the plan with your existing network. Either way, the right people show up." },
@@ -275,6 +370,9 @@ function HowItWorks() {
                 </div>
               </div>
             ))}
+          </div>
+          <div style={{ marginTop: 32 }}>
+            <Pill onClick={onSignup} style={{ padding: "14px 32px", fontSize: 15 }}>Join the waitlist</Pill>
           </div>
         </div>
         <div style={{ position: "sticky", top: 96, borderRadius: 18, overflow: "hidden", height: 500 }}>
@@ -317,6 +415,8 @@ function Footer({ onStart }: { onStart: () => void }) {
 export function LandingPage() {
   const navigate = useNavigate();
   const onStart = () => navigate("/onboarding");
+  const [signupOpen, setSignupOpen] = useState(false);
+  const onSignup = () => setSignupOpen(true);
   return (
     <div style={{ background: BEIGE, minHeight: "100vh" }}>
       <style>{`
@@ -327,11 +427,12 @@ export function LandingPage() {
         }
       `}</style>
       <Nav onStart={onStart} />
-      <Hero />
+      <Hero onSignup={onSignup} />
       <PhotoStrip />
-      <TwoPathways />
-      <HowItWorks />
+      <TwoPathways onSignup={onSignup} />
+      <HowItWorks onSignup={onSignup} />
       <Footer onStart={onStart} />
+      <WaitlistModal open={signupOpen} onClose={() => setSignupOpen(false)} />
     </div>
   );
 }
