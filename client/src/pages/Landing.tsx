@@ -27,7 +27,7 @@ const B = "'Poppins', sans-serif";
 // Audience → Signup forms → Embedded forms → copy the URL inside <form action="…">.
 // It looks like: https://<something>.us21.list-manage.com/subscribe/post?u=XXXX&id=YYYY
 // The modal below turns this into a JSONP call so signups happen inline (no redirect).
-const MAILCHIMP_ACTION = "";
+const MAILCHIMP_ACTION: string = "";
 
 // Served from client/public — referenced by root-absolute URL, not imported.
 const shadowsImg = "/landing/photo-shadows.jpg";
@@ -300,7 +300,7 @@ function Hero({ onSignup }: { onSignup: () => void }) {
 function PhotoStrip() {
   return (
     <div style={{ position: "relative", height: "48vh", minHeight: 300, overflow: "hidden" }}>
-      <img src={shadowsImg} alt="Friends together in golden light" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 35%" }} />
+      <img src={shadowsImg} alt="Shadows of three friends cast against a sunlit wall" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 35%" }} />
       <div style={{ position: "absolute", inset: 0, background: "rgba(20,17,48,0.06)" }} />
       <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <p style={{ fontFamily: D, fontWeight: 800, fontSize: "clamp(24px, 3.8vw, 50px)", color: WHITE, letterSpacing: "-0.035em", textAlign: "center", maxWidth: 620, padding: "0 40px", lineHeight: 1.18, textShadow: "0 2px 32px rgba(20,17,48,0.28)" }}>
@@ -376,7 +376,7 @@ function HowItWorks({ onSignup }: { onSignup: () => void }) {
           </div>
         </div>
         <div style={{ position: "sticky", top: 96, borderRadius: 18, overflow: "hidden", height: 500 }}>
-          <img src={picnicImg} alt="Women clinking drinks at a picnic" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }} />
+          <img src={picnicImg} alt="Women dancing together at a show" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }} />
         </div>
       </div>
     </section>
