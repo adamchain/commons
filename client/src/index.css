@@ -8821,3 +8821,189 @@ h1, h2, h3, h4, h5, h6 {
     transition: none;
   }
 }
+
+/* ============================================================
+   Legal documents (Terms / Privacy) — shared formatting for the
+   public reader page and the onboarding scroll-to-bottom consent
+   gate. Renders LegalContent output.
+   ============================================================ */
+.legal-doc {
+  color: var(--text);
+}
+.legal-doc-head {
+  margin-bottom: 20px;
+}
+.legal-doc-title {
+  margin: 0;
+  font-size: clamp(22px, 3vw, 28px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--text);
+}
+.legal-doc-updated {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--text-subtle);
+}
+.legal-doc-intro .legal-doc-p:first-child {
+  margin-top: 0;
+}
+.legal-doc-section {
+  margin-top: 22px;
+}
+.legal-doc-section-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.legal-doc-p {
+  margin: 0 0 10px;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--ink-700);
+}
+.legal-doc-subhead {
+  margin: 12px 0 6px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.legal-doc-list {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.legal-doc-list li {
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--ink-700);
+}
+
+/* --- Public reader page (/legal/:slug) --- */
+.legal-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: calc(clamp(20px, 5vw, 40px) + env(safe-area-inset-top, 0px))
+    clamp(18px, 5vw, 32px)
+    calc(80px + env(safe-area-inset-bottom, 0px));
+}
+.legal-page-back {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.legal-page-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.legal-page-back:hover {
+  color: var(--text);
+}
+.legal-page-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+.legal-page-tab {
+  padding: 8px 16px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.legal-page-tab.is-active {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--paper-50);
+}
+
+/* --- Onboarding consent gate --- */
+.legal-consent-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.legal-consent-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+.legal-consent-tab.is-active {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--accent-soft);
+}
+.legal-consent-tab-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--success);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+}
+.legal-consent-panel {
+  position: relative;
+  height: min(46vh, 360px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  text-align: left;
+}
+.legal-consent-panel .legal-doc-title {
+  font-size: 18px;
+}
+.legal-consent-scrollhint {
+  position: sticky;
+  bottom: -16px;
+  margin: 8px -16px -16px;
+  padding: 10px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: linear-gradient(to top, var(--surface) 55%, transparent);
+  pointer-events: none;
+}
+.legal-consent-status {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.legal-consent-status.is-done {
+  color: var(--success);
+  font-weight: 600;
+}

@@ -13,6 +13,7 @@ import { FeedPage } from "./pages/Feed";
 import { NotificationsPage } from "./pages/Notifications";
 import { OnboardingPage } from "./pages/Onboarding";
 import { LandingPage } from "./pages/Landing";
+import { LegalPage } from "./pages/Legal";
 import { isNative } from "./lib/platform";
 import { PlanDetailPage } from "./pages/PlanDetail";
 import { AdminPage } from "./pages/Admin";
@@ -59,6 +60,7 @@ export default function App() {
       <TopBar />
       <Routes>
         <Route path="/welcome" element={<LandingPage />} />
+        <Route path="/legal/:slug" element={<LegalPage />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/login" element={<Navigate to="/onboarding" replace />} />

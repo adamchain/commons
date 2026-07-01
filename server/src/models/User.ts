@@ -31,6 +31,8 @@ const UserSchema = new mongoose.Schema<UserRecord>(
     dismissedNetworkPromptPlanIds: { type: [String], default: undefined },
     socialLinks: { type: { instagram: { type: String }, tiktok: { type: String } }, default: undefined },
     guidelinesAcknowledgedAt: { type: String, default: null },
+    termsAcceptedAt: { type: String, default: null },
+    privacyAcceptedAt: { type: String, default: null },
     notificationPrefs: {
       type: {
         someoneJoinedYourPlan: { type: Boolean },

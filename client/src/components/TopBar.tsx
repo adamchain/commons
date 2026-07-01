@@ -17,6 +17,7 @@ export function TopBar() {
 
   const hide =
     pathname.startsWith("/welcome") ||
+    pathname.startsWith("/legal") ||
     pathname.startsWith("/onboarding") ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/admin") ||

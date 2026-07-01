@@ -42,6 +42,10 @@ export interface UserRecord {
   socialLinks?: { instagram?: string; tiktok?: string };
   /** ISO timestamp the user tapped through the community-guidelines acknowledgment. */
   guidelinesAcknowledgedAt?: string | null;
+  /** ISO timestamp the user scrolled through and accepted the Terms of Service. */
+  termsAcceptedAt?: string | null;
+  /** ISO timestamp the user scrolled through and accepted the Privacy Policy. */
+  privacyAcceptedAt?: string | null;
   /** Notification toggles. Stored as a partial — missing keys default to true at the boundary. */
   notificationPrefs?: Partial<{
     someoneJoinedYourPlan: boolean;

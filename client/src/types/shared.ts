@@ -358,6 +358,10 @@ export interface MeDTO {
   canAccessAdmin?: boolean;
   /** ISO timestamp the user accepted the community guidelines, or null if not yet. */
   guidelinesAcknowledgedAt?: string | null;
+  /** ISO timestamp the user scrolled through and accepted the Terms of Service. */
+  termsAcceptedAt?: string | null;
+  /** ISO timestamp the user scrolled through and accepted the Privacy Policy. */
+  privacyAcceptedAt?: string | null;
   /** Notification toggles. Missing keys fall back to DEFAULT_NOTIFICATION_PREFS. */
   notificationPrefs?: NotificationPrefs;
 }

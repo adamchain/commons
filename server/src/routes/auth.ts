@@ -80,6 +80,8 @@ function meFromUser(user: UserRecord): MeDTO {
     socialLinks: user.socialLinks,
     canAccessAdmin: isAdminPhone(user.phoneNumber),
     guidelinesAcknowledgedAt: user.guidelinesAcknowledgedAt ?? null,
+    termsAcceptedAt: user.termsAcceptedAt ?? null,
+    privacyAcceptedAt: user.privacyAcceptedAt ?? null,
     notificationPrefs: { ...DEFAULT_NOTIFICATION_PREFS, ...(user.notificationPrefs ?? {}) },
   };
 }
@@ -218,6 +220,12 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
   if (typeof req.body?.onboardingComplete === "boolean") patch.onboardingComplete = req.body.onboardingComplete;
   if (req.body?.guidelinesAcknowledged === true) {
     patch.guidelinesAcknowledgedAt = new Date().toISOString();
+  }
+  if (req.body?.termsAccepted === true) {
+    patch.termsAcceptedAt = new Date().toISOString();
+  }
+  if (req.body?.privacyAccepted === true) {
+    patch.privacyAcceptedAt = new Date().toISOString();
   }
   if (req.body?.socialLinks && typeof req.body.socialLinks === "object") {
     const ig = String(req.body.socialLinks.instagram ?? "").replace(/^@/, "").trim();

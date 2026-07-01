@@ -10,6 +10,8 @@ import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
 import { getCurrentCoords } from "../lib/geolocate";
+import { LegalContent } from "../components/LegalContent";
+import { LEGAL_DOCS } from "../content/legal";
 import {
   ALL_INTERESTS,
   AVATAR_PRESETS,
@@ -25,19 +27,37 @@ import {
 const TERMS_URL = "https://jointhecommons.com/terms";
 const PRIVACY_URL = "https://jointhecommons.com/privacy";
 
+// TEMP launch gate: after verifying their phone, every (non-admin) member must
+// enter this exclusive code to finalize account setup. Stored client-side once
+// passed so it isn't re-prompted on refresh. Remove this gate (the EXCLUSIVE_CODE
+// constant, the "gate" Step, its render block, and the gate branch in
+// pickInitial) when the invite-only launch period ends.
+const EXCLUSIVE_CODE = "commonsphl";
+const GATE_STORAGE_KEY = "commons_gate_ok";
+
+function isGatePassed(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(GATE_STORAGE_KEY) === "1";
+}
+
 type Step =
   | "phone"
   | "code"
+  | "gate"
   | "admin_choice"
   | "location"
   | "interests"
   | "profile"
+  | "legal"
   | "guidelines";
 
 export function OnboardingPage() {
   const { user, refreshUser, setUser } = useAuth();
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>(() => pickInitial(user));
+  // TEMP launch gate: whether this device has already cleared the access-code
+  // step. Read once so a refresh mid-onboarding doesn't re-prompt or bypass it.
+  const [gatePassed, setGatePassed] = useState<boolean>(isGatePassed);
+  const [step, setStep] = useState<Step>(() => pickInitial(user, gatePassed));
   const [phoneNumber, setPhoneNumber] = useState("");
   const [smsConfigured, setSmsConfigured] = useState<boolean | null>(null);
   /** Set after requesting a code; drives code length rules (Verify vs local dev). */
@@ -48,15 +68,13 @@ export function OnboardingPage() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const lastAutoSubmittedCode = useRef<string | null>(null);
   const verifyInFlight = useRef(false);
-  // Invite code: prefilled from ?invite= on the share link, redeemed after
-  // verify-code succeeds. Stays around through the whole onboarding session.
-  const [inviteCode, setInviteCode] = useState<string>(() => {
+  // Access code for the launch gate. Accepts the shared exclusive code OR a
+  // personal invite code from an existing member. Prefilled from ?invite= on a
+  // share link so invite-link users just tap Continue.
+  const [accessCode, setAccessCode] = useState<string>(() => {
     if (typeof window === "undefined") return "";
-    return new URLSearchParams(window.location.search).get("invite")?.toUpperCase() ?? "";
+    return new URLSearchParams(window.location.search).get("invite") ?? "";
   });
-  // Landing screen hides the invite field behind a "Have an invite code?" link;
-  // expanded automatically when one is prefilled from the share-link query param.
-  const [showInviteField, setShowInviteField] = useState<boolean>(() => inviteCode.length > 0);
 
   // If logged-in user lands here with onboarding done, send them home.
   useEffect(() => {
@@ -70,8 +88,8 @@ export function OnboardingPage() {
       setStep("admin_choice");
       return;
     }
-    setStep(pickInitial(user));
-  }, [user, step]);
+    setStep(pickInitial(user, gatePassed));
+  }, [user, step, gatePassed]);
 
   useEffect(() => {
     const formatted = formatPhoneInput(phoneNumber);
@@ -127,23 +145,13 @@ export function OnboardingPage() {
       const { token, ...me } = result;
       if (token) await setAuthToken(token);
       setUser(me);
-      // Best-effort redeem — failure here doesn't block onboarding. The user
-      // is already authenticated; the code is just attribution for the inviter.
-      if (inviteCode.trim()) {
-        try {
-          await api("/api/auth/redeem-code", {
-            method: "POST",
-            body: JSON.stringify({ code: inviteCode.trim() }),
-          });
-        } catch {
-          /* swallow — bad code shouldn't block the signup */
-        }
-      }
       if (me.canAccessAdmin) {
         sessionStorage.setItem("commons_pending_admin_choice", "1");
         setStep("admin_choice");
       } else {
-        setStep(pickInitial(me));
+        // Non-admins hit the launch gate next (unless already cleared on this
+        // device) — pickInitial routes them to "gate" when !gatePassed.
+        setStep(pickInitial(me, gatePassed));
       }
     } catch (e) {
       setError(formatError(e));
@@ -151,6 +159,38 @@ export function OnboardingPage() {
       verifyInFlight.current = false;
       setBusy(false);
     }
+  }
+
+  // TEMP launch gate: accept the shared exclusive code, or redeem a personal
+  // invite code from an existing member. Either one clears the gate for this
+  // device and lets account setup continue.
+  async function submitGate() {
+    const entered = accessCode.trim();
+    if (!entered) return;
+    setError(null);
+    if (entered.toLowerCase() === EXCLUSIVE_CODE) {
+      passGate();
+      return;
+    }
+    setBusy(true);
+    try {
+      await api("/api/auth/redeem-code", {
+        method: "POST",
+        body: JSON.stringify({ code: entered }),
+      });
+      passGate();
+    } catch {
+      setError("That code isn't valid. Enter your access code, or an invite code from a member.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function passGate() {
+    if (typeof window !== "undefined") localStorage.setItem(GATE_STORAGE_KEY, "1");
+    setGatePassed(true);
+    setError(null);
+    setStep(pickInitial(user, true));
   }
 
   async function patchMe(patch: Partial<MeDTO>) {
@@ -174,18 +214,6 @@ export function OnboardingPage() {
           value={phoneNumber}
           onChange={(e) => setPhoneNumber(formatPhoneInput(e.target.value))}
         />
-        {showInviteField && (
-          <input
-            className="onboarding-input onboarding-input-invite"
-            type="text"
-            inputMode="text"
-            maxLength={10}
-            placeholder="Invite code"
-            value={inviteCode}
-            onChange={(e) => setInviteCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
-            autoFocus
-          />
-        )}
         {error && <div className="onboarding-error">{error}</div>}
         <button className="btn-primary btn-block" disabled={busy || !phoneNumber} onClick={requestCode}>
           {busy ? "Sending…" : "Get started"}
@@ -197,15 +225,6 @@ export function OnboardingPage() {
               ? "You'll get a text with your verification code (Twilio Verify). Message rates may apply."
               : "We'll text you a code to verify your number."}
         </p>
-        {!showInviteField && (
-          <button
-            type="button"
-            className="btn-link onboarding-invite-link"
-            onClick={() => setShowInviteField(true)}
-          >
-            Have an invite code?
-          </button>
-        )}
       </OnboardingShell>
     );
   }
@@ -242,6 +261,39 @@ export function OnboardingPage() {
       </OnboardingShell>
     );
   }
+  if (step === "gate") {
+    return (
+      <OnboardingShell
+        title="One last step."
+        subtitle="Commons is invite-only for now. Enter your access code, or an invite code from a member, to finish setting up your account."
+      >
+        <input
+          className="onboarding-input"
+          type="text"
+          inputMode="text"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          maxLength={32}
+          placeholder="Access code"
+          value={accessCode}
+          onChange={(e) => setAccessCode(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void submitGate();
+          }}
+          autoFocus
+        />
+        {error && <div className="onboarding-error">{error}</div>}
+        <button
+          className="btn-primary btn-block"
+          disabled={busy || !accessCode.trim()}
+          onClick={() => void submitGate()}
+        >
+          {busy ? "Checking…" : "Continue"}
+        </button>
+      </OnboardingShell>
+    );
+  }
   if (step === "admin_choice" && user?.canAccessAdmin) {
     return (
       <OnboardingShell title="Admin access" subtitle="You signed in with a number that can open the Commons admin dashboard.">
@@ -253,7 +305,7 @@ export function OnboardingPage() {
           type="button"
           onClick={() => {
             sessionStorage.removeItem("commons_pending_admin_choice");
-            setStep(pickInitial(user));
+            setStep(pickInitial(user, gatePassed));
           }}
         >
           Continue as member
@@ -318,16 +370,33 @@ export function OnboardingPage() {
             avatarPhotoDataUrl: avatarPhotoDataUrl ?? undefined,
             avatarParams: avatarParams ?? undefined,
           });
-          setStep("guidelines");
+          setStep("legal");
         }}
         onBack={() => setStep("interests")}
+      />
+    );
+  }
+  if (step === "legal") {
+    return (
+      <LegalConsentStep
+        onBack={() => setStep("profile")}
+        onAgree={async () => {
+          // termsAccepted/privacyAccepted are server-side action flags (they
+          // stamp *AcceptedAt), not MeDTO fields — call the endpoint directly.
+          const me = await api<MeDTO>("/api/auth/me", {
+            method: "PATCH",
+            body: JSON.stringify({ termsAccepted: true, privacyAccepted: true }),
+          });
+          setUser(me);
+          setStep("guidelines");
+        }}
       />
     );
   }
   if (step === "guidelines") {
     return (
       <GuidelinesStep
-        onBack={() => setStep("profile")}
+        onBack={() => setStep("legal")}
         onAgree={async () => {
           await api<MeDTO>("/api/auth/me", {
             method: "PATCH",
@@ -342,14 +411,21 @@ export function OnboardingPage() {
   return null;
 }
 
-function pickInitial(user: MeDTO | null): Step {
+function pickInitial(user: MeDTO | null, gatePassed: boolean): Step {
   if (!user) return "phone";
   if (user.onboardingComplete) return "phone";
+  // TEMP launch gate: members must clear the access-code step before any of the
+  // profile-setup steps. Admins are exempt so the operator can't lock themselves
+  // out. Drop this check when the invite-only launch period ends.
+  if (!gatePassed && !user.canAccessAdmin) return "gate";
   const hoods =
     user.neighborhoodIds?.length ? user.neighborhoodIds : user.neighborhoodId ? [user.neighborhoodId] : [];
   if (hoods.length === 0) return "location";
   if (user.interests.length < 1) return "interests";
   if (!user.firstName.trim()) return "profile";
+  // New users must scroll through and accept the Terms + Privacy before the
+  // final community-guidelines step.
+  if (!user.termsAcceptedAt || !user.privacyAcceptedAt) return "legal";
   if (!user.guidelinesAcknowledgedAt) return "guidelines";
   return "guidelines";
 }
@@ -630,6 +706,120 @@ function LocationStep({
       </button>
       <button className="btn-link" type="button" disabled={busy} onClick={onSkip}>
         Skip for now
+      </button>
+    </OnboardingShell>
+  );
+}
+
+/**
+ * Scroll-to-bottom consent gate for the Terms of Service and Privacy Policy.
+ * Each document must be scrolled to its end before the "I agree" checkbox
+ * unlocks — required for new users during onboarding. Reading state is tracked
+ * per document and persists across tab switches.
+ */
+function LegalConsentStep({
+  onAgree,
+  onBack,
+}: {
+  onAgree: () => Promise<void>;
+  onBack?: () => void;
+}) {
+  const [active, setActive] = useState<"terms" | "privacy">("terms");
+  const [read, setRead] = useState<{ terms: boolean; privacy: boolean }>({
+    terms: false,
+    privacy: false,
+  });
+  const [agreed, setAgreed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const doc = LEGAL_DOCS[active];
+  const bothRead = read.terms && read.privacy;
+
+  // Mark the active doc read once its panel is scrolled to (or already sits at)
+  // the bottom. A generous tolerance keeps short viewports / momentum scroll
+  // from getting stuck one pixel shy of the end.
+  function markIfAtBottom() {
+    const el = panelRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 28;
+    if (atBottom) setRead((r) => (r[active] ? r : { ...r, [active]: true }));
+  }
+
+  // On tab switch, reset scroll to the top and re-measure after layout settles —
+  // a document short enough to fit without scrolling counts as read immediately.
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    el.scrollTop = 0;
+    const id = window.setTimeout(markIfAtBottom, 60);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+
+  return (
+    <OnboardingShell
+      title="The legal bit."
+      subtitle="Please read our Terms and Privacy Policy. Scroll to the bottom of each to continue."
+      onBack={onBack}
+    >
+      <div className="legal-consent-tabs">
+        {(["terms", "privacy"] as const).map((slug) => (
+          <button
+            key={slug}
+            type="button"
+            className={`legal-consent-tab ${active === slug ? "is-active" : ""}`}
+            onClick={() => setActive(slug)}
+          >
+            {read[slug] && (
+              <span className="legal-consent-tab-check" aria-hidden="true">
+                ✓
+              </span>
+            )}
+            {LEGAL_DOCS[slug].title}
+          </button>
+        ))}
+      </div>
+
+      <div className="legal-consent-panel" ref={panelRef} onScroll={markIfAtBottom}>
+        <LegalContent doc={doc} />
+        {!read[active] && <div className="legal-consent-scrollhint">Scroll to continue ↓</div>}
+      </div>
+
+      <p className={`legal-consent-status ${bothRead ? "is-done" : ""}`}>
+        {bothRead
+          ? "Thanks for reading both documents."
+          : read.terms
+            ? "Now read the Privacy Policy."
+            : read.privacy
+              ? "Now read the Terms of Service."
+              : "Scroll to the bottom of each document to continue."}
+      </p>
+
+      <label className="guidelines-agree">
+        <input
+          type="checkbox"
+          checked={agreed}
+          disabled={!bothRead}
+          onChange={(e) => setAgreed(e.target.checked)}
+        />
+        <span>I have read and agree to the Terms of Service and Privacy Policy.</span>
+      </label>
+
+      <button
+        type="button"
+        className="btn-primary btn-block"
+        disabled={busy || !bothRead || !agreed}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            await onAgree();
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "One sec…" : "Agree & continue"}
       </button>
     </OnboardingShell>
   );

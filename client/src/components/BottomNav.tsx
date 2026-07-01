@@ -44,6 +44,7 @@ export function BottomNav() {
 
   const hide =
     pathname.startsWith("/welcome") ||
+    pathname.startsWith("/legal") ||
     pathname.startsWith("/admin") ||
     pathname.startsWith("/onboarding") ||
     pathname.startsWith("/login") ||

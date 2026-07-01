@@ -104,7 +104,22 @@ export function SettingsPage() {
         <SettingsRow
           icon={<InfoIcon />}
           title="About COMMONS"
-          sub="Version 0.4 · Help · Terms"
+          sub="Version 0.4"
+        />
+      </SettingsGroup>
+
+      <SettingsGroup label="Legal">
+        <SettingsRow
+          to="/legal/terms"
+          icon={<InfoIcon />}
+          title="Terms of Service"
+          sub="The rules of the community"
+        />
+        <SettingsRow
+          to="/legal/privacy"
+          icon={<LockIcon />}
+          title="Privacy Policy"
+          sub="How we handle your data"
         />
       </SettingsGroup>
 
