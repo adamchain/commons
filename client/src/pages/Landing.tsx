@@ -33,7 +33,6 @@ const MAILCHIMP_ACTION: string = "";
 const shadowsImg = "/landing/photo-shadows.jpg";
 const sunsetImg = "/landing/photo-sunset.jpg";
 const picnicImg = "/landing/photo-picnic.jpg";
-const feedYogaImg = "/landing/feed-yoga.jpg";
 
 function Pill({
   children,
@@ -165,96 +164,6 @@ function WaitlistModal({ open, onClose }: { open: boolean; onClose: () => void }
   );
 }
 
-function FloatingFeed() {
-  const days = [
-    { n: "22", d: "M", active: true },
-    { n: "23", d: "T" },
-    { n: "24", d: "W" },
-    { n: "25", d: "T" },
-    { n: "26", d: "F" },
-    { n: "27", d: "S" },
-    { n: "28", d: "S" },
-  ];
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ background: WHITE, borderRadius: 16, padding: "16px 20px", boxShadow: "0 1px 12px rgba(20,17,48,0.06)", display: "flex", justifyContent: "space-between" }}>
-        {days.map((d) => (
-          <div key={d.n} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
-            <span style={{ fontFamily: B, fontSize: 9, color: MUTED, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.07em" }}>{d.d}</span>
-            <div style={{ width: 29, height: 29, borderRadius: "50%", background: d.active ? RED : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <span style={{ fontFamily: B, fontSize: 12, fontWeight: d.active ? 600 : 400, color: d.active ? WHITE : NAVY }}>{d.n}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 5, paddingLeft: 1 }}>
-        {["All plans", "My plans", "Filters"].map((t, i) => (
-          <span key={t} style={{ fontFamily: B, fontSize: 11, fontWeight: 500, padding: "5px 12px", borderRadius: 9999, background: i === 0 ? WHITE : "transparent", color: i === 0 ? NAVY : MUTED, boxShadow: i === 0 ? "0 1px 6px rgba(20,17,48,0.07)" : "none" }}>{t}</span>
-        ))}
-      </div>
-      <div style={{ background: WHITE, borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 18px rgba(20,17,48,0.07)" }}>
-        <div style={{ padding: "14px 16px 10px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-            <div style={{ width: 19, height: 19, borderRadius: "50%", background: "#C8B8A2", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <span style={{ fontSize: 8, fontWeight: 700, color: NAVY }}>A</span>
-            </div>
-            <span style={{ fontFamily: B, fontSize: 10, color: MUTED, fontWeight: 500 }}>Anna</span>
-          </div>
-          <p style={{ fontFamily: D, fontWeight: 700, fontSize: 13, color: NAVY, letterSpacing: "-0.02em", lineHeight: 1.3, marginBottom: 4 }}>Anyone Want To Try Yoga This Week?</p>
-          <p style={{ fontFamily: B, fontSize: 10, color: MUTED }}>Mon, Jun 22 · 7:00 PM · Rittenhouse</p>
-        </div>
-        <div style={{ height: 84, overflow: "hidden" }}>
-          <img src={feedYogaImg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 30%" }} />
-        </div>
-        <div style={{ padding: "10px 16px 13px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontFamily: B, fontSize: 10, color: MUTED }}>1 going · 2 interested</span>
-          <span style={{ background: RED, color: WHITE, borderRadius: 9999, fontFamily: B, fontWeight: 500, fontSize: 10, padding: "4px 12px" }}>Interested</span>
-        </div>
-      </div>
-      <div style={{ background: WHITE, borderRadius: 16, padding: "14px 16px", boxShadow: "0 2px 18px rgba(20,17,48,0.07)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-          <div style={{ width: 19, height: 19, borderRadius: "50%", background: "#8B7355", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontSize: 8, fontWeight: 700, color: WHITE }}>M</span>
-          </div>
-          <span style={{ fontFamily: B, fontSize: 10, color: MUTED, fontWeight: 500 }}>Marcia</span>
-        </div>
-        <p style={{ fontFamily: D, fontWeight: 700, fontSize: 13, color: NAVY, letterSpacing: "-0.02em", lineHeight: 1.3, marginBottom: 4 }}>Long Run — Schuylkill Banks</p>
-        <p style={{ fontFamily: B, fontSize: 10, color: MUTED, marginBottom: 10 }}>Wed, Jul 29 · 7:00 AM · Schuylkill Banks</p>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontFamily: B, fontSize: 10, color: MUTED }}>5 going · 3 interested</span>
-          <span style={{ background: RED, color: WHITE, borderRadius: 9999, fontFamily: B, fontWeight: 500, fontSize: 10, padding: "4px 12px" }}>Join</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FloatingPathSelector() {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ paddingBottom: 6 }}>
-        <p style={{ fontFamily: B, fontSize: 10, color: MUTED, marginBottom: 8, letterSpacing: "0.02em" }}>← Back</p>
-        <h3 style={{ fontFamily: D, fontWeight: 800, fontSize: 20, color: NAVY, letterSpacing: "-0.035em", lineHeight: 1.2, marginBottom: 5 }}>
-          Hey Anna,<br />what's on your mind?
-        </h3>
-        <p style={{ fontFamily: B, fontSize: 11, color: MUTED, lineHeight: 1.55 }}>Drop something in, you never know who's down.</p>
-      </div>
-      <div style={{ background: WHITE, borderRadius: 16, padding: "18px 18px", boxShadow: "0 2px 18px rgba(20,17,48,0.07)", border: `1.5px solid ${RED}` }}>
-        <p style={{ fontFamily: B, fontWeight: 600, fontSize: 9, color: RED, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 7 }}>Casual</p>
-        <p style={{ fontFamily: D, fontWeight: 800, fontSize: 15, color: NAVY, letterSpacing: "-0.025em", marginBottom: 6 }}>Just an idea</p>
-        <p style={{ fontFamily: B, fontSize: 11, color: MUTED, lineHeight: 1.6, marginBottom: 13 }}>A casual thought — see who's down before committing to anything.</p>
-        <span style={{ display: "inline-flex", background: RED, color: WHITE, borderRadius: 9999, fontFamily: B, fontWeight: 500, fontSize: 11, padding: "6px 14px" }}>Share the vibe →</span>
-      </div>
-      <div style={{ background: WHITE, borderRadius: 16, padding: "18px 18px", boxShadow: "0 2px 18px rgba(20,17,48,0.07)" }}>
-        <p style={{ fontFamily: B, fontWeight: 600, fontSize: 9, color: MUTED, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 7 }}>Committed</p>
-        <p style={{ fontFamily: D, fontWeight: 800, fontSize: 15, color: NAVY, letterSpacing: "-0.025em", marginBottom: 6 }}>Make a plan</p>
-        <p style={{ fontFamily: B, fontSize: 11, color: MUTED, lineHeight: 1.6, marginBottom: 13 }}>Know what you want to do. Set the details, post it, and see who's in.</p>
-        <span style={{ display: "inline-flex", background: "transparent", color: NAVY, border: `1.5px solid rgba(20,17,48,0.18)`, borderRadius: 9999, fontFamily: B, fontWeight: 500, fontSize: 11, padding: "6px 14px" }}>Set the details →</span>
-      </div>
-    </div>
-  );
-}
-
 function Nav({ onStart }: { onStart: () => void }) {
   return (
     <nav style={{ position: "sticky", top: 0, zIndex: 50, background: BEIGE }}>
@@ -269,7 +178,7 @@ function Nav({ onStart }: { onStart: () => void }) {
 function Hero({ onSignup }: { onSignup: () => void }) {
   return (
     <section style={{ background: BEIGE }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "96px 48px 88px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 72, alignItems: "center" }} className="hero-grid">
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "96px 48px 88px", display: "grid", gridTemplateColumns: "1fr", gap: 72, alignItems: "center" }} className="hero-grid">
         <div>
           <h1 style={{ fontFamily: D, fontWeight: 800, fontSize: "clamp(48px, 5.8vw, 76px)", color: NAVY, lineHeight: 0.98, letterSpacing: "-0.045em", marginBottom: 32 }}>
             More plans.<br />
@@ -287,10 +196,6 @@ function Hero({ onSignup }: { onSignup: () => void }) {
             <a href="#pathways" style={{ fontFamily: B, fontWeight: 500, fontSize: 14, color: NAVY, textDecoration: "none", borderBottom: `1px solid rgba(20,17,48,0.3)`, paddingBottom: 2 }}>Peek inside</a>
           </div>
           <p style={{ fontFamily: B, fontSize: 11, color: MUTED, letterSpacing: "0.05em" }}>Invite-only · Built for iOS</p>
-        </div>
-        <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }} className="hero-previews">
-          <div style={{ flex: 1, paddingTop: 36 }}><FloatingFeed /></div>
-          <div style={{ flex: 1 }}><FloatingPathSelector /></div>
         </div>
       </div>
     </section>
