@@ -87,6 +87,8 @@ export interface PublicUser {
   firstName: string;
   lastName?: string;
   bio?: string;
+  /** Coarse age bracket, exposed so the feed can filter plans by host age. */
+  ageRange?: AgeRange | null;
   neighborhoodId: string | null;
   avatarSeed: string;
   avatarStyle: AvatarStyle;

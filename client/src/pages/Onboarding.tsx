@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { CSSProperties, ReactNode } from "react";
 import { api } from "../api/http";
-import { setAuthToken } from "../api/authToken";
+import { setAuthToken, clearAuthToken } from "../api/authToken";
 import { Avatar } from "../components/Avatar";
 import { AvatarCropModal } from "../components/AvatarCropModal";
 import { useAuth } from "../context/AuthContext";
@@ -15,7 +15,6 @@ import { LegalContent } from "../components/LegalContent";
 import { LEGAL_DOCS } from "../content/legal";
 import {
   ALL_INTERESTS,
-  AVATAR_PRESETS,
   INTEREST_EMOJI,
   INTEREST_LABELS,
   AGE_RANGE_LABELS,
@@ -271,6 +270,7 @@ export function OnboardingPage() {
       <OnboardingShell
         title="One last step."
         subtitle="Commons is invite-only for now. Enter your access code, or an invite code from a member, to finish setting up your account."
+        showExit
       >
         <input
           className="onboarding-input"
@@ -550,6 +550,7 @@ function OnboardingShell({
   children,
   landing = false,
   onBack,
+  showExit = false,
 }: {
   title: string;
   subtitle: string;
@@ -558,12 +559,45 @@ function OnboardingShell({
   landing?: boolean;
   /** When provided, renders a back arrow to return to the previous step. */
   onBack?: () => void;
+  /** Renders an "Exit" link that signs out and returns to the front door. Use on
+   *  post-verification setup steps so a user can bail out of onboarding. */
+  showExit?: boolean;
 }) {
+  const { setUser } = useAuth();
+  const navigate = useNavigate();
+
+  // Onboarding can't be left "half done" — the route guard bounces incomplete
+  // users straight back here — so the honest exit is a sign-out that returns to
+  // the marketing landing (web) or the start of onboarding (native).
+  async function handleExit() {
+    const ok = window.confirm("Exit setup? You'll be signed out and can finish anytime.");
+    if (!ok) return;
+    sessionStorage.removeItem("commons_pending_admin_choice");
+    try {
+      await api("/api/auth/logout", { method: "POST" });
+    } catch {
+      /* best-effort — sign out locally regardless */
+    }
+    await clearAuthToken();
+    setUser(null);
+    navigate(isNative() ? "/onboarding" : "/welcome", { replace: true });
+  }
+
   return (
     <div className={`onboarding-shell ${landing ? "onboarding-shell--landing" : ""}`}>
       {onBack && (
         <button type="button" className="onboarding-back" onClick={onBack} aria-label="Back">
           ← Back
+        </button>
+      )}
+      {showExit && (
+        <button
+          type="button"
+          className="onboarding-exit"
+          onClick={() => void handleExit()}
+          aria-label="Exit setup"
+        >
+          Exit
         </button>
       )}
       {landing && (
@@ -649,7 +683,7 @@ function LocationStep({
 
   if (permissionState === "idle") {
     return (
-      <OnboardingShell title="Share your location" subtitle="So we can show you what's happening nearby.">
+      <OnboardingShell title="Share your location" subtitle="So we can show you what's happening nearby." showExit>
         <button className="btn-primary btn-block" onClick={shareLocation}>
           Allow location access
         </button>
@@ -667,6 +701,7 @@ function LocationStep({
     <OnboardingShell
       title="Where do you spend time?"
       subtitle={coords ? "Pick your neighborhoods — we’ll show you what’s happening nearby." : "Pick every area that fits — we’ll personalize your feed."}
+      showExit
     >
       <input
         className="onboarding-input"
@@ -778,6 +813,7 @@ function LegalConsentStep({
       title="The legal bit."
       subtitle="Please read our Terms and Privacy Policy. Scroll to the bottom of each to continue."
       onBack={onBack}
+      showExit
     >
       <div className="legal-consent-tabs">
         {(["terms", "privacy"] as const).map((slug) => (
@@ -850,6 +886,7 @@ function GuidelinesStep({ onAgree, onBack }: { onAgree: () => Promise<void>; onB
       title="Before you hit the feed."
       subtitle="A quick read. We mean it."
       onBack={onBack}
+      showExit
     >
       <ul className="guidelines-list">
         <li>
@@ -940,7 +977,7 @@ function InterestsStep({ me, onSave, onSkip, onBack }: { me: MeDTO; onSave: (int
   }
 
   return (
-    <OnboardingShell title="What are you into?" subtitle="Pick what you’re into. Your feed does the rest." onBack={onBack}>
+    <OnboardingShell title="What are you into?" subtitle="Pick what you’re into. Your feed does the rest." onBack={onBack} showExit>
       <div className="interest-grid">
         {ALL_INTERESTS.map((t) => {
           const isPicked = picked.includes(t);
@@ -997,14 +1034,11 @@ function ProfileStep({
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Photo and preset are mutually exclusive — picking one clears the other.
+  // A real photo is the only way to set a picture now; clear any legacy preset
+  // avatar the moment one is chosen.
   function pickPhoto(dataUrl: string) {
     setPhoto(dataUrl);
     setAvatarParams(null);
-  }
-  function pickPreset(params: string) {
-    setAvatarParams((cur) => (cur === params ? null : params));
-    if (avatarParams !== params) setPhoto(null);
   }
 
   // Tapping the circle opens the photo library. On native we get a data URL
@@ -1023,11 +1057,10 @@ function ProfileStep({
     }
   }
 
-  const hasAvatar = Boolean(photo || avatarParams);
-  const canContinue = Boolean(firstName.trim() && lastName.trim()) && hasAvatar;
+  const canContinue = Boolean(firstName.trim() && lastName.trim() && photo);
 
   return (
-    <OnboardingShell title="Put a face to your name." subtitle="Add a photo and your name to continue." onBack={onBack}>
+    <OnboardingShell title="Put a face to your name." subtitle="Add a photo and your name to continue." onBack={onBack} showExit>
       <div className="profile-avatar-preview">
         <button
           type="button"
@@ -1076,25 +1109,6 @@ function ProfileStep({
         onChange={(e) => setLastName(e.target.value)}
       />
 
-      <details className="profile-preset-disclosure">
-        <summary>Or pick an avatar</summary>
-        <div className="profile-preset-grid" style={{ marginTop: 10 }}>
-          {AVATAR_PRESETS.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className={`profile-preset-pick ${avatarParams === p.params ? "is-selected" : ""}`}
-              onClick={() => pickPreset(p.params)}
-              aria-pressed={avatarParams === p.params}
-              aria-label={p.label}
-              title={p.label}
-            >
-              <Avatar seed={me.avatarSeed} style="avataaars" params={p.params} size="md" />
-            </button>
-          ))}
-        </div>
-      </details>
-
       <button
         type="button"
         className="btn-primary btn-block"
@@ -1112,11 +1126,11 @@ function ProfileStep({
       </button>
       {!canContinue && (
         <p className="onboarding-fineprint">
-          {!firstName.trim() && !hasAvatar
-            ? "Add your first name and a photo to continue."
-            : !firstName.trim()
-              ? "Add your first name to continue."
-              : "Add a photo or pick an avatar to continue."}
+          {!firstName.trim()
+            ? "Add your first name to continue."
+            : !lastName.trim()
+              ? "Add your last name to continue."
+              : "Add a photo to continue."}
         </p>
       )}
 
@@ -1152,6 +1166,7 @@ function AgeStep({
       title="Quick age check."
       subtitle="Commons is for adults. Pick your age range so we can personalize your feed."
       onBack={onBack}
+      showExit
     >
       <label className="guidelines-agree">
         <input

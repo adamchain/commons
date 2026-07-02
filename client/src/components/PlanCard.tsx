@@ -103,7 +103,9 @@ export function PlanCard({
             ? `${goingLabel}${interestedLabel}`
             : null;
 
-  const showActions = !hasEnded && !isCancelled;
+  // Invite / Share / Get there appear on every plan card, including past and
+  // cancelled ones — people still share and navigate to plans after the fact.
+  const showActions = true;
 
   return (
     <div

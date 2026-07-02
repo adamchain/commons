@@ -5,8 +5,7 @@
 :root {
   /* ===== COMMONS Design System v0.4 — paper / ink / signal =====
      Warm paper surfaces, deep navy ink for type, a single signal red for
-     every decision. Default is the light "paper" theme; an ink dark theme
-     lives under [data-theme="dark"]. */
+     every decision. Commons is light-only. */
 
   /* --- Primitives --- */
   --paper-50:  #faf5ec;
@@ -105,43 +104,6 @@
 /* Light = paper (explicit, mirrors the default). */
 [data-theme="light"] {
   color-scheme: light;
-}
-
-/* Dark = ink. Deep navy surfaces, paper-toned type, same signal red. */
-[data-theme="dark"] {
-  --bg: var(--ink-900);
-  --bg-gradient: radial-gradient(120% 80% at 50% -10%, rgba(var(--accent-rgb), 0.10), transparent 55%),
-    var(--bg);
-  /* In ink mode the cards float a step lighter than the deep navy bg, with a
-     warmer hairline and softer shadow so they read as "cards" not "panels". */
-  --surface: #1f1f55;
-  --surface-2: #2a2a66;
-  --surface-hover: #34347a;
-  --border: rgba(245, 239, 228, 0.12);
-  --border-strong: rgba(245, 239, 228, 0.24);
-  --text: var(--paper-50);
-  --text-muted: #a9a9c4;
-  --text-subtle: #7c7c9c;
-  --accent: var(--signal-500);
-  --accent-hover: var(--signal-300);
-  --accent-soft: rgba(var(--accent-rgb), 0.22);
-  --accent-on: var(--paper-50);
-  --success: #4caf72;
-  --success-bg: rgba(76, 175, 114, 0.14);
-  --success-border: rgba(76, 175, 114, 0.30);
-  --warning: #e0962f;
-  --looking-orange: #f5821f;
-  --danger: var(--signal-500);
-  --shadow-card: 0 1px 0 rgba(0, 0, 0, 0.18);
-  --shadow-elevate: 0 1px 2px rgba(0, 0, 0, 0.28);
-  --shadow-fab: none;
-  --shadow-nav: 0 -1px 0 rgba(0, 0, 0, 0.42);
-
-  --community-pink: #f0dde1;
-  --community-pink-soft: rgba(214, 52, 64, 0.18);
-  --community-pink-border: rgba(214, 52, 64, 0.32);
-
-  color-scheme: dark;
 }
 
 * {
@@ -968,9 +930,6 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
   margin-left: -10px;
   box-shadow: 0 0 0 2px var(--surface);
-}
-[data-theme="dark"] .avatar-stack-more {
-  background: var(--surface-2);
 }
 
 /* ---------- Plan detail ---------- */
@@ -2304,6 +2263,26 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text);
 }
 
+/* Exit-onboarding link — mirrors the back pill but anchored top-right. Signs the
+   user out and returns them to the front door. */
+.onboarding-exit {
+  position: absolute;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  right: 16px;
+  z-index: 3;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.onboarding-exit:hover {
+  color: var(--text);
+}
+
 /* Guidelines agree checkbox + legal links. */
 .guidelines-agree {
   display: flex;
@@ -3240,12 +3219,6 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 1.5;
   margin: 0 0 14px;
 }
-.profile-interest-chip {
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-  font-weight: 500;
-}
 .messages-page-title {
   font-size: 22px;
   font-weight: 600;
@@ -3420,11 +3393,11 @@ h1, h2, h3, h4, h5, h6 {
 .profile-interest-chip {
   padding: 6px 12px;
   border-radius: 999px;
-  background: var(--community-pink-soft);
-  color: var(--community-pink);
+  background: var(--surface);
+  color: var(--text);
   font-size: 13px;
-  font-weight: 600;
-  border: 1px solid var(--community-pink-border);
+  font-weight: 500;
+  border: 1px solid var(--border);
 }
 
 .profile-edit-panel {
@@ -4502,9 +4475,6 @@ h1, h2, h3, h4, h5, h6 {
   height: 16px;
   flex-shrink: 0;
 }
-[data-theme="dark"] .plan-card-meta-icon {
-  color: rgba(245, 239, 228, 0.45);
-}
 .plan-card-meta-icon svg {
   width: 100%;
   height: 100%;
@@ -4558,11 +4528,6 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--accent);
   color: var(--paper-50);
   border: 1px solid var(--accent);
-}
-[data-theme="dark"] .plan-card-state-pill--in {
-  background: var(--accent);
-  color: var(--paper-50);
-  border-color: var(--accent);
 }
 .plan-card-state-pill--interested {
   background: transparent;
@@ -5692,10 +5657,6 @@ h1, h2, h3, h4, h5, h6 {
 /* Dark mode: black ink would disappear on the navy background. Drop the
    wordmark to solid paper-tone (loses the red squiggle accent — ship a
    dedicated dark-mode asset later if that matters). */
-[data-theme="dark"] .top-bar-brand-img {
-  filter: brightness(0) invert(1);
-  opacity: 0.92;
-}
 
 .top-bar-actions {
   display: inline-flex;
@@ -7030,9 +6991,6 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--paper-200);
   color: var(--text);
 }
-[data-theme="dark"] .settings-row-icon {
-  background: var(--surface-2);
-}
 .settings-row-icon--accent {
   background: var(--accent);
   color: var(--accent-on);
@@ -7095,9 +7053,6 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 999px;
   padding: 2px;
 }
-[data-theme="dark"] .settings-seg {
-  background: var(--surface-2);
-}
 .settings-seg button {
   appearance: none;
   border: none;
@@ -7113,10 +7068,6 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--surface);
   color: var(--text);
   box-shadow: var(--shadow-elevate);
-}
-[data-theme="dark"] .settings-seg button.is-active {
-  background: var(--ink-900);
-  color: var(--paper-50);
 }
 
 /* Sign out row */
@@ -7201,9 +7152,6 @@ h1, h2, h3, h4, h5, h6 {
   transition: background 160ms ease;
   border: none;
   padding: 0;
-}
-[data-theme="dark"] .pref-toggle input {
-  background: var(--surface-hover);
 }
 .pref-toggle input::before {
   content: "";
@@ -7738,15 +7686,6 @@ h1, h2, h3, h4, h5, h6 {
     transparent 19px
   );
 }
-[data-theme="dark"] .cover-picker {
-  background-image: repeating-linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.06) 0,
-    rgba(255, 255, 255, 0.06) 1px,
-    transparent 1px,
-    transparent 19px
-  );
-}
 .cover-picker-title {
   font-size: 17px;
   font-weight: 600;
@@ -8153,12 +8092,12 @@ h1, h2, h3, h4, h5, h6 {
   margin-bottom: 22px;
 }
 .xpl-pitch-eyebrow {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.10em;
   text-transform: uppercase;
   color: var(--accent);
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 .xpl-pitch-head {
   font-size: 38px;

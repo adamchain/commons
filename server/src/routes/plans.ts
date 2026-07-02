@@ -63,6 +63,7 @@ export function userToPublic(user: UserRecord): PublicUser {
     firstName: user.firstName || "Friend",
     lastName: user.lastName,
     bio: user.bio || undefined,
+    ageRange: user.ageRange ?? null,
     neighborhoodId: user.neighborhoodId,
     avatarSeed: user.avatarSeed,
     avatarStyle: user.avatarStyle,

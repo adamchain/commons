@@ -186,6 +186,7 @@ export function FeedPage() {
     }
     if (selectedTag) list = list.filter((p) => p.tags.includes(selectedTag));
     if (selectedHoodId) list = list.filter((p) => p.neighborhoodId === selectedHoodId);
+    if (selectedAgeRange) list = list.filter((p) => p.creator.ageRange === selectedAgeRange);
     if (selectedDayIso) list = list.filter((p) => p.date.slice(0, 10) === selectedDayIso);
     // Happened = ended and not cancelled (mirrors PlanCard badge logic).
     if (hideHappened) list = list.filter((p) => p.cancelledAt || !planHasEnded(p));
@@ -209,7 +210,7 @@ export function FeedPage() {
       }
     }
     return list;
-  }, [plans, view, selectedTag, selectedHoodId, selectedDayIso, hideHappened, hideCancelled, justPostedId]);
+  }, [plans, view, selectedTag, selectedHoodId, selectedAgeRange, selectedDayIso, hideHappened, hideCancelled, justPostedId]);
 
   const activeFilterCount =
     (selectedTag ? 1 : 0) +
