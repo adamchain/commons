@@ -12,11 +12,6 @@ interface ThemeContextValue {
 const STORAGE_KEY = "commons-theme";
 
 function detectInitialTheme(): Theme {
-  // Paper (light) is the default Commons surface; dark is opt-in.
-  if (typeof window === "undefined") return "light";
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  if (stored === "light" || stored === "dark") return stored;
-  if (window.matchMedia?.("(prefers-color-scheme: dark)").matches) return "dark";
   return "light";
 }
 
@@ -30,8 +25,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(detectInitialTheme);
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    window.localStorage.setItem(STORAGE_KEY, theme);
+    document.documentElement.setAttribute("data-theme", "light");
+    window.localStorage.setItem(STORAGE_KEY, "light");
   }, [theme]);
 
   const value = useMemo<ThemeContextValue>(

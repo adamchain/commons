@@ -27,7 +27,7 @@ import { MessagesPage } from "./pages/Messages";
 import { MyPlansPage } from "./pages/MyPlans";
 
 const APP_BOOT_AT = Date.now();
-const MIN_BOOT_SPLASH_MS = 1500;
+const MIN_BOOT_SPLASH_MS = 600;
 
 function Protected({
   children,
@@ -46,7 +46,7 @@ function Protected({
     const t = setTimeout(() => setBootSplashDone(true), Math.max(0, remaining));
     return () => clearTimeout(t);
   }, [bootSplashDone]);
-  if (loading || !bootSplashDone) return <LoadingScreen tagline="A place for plans meant to be shared." />;
+  if (loading || !bootSplashDone) return <LoadingScreen simple tagline="A place for plans meant to be shared." />;
   // The app is iOS-only; on the web there's nothing to sign into, so send
   // unauthenticated web visitors to the marketing landing instead of onboarding.
   if (!user) return <Navigate to={isNative() ? "/onboarding" : "/welcome"} replace />;

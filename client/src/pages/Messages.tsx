@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/http";
-import { LoadingScreen } from "../components/LoadingScreen";
 import { formatRelative } from "../lib/format";
 import type { ConversationSummaryDTO } from "../types/shared";
 
@@ -12,24 +11,40 @@ const ROLE_LABEL: Record<ConversationSummaryDTO["myRole"], string> = {
 };
 
 export function MessagesPage() {
-  const [items, setItems] = useState<ConversationSummaryDTO[] | null>(null);
+  const [items, setItems] = useState<ConversationSummaryDTO[]>([]);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     void api<ConversationSummaryDTO[]>("/api/conversations")
-      .then(setItems)
-      .catch(() => setItems([]));
+      .then((rows) => {
+        setItems(
+          [...rows].sort((a, b) => {
+            const at = a.lastMessageAt ?? a.planDate;
+            const bt = b.lastMessageAt ?? b.planDate;
+            return at.localeCompare(bt);
+          }),
+        );
+        setReady(true);
+      })
+      .catch(() => {
+        setItems([]);
+        setReady(true);
+      });
   }, []);
 
-  if (items === null) return <LoadingScreen tagline="Loading messages" />;
-
   return (
-    <main className="app-shell app-shell--with-nav app-shell--with-topbar">
+    <main className="app-shell app-shell--with-nav app-shell--with-topbar app-shell--messages-lock">
       <h1 className="messages-page-title">Messages</h1>
       <p className="messages-page-sub">
         Group chats from plans you&apos;ve started, are going to, or are interested in.
       </p>
 
-      {items.length === 0 ? (
+      {!ready ? (
+        <div className="feed-skeleton" aria-hidden="true">
+          <div className="feed-skeleton-card" />
+          <div className="feed-skeleton-card" />
+        </div>
+      ) : items.length === 0 ? (
         <div className="empty-state">
           <p style={{ margin: 0 }}>No chats yet — join a plan and its group chat shows up here.</p>
           <Link to="/explore" className="btn-primary" style={{ marginTop: 14, display: "inline-block" }}>

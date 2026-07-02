@@ -176,11 +176,18 @@ const ICONS: Array<{
   },
 ];
 
-export function LoadingScreen({ tagline = "A place for plans meant to be shared." }: { tagline?: string }) {
+export function LoadingScreen({
+  tagline = "A place for plans meant to be shared.",
+  simple = false,
+}: {
+  tagline?: string;
+  simple?: boolean;
+}) {
   return (
-    <div className="loader-screen" role="status" aria-live="polite">
-      <div className="loader-icons" aria-hidden="true">
-        {ICONS.map((icon) => {
+    <div className={`loader-screen ${simple ? "loader-screen--simple" : ""}`} role="status" aria-live="polite">
+      {!simple && (
+        <div className="loader-icons" aria-hidden="true">
+          {ICONS.map((icon) => {
           const style: CSSProperties & { ["--rot"]?: string } = {
             top: icon.top,
             left: icon.left,
@@ -197,6 +204,7 @@ export function LoadingScreen({ tagline = "A place for plans meant to be shared.
           );
         })}
       </div>
+      )}
 
       <div className="loader-center">
         <h1 className="loader-wordmark">COMMONS</h1>

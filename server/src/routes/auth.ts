@@ -64,6 +64,9 @@ function meFromUser(user: UserRecord): MeDTO {
     phoneNumber: user.phoneNumber,
     firstName: user.firstName,
     lastName: user.lastName,
+    bio: user.bio || undefined,
+    ageRange: user.ageRange ?? null,
+    ageConfirmedAt: user.ageConfirmedAt ?? null,
     neighborhoodId: user.neighborhoodId ?? neighborhoodIds[0] ?? null,
     neighborhoodIds,
     interests: user.interests,
@@ -203,6 +206,10 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
   const patch: UserPatch = {};
   if (typeof req.body?.firstName === "string") patch.firstName = req.body.firstName.trim();
   if (typeof req.body?.lastName === "string") patch.lastName = req.body.lastName.trim();
+  if (typeof req.body?.bio === "string") patch.bio = req.body.bio.trim().slice(0, 160);
+  if (req.body?.bio === null || req.body?.bio === "") patch.bio = "";
+  if (typeof req.body?.ageRange === "string") patch.ageRange = req.body.ageRange;
+  if (req.body?.ageConfirmed === true) patch.ageConfirmedAt = new Date().toISOString();
   if (typeof req.body?.neighborhoodId === "string") patch.neighborhoodId = req.body.neighborhoodId;
   if (Array.isArray(req.body?.neighborhoodIds)) {
     patch.neighborhoodIds = (req.body.neighborhoodIds as unknown[]).map(String).filter(Boolean);

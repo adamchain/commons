@@ -42,7 +42,7 @@ const PAST_EVENTS: PastEvent[] = [
     host: "adam2", title: "Coffee + catch up at Ultimo", neighborhoodName: "Graduate Hospital",
     location: { name: "Ultimo Coffee", address: "2149 Catharine St, Philadelphia, PA" },
     daysAgo: 7, time: "10:00", durationHours: 1.5,
-    tags: ["coffee_cowork", "food_drinks"], description: "Long overdue coffee. Ended up staying two hours.", hostEmoji: "☕",
+    tags: ["coffee", "food"], description: "Long overdue coffee. Ended up staying two hours.", hostEmoji: "☕",
     messages: [
       { from: "nishika", body: "Running 5 min late, grabbing a seat?", minutesBeforeStart: 5 },
       { from: "adam2", body: "Got us the corner table by the window 👍", minutesBeforeStart: 3 },
@@ -52,7 +52,7 @@ const PAST_EVENTS: PastEvent[] = [
     host: "nishika", title: "Evening walk · Rittenhouse Square", neighborhoodName: "Center City",
     location: { name: "Rittenhouse Square", address: "1800 Walnut St, Philadelphia, PA", lat: 39.949, lng: -75.171 },
     daysAgo: 12, time: "18:30", durationHours: 1,
-    tags: ["wellness", "fitness_outdoors"], description: "Easy loop around the square before dinner.", hostEmoji: "🌳",
+    tags: ["workouts", "workouts"], description: "Easy loop around the square before dinner.", hostEmoji: "🌳",
     messages: [
       { from: "adam2", body: "Meet by the fountain?", minutesBeforeStart: 20 },
     ],
@@ -61,14 +61,14 @@ const PAST_EVENTS: PastEvent[] = [
     host: "adam2", title: "Dinner in the city", neighborhoodName: "Center City",
     location: { name: "Vernick Food & Drink", address: "2031 Walnut St, Philadelphia, PA" },
     daysAgo: 21, time: "19:30", durationHours: 2,
-    tags: ["food_drinks"], description: "Tried the new tasting spots — worth it.", hostEmoji: "🍽️",
+    tags: ["food"], description: "Tried the new tasting spots — worth it.", hostEmoji: "🍽️",
     messages: [],
   },
   {
     host: "nishika", title: "Art Museum afternoon", neighborhoodName: "Fairmount",
     location: { name: "Philadelphia Museum of Art", address: "2600 Benjamin Franklin Pkwy, Philadelphia, PA" },
     daysAgo: 30, time: "14:00", durationHours: 2.5,
-    tags: ["arts_culture"], description: "New exhibit was incredible. Ran the steps after, obviously.", hostEmoji: "🖼️",
+    tags: ["creative"], description: "New exhibit was incredible. Ran the steps after, obviously.", hostEmoji: "🖼️",
     messages: [
       { from: "nishika", body: "I'll grab tickets online so we skip the line", minutesBeforeStart: 60 },
     ],
@@ -77,14 +77,14 @@ const PAST_EVENTS: PastEvent[] = [
     host: "adam2", title: "Sunday run along the Schuylkill", neighborhoodName: "Fairmount",
     location: { name: "Schuylkill Banks Trailhead", address: "2500 Walnut St, Philadelphia, PA", lat: 39.9513, lng: -75.182 },
     daysAgo: 40, time: "08:00", durationHours: 1.5,
-    tags: ["running", "fitness_outdoors"], description: "Easy 5 miles, coffee after.", hostEmoji: "🏃",
+    tags: ["workouts", "workouts"], description: "Easy 5 miles, coffee after.", hostEmoji: "🏃",
     messages: [],
   },
   {
     host: "nishika", title: "First Friday gallery night", neighborhoodName: "Old City",
     location: { name: "Old City Arts District", address: "N 3rd St & Market St, Philadelphia, PA" },
     daysAgo: 54, time: "18:00", durationHours: 3,
-    tags: ["arts_culture", "local_events", "food_drinks"], description: "Hit four galleries then drinks at the corner spot.", hostEmoji: "🎨",
+    tags: ["creative", "events", "food"], description: "Hit four galleries then drinks at the corner spot.", hostEmoji: "🎨",
     messages: [
       { from: "adam2", body: "Starting at the flagpole?", minutesBeforeStart: 30 },
       { from: "nishika", body: "Yep — see you there!", minutesBeforeStart: 25 },

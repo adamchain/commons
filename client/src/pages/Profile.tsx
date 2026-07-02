@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import { clearAuthToken } from "../api/authToken";
 import { Avatar } from "../components/Avatar";
-import { LoadingScreen } from "../components/LoadingScreen";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
@@ -45,6 +44,7 @@ export function ProfilePage() {
   const [feedPlans, setFeedPlans] = useState<PlanDTO[]>([]);
   const [network, setNetwork] = useState<PublicUser[] | null>(null);
   const [editing, setEditing] = useState(false);
+  const [plansView, setPlansView] = useState<"list" | "calendar">("list");
   const isSelf = user?.id === userId;
 
   const reloadProfile = () =>
@@ -67,7 +67,18 @@ export function ProfilePage() {
       .catch(() => setNetwork([]));
   }, [isSelf, user?.networkUserIds?.length]);
 
-  if (!profile) return <LoadingScreen tagline="Loading profile" />;
+  if (!profile) {
+    return (
+      <main className="app-shell app-shell--with-nav app-shell--with-topbar">
+        <div className="feed-skeleton" aria-hidden="true">
+          <div className="feed-skeleton-card" />
+        </div>
+      </main>
+    );
+  }
+
+  const displayName = [profile.user.firstName, profile.user.lastName].filter(Boolean).join(" ") || "Unnamed";
+  const networkCount = isSelf ? (network?.length ?? 0) : profile.network.mutualCount;
 
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">
@@ -108,13 +119,32 @@ export function ProfilePage() {
               />
             )}
             <div className="profile-hero-text">
-              <div className="profile-name">{profile.user.firstName || "Unnamed"}</div>
+              <div className="profile-name">{displayName}</div>
+              {profile.user.bio && (
+                <p className="profile-bio">{profile.user.bio}</p>
+              )}
               {profile.neighborhood && (
                 <div className="profile-meta-line">
                   <PinIcon />
                   {profile.neighborhood.name}
                 </div>
               )}
+              <div className="profile-stats profile-stats--inline" aria-label="Profile stats">
+                <div className="profile-stat">
+                  <span className="profile-stat-num">{profile.stats.hosted}</span>
+                  <span className="profile-stat-label">Started</span>
+                </div>
+                <div className="profile-stat">
+                  <span className="profile-stat-num">{profile.stats.joined}</span>
+                  <span className="profile-stat-label">Joined</span>
+                </div>
+                {isSelf && (
+                  <div className="profile-stat">
+                    <span className="profile-stat-num">{networkCount}</span>
+                    <span className="profile-stat-label">Friends</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           {isSelf && !editing && (
@@ -158,17 +188,6 @@ export function ProfilePage() {
 
         <div className="profile-divider" />
 
-        <div className="profile-stats" aria-label="Profile stats">
-          <div className="profile-stat">
-            <span className="profile-stat-num">{profile.stats.hosted}</span>
-            <span className="profile-stat-label">Started</span>
-          </div>
-          <div className="profile-stat">
-            <span className="profile-stat-num">{profile.stats.joined}</span>
-            <span className="profile-stat-label">Joined</span>
-          </div>
-        </div>
-
         {!isSelf && (
           <Link
             to={`/plans/new?inviteUser=${encodeURIComponent(profile.user.id)}&inviteName=${encodeURIComponent(profile.user.firstName)}`}
@@ -194,7 +213,7 @@ export function ProfilePage() {
         />
       )}
 
-      {profile.interests.length > 0 && (
+      {profile.interests.length > 0 && !isSelf && (
         <section className="profile-block">
           <h3 className="profile-section-label">Interests</h3>
           <div className="profile-interests">
@@ -207,15 +226,28 @@ export function ProfilePage() {
         </section>
       )}
 
-      {isSelf && <ProfileMenu network={network} />}
+      {isSelf && (
+        <ProfileMenu
+          network={network}
+          onOpenCalendar={() => {
+            setPlansView("calendar");
+            setTimeout(() => {
+              document.getElementById("profile-plans-block")?.scrollIntoView({ behavior: "smooth" });
+            }, 50);
+          }}
+        />
+      )}
 
       {(profile.upcoming.length > 0 || profile.past.length > 0) && (
         <YourPlansBlock
+          id="profile-plans-block"
           upcoming={profile.upcoming}
           past={profile.past}
           isSelf={isSelf}
           viewerId={user?.id}
           calendarPlans={isSelf ? feedPlans : profile.upcoming}
+          view={plansView}
+          onViewChange={setPlansView}
         />
       )}
 
@@ -481,8 +513,11 @@ function EditPanel({
   onCancel: () => void;
 }) {
   const [firstName, setFirstName] = useState(me.firstName);
+  const [lastName, setLastName] = useState(me.lastName ?? "");
+  const [bio, setBio] = useState(me.bio ?? "");
   const [photo, setPhoto] = useState<string | null>(me.avatarPhotoDataUrl ?? null);
   const [avatarParams, setAvatarParams] = useState<string | null>(me.avatarParams ?? null);
+  const [presetOpen, setPresetOpen] = useState(false);
   const [instagram, setInstagram] = useState(me.socialLinks?.instagram ?? "");
   const [tiktok, setTiktok] = useState(me.socialLinks?.tiktok ?? "");
   const [busy, setBusy] = useState(false);
@@ -506,6 +541,8 @@ function EditPanel({
         method: "PATCH",
         body: JSON.stringify({
           firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          bio: bio.trim(),
           avatarPhotoDataUrl: photo ?? null,
           avatarParams: avatarParams ?? null,
           socialLinks: {
@@ -525,7 +562,7 @@ function EditPanel({
   return (
     <section className="profile-edit-panel">
       <label className="form-question" htmlFor="profile-edit-name">
-        Your name
+        First name
       </label>
       <input
         id="profile-edit-name"
@@ -533,6 +570,30 @@ function EditPanel({
         value={firstName}
         onChange={(e) => setFirstName(e.target.value)}
         maxLength={40}
+      />
+
+      <label className="form-question" htmlFor="profile-edit-last" style={{ marginTop: 10 }}>
+        Last name
+      </label>
+      <input
+        id="profile-edit-last"
+        className="onboarding-input"
+        value={lastName}
+        onChange={(e) => setLastName(e.target.value)}
+        maxLength={40}
+      />
+
+      <label className="form-question" htmlFor="profile-edit-bio" style={{ marginTop: 10 }}>
+        Bio
+      </label>
+      <textarea
+        id="profile-edit-bio"
+        className="onboarding-input profile-edit-bio"
+        value={bio}
+        onChange={(e) => setBio(e.target.value)}
+        maxLength={160}
+        rows={3}
+        placeholder="A short line about you…"
       />
 
       <label className="form-question" style={{ marginTop: 14 }}>
@@ -597,8 +658,13 @@ function EditPanel({
         </div>
       </div>
 
-      <p className="profile-emoji-label" style={{ marginTop: 12 }}>Or pick an avatar</p>
-      <div className="profile-preset-grid">
+      <details
+        className="profile-preset-disclosure"
+        open={presetOpen}
+        onToggle={(e) => setPresetOpen((e.target as HTMLDetailsElement).open)}
+      >
+        <summary>Pick an avatar</summary>
+        <div className="profile-preset-grid" style={{ marginTop: 10 }}>
         {AVATAR_PRESETS.map((p) => (
           <button
             key={p.id}
@@ -612,7 +678,8 @@ function EditPanel({
             <Avatar seed={me.avatarSeed} style="avataaars" params={p.params} size="md" />
           </button>
         ))}
-      </div>
+        </div>
+      </details>
 
       <label className="form-question" htmlFor="profile-edit-ig" style={{ marginTop: 14 }}>
         Instagram
@@ -658,7 +725,7 @@ function EditPanel({
           type="button"
           className="btn-primary"
           style={{ flex: 2 }}
-          disabled={busy || !firstName.trim()}
+          disabled={busy || !firstName.trim() || !lastName.trim()}
           onClick={() => void save()}
         >
           {busy ? "Saving…" : "Save changes"}
@@ -669,9 +736,12 @@ function EditPanel({
 }
 
 function MonthCalendar({ plans }: { plans: PlanDTO[] }) {
+  const [monthOffset, setMonthOffset] = useState(0);
+  const [openDay, setOpenDay] = useState<number | null>(null);
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
+  const viewDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
   const first = new Date(year, month, 1);
   const startPad = (first.getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -689,9 +759,17 @@ function MonthCalendar({ plans }: { plans: PlanDTO[] }) {
 
   return (
     <div className="profile-month-calendar" aria-label="Month view">
-      <h4 className="profile-month-caption">
-        {first.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
-      </h4>
+      <div className="profile-month-header">
+        <button type="button" className="month-cal-nav" onClick={() => { setMonthOffset((m) => m - 1); setOpenDay(null); }} aria-label="Previous month">
+          ‹
+        </button>
+        <h4 className="profile-month-caption">
+          {first.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+        </h4>
+        <button type="button" className="month-cal-nav" onClick={() => { setMonthOffset((m) => m + 1); setOpenDay(null); }} aria-label="Next month">
+          ›
+        </button>
+      </div>
       <div className="month-cal-grid">
         {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
           <div key={`${d}-${i}`} className="month-cal-dow">
@@ -703,14 +781,25 @@ function MonthCalendar({ plans }: { plans: PlanDTO[] }) {
             <div key={`e-${i}`} className="month-cal-cell month-cal-cell--empty" />
           ) : (
             <div key={dom} className={`month-cal-cell ${byDay.has(dom) ? "has-plans" : ""}`}>
-              <span className="month-cal-num">{dom}</span>
-              <div className="month-cal-plans">
-                {(byDay.get(dom) ?? []).slice(0, 3).map((p) => (
-                  <Link key={p.id} to={`/plans/${p.id}`} className="month-cal-dot-plan">
-                    <span>{p.hostEmoji}</span> <span className="month-cal-dot-title">{p.title}</span>
-                  </Link>
-                ))}
-              </div>
+              <button
+                type="button"
+                className="month-cal-day-btn"
+                onClick={() => setOpenDay(openDay === dom ? null : dom)}
+                aria-expanded={openDay === dom}
+              >
+                <span className="month-cal-num">{dom}</span>
+                {byDay.has(dom) && <span className="month-cal-dot" aria-hidden="true" />}
+              </button>
+              {openDay === dom && (byDay.get(dom) ?? []).length > 0 && (
+                <div className="month-cal-dropdown">
+                  {(byDay.get(dom) ?? []).map((p) => (
+                    <Link key={p.id} to={`/plans/${p.id}`} className="month-cal-dropdown-item">
+                      <span>{p.hostEmoji}</span>
+                      <span className="month-cal-dot-title">{p.title}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
           ),
         )}
@@ -726,26 +815,30 @@ function MonthCalendar({ plans }: { plans: PlanDTO[] }) {
  * to each plan is. Past rows tag HOSTED or WENT.
  */
 function YourPlansBlock({
+  id,
   upcoming,
   past,
   isSelf,
   viewerId,
   calendarPlans,
+  view,
+  onViewChange,
 }: {
+  id?: string;
   upcoming: PlanDTO[];
   past: Array<{ id: string; title: string; date: string; wentCount: number }>;
   isSelf: boolean;
   viewerId: string | undefined;
   calendarPlans: PlanDTO[];
+  view: "list" | "calendar";
+  onViewChange: (v: "list" | "calendar") => void;
 }) {
   const [upcomingExpanded, setUpcomingExpanded] = useState(false);
   const [pastOpen, setPastOpen] = useState(false);
-  // List is the default; calendar is an opt-in toggle (not the default view).
-  const [view, setView] = useState<"list" | "calendar">("list");
   const visibleUpcoming = upcomingExpanded ? upcoming : upcoming.slice(0, 3);
   const hiddenCount = Math.max(0, upcoming.length - visibleUpcoming.length);
   return (
-    <section className="profile-block">
+    <section className="profile-block" id={id}>
       <div className="profile-block-heading-row">
         <h3 className="who-block-heading">{isSelf ? "Your plans" : "Plans"}</h3>
         <div className="profile-plans-toggle" role="tablist" aria-label="Plans view">
@@ -754,7 +847,7 @@ function YourPlansBlock({
             role="tab"
             aria-selected={view === "list"}
             className={view === "list" ? "is-active" : ""}
-            onClick={() => setView("list")}
+            onClick={() => onViewChange("list")}
           >
             List
           </button>
@@ -763,7 +856,7 @@ function YourPlansBlock({
             role="tab"
             aria-selected={view === "calendar"}
             className={view === "calendar" ? "is-active" : ""}
-            onClick={() => setView("calendar")}
+            onClick={() => onViewChange("calendar")}
           >
             Calendar
           </button>
@@ -860,35 +953,62 @@ function YourPlansBlock({
   );
 }
 
-function ProfileMenu({ network }: { network: PublicUser[] | null }) {
+function ProfileMenu({
+  network,
+  onOpenCalendar,
+}: {
+  network: PublicUser[] | null;
+  onOpenCalendar: () => void;
+}) {
   const networkCount = network?.length ?? null;
   const firstFive = (network ?? []).slice(0, 5);
-  const countLabel =
-    networkCount === null
-      ? "Your people"
-      : `${networkCount} ${networkCount === 1 ? "person" : "people"}`;
+  const emptySlots = Math.max(0, 5 - firstFive.length);
   return (
     <nav className="profile-menu" aria-label="Profile menu">
-      <Link to="/network" className="profile-menu-row profile-menu-row--with-stack">
+      <button type="button" className="profile-menu-row" onClick={onOpenCalendar}>
+        <span className="profile-menu-icon" aria-hidden="true">📅</span>
+        <span className="profile-menu-text">
+          <span className="profile-menu-label">Calendar</span>
+          <span className="profile-menu-sub">Month view of your plans</span>
+        </span>
+        <ChevronRight />
+      </button>
+      <Link to="/my-plans" className="profile-menu-row">
+        <span className="profile-menu-icon" aria-hidden="true">📋</span>
+        <span className="profile-menu-text">
+          <span className="profile-menu-label">My plans</span>
+          <span className="profile-menu-sub">Hosting, going, interested, saved</span>
+        </span>
+        <ChevronRight />
+      </Link>
+      <Link to="/network" className="profile-menu-row profile-menu-row--network">
         <span className="profile-menu-icon" aria-hidden="true">👥</span>
         <span className="profile-menu-text">
           <span className="profile-menu-label">Your network</span>
-          <span className="profile-menu-sub">{countLabel}</span>
+          <span className="profile-menu-sub">
+            {networkCount === null
+              ? "Your people"
+              : `${networkCount} ${networkCount === 1 ? "person" : "people"}`}
+          </span>
         </span>
-        {firstFive.length > 0 && (
-          <span className="profile-menu-avatar-stack avatar-stack avatar-stack--md">
-            {firstFive.map((u) => (
+        <span className="profile-network-slots" aria-hidden="true">
+          {firstFive.map((u) => (
+            <span key={u.id} className="profile-network-slot profile-network-slot--filled">
               <Avatar
-                key={u.id}
                 seed={u.avatarSeed}
                 style={u.avatarStyle}
                 photoDataUrl={u.avatarPhotoDataUrl}
                 params={u.avatarParams}
                 size="xs"
               />
-            ))}
-          </span>
-        )}
+            </span>
+          ))}
+          {Array.from({ length: emptySlots }).map((_, i) => (
+            <span key={`empty-${i}`} className="profile-network-slot">
+              <span className="profile-network-slot-dot" />
+            </span>
+          ))}
+        </span>
         <ChevronRight />
       </Link>
       <Link to="/invite" className="profile-menu-row">
@@ -899,11 +1019,11 @@ function ProfileMenu({ network }: { network: PublicUser[] | null }) {
         </span>
         <ChevronRight />
       </Link>
-      <Link to="/settings" className="profile-menu-row">
+      <Link to="/settings" className="profile-menu-row profile-menu-row--settings">
         <span className="profile-menu-icon" aria-hidden="true">⚙️</span>
         <span className="profile-menu-text">
           <span className="profile-menu-label">Settings</span>
-          <span className="profile-menu-sub">Interests, notifications, invite codes, account</span>
+          <span className="profile-menu-sub">Notifications, interests, account</span>
         </span>
         <ChevronRight />
       </Link>

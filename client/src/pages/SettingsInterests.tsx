@@ -5,7 +5,6 @@ import { LoadingScreen } from "../components/LoadingScreen";
 import { useAuth } from "../context/AuthContext";
 import {
   ALL_INTERESTS,
-  INTEREST_EMOJI,
   INTEREST_LABELS,
   type InterestTag,
   type MeDTO,
@@ -61,19 +60,18 @@ export function SettingsInterestsPage() {
         Pick what you're into. Your feed does the rest.
       </p>
 
-      <div className="interest-grid">
+      <div className="settings-interests-grid">
         {ALL_INTERESTS.map((t) => {
           const isPicked = picked.includes(t);
           return (
             <button
               key={t}
               type="button"
-              className={`interest-tile ${isPicked ? "is-picked" : ""}`}
+              className={`community-chip ${isPicked ? "is-active" : ""}`}
               onClick={() => toggle(t)}
               aria-pressed={isPicked}
             >
-              <span className="interest-emoji" aria-hidden="true">{INTEREST_EMOJI[t]}</span>
-              <span className="interest-label">{INTEREST_LABELS[t]}</span>
+              {INTEREST_LABELS[t]}
             </button>
           );
         })}

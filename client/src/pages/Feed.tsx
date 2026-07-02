@@ -3,13 +3,12 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { FilterSheet } from "../components/FilterSheet";
 import { InviteSheet } from "../components/InviteSheet";
-import { LoadingScreen } from "../components/LoadingScreen";
 import { NetworkPromptModal } from "../components/NetworkPromptModal";
 import { PlanCard } from "../components/PlanCard";
 import { WeekStrip } from "../components/WeekStrip";
 import { useAuth } from "../context/AuthContext";
 import { planHasEnded } from "../lib/planTime";
-import type { InterestTag, MeDTO, NeighborhoodDTO, NetworkPromptDTO, PlanDTO } from "../types/shared";
+import type { AgeRange, InterestTag, MeDTO, NeighborhoodDTO, NetworkPromptDTO, PlanDTO } from "../types/shared";
 
 // Feed filters persist across navigation + reload — losing "hide cancelled"
 // every time you left the feed was a papercut.
@@ -18,6 +17,7 @@ const FEED_FILTERS_KEY = "commons.feedFilters.v1";
 type PersistedFilters = {
   selectedTag: InterestTag | null;
   selectedHoodId: string | null;
+  selectedAgeRange: AgeRange | null;
   hideHappened: boolean;
   hideCancelled: boolean;
 };
@@ -25,6 +25,7 @@ type PersistedFilters = {
 const EMPTY_FILTERS: PersistedFilters = {
   selectedTag: null,
   selectedHoodId: null,
+  selectedAgeRange: null,
   hideHappened: false,
   hideCancelled: false,
 };
@@ -40,11 +41,13 @@ function loadPersistedFilters(): PersistedFilters {
 }
 
 export function FeedPage() {
-  const [plans, setPlans] = useState<PlanDTO[] | null>(null);
+  const [plans, setPlans] = useState<PlanDTO[]>([]);
+  const [feedReady, setFeedReady] = useState(false);
   const [neighborhoods, setNeighborhoods] = useState<NeighborhoodDTO[]>([]);
   const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState<InterestTag | null>(() => loadPersistedFilters().selectedTag);
   const [selectedHoodId, setSelectedHoodId] = useState<string | null>(() => loadPersistedFilters().selectedHoodId);
+  const [selectedAgeRange, setSelectedAgeRange] = useState<AgeRange | null>(() => loadPersistedFilters().selectedAgeRange);
   const [hideHappened, setHideHappened] = useState(() => loadPersistedFilters().hideHappened);
   const [hideCancelled, setHideCancelled] = useState(() => loadPersistedFilters().hideCancelled);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -64,11 +67,37 @@ export function FeedPage() {
   );
 
   const [refreshing, setRefreshing] = useState(false);
-  const refreshPlans = () => void api<PlanDTO[]>("/api/plans").then(setPlans).catch(() => setPlans([]));
+  const refreshPlans = () =>
+    void api<PlanDTO[]>("/api/plans")
+      .then((rows) => {
+        setPlans(rows);
+        setFeedReady(true);
+      })
+      .catch(() => {
+        setPlans([]);
+        setFeedReady(true);
+      });
 
   useEffect(() => {
     refreshPlans();
     void api<NeighborhoodDTO[]>("/api/neighborhoods").then(setNeighborhoods).catch(() => undefined);
+  }, []);
+
+  // Tapping Home while already on the feed scrolls to top and re-pulls plans.
+  useEffect(() => {
+    const onHomeRefresh = () => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      setRefreshing(true);
+      void api<PlanDTO[]>("/api/plans")
+        .then((rows) => {
+          setPlans(rows);
+          setFeedReady(true);
+        })
+        .catch(() => undefined)
+        .finally(() => setRefreshing(false));
+    };
+    window.addEventListener("commons:home-refresh", onHomeRefresh);
+    return () => window.removeEventListener("commons:home-refresh", onHomeRefresh);
   }, []);
 
   // Pull-to-refresh: a downward drag while already scrolled to the top re-pulls
@@ -91,9 +120,12 @@ export function FeedPage() {
         armed = false;
         setRefreshing(true);
         void api<PlanDTO[]>("/api/plans")
-          .then(setPlans)
+          .then((rows) => {
+            setPlans(rows);
+            setFeedReady(true);
+          })
           .catch(() => undefined)
-          .finally(() => setTimeout(() => setRefreshing(false), 400));
+          .finally(() => setRefreshing(false));
       }
     };
     const onEnd = () => { armed = false; };
@@ -114,13 +146,13 @@ export function FeedPage() {
   }, [justPostedId, location.pathname, location.state, navigate]);
 
   useEffect(() => {
-    if (!highlightId || plans === null) return;
+    if (!highlightId || !feedReady) return;
     const el = document.querySelector(`[data-plan-id="${highlightId}"]`);
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
     // Fade the banner/glow but keep the plan pinned to the top of the feed.
     const t = setTimeout(() => setHighlightId(null), 4500);
     return () => clearTimeout(t);
-  }, [highlightId, plans]);
+  }, [highlightId, feedReady]);
 
   useEffect(() => {
     if (user?.notificationPrefs && user.notificationPrefs.postPlanNetworkNudge === false) {
@@ -138,12 +170,12 @@ export function FeedPage() {
     try {
       localStorage.setItem(
         FEED_FILTERS_KEY,
-        JSON.stringify({ selectedTag, selectedHoodId, hideHappened, hideCancelled }),
+        JSON.stringify({ selectedTag, selectedHoodId, selectedAgeRange, hideHappened, hideCancelled }),
       );
     } catch {
       /* storage unavailable — non-fatal */
     }
-  }, [selectedTag, selectedHoodId, hideHappened, hideCancelled]);
+  }, [selectedTag, selectedHoodId, selectedAgeRange, hideHappened, hideCancelled]);
 
   const filteredPlans = useMemo(() => {
     let list = plans ?? [];
@@ -182,11 +214,20 @@ export function FeedPage() {
   const activeFilterCount =
     (selectedTag ? 1 : 0) +
     (selectedHoodId ? 1 : 0) +
+    (selectedAgeRange ? 1 : 0) +
     (hideHappened ? 1 : 0) +
     (hideCancelled ? 1 : 0);
 
-  if (plans === null) {
-    return <LoadingScreen tagline="Gathering plans" />;
+  if (!feedReady) {
+    return (
+      <main className="app-shell app-shell--wide app-shell--with-nav app-shell--with-topbar">
+        <div className="feed-skeleton" aria-hidden="true">
+          <div className="feed-skeleton-strip" />
+          <div className="feed-skeleton-card" />
+          <div className="feed-skeleton-card" />
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -251,6 +292,7 @@ export function FeedPage() {
             onClearFilters={() => {
               setSelectedTag(null);
               setSelectedHoodId(null);
+              setSelectedAgeRange(null);
               setSelectedDayIso(null);
               setHideHappened(false);
               setHideCancelled(false);
@@ -289,16 +331,19 @@ export function FeedPage() {
           userInterests={user?.interests ?? []}
           selectedTag={selectedTag}
           selectedHoodId={selectedHoodId}
+          selectedAgeRange={selectedAgeRange}
           hideHappened={hideHappened}
           hideCancelled={hideCancelled}
           onTagChange={setSelectedTag}
           onHoodChange={setSelectedHoodId}
+          onAgeRangeChange={setSelectedAgeRange}
           onHideHappenedChange={setHideHappened}
           onHideCancelledChange={setHideCancelled}
           onClose={() => setFilterOpen(false)}
           onClear={() => {
             setSelectedTag(null);
             setSelectedHoodId(null);
+            setSelectedAgeRange(null);
             setHideHappened(false);
             setHideCancelled(false);
           }}

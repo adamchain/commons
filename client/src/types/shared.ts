@@ -1,56 +1,64 @@
 // Commons v2 shared types — kept in sync between client/src/types/shared.ts
 // and server/src/types/shared.ts. Edit both when changing.
 
-/** Community interest filters — Philly launch set (COMMONS-seeded). */
+/** Community interest filters — launch set. */
 export type InterestTag =
-  | "fitness_outdoors"
-  | "food_drinks"
-  | "arts_culture"
-  | "music_nightlife"
-  | "thrifting"
-  | "local_events"
-  | "wellness"
-  | "coffee_cowork"
-  | "dog_owners"
-  | "running";
+  | "coffee"
+  | "cowork"
+  | "events"
+  | "drinks"
+  | "food"
+  | "music"
+  | "clubs"
+  | "creative"
+  | "games"
+  | "night_out"
+  | "workouts"
+  | "moms";
 
 export const INTEREST_LABELS: Record<InterestTag, string> = {
-  fitness_outdoors: "Fitness + Outdoors",
-  food_drinks: "Food + Drinks",
-  arts_culture: "Arts + Culture",
-  music_nightlife: "Music + Nightlife",
-  thrifting: "Thrifting",
-  local_events: "Local Events",
-  wellness: "Wellness",
-  coffee_cowork: "Coffee + Co-working",
-  dog_owners: "Dog owners",
-  running: "Running",
+  coffee: "Coffee",
+  cowork: "Co-Work",
+  events: "Events",
+  drinks: "Drinks",
+  food: "Food",
+  music: "Music",
+  clubs: "Clubs",
+  creative: "Creative",
+  games: "Games",
+  night_out: "Night Out",
+  workouts: "Workouts",
+  moms: "Moms",
 };
 
 export const INTEREST_EMOJI: Record<InterestTag, string> = {
-  fitness_outdoors: "💪",
-  food_drinks: "🍔",
-  arts_culture: "🎨",
-  music_nightlife: "🎵",
-  thrifting: "🛍️",
-  local_events: "🎉",
-  wellness: "🧘",
-  coffee_cowork: "☕",
-  dog_owners: "🐶",
-  running: "🏃",
+  coffee: "☕",
+  cowork: "💻",
+  events: "🎉",
+  drinks: "🍸",
+  food: "🍔",
+  music: "🎵",
+  clubs: "🪩",
+  creative: "🎨",
+  games: "🎲",
+  night_out: "🌙",
+  workouts: "💪",
+  moms: "👩‍👧",
 };
 
 export const ALL_INTERESTS: InterestTag[] = [
-  "fitness_outdoors",
-  "food_drinks",
-  "arts_culture",
-  "music_nightlife",
-  "thrifting",
-  "local_events",
-  "wellness",
-  "coffee_cowork",
-  "dog_owners",
-  "running",
+  "coffee",
+  "cowork",
+  "events",
+  "drinks",
+  "food",
+  "music",
+  "clubs",
+  "creative",
+  "games",
+  "night_out",
+  "workouts",
+  "moms",
 ];
 
 /** Same set as interests — used in create-plan vibe picker. */
@@ -69,11 +77,12 @@ export type VibeIcon =
   | "drinks"
   | "food"
   | "music"
-  | "books"
-  | "arts"
+  | "clubs"
+  | "creative"
   | "games"
-  | "dancing"
-  | "workouts";
+  | "night_out"
+  | "workouts"
+  | "moms";
 
 export interface VibeOption {
   id: VibeIcon;
@@ -83,20 +92,33 @@ export interface VibeOption {
 }
 
 export const VIBE_OPTIONS: VibeOption[] = [
-  { id: "coffee",   emoji: "☕", label: "Coffee",     tag: "coffee_cowork" },
-  { id: "cowork",   emoji: "💻", label: "Co-Work",    tag: "coffee_cowork" },
-  { id: "events",   emoji: "🎉", label: "Events",     tag: "local_events" },
-  { id: "drinks",   emoji: "🍸", label: "Drinks",     tag: "food_drinks" },
-  { id: "food",     emoji: "🍔", label: "Food",       tag: "food_drinks" },
-  { id: "music",    emoji: "🎵", label: "Music",      tag: "music_nightlife" },
-  { id: "books",    emoji: "📚", label: "Book Clubs", tag: "arts_culture" },
-  { id: "arts",     emoji: "🎨", label: "Arts",       tag: "arts_culture" },
-  { id: "games",    emoji: "🎲", label: "Games",      tag: "local_events" },
-  { id: "dancing",  emoji: "💃", label: "Dancing",    tag: "music_nightlife" },
-  { id: "workouts", emoji: "💪", label: "Workouts",   tag: "fitness_outdoors" },
+  { id: "coffee",    emoji: "☕", label: "Coffee",     tag: "coffee" },
+  { id: "cowork",    emoji: "💻", label: "Co-Work",    tag: "cowork" },
+  { id: "events",    emoji: "🎉", label: "Events",     tag: "events" },
+  { id: "drinks",    emoji: "🍸", label: "Drinks",     tag: "drinks" },
+  { id: "food",      emoji: "🍔", label: "Food",       tag: "food" },
+  { id: "music",     emoji: "🎵", label: "Music",      tag: "music" },
+  { id: "clubs",     emoji: "🪩", label: "Clubs",      tag: "clubs" },
+  { id: "creative",  emoji: "🎨", label: "Creative",   tag: "creative" },
+  { id: "games",     emoji: "🎲", label: "Games",      tag: "games" },
+  { id: "night_out", emoji: "🌙", label: "Night Out",  tag: "night_out" },
+  { id: "workouts",  emoji: "💪", label: "Workouts",   tag: "workouts" },
+  { id: "moms",      emoji: "👩‍👧", label: "Moms",       tag: "moms" },
 ];
 
 export type PlanKind = "standard" | "looking_for";
+
+/** User-selected age bracket for filters and onboarding. */
+export type AgeRange = "18_24" | "25_35" | "35_50" | "50_plus";
+
+export const AGE_RANGE_LABELS: Record<AgeRange, string> = {
+  "18_24": "18–24",
+  "25_35": "25–35",
+  "35_50": "35–50",
+  "50_plus": "50+",
+};
+
+export const ALL_AGE_RANGES: AgeRange[] = ["18_24", "25_35", "35_50", "50_plus"];
 
 export type PlanVisibility = "everyone" | "community" | "network";
 
@@ -165,6 +187,7 @@ export interface PublicUser {
   id: string;
   firstName: string;
   lastName?: string;
+  bio?: string;
   neighborhoodId: string | null;
   avatarSeed: string;
   avatarStyle: AvatarStyle;
@@ -340,6 +363,10 @@ export interface MeDTO {
   phoneNumber: string;
   firstName: string;
   lastName?: string;
+  bio?: string;
+  ageRange?: AgeRange | null;
+  /** ISO timestamp when the user confirmed they are 18+. */
+  ageConfirmedAt?: string | null;
   /** @deprecated prefer neighborhoodIds — kept for older rows */
   neighborhoodId: string | null;
   /** Areas the user spends time in — feeds personalization. */

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
-import type { InterestTag, NeighborhoodDTO } from "../types/shared";
-import { ALL_INTERESTS, INTEREST_LABELS } from "../types/shared";
+import type { AgeRange, InterestTag, NeighborhoodDTO } from "../types/shared";
+import { ALL_AGE_RANGES, ALL_INTERESTS, AGE_RANGE_LABELS, INTEREST_LABELS } from "../types/shared";
 
 /**
  * Bottom-sheet filter for the feed. Surfaces neighborhood + interest pickers
@@ -12,10 +12,12 @@ export function FilterSheet({
   userInterests,
   selectedTag,
   selectedHoodId,
+  selectedAgeRange,
   hideHappened,
   hideCancelled,
   onTagChange,
   onHoodChange,
+  onAgeRangeChange,
   onHideHappenedChange,
   onHideCancelledChange,
   onClose,
@@ -26,10 +28,12 @@ export function FilterSheet({
   userInterests: InterestTag[];
   selectedTag: InterestTag | null;
   selectedHoodId: string | null;
+  selectedAgeRange: AgeRange | null;
   hideHappened: boolean;
   hideCancelled: boolean;
   onTagChange: (t: InterestTag | null) => void;
   onHoodChange: (id: string | null) => void;
+  onAgeRangeChange: (r: AgeRange | null) => void;
   onHideHappenedChange: (v: boolean) => void;
   onHideCancelledChange: (v: boolean) => void;
   onClose: () => void;
@@ -83,6 +87,29 @@ export function FilterSheet({
             >
               Hide cancelled
             </button>
+          </div>
+        </div>
+
+        <div className="filter-sheet-group">
+          <div className="filter-sheet-group-label">Age range</div>
+          <div className="filter-sheet-chips">
+            <button
+              type="button"
+              className={`community-chip ${selectedAgeRange === null ? "is-active" : ""}`}
+              onClick={() => onAgeRangeChange(null)}
+            >
+              All ages
+            </button>
+            {ALL_AGE_RANGES.map((r) => (
+              <button
+                key={r}
+                type="button"
+                className={`community-chip ${selectedAgeRange === r ? "is-active" : ""}`}
+                onClick={() => onAgeRangeChange(selectedAgeRange === r ? null : r)}
+              >
+                {AGE_RANGE_LABELS[r]}
+              </button>
+            ))}
           </div>
         </div>
 

@@ -46,8 +46,9 @@ export function ExplorePage() {
           Browse spots.<br />Make plans<br />there.
         </h2>
         <p className="xpl-pitch-body">
-          Every café, bar, park and gym in your neighborhood — with plans already
-          happening at them.
+          This page is a preview of what&apos;s coming — browse cafés, bars, parks,
+          and gyms in your neighborhood, with plans already happening at them.
+          Search and nearby discovery aren&apos;t live yet.
         </p>
         <Link to="/plans/new" className="xpl-pitch-cta">
           Post a plan now →

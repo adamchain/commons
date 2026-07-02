@@ -1,8 +1,11 @@
 import { useState } from "react";
-import type { FormEvent, MouseEvent } from "react";
-import { Link } from "react-router-dom";
+import type { MouseEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "./Avatar";
+import { GetThereSheet } from "./GetThereSheet";
+import { InviteSheet } from "./InviteSheet";
+import { ShareSheet } from "./ShareSheet";
 import { useAuth } from "../context/AuthContext";
 import type { MeDTO, PlanDTO } from "../types/shared";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
@@ -11,9 +14,8 @@ import { useNeighborhoods } from "../lib/useNeighborhoods";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
 
 /**
- * Compact event card — title, time, details. Card type (confirmed / looking_for /
- * plan_created) still drives shading and the reply form, but the dense metadata
- * row (avatars, posted-by, distance) is gone per the simplified spec.
+ * Compact event card — title, time, details. Card type (confirmed / looking_for)
+ * drives shading; quick RSVP and action row sit below the card link.
  */
 export function PlanCard({
   plan,
@@ -35,13 +37,13 @@ export function PlanCard({
   const isPlanCreated = isLooking && Boolean(plan.lockedAt);
   const isCancelled = Boolean(plan.cancelledAt);
   const hasEnded = !isCancelled && planHasEnded(plan);
-  const suggestions = plan.suggestions ?? [];
-  const [reply, setReply] = useState("");
-  const [replyBusy, setReplyBusy] = useState(false);
   const { user, setUser } = useAuth();
   const isHosting = !!user && plan.creator.id === user.id;
   const isSaved = !!user?.savedPlanIds?.includes(plan.id);
   const [savePending, setSavePending] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const [showGetThere, setShowGetThere] = useState(false);
 
   async function toggleSave(e: MouseEvent) {
     e.preventDefault();
@@ -60,31 +62,12 @@ export function PlanCard({
       setSavePending(false);
     }
   }
+
   const canChat =
     !!user &&
+    !isLooking &&
     (isHosting || plan.myState === "going" || plan.myState === "interested");
 
-  async function sendReply(e: FormEvent) {
-    e.preventDefault();
-    const t = reply.trim();
-    if (!t || replyBusy) return;
-    setReplyBusy(true);
-    try {
-      await api(`/api/plans/${plan.id}/suggestions`, {
-        method: "POST",
-        body: JSON.stringify({ body: t }),
-      });
-      setReply("");
-      onPlanRefresh?.();
-    } catch {
-      /* keep text for retry */
-    } finally {
-      setReplyBusy(false);
-    }
-  }
-
-  // Consistent flex labeling — every card type says "Flexible time" or
-  // "Flexible location" (never "TBD") so users learn one vocabulary.
   const whenLine = plan.isFlexibleTime
     ? `${formatPlanDate(plan.date)} · Flexible time`
     : `${formatPlanDate(plan.date)} · ${formatPlanTime(plan.time, plan.isFlexibleTime)}`;
@@ -92,10 +75,7 @@ export function PlanCard({
   const goingCount = plan.participants.going.length;
   const interestedCount = plan.participants.interested.length;
   const totalRsvps = goingCount + interestedCount;
-  // Same threshold the group prompt uses (≥2 RSVPs) on a still-open looking_for.
   const almostPlan = isLooking && !isPlanCreated && !hasEnded && totalRsvps >= 2;
-  // Spots-left scarcity. Only on capped plans, while seats remain, before end
-  // time. Reads "2 spots · 1 left" — count of total seats, dot, remaining.
   const spotsRemaining =
     plan.capacity !== null && !hasEnded && !isCancelled
       ? Math.max(0, plan.capacity - goingCount)
@@ -108,7 +88,6 @@ export function PlanCard({
     : hoodName
       ? `${plan.location.name} · ${hoodName}`
       : plan.location.name;
-  const metaLine = `${whenLine} · ${locationLine}`;
 
   const goingLabel = `${goingCount} going`;
   const interestedLabel = interestedCount > 0 ? ` · ${interestedCount} interested` : "";
@@ -123,6 +102,8 @@ export function PlanCard({
           : goingCount >= 1 || interestedCount >= 1
             ? `${goingLabel}${interestedLabel}`
             : null;
+
+  const showActions = !hasEnded && !isCancelled;
 
   return (
     <div
@@ -171,87 +152,111 @@ export function PlanCard({
             <img src={coverImage} alt="" loading="lazy" />
           </div>
         ) : null}
-        <header className="plan-card-poster-row">
-          <Avatar
-            seed={plan.creator.avatarSeed}
-            style={plan.creator.avatarStyle}
-            photoDataUrl={plan.creator.avatarPhotoDataUrl}
-            params={plan.creator.avatarParams}
-            size="xs"
-          />
-          <span className="plan-card-posted-by">{plan.creator.firstName}</span>
-          {isCancelled ? (
-            <span className="plan-card-kind-pill is-cancelled">Cancelled</span>
-          ) : hasEnded ? (
-            <span className="plan-card-kind-pill is-happened">Happened</span>
-          ) : isLooking && !isPlanCreated ? (
-            <span className="plan-card-kind-pill is-looking">Looking For</span>
-          ) : null}
-        </header>
-        <h3 className="plan-card-title">{title}</h3>
-        <p className="plan-card-meta-line plan-card-meta-line--single">{metaLine}</p>
-        {plan.description && (
-          <p className="plan-card-description">{plan.description}</p>
-        )}
+        <div className="plan-card-body">
+          <header className="plan-card-poster-row">
+            <Avatar
+              seed={plan.creator.avatarSeed}
+              style={plan.creator.avatarStyle}
+              photoDataUrl={plan.creator.avatarPhotoDataUrl}
+              params={plan.creator.avatarParams}
+              size="xs"
+            />
+            <span className="plan-card-posted-by">{plan.creator.firstName}</span>
+            {isCancelled ? (
+              <span className="plan-card-kind-pill is-cancelled">Cancelled</span>
+            ) : hasEnded ? (
+              <span className="plan-card-kind-pill is-happened">Happened</span>
+            ) : null}
+          </header>
+          <h3 className="plan-card-title">{title}</h3>
+          <p className="plan-card-meta-line">
+            <span className="plan-card-meta-icon" aria-hidden="true">
+              <CalendarIcon />
+            </span>
+            <span>{whenLine}</span>
+          </p>
+          <p className="plan-card-meta-line plan-card-meta-line--location">
+            <span className="plan-card-meta-icon" aria-hidden="true">
+              <PinIcon />
+            </span>
+            <span>{locationLine}</span>
+          </p>
+          {plan.description && (
+            <p className="plan-card-description">{plan.description}</p>
+          )}
 
-        {/* Link preview rendered as a non-anchor block inside the card link to
-            avoid nesting <a> inside <a> (invalid HTML; in iOS WebView it can
-            collapse the wrapper Link and bounce navigation to /). The actual
-            external open happens via the sibling overlay anchor below. */}
-        {plan.flyerLinkUrl && (
-          <div className="link-preview link-preview--card" aria-hidden="true">
-            {plan.flyerLinkPreview?.image && (
-              <img src={plan.flyerLinkPreview.image} alt="" className="link-preview-image" />
-            )}
-            <div className="link-preview-body">
-              {plan.flyerLinkPreview?.siteName && (
-                <div className="link-preview-site">{plan.flyerLinkPreview.siteName}</div>
+          {plan.flyerLinkUrl && (
+            <div className="link-preview link-preview--card" aria-hidden="true">
+              {plan.flyerLinkPreview?.image && (
+                <img src={plan.flyerLinkPreview.image} alt="" className="link-preview-image" />
               )}
-              {plan.flyerLinkPreview?.title ? (
-                <div className="link-preview-title">{plan.flyerLinkPreview.title}</div>
-              ) : (
-                <div className="link-preview-title">{plan.flyerLinkUrl}</div>
+              <div className="link-preview-body">
+                {plan.flyerLinkPreview?.siteName && (
+                  <div className="link-preview-site">{plan.flyerLinkPreview.siteName}</div>
+                )}
+                {plan.flyerLinkPreview?.title ? (
+                  <div className="link-preview-title">{plan.flyerLinkPreview.title}</div>
+                ) : (
+                  <div className="link-preview-title">{plan.flyerLinkUrl}</div>
+                )}
+                {plan.flyerLinkPreview?.description && (
+                  <div className="link-preview-desc">{plan.flyerLinkPreview.description}</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <footer className="plan-card-footer-row">
+            <div className="plan-card-attendees">
+              {(plan.participants.going.length > 0 || plan.participants.interested.length > 0) && (
+                <div className="avatar-stack">
+                  {[...plan.participants.going, ...plan.participants.interested]
+                    .slice(0, 3)
+                    .map((p) => (
+                      <Avatar
+                        key={p.id}
+                        seed={p.avatarSeed}
+                        style={p.avatarStyle}
+                        photoDataUrl={p.avatarPhotoDataUrl}
+                        params={p.avatarParams}
+                        size="xs"
+                      />
+                    ))}
+                </div>
               )}
-              {plan.flyerLinkPreview?.description && (
-                <div className="link-preview-desc">{plan.flyerLinkPreview.description}</div>
+              {footerCount && (
+                <span className="plan-card-going-count">{footerCount}</span>
               )}
             </div>
-          </div>
-        )}
-
-        <footer className="plan-card-footer-row">
-          <div className="plan-card-attendees">
-            {(plan.participants.going.length > 0 || plan.participants.interested.length > 0) && (
-              <div className="avatar-stack">
-                {[...plan.participants.going, ...plan.participants.interested]
-                  .slice(0, 3)
-                  .map((p) => (
-                    <Avatar
-                      key={p.id}
-                      seed={p.avatarSeed}
-                      style={p.avatarStyle}
-                      photoDataUrl={p.avatarPhotoDataUrl}
-                      params={p.avatarParams}
-                      size="xs"
-                    />
-                  ))}
-              </div>
+            {!isHosting && !hasEnded && !isCancelled && (
+              <QuickJoin
+                planId={plan.id}
+                isLooking={isLooking}
+                state={plan.myState ?? null}
+                disabled={isFull && !isLooking}
+                onPlanRefresh={onPlanRefresh}
+              />
             )}
-            {footerCount && (
-              <span className="plan-card-going-count">{footerCount}</span>
-            )}
-          </div>
-          {!isHosting && !hasEnded && !isCancelled && (
-            <QuickJoin
-              planId={plan.id}
-              isLooking={isLooking}
-              state={plan.myState ?? null}
-              disabled={isFull && !isLooking}
-              onPlanRefresh={onPlanRefresh}
-            />
-          )}
-        </footer>
+          </footer>
+        </div>
       </Link>
+
+      {showActions && (
+        <div className="plan-card-actions" onClick={(e) => e.stopPropagation()}>
+          <button type="button" className="plan-card-action-btn" onClick={() => setShowGetThere(true)}>
+            <PinIcon />
+            <span>Get there</span>
+          </button>
+          <button type="button" className="plan-card-action-btn" onClick={() => setShowInvite(true)}>
+            <PlusIcon />
+            <span>Invite</span>
+          </button>
+          <button type="button" className="plan-card-action-btn" onClick={() => setShowShare(true)}>
+            <ShareIcon />
+            <span>Share</span>
+          </button>
+        </div>
+      )}
 
       {canChat && (
         <Link
@@ -259,7 +264,7 @@ export function PlanCard({
           className="plan-card-chat-link"
           onClick={(e) => e.stopPropagation()}
         >
-          💬 Group chat
+          Group chat
         </Link>
       )}
 
@@ -269,41 +274,23 @@ export function PlanCard({
         </Link>
       )}
 
-      {isLooking && !isPlanCreated && !hasEnded && !isCancelled && (
-        <div className="plan-card-suggest" onClick={(e) => e.stopPropagation()}>
-          {suggestions.length > 0 && (
-            <ul className="plan-card-suggest-list">
-              {suggestions.map((s) => (
-                <li key={s.id} className="plan-card-suggest-line">
-                  <span className="plan-card-suggest-name">{s.author.firstName}</span>
-                  <span className="plan-card-suggest-body">{s.body}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <form className="plan-card-suggest-form" onSubmit={(e) => void sendReply(e)}>
-            <input
-              className="plan-card-suggest-input"
-              placeholder="Reply or suggest something…"
-              value={reply}
-              onChange={(e) => setReply(e.target.value)}
-              maxLength={600}
-            />
-            <button type="submit" className="plan-card-suggest-send" disabled={replyBusy || !reply.trim()}>
-              {replyBusy ? "…" : "Send"}
-            </button>
-          </form>
-        </div>
+      {showInvite && (
+        <InviteSheet
+          planId={plan.id}
+          planTitle={plan.title}
+          onClose={() => setShowInvite(false)}
+        />
+      )}
+      {showShare && (
+        <ShareSheet plan={plan} onClose={() => setShowShare(false)} />
+      )}
+      {showGetThere && (
+        <GetThereSheet plan={plan} onClose={() => setShowGetThere(false)} />
       )}
     </div>
   );
 }
 
-/**
- * On-card quick RSVP. Lets you commit straight from the feed without opening
- * the plan. "I'm in" for standard plans, "I'm interested" for looking_for /
- * tentative. Already-going cards don't render this (handled by the caller).
- */
 function QuickJoin({
   planId,
   isLooking,
@@ -317,6 +304,7 @@ function QuickJoin({
   disabled?: boolean;
   onPlanRefresh?: () => void;
 }) {
+  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const target: "going" | "interested" = isLooking ? "interested" : "going";
   const active = state === target;
@@ -329,27 +317,29 @@ function QuickJoin({
     try {
       if (active) {
         await api(`/api/plans/${planId}/participation`, { method: "DELETE" });
+        onPlanRefresh?.();
       } else {
         await api(`/api/plans/${planId}/participation`, {
           method: "PUT",
           body: JSON.stringify({ state: target }),
         });
+        onPlanRefresh?.();
+        if (isLooking) {
+          navigate(`/plans/${planId}/chat`);
+        }
       }
-      onPlanRefresh?.();
     } catch {
-      /* surface nothing on the card — they can open the plan to retry */
+      /* surface nothing on the card */
     } finally {
       setBusy(false);
     }
   }
 
   const label = active
-    ? target === "going"
-      ? "✓ You're in"
-      : "Interested"
+    ? "You're in"
     : isLooking
       ? "Interested"
-      : "Join";
+      : "I'm in";
 
   return (
     <button
@@ -360,5 +350,41 @@ function QuickJoin({
     >
       {busy ? "…" : label}
     </button>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </svg>
+  );
+}
+
+function PinIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function ShareIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+      <polyline points="16 6 12 2 8 6" />
+      <line x1="12" x2="12" y1="2" y2="15" />
+    </svg>
   );
 }

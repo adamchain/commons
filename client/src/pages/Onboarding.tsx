@@ -10,6 +10,7 @@ import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
 import { getCurrentCoords } from "../lib/geolocate";
+import { LoadingScreen } from "../components/LoadingScreen";
 import { LegalContent } from "../components/LegalContent";
 import { LEGAL_DOCS } from "../content/legal";
 import {
@@ -17,6 +18,9 @@ import {
   AVATAR_PRESETS,
   INTEREST_EMOJI,
   INTEREST_LABELS,
+  AGE_RANGE_LABELS,
+  ALL_AGE_RANGES,
+  type AgeRange,
   type AvatarStyle,
   type InterestTag,
   type MeDTO,
@@ -48,6 +52,7 @@ type Step =
   | "location"
   | "interests"
   | "profile"
+  | "age"
   | "legal"
   | "guidelines";
 
@@ -193,7 +198,7 @@ export function OnboardingPage() {
     setStep(pickInitial(user, true));
   }
 
-  async function patchMe(patch: Partial<MeDTO>) {
+  async function patchMe(patch: Partial<MeDTO> & { ageConfirmed?: boolean }) {
     const me = await api<MeDTO>("/api/auth/me", {
       method: "PATCH",
       body: JSON.stringify(patch),
@@ -325,7 +330,7 @@ export function OnboardingPage() {
     );
   }
   if (!user) {
-    return <OnboardingShell title="Loading…" subtitle="" />;
+    return <LoadingScreen simple tagline="A place for plans meant to be shared." />;
   }
   if (step === "location") {
     return (
@@ -370,16 +375,28 @@ export function OnboardingPage() {
             avatarPhotoDataUrl: avatarPhotoDataUrl ?? undefined,
             avatarParams: avatarParams ?? undefined,
           });
-          setStep("legal");
+          setStep("age");
         }}
         onBack={() => setStep("interests")}
+      />
+    );
+  }
+  if (step === "age") {
+    return (
+      <AgeStep
+        me={user}
+        onSave={async (ageRange) => {
+          await patchMe({ ageRange, ageConfirmed: true });
+          setStep("legal");
+        }}
+        onBack={() => setStep("profile")}
       />
     );
   }
   if (step === "legal") {
     return (
       <LegalConsentStep
-        onBack={() => setStep("profile")}
+        onBack={() => setStep("age")}
         onAgree={async () => {
           // termsAccepted/privacyAccepted are server-side action flags (they
           // stamp *AcceptedAt), not MeDTO fields — call the endpoint directly.
@@ -423,8 +440,7 @@ function pickInitial(user: MeDTO | null, gatePassed: boolean): Step {
   if (hoods.length === 0) return "location";
   if (user.interests.length < 1) return "interests";
   if (!user.firstName.trim()) return "profile";
-  // New users must scroll through and accept the Terms + Privacy before the
-  // final community-guidelines step.
+  if (!user.ageConfirmedAt) return "age";
   if (!user.termsAcceptedAt || !user.privacyAcceptedAt) return "legal";
   if (!user.guidelinesAcknowledgedAt) return "guidelines";
   return "guidelines";
@@ -1008,7 +1024,7 @@ function ProfileStep({
   }
 
   const hasAvatar = Boolean(photo || avatarParams);
-  const canContinue = Boolean(firstName.trim()) && hasAvatar;
+  const canContinue = Boolean(firstName.trim() && lastName.trim()) && hasAvatar;
 
   return (
     <OnboardingShell title="Put a face to your name." subtitle="Add a photo and your name to continue." onBack={onBack}>
@@ -1114,6 +1130,68 @@ function ProfileStep({
           }}
         />
       )}
+    </OnboardingShell>
+  );
+}
+
+function AgeStep({
+  me,
+  onSave,
+  onBack,
+}: {
+  me: MeDTO;
+  onSave: (ageRange: AgeRange) => Promise<void>;
+  onBack?: () => void;
+}) {
+  const [confirmed, setConfirmed] = useState(Boolean(me.ageConfirmedAt));
+  const [ageRange, setAgeRange] = useState<AgeRange | null>(me.ageRange ?? null);
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <OnboardingShell
+      title="Quick age check."
+      subtitle="Commons is for adults. Pick your age range so we can personalize your feed."
+      onBack={onBack}
+    >
+      <label className="guidelines-agree">
+        <input
+          type="checkbox"
+          checked={confirmed}
+          onChange={(e) => setConfirmed(e.target.checked)}
+        />
+        <span>I confirm I am 18 years or older.</span>
+      </label>
+
+      <div className="filter-sheet-chips" style={{ marginTop: 16 }}>
+        {ALL_AGE_RANGES.map((r) => (
+          <button
+            key={r}
+            type="button"
+            className={`community-chip ${ageRange === r ? "is-active" : ""}`}
+            onClick={() => setAgeRange(r)}
+          >
+            {AGE_RANGE_LABELS[r]}
+          </button>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        className="btn-primary btn-block"
+        style={{ marginTop: 18 }}
+        disabled={busy || !confirmed || !ageRange}
+        onClick={async () => {
+          if (!ageRange) return;
+          setBusy(true);
+          try {
+            await onSave(ageRange);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "Saving…" : "Continue"}
+      </button>
     </OnboardingShell>
   );
 }

@@ -4,7 +4,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { useAuth } from "../context/AuthContext";
-import { useTheme } from "../context/ThemeContext";
 import {
   INTEREST_LABELS,
   type InviteCodeDTO,
@@ -94,7 +93,6 @@ export function SettingsPage() {
       </SettingsGroup>
 
       <SettingsGroup label="App">
-        <AppearanceRow />
         <SettingsRow
           icon={<GlobeIcon />}
           title="Language"
@@ -211,57 +209,6 @@ function SettingsRow({
   );
 }
 
-function AppearanceRow() {
-  const { theme, setTheme } = useTheme();
-  return (
-    <div className="settings-row">
-      <span className="settings-row-icon">
-        <SunIcon />
-      </span>
-      <div className="settings-row-body">
-        <div className="settings-row-title">Appearance</div>
-        <div className="settings-row-sub">
-          {theme === "dark" ? "Dark mode" : "Light mode"}
-        </div>
-      </div>
-      <div className="settings-row-right">
-        <div className="settings-seg" role="tablist" aria-label="Theme">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={theme === "light"}
-            className={theme === "light" ? "is-active" : ""}
-            onClick={() => setTheme("light")}
-          >
-            Light
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={theme === "dark"}
-            className={theme === "dark" ? "is-active" : ""}
-            onClick={() => setTheme("dark")}
-          >
-            Dark
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={false}
-            onClick={() => alert("Auto mode coming soon.")}
-          >
-            Auto
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Delete-account flow. Tucked below sign-out so it isn't the first thing
- * users see, but kept reachable without an extra screen.
- */
 function DeleteAccountRow({ onSignedOut }: { onSignedOut: () => void }) {
   const { setUser } = useAuth();
   const [showDelete, setShowDelete] = useState(false);
@@ -392,14 +339,6 @@ function LockIcon() {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <rect x="4" y="11" width="16" height="10" rx="2" />
       <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-    </svg>
-  );
-}
-function SunIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
     </svg>
   );
 }

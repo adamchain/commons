@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { mongoMirror } from "./mongoMirror.js";
 import type {
+  AgeRange,
   AvatarStyle,
   InterestTag,
   JoinType,
@@ -18,6 +19,9 @@ export interface UserRecord {
   accountSource?: "verify" | "seed";
   firstName: string;
   lastName?: string;
+  bio?: string;
+  ageRange?: AgeRange | null;
+  ageConfirmedAt?: string | null;
   /** Primary hood — mirrors first of neighborhoodIds when set. */
   neighborhoodId: string | null;
   /** Optional on legacy rows. */

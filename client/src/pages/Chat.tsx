@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
-import { LoadingScreen } from "../components/LoadingScreen";
 import { PollCard } from "../components/PollCard";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
@@ -26,10 +25,11 @@ export function ChatPage() {
   const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
   const [creatingPoll, setCreatingPoll] = useState(false);
   const [busyPollId, setBusyPollId] = useState<string | null>(null);
-  // Pinned active polls collapse into a single dropdown so an open poll doesn't
-  // render as a full card twice (pinned + inline in the thread).
   const [pinnedPollsOpen, setPinnedPollsOpen] = useState(false);
+  const [composerMenuOpen, setComposerMenuOpen] = useState(false);
+  const [chatReady, setChatReady] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const composerMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     void (async () => {
@@ -40,7 +40,8 @@ export function ChatPage() {
       setPlan(p);
       setConv(c);
       const msgs = await api<MessageDTO[]>(`/api/conversations/${c.id}/messages`);
-      setMessages(msgs);
+      setMessages(msgs.sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+      setChatReady(true);
     })();
   }, [planId]);
 
@@ -50,7 +51,7 @@ export function ChatPage() {
     const interval = setInterval(async () => {
       try {
         const msgs = await api<MessageDTO[]>(`/api/conversations/${conv.id}/messages`);
-        setMessages(msgs);
+        setMessages(msgs.sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
       } catch { /* swallow */ }
     }, POLL_MS);
     return () => clearInterval(interval);
@@ -63,9 +64,26 @@ export function ChatPage() {
     }
   }, [messages.length]);
 
+  useEffect(() => {
+    if (!composerMenuOpen) return;
+    const close = (e: MouseEvent) => {
+      if (composerMenuRef.current && !composerMenuRef.current.contains(e.target as Node)) {
+        setComposerMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [composerMenuOpen]);
+
   const grouped = useMemo(() => groupMessages(messages), [messages]);
 
-  if (!conv || !user || !plan) return <LoadingScreen tagline="Opening chat" />;
+  if (!chatReady || !conv || !user || !plan) {
+    return (
+      <main className="app-shell app-shell--chat">
+        <div className="chat-loading-placeholder" aria-hidden="true" />
+      </main>
+    );
+  }
 
   async function send() {
     const trimmed = body.trim();
@@ -198,18 +216,17 @@ export function ChatPage() {
 
   return (
     <main className="app-shell app-shell--chat">
-      <header className="app-header app-header--minimal chat-header-bar">
-        <Link to={`/plans/${planId}`} className="detail-back">← Back to plan</Link>
+      <header className="app-header app-header--minimal chat-header-bar chat-header-bar--thread">
+        <Link to="/messages" className="detail-back">← Messages</Link>
+        <div className="chat-thread-title">{sentenceCaseTitle(plan.title)}</div>
         <button type="button" className="btn-link chat-leave-btn" onClick={() => void leaveChat()}>
-          Leave chat
+          Leave
         </button>
       </header>
 
       <div className="chat-shell">
-        <Link to={`/plans/${planId}`} className="chat-header-card" aria-label="Open plan details">
-          <span className="chat-header-emoji" aria-hidden>{plan.hostEmoji}</span>
+        <Link to={`/plans/${planId}`} className="chat-header-card chat-header-card--compact" aria-label="Open plan details">
           <div className="chat-header-text">
-            <div className="chat-header-title">{sentenceCaseTitle(plan.title)}</div>
             <div className="chat-header-meta">
               {formatPlanDate(plan.date)} · {formatPlanTime(plan.time, plan.isFlexibleTime)} · {participantLabel}
             </div>
@@ -233,11 +250,10 @@ export function ChatPage() {
         </Link>
 
         {planConcluded && others.length > 0 && (
-          <Link to={replanHref} className="chat-replan-cta">
-            <span className="chat-replan-emoji" aria-hidden="true">🔁</span>
+          <Link to={replanHref} className="chat-replan-cta chat-replan-cta--primary">
             <span className="chat-replan-text">
-              <strong>Want to make this a regular thing?</strong>
-              <span>Post the next one.</span>
+              <strong>Plan the next one</strong>
+              <span>Post another with this group.</span>
             </span>
             <span className="chat-replan-arrow" aria-hidden="true">→</span>
           </Link>
@@ -380,15 +396,42 @@ export function ChatPage() {
             void send();
           }}
         >
-          <button
-            type="button"
-            className="chat-composer-poll"
-            onClick={() => setPollModalOpen(true)}
-            aria-label="Create a poll"
-            title="Create a poll"
-          >
-            <PollIcon />
-          </button>
+          <div className="chat-composer-menu-wrap" ref={composerMenuRef}>
+            <button
+              type="button"
+              className="chat-composer-add"
+              onClick={() => setComposerMenuOpen((v) => !v)}
+              aria-label="More actions"
+              aria-expanded={composerMenuOpen}
+            >
+              +
+            </button>
+            {composerMenuOpen && (
+              <div className="chat-composer-menu" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setComposerMenuOpen(false);
+                    setPollModalOpen(true);
+                  }}
+                >
+                  Add a poll
+                </button>
+                <Link
+                  to={replanHref}
+                  role="menuitem"
+                  className="chat-composer-menu-link"
+                  onClick={() => setComposerMenuOpen(false)}
+                >
+                  Make a plan
+                </Link>
+                <button type="button" role="menuitem" disabled>
+                  Upload an image (soon)
+                </button>
+              </div>
+            )}
+          </div>
           <input
             type="text"
             className="chat-composer-input"
@@ -398,11 +441,11 @@ export function ChatPage() {
           />
           <button
             type="submit"
-            className="chat-composer-send"
+            className={`chat-composer-send ${body.trim() ? "is-ready" : ""}`}
             disabled={sending || !body.trim()}
             aria-label="Send message"
           >
-            <SendIcon />
+            <ArrowSendIcon />
           </button>
         </form>
       </div>
@@ -480,26 +523,11 @@ export function ChatPage() {
   );
 }
 
-function PollIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x="4" y="10" width="3.6" height="9" rx="1" stroke="currentColor" strokeWidth="1.8" />
-      <rect x="10.2" y="5" width="3.6" height="14" rx="1" stroke="currentColor" strokeWidth="1.8" />
-      <rect x="16.4" y="13" width="3.6" height="6" rx="1" stroke="currentColor" strokeWidth="1.8" />
-    </svg>
-  );
-}
-
-function SendIcon() {
+function ArrowSendIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M3.4 11.3 20.6 3.4a.6.6 0 0 1 .8.8L13.5 21.4a.6.6 0 0 1-1.1 0l-2.5-7.4-7.4-2.5a.6.6 0 0 1 0-1.1Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
+      <path d="M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="m13 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

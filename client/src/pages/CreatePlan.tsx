@@ -349,16 +349,14 @@ export function CreatePlanPage() {
         <div className="path-picker">
           <button
             type="button"
-            className={`path-picker-card path-picker-card--idea ${pendingPath === "idea" ? "is-selected" : ""}`}
+            className={`path-picker-card ${pendingPath === "idea" ? "is-selected" : ""}`}
             onClick={() => setPendingPath("idea")}
             aria-pressed={pendingPath === "idea"}
           >
-            <span className="path-picker-eyebrow path-picker-eyebrow--accent">Casual</span>
             <span className="path-picker-title">Just an idea</span>
             <span className="path-picker-sub">
               A casual thought — see who&apos;s down before committing to anything.
             </span>
-            <span className="path-picker-chip path-picker-chip--accent">Share the vibe →</span>
           </button>
           <button
             type="button"
@@ -366,12 +364,10 @@ export function CreatePlanPage() {
             onClick={() => setPendingPath("plan")}
             aria-pressed={pendingPath === "plan"}
           >
-            <span className="path-picker-eyebrow path-picker-eyebrow--muted">Committed</span>
             <span className="path-picker-title">Make a plan</span>
             <span className="path-picker-sub">
               Know what you want to do. Set the details, post it, and see who&apos;s in.
             </span>
-            <span className="path-picker-chip path-picker-chip--neutral">Set the details →</span>
           </button>
         </div>
         <div className="path-picker-divider" />

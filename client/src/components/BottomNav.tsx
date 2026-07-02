@@ -61,6 +61,12 @@ export function BottomNav() {
         end
         className={({ isActive }) => `bottom-nav-item ${isActive ? "is-active" : ""}`}
         aria-label="Home"
+        onClick={(e) => {
+          if (pathname === "/") {
+            e.preventDefault();
+            window.dispatchEvent(new CustomEvent("commons:home-refresh"));
+          }
+        }}
       >
         <span className="bottom-nav-icon-wrap">
           <HomeIcon />
