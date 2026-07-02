@@ -280,7 +280,7 @@ function HowItWorks({ onSignup }: { onSignup: () => void }) {
             <Pill onClick={onSignup} style={{ padding: "14px 32px", fontSize: 15 }}>Join the waitlist</Pill>
           </div>
         </div>
-        <div style={{ position: "sticky", top: 96, borderRadius: 18, overflow: "hidden", height: 500 }}>
+        <div style={{ position: "sticky", top: 96, marginTop: 48, borderRadius: 18, overflow: "hidden", height: 500 }}>
           <img src={picnicImg} alt="Women dancing together at a show" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }} />
         </div>
       </div>
