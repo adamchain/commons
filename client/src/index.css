@@ -2308,6 +2308,18 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--accent);
   text-decoration: underline;
 }
+/* Woman-identity confirmation line above the Terms agree checkbox. */
+.onboarding-women-note {
+  margin: 16px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.45;
+  text-align: center;
+}
 .onboarding-guidelines-links {
   margin-top: 14px;
   text-align: center;
@@ -2432,14 +2444,28 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-muted);
   text-align: center;
 }
+/* Real COMMONS wordmark asset (matches the top bar). Multiply blend drops its
+   white matte into the warm card surface. */
+.onboarding-brand-img {
+  height: 26px;
+  width: auto;
+  display: block;
+  margin: 0 auto 4px;
+  mix-blend-mode: multiply;
+}
 .onboarding-title {
   font-family: var(--font-display);
-  font-size: 34px;
+  font-size: 24px;
   margin: 0;
   text-align: center;
   font-weight: 600;
   letter-spacing: -0.02em;
-  line-height: 1.1;
+  line-height: 1.2;
+}
+/* Reserve room at the top of the card so the absolutely-positioned Back/Exit
+   pills never overlap the wordmark or title. */
+.onboarding-card--has-nav {
+  padding-top: calc(56px + env(safe-area-inset-top, 0px));
 }
 .onboarding-subtitle {
   margin: 0;
@@ -3921,12 +3947,34 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--color-danger, #c0392b);
 }
 
-.feed-refreshing {
-  text-align: center;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-muted);
-  padding: 8px 0;
+/* Pull-to-refresh — iPhone-native feel: finger-tracked transform + fixed spinner. */
+.feed-pull-indicator {
+  position: fixed;
+  top: calc(var(--topbar-height, 56px) + env(safe-area-inset-top, 0px) + 2px);
+  left: 50%;
+  z-index: 42;
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+  transform: translate3d(-50%, 0, 0) scale(0.55);
+}
+.feed-pull-spinner {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(20, 20, 58, 0.12);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  transform-origin: center;
+}
+.feed-pull-spinner.is-spinning {
+  animation: feed-pull-spin 0.6s linear infinite;
+}
+@keyframes feed-pull-spin {
+  to { transform: rotate(360deg); }
+}
+.feed-pull-content {
+  will-change: transform;
 }
 
 /* My Plans page */
@@ -8905,11 +8953,11 @@ h1, h2, h3, h4, h5, h6 {
   gap: 6px;
   padding: 9px 12px;
   border-radius: var(--r-md);
-  border: 1px solid var(--border);
-  background: var(--surface);
+  border: 1px solid var(--accent);
+  background: #fff;
   font-size: 13.5px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text);
   cursor: pointer;
   transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
 }

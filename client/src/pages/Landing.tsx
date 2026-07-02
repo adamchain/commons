@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { CSSProperties, FormEvent, ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import wordmark from "../assets/wordmark.png";
 
@@ -23,11 +23,11 @@ const MUTED = "rgba(20,17,48,0.46)";
 const D = "'Plus Jakarta Sans', sans-serif";
 const B = "'Poppins', sans-serif";
 
-// Mailchimp embedded-form action URL. Get it from Mailchimp:
-// Audience → Signup forms → Embedded forms → copy the URL inside <form action="…">.
-// It looks like: https://<something>.us21.list-manage.com/subscribe/post?u=XXXX&id=YYYY
-// The modal below turns this into a JSONP call so signups happen inline (no redirect).
-const MAILCHIMP_ACTION: string = "";
+// Google Form waitlist. Short link: https://forms.gle/GxVDLYj74rvXtGYb9
+// The modal embeds the form (embedded=true strips Google's own chrome) so
+// signups happen inline without leaving the landing page.
+const WAITLIST_FORM_URL =
+  "https://docs.google.com/forms/d/e/1FAIpQLSc8S_DMmQz7WaS1wZUn9GKHbIK1XELSnx81Kbjj1EMnLiOKVg/viewform?embedded=true";
 
 // Served from client/public — referenced by root-absolute URL, not imported.
 const shadowsImg = "/landing/photo-shadows.jpg";
@@ -80,85 +80,48 @@ function Pill({
 }
 
 /**
- * Branded email-capture popup. Submits to Mailchimp via JSONP (the standard
- * `post-json?...&c=callback` pattern) so the signup happens inline without
- * redirecting off the landing page. Opened from the hero CTA and the buttons
+ * Branded waitlist popup. Embeds the full COMMONS Google Form
+ * (https://forms.gle/GxVDLYj74rvXtGYb9) in an iframe so signups happen inline
+ * without leaving the landing page. The Google chrome is stripped via
+ * `embedded=true`; the app-styled card supplies the framing while the form's
+ * own title/fields carry the content. Opened from the hero CTA and the buttons
  * under "Post a plan two ways" and "How it works".
  */
 function WaitlistModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "ok" | "err">("idle");
-  const [msg, setMsg] = useState("");
+  const [loaded, setLoaded] = useState(false);
   if (!open) return null;
-
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    if (!MAILCHIMP_ACTION) {
-      setStatus("err");
-      setMsg("Signup isn't connected yet — add your Mailchimp form URL.");
-      return;
-    }
-    setStatus("loading");
-    const cb = `mcCallback${Math.floor(Math.random() * 1e9)}`;
-    const url = MAILCHIMP_ACTION.replace("/post?", "/post-json?");
-    const script = document.createElement("script");
-    (window as unknown as Record<string, unknown>)[cb] = (data: { result: string; msg: string }) => {
-      const clean = data.msg ? data.msg.replace(/<[^>]*>/g, "") : "";
-      if (data.result === "success") {
-        setStatus("ok");
-        setMsg("You're on the list — we'll be in touch.");
-      } else {
-        setStatus("err");
-        setMsg(clean || "Something went wrong. Try again.");
-      }
-      delete (window as unknown as Record<string, unknown>)[cb];
-      script.remove();
-    };
-    script.src = `${url}&EMAIL=${encodeURIComponent(email)}&c=${cb}`;
-    document.body.appendChild(script);
-  };
 
   return (
     <div
       onClick={onClose}
-      style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(20,17,48,0.55)", backdropFilter: "blur(3px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+      style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(20,17,48,0.55)", backdropFilter: "blur(3px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ position: "relative", background: WHITE, borderRadius: 24, padding: "44px 40px 40px", width: "100%", maxWidth: 420, boxShadow: "0 24px 80px rgba(20,17,48,0.32)" }}
+        style={{ position: "relative", background: WHITE, borderRadius: 20, width: "100%", maxWidth: 640, height: "96vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 24px 80px rgba(20,17,48,0.32)" }}
       >
         <button
           onClick={onClose}
           aria-label="Close"
-          style={{ position: "absolute", top: 18, right: 18, background: "transparent", border: "none", fontSize: 22, lineHeight: 1, color: MUTED, cursor: "pointer", padding: 4 }}
+          style={{ position: "absolute", top: 14, right: 14, zIndex: 2, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", background: WHITE, borderRadius: 9999, border: "none", fontSize: 22, lineHeight: 1, color: MUTED, cursor: "pointer", boxShadow: "0 2px 10px rgba(20,17,48,0.14)" }}
         >
           ×
         </button>
-        <p style={{ fontFamily: B, fontWeight: 600, fontSize: 11, color: RED, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 12 }}>Invite-only · iOS</p>
-        <h3 style={{ fontFamily: D, fontWeight: 800, fontSize: 28, color: NAVY, letterSpacing: "-0.035em", lineHeight: 1.1, marginBottom: 10 }}>Join the waitlist</h3>
-        <p style={{ fontFamily: B, fontSize: 14, color: MUTED, lineHeight: 1.65, marginBottom: 24 }}>
-          Be first to know when Commons opens up in your city.
-        </p>
-        {status === "ok" ? (
-          <p style={{ fontFamily: B, fontSize: 15, color: NAVY, fontWeight: 500, lineHeight: 1.6 }}>{msg}</p>
-        ) : (
-          <form onSubmit={submit}>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@email.com"
-              style={{ width: "100%", boxSizing: "border-box", fontFamily: B, fontSize: 15, color: NAVY, padding: "14px 18px", borderRadius: 9999, border: `1.5px solid rgba(20,17,48,0.16)`, outline: "none", marginBottom: 12 }}
-            />
-            <Pill onClick={() => {}} style={{ width: "100%", padding: "14px 26px", fontSize: 15, opacity: status === "loading" ? 0.6 : 1 }}>
-              {status === "loading" ? "Joining…" : "Join the waitlist"}
-            </Pill>
-            {status === "err" && (
-              <p style={{ fontFamily: B, fontSize: 12, color: RED, marginTop: 12, lineHeight: 1.5 }}>{msg}</p>
-            )}
-          </form>
-        )}
+        <div style={{ position: "relative", flex: 1, minHeight: 0, overflow: "hidden" }}>
+          {!loaded && (
+            <p style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: B, fontSize: 14, color: MUTED }}>
+              Loading form…
+            </p>
+          )}
+          <iframe
+            title="COMMONS waitlist form"
+            src={WAITLIST_FORM_URL}
+            onLoad={() => setLoaded(true)}
+            style={{ width: "100%", height: "100%", border: "none", display: "block", opacity: loaded ? 1 : 0, transition: "opacity 0.2s" }}
+          >
+            Loading…
+          </iframe>
+        </div>
       </div>
     </div>
   );

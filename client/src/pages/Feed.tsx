@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { FilterSheet } from "../components/FilterSheet";
@@ -21,6 +21,13 @@ type PersistedFilters = {
   hideHappened: boolean;
   hideCancelled: boolean;
 };
+
+const PULL_THRESHOLD = 52;
+const PULL_MAX = 96;
+
+function rubberBandPull(dy: number): number {
+  return Math.min(dy * 0.5, PULL_MAX);
+}
 
 const EMPTY_FILTERS: PersistedFilters = {
   selectedTag: null,
@@ -67,77 +74,140 @@ export function FeedPage() {
   );
 
   const [refreshing, setRefreshing] = useState(false);
-  const refreshPlans = () =>
-    void api<PlanDTO[]>("/api/plans")
-      .then((rows) => {
-        setPlans(rows);
-        setFeedReady(true);
-      })
-      .catch(() => {
-        setPlans([]);
-        setFeedReady(true);
-      });
+  const refreshingRef = useRef(false);
+  const pullRef = useRef({ startY: 0, armed: false, distance: 0 });
+  const contentRef = useRef<HTMLDivElement>(null);
+  const indicatorRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    refreshPlans();
-    void api<NeighborhoodDTO[]>("/api/neighborhoods").then(setNeighborhoods).catch(() => undefined);
+  const setPullVisual = useCallback((distance: number, spinning = false) => {
+    const content = contentRef.current;
+    const indicator = indicatorRef.current;
+    if (!content || !indicator) return;
+
+    const progress = Math.min(distance / PULL_THRESHOLD, 1);
+    content.style.transform = distance > 0 ? `translate3d(0, ${distance}px, 0)` : "";
+    indicator.style.opacity = spinning ? "1" : String(Math.max(0.15, progress));
+    indicator.style.transform = `translate3d(-50%, ${Math.max(0, distance - 24)}px, 0) scale(${0.55 + progress * 0.45})`;
+
+    const spinner = indicator.querySelector<HTMLElement>(".feed-pull-spinner");
+    if (!spinner) return;
+    spinner.classList.toggle("is-spinning", spinning);
+    if (!spinning) spinner.style.transform = `rotate(${progress * 300}deg)`;
+    else spinner.style.transform = "";
   }, []);
 
-  // Tapping Home while already on the feed scrolls to top and re-pulls plans.
+  const resetPullVisual = useCallback(() => {
+    const content = contentRef.current;
+    const indicator = indicatorRef.current;
+    const ease = "transform 200ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms ease";
+    if (content) {
+      content.style.transition = ease;
+      content.style.transform = "";
+    }
+    if (indicator) {
+      indicator.style.transition = ease;
+      indicator.style.opacity = "0";
+      indicator.style.transform = "translate3d(-50%, 0, 0) scale(0.55)";
+    }
+    window.setTimeout(() => {
+      if (content) content.style.transition = "";
+      if (indicator) indicator.style.transition = "";
+    }, 210);
+    pullRef.current.distance = 0;
+    pullRef.current.armed = false;
+  }, []);
+
+  const fetchPlans = useCallback(async (opts?: { pull?: boolean }) => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    const showPull = Boolean(opts?.pull);
+    if (showPull) {
+      setRefreshing(true);
+      setPullVisual(pullRef.current.distance || 36, true);
+    }
+    try {
+      const rows = await api<PlanDTO[]>("/api/plans");
+      setPlans(rows);
+      setFeedReady(true);
+    } catch {
+      setPlans((prev) => (prev.length ? prev : []));
+      setFeedReady(true);
+    } finally {
+      refreshingRef.current = false;
+      setRefreshing(false);
+      if (showPull) resetPullVisual();
+    }
+  }, [resetPullVisual, setPullVisual]);
+
+  const refreshPlans = useCallback(() => {
+    void fetchPlans();
+  }, [fetchPlans]);
+
+  useEffect(() => {
+    void fetchPlans();
+    void api<NeighborhoodDTO[]>("/api/neighborhoods").then(setNeighborhoods).catch(() => undefined);
+  }, [fetchPlans]);
+
+  // Tapping Home while already on the feed snaps to top and re-pulls plans.
   useEffect(() => {
     const onHomeRefresh = () => {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      setRefreshing(true);
-      void api<PlanDTO[]>("/api/plans")
-        .then((rows) => {
-          setPlans(rows);
-          setFeedReady(true);
-        })
-        .catch(() => undefined)
-        .finally(() => setRefreshing(false));
+      window.scrollTo(0, 0);
+      void fetchPlans({ pull: true });
     };
     window.addEventListener("commons:home-refresh", onHomeRefresh);
     return () => window.removeEventListener("commons:home-refresh", onHomeRefresh);
-  }, []);
+  }, [fetchPlans]);
 
-  // Pull-to-refresh: a downward drag while already scrolled to the top re-pulls
-  // the feed. Lightweight (no library) — fires once per gesture past threshold.
+  // Pull-to-refresh tuned for iPhone: follow the finger with a rubber-band
+  // transform, then release into a spinner — no layout-jumping status text.
   useEffect(() => {
-    let startY = 0;
-    let armed = false;
     const onStart = (e: TouchEvent) => {
-      if (window.scrollY <= 0 && e.touches.length === 1) {
-        startY = e.touches[0]!.clientY;
-        armed = true;
+      if (refreshingRef.current) return;
+      if (window.scrollY <= 1 && e.touches.length === 1) {
+        pullRef.current.startY = e.touches[0]!.clientY;
+        pullRef.current.armed = true;
       } else {
-        armed = false;
+        pullRef.current.armed = false;
       }
     };
     const onMove = (e: TouchEvent) => {
-      if (!armed) return;
-      const dy = e.touches[0]!.clientY - startY;
-      if (dy > 80) {
-        armed = false;
-        setRefreshing(true);
-        void api<PlanDTO[]>("/api/plans")
-          .then((rows) => {
-            setPlans(rows);
-            setFeedReady(true);
-          })
-          .catch(() => undefined)
-          .finally(() => setRefreshing(false));
+      if (!pullRef.current.armed || refreshingRef.current) return;
+      const dy = e.touches[0]!.clientY - pullRef.current.startY;
+      if (dy <= 0) {
+        pullRef.current.distance = 0;
+        setPullVisual(0);
+        return;
+      }
+      if (window.scrollY > 1) {
+        pullRef.current.armed = false;
+        return;
+      }
+      e.preventDefault();
+      const distance = rubberBandPull(dy);
+      pullRef.current.distance = distance;
+      setPullVisual(distance);
+    };
+    const onEnd = () => {
+      if (!pullRef.current.armed && pullRef.current.distance <= 0) return;
+      const { distance } = pullRef.current;
+      pullRef.current.armed = false;
+      if (distance >= PULL_THRESHOLD) {
+        void fetchPlans({ pull: true });
+      } else {
+        resetPullVisual();
       }
     };
-    const onEnd = () => { armed = false; };
     window.addEventListener("touchstart", onStart, { passive: true });
-    window.addEventListener("touchmove", onMove, { passive: true });
+    window.addEventListener("touchmove", onMove, { passive: false });
     window.addEventListener("touchend", onEnd, { passive: true });
+    window.addEventListener("touchcancel", onEnd, { passive: true });
     return () => {
       window.removeEventListener("touchstart", onStart);
       window.removeEventListener("touchmove", onMove);
       window.removeEventListener("touchend", onEnd);
+      window.removeEventListener("touchcancel", onEnd);
     };
-  }, []);
+  }, [fetchPlans, resetPullVisual, setPullVisual]);
 
   useEffect(() => {
     if (justPostedId && location.state) {
@@ -233,88 +303,98 @@ export function FeedPage() {
 
   return (
     <main className="app-shell app-shell--wide app-shell--with-nav app-shell--with-topbar">
-      {refreshing && <div className="feed-refreshing" role="status">Refreshing…</div>}
-
-      <WeekStrip
-        plans={plans}
-        selectedDayIso={selectedDayIso}
-        onSelectDay={setSelectedDayIso}
-      />
-
-      <div className="feed-divider" />
-
-      <div className="feed-toolbar">
-        <div className="segmented segmented-feed-view" role="tablist" aria-label="Feed scope">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={view === "all"}
-            className={view === "all" ? "is-active" : ""}
-            onClick={() => setView("all")}
-          >
-            All plans
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={view === "mine"}
-            className={view === "mine" ? "is-active" : ""}
-            onClick={() => setView("mine")}
-          >
-            My plans
-          </button>
-        </div>
-        <button
-          type="button"
-          className={`page-filter-btn ${activeFilterCount > 0 ? "page-filter-btn--active" : ""}`}
-          onClick={() => setFilterOpen(true)}
-          aria-label="Filter plans"
-        >
-          <FilterIcon />
-          Filters
-          {activeFilterCount > 0 && <span className="page-filter-count">{activeFilterCount}</span>}
-        </button>
+      <div
+        ref={indicatorRef}
+        className="feed-pull-indicator"
+        aria-hidden={!refreshing}
+        role={refreshing ? "status" : undefined}
+        aria-label={refreshing ? "Refreshing" : undefined}
+      >
+        <span className="feed-pull-spinner" />
       </div>
 
-      {networkPrompt && (
-        <NetworkPromptModal
-          prompt={networkPrompt}
-          onClose={() => setNetworkPrompt(null)}
-          onUpdated={(me: MeDTO) => setUser(me)}
+      <div ref={contentRef} className="feed-pull-content">
+        <WeekStrip
+          plans={plans}
+          selectedDayIso={selectedDayIso}
+          onSelectDay={setSelectedDayIso}
         />
-      )}
 
-      <div id="feed-plans">
-        {filteredPlans.length === 0 ? (
-          <FeedEmptyState
-            view={view}
-            hasAnyPlans={(plans?.length ?? 0) > 0}
-            hasFilters={activeFilterCount > 0 || selectedDayIso !== null}
-            onClearFilters={() => {
-              setSelectedTag(null);
-              setSelectedHoodId(null);
-              setSelectedAgeRange(null);
-              setSelectedDayIso(null);
-              setHideHappened(false);
-              setHideCancelled(false);
-            }}
-          />
-        ) : (
-          <div className="plan-grid">
-            {filteredPlans.map((plan) => (
-              <PlanCard
-                key={plan.id}
-                plan={plan}
-                onPlanRefresh={refreshPlans}
-                highlight={highlightId === plan.id}
-                onHideKind={(kind) => {
-                  if (kind === "happened") setHideHappened(true);
-                  else setHideCancelled(true);
-                }}
-              />
-            ))}
+        <div className="feed-divider" />
+
+        <div className="feed-toolbar">
+          <div className="segmented segmented-feed-view" role="tablist" aria-label="Feed scope">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === "all"}
+              className={view === "all" ? "is-active" : ""}
+              onClick={() => setView("all")}
+            >
+              All plans
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === "mine"}
+              className={view === "mine" ? "is-active" : ""}
+              onClick={() => setView("mine")}
+            >
+              My plans
+            </button>
           </div>
+          <button
+            type="button"
+            className={`page-filter-btn ${activeFilterCount > 0 ? "page-filter-btn--active" : ""}`}
+            onClick={() => setFilterOpen(true)}
+            aria-label="Filter plans"
+          >
+            <FilterIcon />
+            Filters
+            {activeFilterCount > 0 && <span className="page-filter-count">{activeFilterCount}</span>}
+          </button>
+        </div>
+
+        {networkPrompt && (
+          <NetworkPromptModal
+            prompt={networkPrompt}
+            onClose={() => setNetworkPrompt(null)}
+            onUpdated={(me: MeDTO) => setUser(me)}
+          />
         )}
+
+        <div id="feed-plans">
+          {filteredPlans.length === 0 ? (
+            <FeedEmptyState
+              view={view}
+              hasAnyPlans={(plans?.length ?? 0) > 0}
+              hasFilters={activeFilterCount > 0 || selectedDayIso !== null}
+              onClearFilters={() => {
+                setSelectedTag(null);
+                setSelectedHoodId(null);
+                setSelectedAgeRange(null);
+                setSelectedDayIso(null);
+                setHideHappened(false);
+                setHideCancelled(false);
+              }}
+            />
+          ) : (
+            <div className="plan-grid">
+              {filteredPlans.map((plan) => (
+                <PlanCard
+                  key={plan.id}
+                  plan={plan}
+                  onPlanRefresh={refreshPlans}
+                  highlight={highlightId === plan.id}
+                  onHideKind={(kind) => {
+                    if (kind === "happened") setHideHappened(true);
+                    else setHideCancelled(true);
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {inviteForPlanId && (

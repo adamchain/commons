@@ -13,6 +13,7 @@ import { getCurrentCoords } from "../lib/geolocate";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { LegalContent } from "../components/LegalContent";
 import { LEGAL_DOCS } from "../content/legal";
+import wordmark from "../assets/wordmark.png";
 import {
   ALL_INTERESTS,
   INTEREST_EMOJI,
@@ -620,11 +621,15 @@ function OnboardingShell({
           })}
         </div>
       )}
-      <div className={`onboarding-card ${landing ? "onboarding-card--landing" : ""}`}>
+      <div
+        className={`onboarding-card ${landing ? "onboarding-card--landing" : ""} ${
+          !landing && (onBack || showExit) ? "onboarding-card--has-nav" : ""
+        }`}
+      >
         {landing ? (
           <h1 className="loader-wordmark">COMMONS</h1>
         ) : (
-          <div className="onboarding-brand">COMMONS</div>
+          <img src={wordmark} alt="COMMONS" className="onboarding-brand-img" />
         )}
         {title && <h2 className="onboarding-title">{title}</h2>}
         {subtitle && <p className="onboarding-subtitle">{subtitle}</p>}
@@ -846,6 +851,10 @@ function LegalConsentStep({
             : read.privacy
               ? "Now read the Terms of Service."
               : "Scroll to the bottom of each document to continue."}
+      </p>
+
+      <p className="onboarding-women-note">
+        COMMONS is built for women. By joining, you&rsquo;re confirming that you identify as a woman.
       </p>
 
       <label className="guidelines-agree">
@@ -1164,7 +1173,7 @@ function AgeStep({
   return (
     <OnboardingShell
       title="Quick age check."
-      subtitle="Commons is for adults. Pick your age range so we can personalize your feed."
+      subtitle="COMMONS is for adults. Pick your age range so we can personalize your feed."
       onBack={onBack}
       showExit
     >
