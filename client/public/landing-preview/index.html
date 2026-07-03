@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COMMONS — Make plans. Show up.</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react@18.0.0/umd/react.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18.0.0/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        navy: '#141130',
+                        red: '#BF2B2B',
+                        beige: '#EBE4DA',
+                        beigeSoft: '#F3EEE7',
+                    },
+                    fontFamily: {
+                        display: ['Plus Jakarta Sans', 'sans-serif'],
+                        body: ['Poppins', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Poppins', sans-serif; }
+        h1, h2, h3 { font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: -0.03em; }
+
+        /* Bumble-style hero: a horizontal band of overlapping upright cards that
+           slide continuously across the middle, over the big wordmark. The track
+           holds the card set twice; translating by -50% loops seamlessly. */
+        @keyframes commons-cards-slide {
+            0%   { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        .commons-cards-track {
+            display: flex;
+            width: max-content;
+            animation: commons-cards-slide 32s linear infinite;
+        }
+        .commons-cards-track:hover { animation-play-state: paused; }
+        .commons-cards-band {
+            -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+                    mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+        }
+        /* Band fades/settles in on first load. Applied to the band wrapper (not the
+           sliding track) so it never overrides the track's slide animation. */
+        @keyframes commons-cards-in {
+            0%   { opacity: 0; transform: translateY(28px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        .commons-cards-in { animation: commons-cards-in 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
+        @media (prefers-reduced-motion: reduce) {
+            .commons-cards-track { animation: none; }
+            .commons-cards-in { animation: none; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const WAITLIST_FORM_BASE =
+            "https://docs.google.com/forms/d/e/1FAIpQLSc8S_DMmQz7WaS1wZUn9GKHbIK1XELSnx81Kbjj1EMnLiOKVg/viewform";
+        const WAITLIST_EMAIL_ENTRY = "entry.1045781291";
+
+        function waitlistFormUrl(prefillEmail) {
+            const params = new URLSearchParams({ embedded: "true" });
+            if (prefillEmail) params.set(WAITLIST_EMAIL_ENTRY, prefillEmail);
+            return `${WAITLIST_FORM_BASE}?${params.toString()}`;
+        }
+
+        function WaitlistModal({ open, onClose, prefillEmail }) {
+            const [loaded, setLoaded] = useState(false);
+            const formUrl = waitlistFormUrl(prefillEmail);
+
+            useEffect(() => {
+                if (open) setLoaded(false);
+            }, [open, formUrl]);
+
+            if (!open) return null;
+
+            return (
+                <div
+                    onClick={onClose}
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-3"
+                    style={{ background: "rgba(20,17,48,0.55)", backdropFilter: "blur(3px)" }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="relative bg-white rounded-[20px] w-full max-w-[640px] h-[96vh] flex flex-col overflow-hidden shadow-[0_24px_80px_rgba(20,17,48,0.32)]"
+                    >
+                        <button
+                            onClick={onClose}
+                            aria-label="Close"
+                            className="absolute top-3.5 right-3.5 z-[2] w-[34px] h-[34px] flex items-center justify-center bg-white rounded-full border-0 text-[22px] leading-none text-navy/50 cursor-pointer shadow-[0_2px_10px_rgba(20,17,48,0.14)]"
+                        >
+                            ×
+                        </button>
+                        <div className="relative flex-1 min-h-0 overflow-hidden">
+                            {!loaded && (
+                                <p className="absolute inset-0 flex items-center justify-center text-sm text-navy/50">
+                                    Loading form…
+                                </p>
+                            )}
+                            <iframe
+                                title="COMMONS waitlist form"
+                                src={formUrl}
+                                onLoad={() => setLoaded(true)}
+                                className="w-full h-full border-0 block transition-opacity duration-200"
+                                style={{ opacity: loaded ? 1 : 0 }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const App = () => {
+            const LOGO = "/landing-preview/wordmark.png";
+            const [signupOpen, setSignupOpen] = useState(false);
+            const [prefillEmail, setPrefillEmail] = useState(undefined);
+            const [heroEmail, setHeroEmail] = useState("");
+            const heroRef = useRef(null);
+            const [showSticky, setShowSticky] = useState(false);
+
+            // Reveal the sticky bottom waitlist bar once the hero scrolls out of view.
+            useEffect(() => {
+                const el = heroRef.current;
+                if (!el || typeof IntersectionObserver === "undefined") return;
+                const io = new IntersectionObserver(
+                    ([entry]) => setShowSticky(!entry.isIntersecting),
+                    { threshold: 0, rootMargin: "-96px 0px 0px 0px" }
+                );
+                io.observe(el);
+                return () => io.disconnect();
+            }, []);
+
+            const onSignup = () => {
+                setPrefillEmail(undefined);
+                setSignupOpen(true);
+            };
+            const onSignupWithEmail = (email) => {
+                setPrefillEmail(email);
+                setSignupOpen(true);
+            };
+            const closeSignup = () => {
+                setSignupOpen(false);
+                setPrefillEmail(undefined);
+            };
+            const submitHero = (e) => {
+                e.preventDefault();
+                const trimmed = heroEmail.trim();
+                if (!trimmed) return;
+                onSignupWithEmail(trimmed);
+            };
+
+            // Local landing photos (copied into ./landing-assets).
+            const IMG = {
+                balloons: "/landing-preview/landing-assets/balloons.png",
+                dinner: "/landing-preview/landing-assets/dinner.png",
+                party: "/landing-preview/landing-assets/party.png",
+                gathering: "/landing-preview/landing-assets/gathering.png",
+                concert: "/landing-preview/landing-assets/concert.png",
+                philly: "/landing-preview/landing-assets/philly.png",
+            };
+
+            // Plan cards that loop through the animated hero.
+            const heroPlans = [
+                { img: IMG.dinner, title: "Dinner out", meta: "Fri · Old City", stat: "6 going" },
+                { img: IMG.party, title: "Backyard hang", meta: "Sat · Fishtown", stat: "4 going · 7 interested" },
+                { img: IMG.concert, title: "Show night", meta: "Thu · Fairmount", stat: "5 going · 3 interested" },
+                { img: IMG.balloons, title: "Birthday drinks", meta: "Sun · Rittenhouse", stat: "8 going" },
+                { img: IMG.gathering, title: "Rooftop mixer", meta: "Fri · Northern Liberties", stat: "3 going · 4 interested" },
+                { img: IMG.philly, title: "Mural walk", meta: "Wed · South Philly", stat: "2 going · 5 interested" },
+            ];
+
+            return (
+                <div className="font-body text-navy bg-beige min-h-screen">
+                    {/* Hero Section */}
+                    <div ref={heroRef} className="bg-beige relative overflow-hidden min-h-[92vh] flex flex-col">
+                        {/* Navbar */}
+                        <nav className="relative z-50 flex justify-between items-center px-8 py-6 w-full max-w-7xl mx-auto">
+                            {/* Logo */}
+                            <a href="#" className="flex-shrink-0">
+                                <img src={LOGO} alt="COMMONS" className="h-7 w-auto" />
+                            </a>
+
+                            {/* Nav Links - White pill */}
+                            <div className="hidden lg:flex bg-white rounded-full px-8 py-3 space-x-10 text-[15px] font-medium shadow-sm">
+                                <a href="#how" className="hover:opacity-70 transition-opacity">How it works</a>
+                                <a href="#pathways" className="hover:opacity-70 transition-opacity">Two ways</a>
+                                <button type="button" onClick={onSignup} className="hover:opacity-70 transition-opacity bg-transparent border-0 p-0 cursor-pointer text-[15px] font-medium text-navy">Join waitlist</button>
+                            </div>
+
+                            {/* Right actions */}
+                            <div className="flex items-center space-x-4">
+                                <button type="button" onClick={onSignup} className="bg-navy text-white rounded-full px-8 py-3 text-[15px] font-medium hover:bg-black transition-colors">
+                                    Join the waitlist
+                                </button>
+                            </div>
+                        </nav>
+
+                    {/* Hero Graphics - big COMMONS wordmark with a horizontal band of
+                        overlapping cards sliding across it (Bumble-style). */}
+                    <div className="relative z-10 flex-grow flex flex-col items-center justify-center w-full px-8 pt-4 pb-10">
+                        {/* Wordmark + sliding card band stage (full-bleed to viewport width) */}
+                        <div className="relative w-screen left-1/2 -translate-x-1/2 h-[360px] md:h-[500px] flex items-center justify-center md:mb-8 overflow-hidden">
+                            {/* Big wordmark behind (desktop only) — spans the full page width */}
+                            <span className="hidden md:flex absolute inset-0 items-center justify-center pointer-events-none select-none font-display text-[26vw] font-extrabold leading-none text-navy whitespace-nowrap" style={{ letterSpacing: "-0.04em" }}>
+                                COMMONS
+                            </span>
+
+                            {/* Sliding band of overlapping upright cards (duplicated for a seamless loop) */}
+                            <div className="commons-cards-band commons-cards-in absolute inset-0 flex items-center overflow-hidden">
+                                <div className="commons-cards-track items-center px-8">
+                                    {[...heroPlans, ...heroPlans].map((p, i) => (
+                                        <div
+                                            key={i}
+                                            className="relative shrink-0 rounded-[24px] overflow-hidden w-[190px] h-[300px] md:w-[220px] md:h-[360px] shadow-[0_24px_60px_rgba(20,17,48,0.3)] border-4 border-beige"
+                                            style={{ marginLeft: i === 0 ? 0 : -28, zIndex: i }}
+                                        >
+                                            <img src={p.img} className="w-full h-full object-cover" alt={p.title} />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-navy/75 via-navy/10 to-transparent" />
+                                            <div className="absolute bottom-4 left-4 right-4 text-white">
+                                                <p className="text-[10px] uppercase tracking-widest text-white/70 mb-1">{p.meta}</p>
+                                                <p className="font-display font-extrabold text-lg leading-tight">{p.title}</p>
+                                                <p className="text-[12px] text-white/75 mt-0.5">{p.stat}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Mobile-only big wordmark, sits large below the cards (like the app store hero).
+                            Sized to fit the viewport width so it never overflows the page. */}
+                        <span className="md:hidden block w-full text-center -mt-2 mb-8 px-2 pointer-events-none select-none font-display text-[16vw] font-extrabold leading-[0.9] text-navy" style={{ letterSpacing: "-0.045em" }}>
+                            COMMONS
+                        </span>
+
+                        {/* Headline + email capture */}
+                        <div className="relative z-40 text-center max-w-2xl">
+                            <h1 className="text-[clamp(32px,4.5vw,52px)] font-extrabold leading-[1.0] text-navy mb-4">
+                                More plans. More people. <span className="text-red">More showing up.</span>
+                            </h1>
+                            <p className="text-[16px] leading-relaxed text-navy/60 max-w-md mx-auto mb-6">
+                                COMMONS is where women actually make plans — find someone to do it with, or bring your people together.
+                            </p>
+                            <form onSubmit={submitHero} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 max-w-md mx-auto mb-3">
+                                <input
+                                    type="email"
+                                    required
+                                    value={heroEmail}
+                                    onChange={(e) => setHeroEmail(e.target.value)}
+                                    placeholder="you@email.com"
+                                    aria-label="Email address"
+                                    className="flex-1 bg-white rounded-full px-6 py-4 text-[15px] outline-none border border-navy/10 focus:border-navy/30 transition-colors min-w-0"
+                                />
+                                <button type="submit" className="bg-navy text-white rounded-full px-8 py-4 text-[15px] font-medium hover:bg-black transition-colors whitespace-nowrap">
+                                    Join the waitlist
+                                </button>
+                            </form>
+                            <p className="text-[12px] text-navy/40 tracking-wide">Invite-only · Built for iOS</p>
+                        </div>
+                    </div>
+                    </div>
+
+                    {/* Photo strip / statement */}
+                    <div className="relative h-[46vh] min-h-[300px] overflow-hidden">
+                        <img src={IMG.party} className="w-full h-full object-cover object-center" alt="Friends together at a gathering" />
+                        <div className="absolute inset-0 bg-navy/25" />
+                        <div className="absolute inset-0 flex items-center justify-center px-8">
+                            <p className="font-display font-extrabold text-white text-center text-[clamp(24px,3.8vw,50px)] leading-tight max-w-2xl" style={{textShadow:'0 2px 32px rgba(20,17,48,0.3)'}}>
+                                A place where "we should do something" actually turns into something.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Section 1: Mission */}
+                    <div className="max-w-7xl mx-auto px-8 py-32 flex flex-col md:flex-row items-center gap-16">
+                        <div className="w-full md:w-[45%] space-y-8 pr-10">
+                            <h2 className="text-[clamp(40px,4.5vw,56px)] font-extrabold leading-[1.05] text-navy">We exist to turn intention into showing up.</h2>
+                            <p className="text-[20px] leading-relaxed text-navy/70">Group chats are where plans go to die. COMMONS is built for women who want real, low-pressure things to do — near where they live, with people who actually turn up.</p>
+                            <button type="button" onClick={onSignup} className="inline-block bg-navy text-white rounded-full px-10 py-4 font-medium hover:bg-black transition-colors mt-4">
+                                Join the waitlist
+                            </button>
+                        </div>
+                        <div className="w-full md:w-[55%] flex justify-end">
+                            <img src={IMG.dinner} alt="Dinner out together" className="w-full max-w-[600px] h-[440px] object-cover rounded-[40px] shadow-lg" />
+                        </div>
+                    </div>
+
+                    {/* Section 2: Shape what we build */}
+                    <div className="max-w-7xl mx-auto px-8 pb-32">
+                        <div className="bg-beigeSoft rounded-[48px] p-16 md:p-20 flex flex-col md:flex-row items-center gap-16">
+                            <div className="w-full md:w-1/3 flex justify-center">
+                                <div className="w-[240px] h-[240px] rounded-full bg-red/10 flex items-center justify-center">
+                                    <i className="fas fa-heart text-red text-[80px]"></i>
+                                </div>
+                            </div>
+                            <div className="w-full md:w-2/3 space-y-8">
+                                <h2 className="text-[clamp(40px,4.5vw,56px)] font-extrabold text-navy">Built with women, for women</h2>
+                                <div className="space-y-6 text-[20px] text-navy/70 leading-relaxed max-w-2xl">
+                                    <p>Every early member helps shape what COMMONS becomes. You get first access to new features, a direct line to the team, and a say in how the community grows.</p>
+                                    <p>By joining, you're confirming that you identify as a woman — COMMONS is a space built intentionally for women.</p>
+                                </div>
+                                <button type="button" onClick={onSignup} className="inline-block bg-navy text-white rounded-full px-10 py-4 font-medium hover:bg-black transition-colors mt-4">
+                                    Sign up
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 3: Two ways to post */}
+                    <div id="pathways" className="max-w-7xl mx-auto px-8 pb-32">
+                        <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
+                            <h2 className="text-[clamp(36px,4.2vw,58px)] font-extrabold text-navy leading-none">Post a plan<br/>two ways</h2>
+                            <p className="text-[18px] text-navy/60 max-w-sm">Whether you have something in mind or you're just putting it out there.</p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            {/* Casual */}
+                            <div className="bg-red rounded-[48px] p-12 flex flex-col min-h-[560px] text-white">
+                                <div className="flex-grow flex justify-center items-center mb-10">
+                                    <i className="fas fa-lightbulb text-[120px] text-white/90"></i>
+                                </div>
+                                <div className="space-y-4">
+                                    <p className="text-[11px] uppercase tracking-[0.14em] text-white/70 font-semibold">Casual</p>
+                                    <h3 className="text-[40px] font-extrabold">Just an idea.</h3>
+                                    <p className="text-[19px] leading-relaxed text-white/85">Something's on your mind but you're not sure yet. Toss it out — see who's around and interested before you commit to anything.</p>
+                                    <button type="button" onClick={onSignup} className="inline-block mt-4 text-white underline font-semibold underline-offset-4 decoration-2 hover:opacity-80 transition-opacity bg-transparent border-0 cursor-pointer p-0">Share the vibe →</button>
+                                </div>
+                            </div>
+                            {/* Committed */}
+                            <div className="bg-white rounded-[48px] p-12 flex flex-col min-h-[560px]">
+                                <div className="flex-grow flex justify-center items-center mb-10">
+                                    <i className="fas fa-calendar-check text-[120px] text-navy/85"></i>
+                                </div>
+                                <div className="space-y-4">
+                                    <p className="text-[11px] uppercase tracking-[0.14em] text-red font-semibold">Committed</p>
+                                    <h3 className="text-[40px] font-extrabold text-navy">Make a plan.</h3>
+                                    <p className="text-[19px] leading-relaxed text-navy/70">Know what you want to do. Set the details, post it, and see who's in.</p>
+                                    <button type="button" onClick={onSignup} className="inline-block mt-4 text-navy underline font-semibold underline-offset-4 decoration-2 hover:opacity-70 transition-opacity bg-transparent border-0 cursor-pointer p-0">Set the details →</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 4: How it works */}
+                    <div id="how" className="max-w-7xl mx-auto px-8 pb-32">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
+                            <div>
+                                <h2 className="text-[clamp(34px,4vw,54px)] font-extrabold text-navy leading-none mb-4">From group-chat limbo to a real plan</h2>
+                                <p className="text-[16px] text-navy/60 mb-12">Three steps, start to finish.</p>
+                                <div className="space-y-4">
+                                    {[
+                                        {n:"01", t:"Post the plan", b:"Float a casual idea or lock in the details — a time, a place, a vibe. No endless back-and-forth just to get something on the calendar."},
+                                        {n:"02", t:"Find your people", b:"Discover women nearby doing the same thing, or share the plan with your existing network. Either way, the right people show up."},
+                                        {n:"03", t:"Get it out of the group chat", b:"Everyone who's in lands in one group chat. Share the details, settle things with a quick poll, and actually show up."},
+                                    ].map((s) => (
+                                        <div key={s.n} className="bg-white rounded-[22px] p-7 flex gap-6 items-start shadow-[0_2px_16px_rgba(20,17,48,0.05)]">
+                                            <span className="text-[13px] font-bold text-red tracking-wide pt-1">{s.n}</span>
+                                            <div>
+                                                <h3 className="text-[19px] font-extrabold text-navy mb-2">{s.t}</h3>
+                                                <p className="text-[14px] text-navy/60 leading-relaxed">{s.b}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <button type="button" onClick={onSignup} className="inline-block bg-navy text-white rounded-full px-10 py-4 font-medium hover:bg-black transition-colors mt-8">Join the waitlist</button>
+                            </div>
+                            <div className="rounded-[32px] overflow-hidden h-[600px] lg:sticky lg:top-8">
+                                <img src={IMG.concert} alt="Show night crowd" className="w-full h-full object-cover" />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 6: Get the app */}
+                    <div id="app" className="max-w-7xl mx-auto px-8 pb-32">
+                        <div className="bg-navy rounded-[48px] overflow-hidden flex flex-col md:flex-row items-center">
+                            <div className="w-full md:w-[55%] p-16 md:p-20 space-y-8">
+                                <h2 className="text-[clamp(44px,5vw,64px)] font-extrabold leading-none text-white">Get on the list</h2>
+                                <p className="text-[20px] text-white/70 max-w-md">COMMONS is invite-only and built for iOS. Join the waitlist and we'll let you in.</p>
+                                <button type="button" onClick={onSignup} className="inline-block bg-red text-white rounded-full px-10 py-4 font-medium hover:opacity-90 transition-opacity">
+                                    Join the waitlist
+                                </button>
+                                <p className="text-[12px] text-white/40 tracking-wide">Invite-only · Built for iOS</p>
+                            </div>
+                            <div className="w-full md:w-[45%] h-[440px] relative flex items-center justify-center">
+                                <div className="bg-beige rounded-[40px] px-12 py-14 text-center">
+                                    <i className="fas fa-mobile-screen text-navy text-[110px]"></i>
+                                    <img src={LOGO} alt="COMMONS" className="mt-6 h-8 w-auto mx-auto" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <footer className="max-w-7xl mx-auto px-8 py-24">
+                        <div className="flex flex-col lg:flex-row justify-between gap-16 border-b border-navy/10 pb-16">
+                            <div className="w-full lg:w-1/3">
+                                <img src={LOGO} alt="COMMONS" className="h-9 w-auto" />
+                                <p className="mt-6 text-[15px] text-navy/60 max-w-xs">A place for plans meant to be shared. Built for women.</p>
+                            </div>
+                            <div className="w-full lg:w-2/3 grid grid-cols-2 md:grid-cols-3 gap-10">
+                                <div className="space-y-5">
+                                    <h4 className="font-bold text-[15px]">Explore</h4>
+                                    <ul className="space-y-4 text-[15px] text-navy/70">
+                                        <li><a href="#how" className="hover:underline">How it works</a></li>
+                                        <li><a href="#pathways" className="hover:underline">Two ways to post</a></li>
+                                    </ul>
+                                </div>
+                                <div className="space-y-5">
+                                    <h4 className="font-bold text-[15px]">Company</h4>
+                                    <ul className="space-y-4 text-[15px] text-navy/70">
+                                        <li><a href="#" className="hover:underline">About</a></li>
+                                        <li><a href="#" className="hover:underline">Contact</a></li>
+                                        <li><button type="button" onClick={onSignup} className="hover:underline text-left bg-transparent border-0 p-0 cursor-pointer text-[15px] text-navy/70">Join the waitlist</button></li>
+                                    </ul>
+                                </div>
+                                <div className="space-y-5">
+                                    <h4 className="font-bold text-[15px]">Legal</h4>
+                                    <ul className="space-y-4 text-[15px] text-navy/70">
+                                        <li><a href="/legal/privacy" className="hover:underline">Privacy policy</a></li>
+                                        <li><a href="/legal/terms" className="hover:underline">Terms of service</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="mt-10 flex flex-col md:flex-row justify-between items-center gap-4">
+                            <span className="text-[13px] text-navy/50">© 2026 COMMONS. All rights reserved.</span>
+                            <div className="flex items-center gap-5">
+                                <a href="/legal/privacy" className="text-[13px] text-navy/50 hover:text-navy hover:underline">Privacy</a>
+                                <a href="/legal/terms" className="text-[13px] text-navy/50 hover:text-navy hover:underline">Terms</a>
+                                <span className="text-[13px] text-navy/50">Built for women · iOS</span>
+                            </div>
+                        </div>
+                    </footer>
+
+                    {/* Sticky bottom waitlist bar — slides up once the hero scrolls out of view */}
+                    <div className={`fixed inset-x-0 bottom-0 z-[90] transition-transform duration-300 ${showSticky ? "translate-y-0" : "translate-y-full"}`}>
+                        <div className="bg-navy/95 backdrop-blur border-t border-white/10 shadow-[0_-8px_30px_rgba(20,17,48,0.25)]">
+                            <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
+                                <div className="hidden sm:flex items-center gap-3 mr-auto">
+                                    <img src={LOGO} alt="COMMONS" className="h-5 w-auto" style={{ filter: "brightness(0) invert(1)" }} />
+                                    <span className="text-white/80 text-[14px] font-medium">Join the waitlist</span>
+                                </div>
+                                <form onSubmit={submitHero} className="flex items-center gap-2 w-full sm:w-auto">
+                                    <input
+                                        type="email"
+                                        required
+                                        value={heroEmail}
+                                        onChange={(e) => setHeroEmail(e.target.value)}
+                                        placeholder="you@email.com"
+                                        aria-label="Email address"
+                                        className="flex-1 sm:w-56 bg-white rounded-full px-4 py-2.5 text-[14px] outline-none border border-white/10 focus:border-white/40 transition-colors min-w-0"
+                                    />
+                                    <button type="submit" className="bg-red text-white rounded-full px-6 py-2.5 text-[14px] font-medium hover:opacity-90 transition-opacity whitespace-nowrap">
+                                        Join
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <WaitlistModal open={signupOpen} onClose={closeSignup} prefillEmail={prefillEmail} />
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
