@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { api } from "../api/http";
 import { Avatar } from "./Avatar";
 import { useAuth } from "../context/AuthContext";
@@ -70,7 +71,11 @@ export function NetworkPromptModal({
 
   const selectedCount = selected.size;
 
-  return (
+  // Rendered through a portal to <body> so the fixed overlay covers the whole
+  // viewport. Rendering it inline in the Feed traps it inside the pull-to-refresh
+  // transform container, which re-anchors `position: fixed` and pushes the modal
+  // to the bottom of the (scrollable) feed instead of over the screen.
+  return createPortal(
     <div className="network-prompt-overlay" role="dialog" aria-modal="true" aria-labelledby="network-prompt-title">
       <div className="network-prompt-card">
         <h2 id="network-prompt-title" className="network-prompt-title">
@@ -119,6 +124,7 @@ export function NetworkPromptModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
