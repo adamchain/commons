@@ -32,15 +32,13 @@
         body { font-family: 'Poppins', sans-serif; }
         h1, h2, h3 { font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: -0.03em; }
 
-        /* Bumble-style hero: a centered cluster of tilted cards that shuffle —
-           the images cross-fade in place on an interval (no page-wide scroll). */
-        @keyframes commons-card-swap {
-            0%   { opacity: 0; }
-            100% { opacity: 1; }
-        }
-        .commons-card-swap { animation: commons-card-swap 0.8s ease; }
+        /* Bumble-style hero: a tiled row of upright vertical cards. Each tile is a
+           window over a vertical stack of photos that slides up one notch on its own
+           stagger — so the mosaic keeps shuffling like Bumble's homepage. */
+        .commons-tile { overflow: hidden; }
+        .commons-tile-track { display: flex; flex-direction: column; will-change: transform; }
         @media (prefers-reduced-motion: reduce) {
-            .commons-card-swap { animation: none; }
+            .commons-tile-track { transition: none !important; }
         }
     </style>
 </head>
@@ -105,6 +103,111 @@
             );
         }
 
+        // COMMONS wordmark that always fills the width of its container. textLength +
+        // lengthAdjust force the 7 glyphs to span the viewBox exactly, and the SVG
+        // scales to 100% width — so it fits the max width of the page on any screen.
+        const Wordmark = ({ className, style }) => (
+            <svg
+                viewBox="0 0 1200 210"
+                width="100%"
+                preserveAspectRatio="xMidYMid meet"
+                className={className}
+                style={style}
+                role="img"
+                aria-label="COMMONS"
+            >
+                <text
+                    x="600"
+                    y="170"
+                    textAnchor="middle"
+                    textLength="1184"
+                    lengthAdjust="spacingAndGlyphs"
+                    fontFamily="'Plus Jakarta Sans', sans-serif"
+                    fontWeight="800"
+                    fontSize="200"
+                    fill="#141130"
+                >
+                    COMMONS
+                </text>
+            </svg>
+        );
+
+        // A single tiled vertical card. Shows one plan photo in an upright rounded
+        // tile and, on its own stagger, slides the stack up to reveal the next plan —
+        // then silently resets, so it loops forever like a Bumble mosaic tile.
+        function SlideTile({ w, h, y, tilt, plans, offset, period }) {
+            const [order, setOrder] = useState(() => [
+                offset % plans.length,
+                (offset + 1) % plans.length,
+            ]);
+            const [shift, setShift] = useState(false);
+            const [animate, setAnimate] = useState(true);
+
+            useEffect(() => {
+                const t = setInterval(() => setShift(true), period);
+                return () => clearInterval(t);
+            }, [period]);
+
+            const onDone = () => {
+                if (!shift) return;
+                // The window has scrolled to the next photo — swap it into the top
+                // slot, queue a fresh next photo, and snap back without animating.
+                setAnimate(false);
+                setOrder(([, next]) => [next, (next + 1) % plans.length]);
+                setShift(false);
+                requestAnimationFrame(() =>
+                    requestAnimationFrame(() => setAnimate(true))
+                );
+            };
+
+            const [top, next] = order;
+
+            return (
+                <div
+                    className="commons-tile relative rounded-[22px] border-4 border-beige shadow-[0_22px_50px_rgba(20,17,48,0.30)]"
+                    style={{
+                        width: w,
+                        height: h,
+                        transform: `translateY(${y}px) rotate(${tilt}deg)`,
+                    }}
+                >
+                    <div
+                        className="commons-tile-track"
+                        onTransitionEnd={onDone}
+                        style={{
+                            transform: `translateY(${shift ? -h : 0}px)`,
+                            transition: animate
+                                ? "transform 0.62s cubic-bezier(0.7,0,0.2,1)"
+                                : "none",
+                        }}
+                    >
+                        {[top, next].map((pi, k) => {
+                            const p = plans[pi];
+                            return (
+                                <div
+                                    key={k}
+                                    className="relative shrink-0"
+                                    style={{ width: w, height: h }}
+                                >
+                                    <img
+                                        src={p.img}
+                                        className="w-full h-full object-cover"
+                                        alt={p.title}
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-navy/75 via-navy/10 to-transparent" />
+                                    <div className="absolute bottom-3 left-3 right-3 text-white">
+                                        <p className="text-[9px] uppercase tracking-widest text-white/70 mb-0.5">{p.meta}</p>
+                                        <p className="font-display font-extrabold text-[15px] leading-tight">{p.title}</p>
+                                        <p className="text-[11px] text-white/75 mt-0.5">{p.stat}</p>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        }
+
         const App = () => {
             const LOGO = "client/src/assets/wordmark.png";
             const [signupOpen, setSignupOpen] = useState(false);
@@ -112,13 +215,6 @@
             const [heroEmail, setHeroEmail] = useState("");
             const heroRef = useRef(null);
             const [showSticky, setShowSticky] = useState(false);
-            const [cycle, setCycle] = useState(0);
-
-            // Shuffle the hero cluster images on an interval.
-            useEffect(() => {
-                const t = setInterval(() => setCycle((c) => c + 1), 2600);
-                return () => clearInterval(t);
-            }, []);
 
             // Reveal the sticky bottom waitlist bar once the hero scrolls out of view.
             useEffect(() => {
@@ -197,49 +293,36 @@
                             </div>
                         </nav>
 
-                    {/* Hero Graphics - big COMMONS wordmark with a centered cluster of
-                        tilted cards that shuffle images (Bumble-style). */}
+                    {/* Hero Graphics - big COMMONS wordmark behind a tiled row of upright
+                        vertical cards that each shuffle on their own stagger (Bumble-style). */}
                     <div className="relative z-10 flex-grow flex flex-col items-center justify-center w-full px-8 pt-4 pb-10">
-                        {/* Wordmark + shuffling card cluster stage */}
+                        {/* Wordmark + tiled shuffling cards stage */}
                         <div className="relative w-full flex items-center justify-center mb-6 md:mb-8">
-                            {/* Big wordmark behind (desktop only) — spans the full page width */}
-                            <span className="hidden md:flex absolute inset-0 items-center justify-center pointer-events-none select-none font-display text-[26vw] font-extrabold leading-none text-navy whitespace-nowrap" style={{ letterSpacing: "-0.04em" }}>
-                                COMMONS
-                            </span>
+                            {/* Big wordmark behind (desktop only) — fills the full page width */}
+                            <div className="hidden md:flex absolute inset-0 items-center justify-center px-3 pointer-events-none select-none">
+                                <Wordmark className="w-full" />
+                            </div>
 
-                            {/* Tilted cluster — 3 slots, each shuffling through heroPlans */}
-                            <div className="relative h-[360px] md:h-[520px] w-full flex items-center justify-center scale-[0.72] sm:scale-90 md:scale-100">
-                                {[
-                                    { x: -196, y: 14, rot: -9, z: 10, w: 210, h: 320, off: 0 },
-                                    { x: 0,    y: -6, rot: 3,  z: 30, w: 250, h: 380, off: 1 },
-                                    { x: 196,  y: 18, rot: 12, z: 20, w: 205, h: 310, off: 2 },
-                                ].map((slot, si) => {
-                                    const p = heroPlans[(cycle + slot.off) % heroPlans.length];
-                                    return (
-                                        <div
-                                            key={si}
-                                            className="absolute left-1/2 top-1/2"
-                                            style={{ zIndex: slot.z, transform: `translate(calc(-50% + ${slot.x}px), calc(-50% + ${slot.y}px)) rotate(${slot.rot}deg)` }}
-                                        >
-                                            <div className="relative rounded-[26px] overflow-hidden border-4 border-beige shadow-[0_26px_60px_rgba(20,17,48,0.32)]" style={{ width: slot.w, height: slot.h }}>
-                                                <img key={p.title} src={p.img} className="commons-card-swap w-full h-full object-cover" alt={p.title} />
-                                                <div className="absolute inset-0 bg-gradient-to-t from-navy/75 via-navy/10 to-transparent" />
-                                                <div className="absolute bottom-4 left-4 right-4 text-white">
-                                                    <p className="text-[10px] uppercase tracking-widest text-white/70 mb-1">{p.meta}</p>
-                                                    <p className="font-display font-extrabold text-lg leading-tight">{p.title}</p>
-                                                    <p className="text-[12px] text-white/75 mt-0.5">{p.stat}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                            {/* Tiled masonry row — each tile vertically shuffles independently */}
+                            <div className="relative h-[360px] md:h-[520px] w-full flex items-center justify-center scale-[0.7] sm:scale-90 md:scale-100">
+                                <div className="flex items-center gap-3 md:gap-4">
+                                    {[
+                                        { w: 150, h: 230, y: 34,  tilt: -3, offset: 0, period: 3000 },
+                                        { w: 168, h: 288, y: -14, tilt: 2,  offset: 2, period: 3600 },
+                                        { w: 184, h: 320, y: 8,   tilt: -1, offset: 4, period: 3200 },
+                                        { w: 168, h: 288, y: -18, tilt: 3,  offset: 1, period: 3900 },
+                                        { w: 150, h: 230, y: 30,  tilt: -2, offset: 3, period: 3400 },
+                                    ].map((t, i) => (
+                                        <SlideTile key={i} plans={heroPlans} {...t} />
+                                    ))}
+                                </div>
                             </div>
                         </div>
 
-                        {/* Mobile-only wordmark — full screen width, centered, below the cards */}
-                        <span className="md:hidden block relative left-1/2 -translate-x-1/2 w-screen text-center -mt-2 mb-8 pointer-events-none select-none font-display text-[19.5vw] font-extrabold leading-[0.85] text-navy" style={{ letterSpacing: "-0.05em" }}>
-                            COMMONS
-                        </span>
+                        {/* Mobile-only wordmark — fills the full screen width below the cards */}
+                        <div className="md:hidden relative left-1/2 -translate-x-1/2 w-screen px-3 -mt-2 mb-8 pointer-events-none select-none">
+                            <Wordmark className="w-full" />
+                        </div>
 
                         {/* Headline + email capture */}
                         <div className="relative z-40 text-center max-w-2xl">
