@@ -24,6 +24,9 @@ type PersistedFilters = {
 
 const PULL_THRESHOLD = 52;
 const PULL_MAX = 96;
+// Minimum time the refresh spinner stays up, so a fast API response doesn't
+// flash the spinner in and out (which read as glitchy).
+const PULL_MIN_SPIN_MS = 1250;
 
 function rubberBandPull(dy: number): number {
   return Math.min(dy * 0.5, PULL_MAX);
@@ -121,6 +124,7 @@ export function FeedPage() {
     if (refreshingRef.current) return;
     refreshingRef.current = true;
     const showPull = Boolean(opts?.pull);
+    const startedAt = Date.now();
     if (showPull) {
       setRefreshing(true);
       setPullVisual(pullRef.current.distance || 36, true);
@@ -133,6 +137,12 @@ export function FeedPage() {
       setPlans((prev) => (prev.length ? prev : []));
       setFeedReady(true);
     } finally {
+      // Keep the spinner up for a minimum beat so a fast response doesn't flash
+      // in and out — that flicker is what made the refresh feel glitchy.
+      if (showPull) {
+        const elapsed = Date.now() - startedAt;
+        await new Promise((r) => setTimeout(r, Math.max(0, PULL_MIN_SPIN_MS - elapsed)));
+      }
       refreshingRef.current = false;
       setRefreshing(false);
       if (showPull) resetPullVisual();

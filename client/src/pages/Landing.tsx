@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import wordmark from "../assets/wordmark.png";
 
 /**
@@ -127,12 +127,11 @@ function WaitlistModal({ open, onClose }: { open: boolean; onClose: () => void }
   );
 }
 
-function Nav({ onStart }: { onStart: () => void }) {
+function Nav() {
   return (
     <nav style={{ position: "sticky", top: 0, zIndex: 50, background: BEIGE }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 48px", height: 68, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid rgba(20,17,48,0.06)` }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 48px", height: 68, display: "flex", alignItems: "center", justifyContent: "flex-start", borderBottom: `1px solid rgba(20,17,48,0.06)` }}>
         <img src={wordmark} alt="Commons" style={{ height: 26, width: "auto" }} />
-        <Pill style={{ padding: "9px 22px", fontSize: 13 }} onClick={onStart}>Get started</Pill>
       </div>
     </nav>
   );
@@ -251,7 +250,7 @@ function HowItWorks({ onSignup }: { onSignup: () => void }) {
   );
 }
 
-function Footer({ onStart }: { onStart: () => void }) {
+function Footer() {
   return (
     <footer style={{ position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", inset: 0 }}>
@@ -265,8 +264,7 @@ function Footer({ onStart }: { onStart: () => void }) {
         <p style={{ fontFamily: B, fontSize: 16, color: "rgba(255,255,255,0.65)", lineHeight: 1.75, maxWidth: 360, margin: "0 auto 44px" }}>
           Post what you're doing — or just float an idea. The people are already out there.
         </p>
-        <Pill variant="white" style={{ padding: "14px 34px", fontSize: 15 }} onClick={onStart}>Get started</Pill>
-        <p style={{ fontFamily: B, fontSize: 11, color: "rgba(255,255,255,0.42)", letterSpacing: "0.05em", marginTop: 18 }}>Invite-only · Built for iOS</p>
+        <p style={{ fontFamily: B, fontSize: 11, color: "rgba(255,255,255,0.42)", letterSpacing: "0.05em", marginTop: 0 }}>Invite-only · Built for iOS</p>
         <div style={{ marginTop: 80, paddingTop: 28, borderTop: `1px solid rgba(255,255,255,0.12)`, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
           <img src={wordmark} alt="Commons" style={{ height: 22, width: "auto", filter: "brightness(0) invert(1)" }} />
           <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
@@ -281,8 +279,6 @@ function Footer({ onStart }: { onStart: () => void }) {
 }
 
 export function LandingPage() {
-  const navigate = useNavigate();
-  const onStart = () => navigate("/onboarding");
   const [signupOpen, setSignupOpen] = useState(false);
   const onSignup = () => setSignupOpen(true);
   return (
@@ -308,12 +304,12 @@ export function LandingPage() {
           }
         }
       `}</style>
-      <Nav onStart={onStart} />
+      <Nav />
       <Hero onSignup={onSignup} />
       <PhotoStrip />
       <TwoPathways onSignup={onSignup} />
       <HowItWorks onSignup={onSignup} />
-      <Footer onStart={onStart} />
+      <Footer />
       <WaitlistModal open={signupOpen} onClose={() => setSignupOpen(false)} />
     </div>
   );
