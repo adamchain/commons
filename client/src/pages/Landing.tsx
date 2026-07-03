@@ -211,13 +211,7 @@ function Hero({ onSignupWithEmail }: { onSignupWithEmail: (email: string) => voi
               Join the waitlist
             </Pill>
           </form>
-          <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap", marginBottom: 22 }}>
-            <a href="#how" style={{ textDecoration: "none" }}>
-              <Pill variant="ghost">See how it works</Pill>
-            </a>
-            <a href="#pathways" style={{ fontFamily: B, fontWeight: 500, fontSize: 14, color: NAVY, textDecoration: "none", borderBottom: `1px solid rgba(20,17,48,0.3)`, paddingBottom: 2 }}>Peek inside</a>
-          </div>
-          <p style={{ fontFamily: B, fontSize: 11, color: MUTED, letterSpacing: "0.05em" }}>Invite-only · Built for iOS</p>
+          <p style={{ fontFamily: B, fontSize: 11, color: MUTED, letterSpacing: "0.05em", marginTop: 22 }}>Invite-only · Built for iOS</p>
         </div>
       </div>
     </section>
