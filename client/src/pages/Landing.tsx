@@ -1,5 +1,5 @@
-import { useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useState } from "react";
+import type { CSSProperties, FormEvent, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import wordmark from "../assets/wordmark.png";
 
@@ -24,10 +24,16 @@ const D = "'Plus Jakarta Sans', sans-serif";
 const B = "'Poppins', sans-serif";
 
 // Google Form waitlist. Short link: https://forms.gle/GxVDLYj74rvXtGYb9
-// The modal embeds the form (embedded=true strips Google's own chrome) so
-// signups happen inline without leaving the landing page.
-const WAITLIST_FORM_URL =
-  "https://docs.google.com/forms/d/e/1FAIpQLSc8S_DMmQz7WaS1wZUn9GKHbIK1XELSnx81Kbjj1EMnLiOKVg/viewform?embedded=true";
+// Field entry IDs (from the form HTML) let us pre-fill answers via URL params.
+const WAITLIST_FORM_BASE =
+  "https://docs.google.com/forms/d/e/1FAIpQLSc8S_DMmQz7WaS1wZUn9GKHbIK1XELSnx81Kbjj1EMnLiOKVg/viewform";
+const WAITLIST_EMAIL_ENTRY = "entry.1045781291";
+
+function waitlistFormUrl(prefillEmail?: string): string {
+  const params = new URLSearchParams({ embedded: "true" });
+  if (prefillEmail) params.set(WAITLIST_EMAIL_ENTRY, prefillEmail);
+  return `${WAITLIST_FORM_BASE}?${params.toString()}`;
+}
 
 // Served from client/public — referenced by root-absolute URL, not imported.
 const shadowsImg = "/landing/photo-shadows.jpg";
@@ -39,11 +45,13 @@ function Pill({
   variant = "dark",
   style: x,
   onClick,
+  type = "button",
 }: {
   children: ReactNode;
   variant?: "dark" | "red" | "white" | "ghost";
   style?: CSSProperties;
   onClick?: () => void;
+  type?: "button" | "submit";
 }) {
   const map: Record<string, CSSProperties> = {
     dark: { background: NAVY, color: WHITE },
@@ -53,6 +61,7 @@ function Pill({
   };
   return (
     <button
+      type={type}
       onClick={onClick}
       style={{
         display: "inline-flex",
@@ -87,8 +96,22 @@ function Pill({
  * own title/fields carry the content. Opened from the hero CTA and the buttons
  * under "Post a plan two ways" and "How it works".
  */
-function WaitlistModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function WaitlistModal({
+  open,
+  onClose,
+  prefillEmail,
+}: {
+  open: boolean;
+  onClose: () => void;
+  prefillEmail?: string;
+}) {
   const [loaded, setLoaded] = useState(false);
+  const formUrl = waitlistFormUrl(prefillEmail);
+
+  useEffect(() => {
+    if (open) setLoaded(false);
+  }, [open, formUrl]);
+
   if (!open) return null;
 
   return (
@@ -115,7 +138,7 @@ function WaitlistModal({ open, onClose }: { open: boolean; onClose: () => void }
           )}
           <iframe
             title="COMMONS waitlist form"
-            src={WAITLIST_FORM_URL}
+            src={formUrl}
             onLoad={() => setLoaded(true)}
             style={{ width: "100%", height: "100%", border: "none", display: "block", opacity: loaded ? 1 : 0, transition: "opacity 0.2s" }}
           >
@@ -137,7 +160,16 @@ function Nav() {
   );
 }
 
-function Hero({ onSignup }: { onSignup: () => void }) {
+function Hero({ onSignupWithEmail }: { onSignupWithEmail: (email: string) => void }) {
+  const [email, setEmail] = useState("");
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    const trimmed = email.trim();
+    if (!trimmed) return;
+    onSignupWithEmail(trimmed);
+  };
+
   return (
     <section style={{ background: BEIGE }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "96px 48px 88px", display: "grid", gridTemplateColumns: "1fr", gap: 72, alignItems: "center" }} className="hero-grid">
@@ -150,8 +182,36 @@ function Hero({ onSignup }: { onSignup: () => void }) {
           <p style={{ fontFamily: B, fontSize: 16, color: MUTED, lineHeight: 1.8, marginBottom: 44, maxWidth: 400 }}>
             COMMONS is where women actually make plans — find someone to do it with, or bring your people together. Either way, something happens.
           </p>
+          <form
+            onSubmit={submit}
+            style={{ display: "flex", alignItems: "stretch", gap: 10, flexWrap: "wrap", marginBottom: 22, maxWidth: 460 }}
+          >
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@email.com"
+              aria-label="Email address"
+              style={{
+                flex: "1 1 200px",
+                minWidth: 0,
+                boxSizing: "border-box",
+                fontFamily: B,
+                fontSize: 15,
+                color: NAVY,
+                padding: "12px 18px",
+                borderRadius: 9999,
+                border: `1.5px solid rgba(20,17,48,0.16)`,
+                background: WHITE,
+                outline: "none",
+              }}
+            />
+            <Pill type="submit" style={{ padding: "12px 26px", flexShrink: 0 }}>
+              Join the waitlist
+            </Pill>
+          </form>
           <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap", marginBottom: 22 }}>
-            <Pill onClick={onSignup}>Join the waitlist</Pill>
             <a href="#how" style={{ textDecoration: "none" }}>
               <Pill variant="ghost">See how it works</Pill>
             </a>
@@ -280,7 +340,19 @@ function Footer() {
 
 export function LandingPage() {
   const [signupOpen, setSignupOpen] = useState(false);
-  const onSignup = () => setSignupOpen(true);
+  const [prefillEmail, setPrefillEmail] = useState<string | undefined>();
+  const onSignup = () => {
+    setPrefillEmail(undefined);
+    setSignupOpen(true);
+  };
+  const onSignupWithEmail = (email: string) => {
+    setPrefillEmail(email);
+    setSignupOpen(true);
+  };
+  const closeSignup = () => {
+    setSignupOpen(false);
+    setPrefillEmail(undefined);
+  };
   return (
     <div style={{ background: BEIGE, minHeight: "100vh" }}>
       <style>{`
@@ -305,12 +377,12 @@ export function LandingPage() {
         }
       `}</style>
       <Nav />
-      <Hero onSignup={onSignup} />
+      <Hero onSignupWithEmail={onSignupWithEmail} />
       <PhotoStrip />
       <TwoPathways onSignup={onSignup} />
       <HowItWorks onSignup={onSignup} />
       <Footer />
-      <WaitlistModal open={signupOpen} onClose={() => setSignupOpen(false)} />
+      <WaitlistModal open={signupOpen} onClose={closeSignup} prefillEmail={prefillEmail} />
     </div>
   );
 }
