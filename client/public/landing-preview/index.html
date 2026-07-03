@@ -32,33 +32,15 @@
         body { font-family: 'Poppins', sans-serif; }
         h1, h2, h3 { font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: -0.03em; }
 
-        /* Bumble-style hero: a horizontal band of overlapping upright cards that
-           slide continuously across the middle, over the big wordmark. The track
-           holds the card set twice; translating by -50% loops seamlessly. */
-        @keyframes commons-cards-slide {
-            0%   { transform: translateX(0); }
-            100% { transform: translateX(-50%); }
+        /* Bumble-style hero: a centered cluster of tilted cards that shuffle —
+           the images cross-fade in place on an interval (no page-wide scroll). */
+        @keyframes commons-card-swap {
+            0%   { opacity: 0; }
+            100% { opacity: 1; }
         }
-        .commons-cards-track {
-            display: flex;
-            width: max-content;
-            animation: commons-cards-slide 32s linear infinite;
-        }
-        .commons-cards-track:hover { animation-play-state: paused; }
-        .commons-cards-band {
-            -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
-                    mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
-        }
-        /* Band fades/settles in on first load. Applied to the band wrapper (not the
-           sliding track) so it never overrides the track's slide animation. */
-        @keyframes commons-cards-in {
-            0%   { opacity: 0; transform: translateY(28px); }
-            100% { opacity: 1; transform: translateY(0); }
-        }
-        .commons-cards-in { animation: commons-cards-in 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
+        .commons-card-swap { animation: commons-card-swap 0.8s ease; }
         @media (prefers-reduced-motion: reduce) {
-            .commons-cards-track { animation: none; }
-            .commons-cards-in { animation: none; }
+            .commons-card-swap { animation: none; }
         }
     </style>
 </head>
@@ -130,6 +112,13 @@
             const [heroEmail, setHeroEmail] = useState("");
             const heroRef = useRef(null);
             const [showSticky, setShowSticky] = useState(false);
+            const [cycle, setCycle] = useState(0);
+
+            // Shuffle the hero cluster images on an interval.
+            useEffect(() => {
+                const t = setInterval(() => setCycle((c) => c + 1), 2600);
+                return () => clearInterval(t);
+            }, []);
 
             // Reveal the sticky bottom waitlist bar once the hero scrolls out of view.
             useEffect(() => {
@@ -208,41 +197,47 @@
                             </div>
                         </nav>
 
-                    {/* Hero Graphics - big COMMONS wordmark with a horizontal band of
-                        overlapping cards sliding across it (Bumble-style). */}
+                    {/* Hero Graphics - big COMMONS wordmark with a centered cluster of
+                        tilted cards that shuffle images (Bumble-style). */}
                     <div className="relative z-10 flex-grow flex flex-col items-center justify-center w-full px-8 pt-4 pb-10">
-                        {/* Wordmark + sliding card band stage (full-bleed to viewport width) */}
-                        <div className="relative w-screen left-1/2 -translate-x-1/2 h-[360px] md:h-[500px] flex items-center justify-center md:mb-8 overflow-hidden">
+                        {/* Wordmark + shuffling card cluster stage */}
+                        <div className="relative w-full flex items-center justify-center mb-6 md:mb-8">
                             {/* Big wordmark behind (desktop only) — spans the full page width */}
                             <span className="hidden md:flex absolute inset-0 items-center justify-center pointer-events-none select-none font-display text-[26vw] font-extrabold leading-none text-navy whitespace-nowrap" style={{ letterSpacing: "-0.04em" }}>
                                 COMMONS
                             </span>
 
-                            {/* Sliding band of overlapping upright cards (duplicated for a seamless loop) */}
-                            <div className="commons-cards-band commons-cards-in absolute inset-0 flex items-center overflow-hidden">
-                                <div className="commons-cards-track items-center px-8">
-                                    {[...heroPlans, ...heroPlans].map((p, i) => (
+                            {/* Tilted cluster — 3 slots, each shuffling through heroPlans */}
+                            <div className="relative h-[360px] md:h-[520px] w-full flex items-center justify-center scale-[0.72] sm:scale-90 md:scale-100">
+                                {[
+                                    { x: -196, y: 14, rot: -9, z: 10, w: 210, h: 320, off: 0 },
+                                    { x: 0,    y: -6, rot: 3,  z: 30, w: 250, h: 380, off: 1 },
+                                    { x: 196,  y: 18, rot: 12, z: 20, w: 205, h: 310, off: 2 },
+                                ].map((slot, si) => {
+                                    const p = heroPlans[(cycle + slot.off) % heroPlans.length];
+                                    return (
                                         <div
-                                            key={i}
-                                            className="relative shrink-0 rounded-[24px] overflow-hidden w-[190px] h-[300px] md:w-[220px] md:h-[360px] shadow-[0_24px_60px_rgba(20,17,48,0.3)] border-4 border-beige"
-                                            style={{ marginLeft: i === 0 ? 0 : -28, zIndex: i }}
+                                            key={si}
+                                            className="absolute left-1/2 top-1/2"
+                                            style={{ zIndex: slot.z, transform: `translate(calc(-50% + ${slot.x}px), calc(-50% + ${slot.y}px)) rotate(${slot.rot}deg)` }}
                                         >
-                                            <img src={p.img} className="w-full h-full object-cover" alt={p.title} />
-                                            <div className="absolute inset-0 bg-gradient-to-t from-navy/75 via-navy/10 to-transparent" />
-                                            <div className="absolute bottom-4 left-4 right-4 text-white">
-                                                <p className="text-[10px] uppercase tracking-widest text-white/70 mb-1">{p.meta}</p>
-                                                <p className="font-display font-extrabold text-lg leading-tight">{p.title}</p>
-                                                <p className="text-[12px] text-white/75 mt-0.5">{p.stat}</p>
+                                            <div className="relative rounded-[26px] overflow-hidden border-4 border-beige shadow-[0_26px_60px_rgba(20,17,48,0.32)]" style={{ width: slot.w, height: slot.h }}>
+                                                <img key={p.title} src={p.img} className="commons-card-swap w-full h-full object-cover" alt={p.title} />
+                                                <div className="absolute inset-0 bg-gradient-to-t from-navy/75 via-navy/10 to-transparent" />
+                                                <div className="absolute bottom-4 left-4 right-4 text-white">
+                                                    <p className="text-[10px] uppercase tracking-widest text-white/70 mb-1">{p.meta}</p>
+                                                    <p className="font-display font-extrabold text-lg leading-tight">{p.title}</p>
+                                                    <p className="text-[12px] text-white/75 mt-0.5">{p.stat}</p>
+                                                </div>
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
+                                    );
+                                })}
                             </div>
                         </div>
 
-                        {/* Mobile-only big wordmark, sits large below the cards (like the app store hero).
-                            Sized to fit the viewport width so it never overflows the page. */}
-                        <span className="md:hidden block w-full text-center -mt-2 mb-8 px-2 pointer-events-none select-none font-display text-[16vw] font-extrabold leading-[0.9] text-navy" style={{ letterSpacing: "-0.045em" }}>
+                        {/* Mobile-only wordmark — full screen width, centered, below the cards */}
+                        <span className="md:hidden block relative left-1/2 -translate-x-1/2 w-screen text-center -mt-2 mb-8 pointer-events-none select-none font-display text-[19.5vw] font-extrabold leading-[0.85] text-navy" style={{ letterSpacing: "-0.05em" }}>
                             COMMONS
                         </span>
 
