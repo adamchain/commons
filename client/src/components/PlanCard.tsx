@@ -3,9 +3,6 @@ import type { MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "./Avatar";
-import { GetThereSheet } from "./GetThereSheet";
-import { InviteSheet } from "./InviteSheet";
-import { ShareSheet } from "./ShareSheet";
 import { useAuth } from "../context/AuthContext";
 import type { MeDTO, PlanDTO } from "../types/shared";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
@@ -15,7 +12,8 @@ import { useCardImages, pickCoverImage } from "../lib/cardImages";
 
 /**
  * Compact event card — title, time, details. Card type (confirmed / looking_for)
- * drives shading; quick RSVP and action row sit below the card link.
+ * drives shading; quick RSVP sits below the card link. Invite / Share / Get
+ * there and the group chat live on the plan detail page, not the feed card.
  */
 export function PlanCard({
   plan,
@@ -41,9 +39,6 @@ export function PlanCard({
   const isHosting = !!user && plan.creator.id === user.id;
   const isSaved = !!user?.savedPlanIds?.includes(plan.id);
   const [savePending, setSavePending] = useState(false);
-  const [showInvite, setShowInvite] = useState(false);
-  const [showShare, setShowShare] = useState(false);
-  const [showGetThere, setShowGetThere] = useState(false);
 
   async function toggleSave(e: MouseEvent) {
     e.preventDefault();
@@ -62,11 +57,6 @@ export function PlanCard({
       setSavePending(false);
     }
   }
-
-  const canChat =
-    !!user &&
-    !isLooking &&
-    (isHosting || plan.myState === "going" || plan.myState === "interested");
 
   const whenLine = plan.isFlexibleTime
     ? `${formatPlanDate(plan.date)} · Flexible time`
@@ -102,10 +92,6 @@ export function PlanCard({
           : goingCount >= 1 || interestedCount >= 1
             ? `${goingLabel}${interestedLabel}`
             : null;
-
-  // Invite / Share / Get there appear on every plan card, including past and
-  // cancelled ones — people still share and navigate to plans after the fact.
-  const showActions = true;
 
   return (
     <div
@@ -243,52 +229,12 @@ export function PlanCard({
         </div>
       </Link>
 
-      {showActions && (
-        <div className="plan-card-actions" onClick={(e) => e.stopPropagation()}>
-          <button type="button" className="plan-card-action-btn" onClick={() => setShowGetThere(true)}>
-            <PinIcon />
-            <span>Get there</span>
-          </button>
-          <button type="button" className="plan-card-action-btn" onClick={() => setShowInvite(true)}>
-            <PlusIcon />
-            <span>Invite</span>
-          </button>
-          <button type="button" className="plan-card-action-btn" onClick={() => setShowShare(true)}>
-            <ShareIcon />
-            <span>Share</span>
-          </button>
-        </div>
-      )}
-
-      {canChat && (
-        <Link
-          to={`/plans/${plan.id}/chat`}
-          className="plan-card-chat-link"
-          onClick={(e) => e.stopPropagation()}
-        >
-          Group chat
-        </Link>
-      )}
-
       {hasEnded && isHosting && (
         <Link to="/plans/new" className="plan-card-host-again" onClick={(e) => e.stopPropagation()}>
           Host another like this →
         </Link>
       )}
 
-      {showInvite && (
-        <InviteSheet
-          planId={plan.id}
-          planTitle={plan.title}
-          onClose={() => setShowInvite(false)}
-        />
-      )}
-      {showShare && (
-        <ShareSheet plan={plan} onClose={() => setShowShare(false)} />
-      )}
-      {showGetThere && (
-        <GetThereSheet plan={plan} onClose={() => setShowGetThere(false)} />
-      )}
     </div>
   );
 }
@@ -369,24 +315,6 @@ function PinIcon() {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
       <circle cx="12" cy="10" r="3" />
-    </svg>
-  );
-}
-
-function PlusIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  );
-}
-
-function ShareIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-      <polyline points="16 6 12 2 8 6" />
-      <line x1="12" x2="12" y1="2" y2="15" />
     </svg>
   );
 }

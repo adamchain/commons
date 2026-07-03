@@ -69,7 +69,7 @@ export function ProfilePage() {
 
   if (!profile) {
     return (
-      <main className="app-shell app-shell--with-nav app-shell--with-topbar">
+      <main className="app-shell app-shell--with-nav app-shell--with-topbar profile-shell">
         <div className="feed-skeleton" aria-hidden="true">
           <div className="feed-skeleton-card" />
         </div>
@@ -81,7 +81,7 @@ export function ProfilePage() {
   const networkCount = isSelf ? (network?.length ?? 0) : profile.network.mutualCount;
 
   return (
-    <main className="app-shell app-shell--with-nav app-shell--with-topbar">
+    <main className="app-shell app-shell--with-nav app-shell--with-topbar profile-shell">
       {!isSelf && (
         <header className="app-header app-header--minimal">
           <Link to="/" className="detail-back">← Back</Link>
@@ -960,9 +960,6 @@ function ProfileMenu({
   network: PublicUser[] | null;
   onOpenCalendar: () => void;
 }) {
-  const networkCount = network?.length ?? null;
-  const firstFive = (network ?? []).slice(0, 5);
-  const emptySlots = Math.max(0, 5 - firstFive.length);
   return (
     <nav className="profile-menu" aria-label="Profile menu">
       <button type="button" className="profile-menu-row" onClick={onOpenCalendar}>
@@ -981,36 +978,9 @@ function ProfileMenu({
         </span>
         <ChevronRight />
       </Link>
-      <Link to="/network" className="profile-menu-row profile-menu-row--network">
-        <span className="profile-menu-icon" aria-hidden="true">👥</span>
-        <span className="profile-menu-text">
-          <span className="profile-menu-label">Your network</span>
-          <span className="profile-menu-sub">
-            {networkCount === null
-              ? "Your people"
-              : `${networkCount} ${networkCount === 1 ? "person" : "people"}`}
-          </span>
-        </span>
-        <span className="profile-network-slots" aria-hidden="true">
-          {firstFive.map((u) => (
-            <span key={u.id} className="profile-network-slot profile-network-slot--filled">
-              <Avatar
-                seed={u.avatarSeed}
-                style={u.avatarStyle}
-                photoDataUrl={u.avatarPhotoDataUrl}
-                params={u.avatarParams}
-                size="xs"
-              />
-            </span>
-          ))}
-          {Array.from({ length: emptySlots }).map((_, i) => (
-            <span key={`empty-${i}`} className="profile-network-slot">
-              <span className="profile-network-slot-dot" />
-            </span>
-          ))}
-        </span>
-        <ChevronRight />
-      </Link>
+
+      <NetworkCard network={network} />
+
       <Link to="/invite" className="profile-menu-row">
         <span className="profile-menu-icon" aria-hidden="true">✉️</span>
         <span className="profile-menu-text">
@@ -1028,6 +998,61 @@ function ProfileMenu({
         <ChevronRight />
       </Link>
     </nav>
+  );
+}
+
+/**
+ * "Your network" card — mirrors the wireframe: a labelled card with a row of
+ * five avatar slots (filled for people you're connected with, dashed circles
+ * for the rest). Empty state prompts an invite; otherwise it links through to
+ * the full network list.
+ */
+function NetworkCard({ network }: { network: PublicUser[] | null }) {
+  const count = network?.length ?? 0;
+  const firstFive = (network ?? []).slice(0, 5);
+  const emptySlots = Math.max(0, 5 - firstFive.length);
+  const isEmpty = count === 0;
+  return (
+    <div className="profile-network-card">
+      <Link to="/network" className="profile-network-card-head">
+        <span className="profile-network-card-label">Your network</span>
+        <span className="profile-network-card-count">
+          {count} {count === 1 ? "person" : "people"}
+        </span>
+      </Link>
+      <Link to="/network" className="profile-network-card-slots" aria-hidden="true">
+        {firstFive.map((u) => (
+          <span key={u.id} className="profile-network-slot profile-network-slot--filled">
+            <Avatar
+              seed={u.avatarSeed}
+              style={u.avatarStyle}
+              photoDataUrl={u.avatarPhotoDataUrl}
+              params={u.avatarParams}
+              size="sm"
+            />
+          </span>
+        ))}
+        {Array.from({ length: emptySlots }).map((_, i) => (
+          <span key={`empty-${i}`} className="profile-network-slot">
+            <span className="profile-network-slot-dot" />
+          </span>
+        ))}
+      </Link>
+      {isEmpty ? (
+        <>
+          <p className="profile-network-card-empty">
+            Your people aren't here yet — invite them and plan things together.
+          </p>
+          <Link to="/invite" className="btn-primary btn-block profile-network-card-invite">
+            Invite friends →
+          </Link>
+        </>
+      ) : (
+        <Link to="/network" className="btn-link profile-network-card-seeall">
+          See all →
+        </Link>
+      )}
+    </div>
   );
 }
 

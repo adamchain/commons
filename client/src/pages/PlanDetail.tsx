@@ -361,7 +361,7 @@ export function PlanDetailPage() {
 
         <div className="plan-meta-card">
           <div className="plan-meta-row">
-            <span className="plan-meta-icon" aria-hidden="true">🕒</span>
+            <span className="plan-meta-icon" aria-hidden="true"><ClockIcon /></span>
             <div className="plan-meta-text">
               <span className="plan-meta-label">Date &amp; time</span>
               <span className="plan-meta-value">
@@ -371,7 +371,7 @@ export function PlanDetailPage() {
           </div>
           {plan.isFlexibleLocation ? (
             <div className="plan-meta-row">
-              <span className="plan-meta-icon" aria-hidden="true">📍</span>
+              <span className="plan-meta-icon" aria-hidden="true"><PinIcon /></span>
               <div className="plan-meta-text">
                 <span className="plan-meta-label">Location</span>
                 <span className="plan-meta-value">{plan.location.name}</span>
@@ -386,7 +386,7 @@ export function PlanDetailPage() {
               rel="noopener noreferrer"
               aria-label={`Open ${plan.location.name} in Google Maps`}
             >
-              <span className="plan-meta-icon" aria-hidden="true">📍</span>
+              <span className="plan-meta-icon" aria-hidden="true"><PinIcon /></span>
               <div className="plan-meta-text">
                 <span className="plan-meta-label">Location</span>
                 <span className="plan-meta-value">{plan.location.name}</span>
@@ -397,27 +397,22 @@ export function PlanDetailPage() {
           )}
         </div>
 
-        {/* On your own plan you get the full toolkit. On someone else's, the
-            venue already links to Maps up top, so we only surface Invite —
-            bring your own people. Hidden once the event is over. */}
+        {/* Full action toolkit on every plan — Get there, Invite, and Share
+            appear whether or not you're the host. Hidden once the event is over. */}
         {!isPast && (
-        <div className={`plan-actions-row ${isHosting ? "plan-actions-row--triple" : "plan-actions-row--single"}`}>
-          {isHosting && (
-            <button type="button" className="action-btn action-btn--stack" onClick={() => setShowGetThere(true)}>
-              <span className="action-btn-icon" aria-hidden="true">📍</span>
-              <span className="action-btn-label">Get there</span>
-            </button>
-          )}
+        <div className="plan-actions-row plan-actions-row--triple">
+          <button type="button" className="action-btn action-btn--stack" onClick={() => setShowGetThere(true)}>
+            <span className="action-btn-icon" aria-hidden="true"><NavIcon /></span>
+            <span className="action-btn-label">Get there</span>
+          </button>
           <button type="button" className="action-btn action-btn--stack" onClick={() => setShowInvite(true)}>
-            <span className="action-btn-icon" aria-hidden="true">＋</span>
+            <span className="action-btn-icon" aria-hidden="true"><PlusIcon /></span>
             <span className="action-btn-label">Invite</span>
           </button>
-          {isHosting && (
-            <button type="button" className="action-btn action-btn--stack" onClick={() => setShowShare(true)}>
-              <span className="action-btn-icon" aria-hidden="true">↗</span>
-              <span className="action-btn-label">Share</span>
-            </button>
-          )}
+          <button type="button" className="action-btn action-btn--stack" onClick={() => setShowShare(true)}>
+            <span className="action-btn-icon" aria-hidden="true"><ShareIcon /></span>
+            <span className="action-btn-label">Share</span>
+          </button>
         </div>
         )}
 
@@ -642,6 +637,50 @@ function ParticipantsRow({
         </ul>
       )}
     </>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+
+function PinIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+function NavIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polygon points="3 11 22 2 13 21 11 13 3 11" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function ShareIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+      <polyline points="16 6 12 2 8 6" />
+      <line x1="12" x2="12" y1="2" y2="15" />
+    </svg>
   );
 }
 

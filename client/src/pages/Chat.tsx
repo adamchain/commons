@@ -217,7 +217,7 @@ export function ChatPage() {
   return (
     <main className="app-shell app-shell--chat">
       <header className="app-header app-header--minimal chat-header-bar chat-header-bar--thread">
-        <Link to="/messages" className="detail-back">← Messages</Link>
+        <Link to={`/plans/${planId}`} className="detail-back">← Plan</Link>
         <div className="chat-thread-title">{sentenceCaseTitle(plan.title)}</div>
         <button type="button" className="btn-link chat-leave-btn" onClick={() => void leaveChat()}>
           Leave
@@ -329,6 +329,7 @@ export function ChatPage() {
                       poll={msg.poll}
                       author={msg.sender}
                       participants={conv.participants}
+                      collapsible
                       onVote={(optId) => void votePoll(msg.id, optId)}
                       onClose={msg.poll.canClose ? () => void closePoll(msg.id) : undefined}
                       onReopen={msg.poll.canClose ? () => void reopenPoll(msg.id) : undefined}

@@ -2853,8 +2853,13 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: center;
   border-radius: 10px;
   background: var(--accent-soft);
+  color: var(--accent);
   font-size: 16px;
   line-height: 1;
+}
+.plan-meta-icon svg {
+  width: 18px;
+  height: 18px;
 }
 .plan-meta-text {
   display: flex;
@@ -2994,9 +2999,16 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--surface-2);
 }
 .action-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--accent);
   font-size: 20px;
   line-height: 1;
+}
+.action-btn-icon svg {
+  width: 18px;
+  height: 18px;
 }
 .action-btn-label {
   font-size: 13px;
@@ -3245,6 +3257,54 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 1.5;
   margin: 0 0 14px;
 }
+/* Profile page: lock scrolling to vertical only — no sideways drift/rubber-band
+   from any wide child (avatar rows, chips). */
+.profile-shell {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+/* "Your network" card (profile menu) — matches the wireframe. */
+.profile-network-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 14px;
+  text-decoration: none;
+  color: inherit;
+}
+.profile-network-card-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.profile-network-card-count {
+  font-size: 13px;
+  color: var(--text-subtle);
+}
+.profile-network-card-slots {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  text-decoration: none;
+}
+.profile-network-card-empty {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin: 0 0 14px;
+}
+.profile-network-card-invite {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+}
+.profile-network-card-seeall {
+  display: inline-block;
+  margin-top: 2px;
+}
 .messages-page-title {
   font-size: 22px;
   font-weight: 600;
@@ -3318,27 +3378,27 @@ h1, h2, h3, h4, h5, h6 {
   margin: 0 0 14px;
 }
 .segmented-feed-view button {
-  border-radius: 22px;
-  padding: 7px 16px;
-  background: var(--surface);
+  border-radius: 999px;
+  padding: 5px 13px;
+  background: var(--bg);
   border: 1.5px solid var(--border);
   color: var(--text-muted);
-  font-weight: 400;
+  font-weight: 500;
   font-size: 12px;
 }
 .segmented-feed-view button.is-active {
-  background: var(--paper-100, var(--bg));
+  background: var(--bg);
   border-color: var(--accent);
   color: var(--accent);
   font-weight: 600;
 }
 .page-filter-btn {
-  background: var(--surface);
+  background: var(--bg);
   border: 1.5px solid var(--border);
   color: var(--text-muted);
-  font-weight: 400;
+  font-weight: 500;
   font-size: 12px;
-  padding: 7px 14px;
+  padding: 5px 13px;
 }
 .page-filter-count {
   min-width: 14px;
@@ -3419,11 +3479,11 @@ h1, h2, h3, h4, h5, h6 {
 .profile-interest-chip {
   padding: 6px 12px;
   border-radius: 999px;
-  background: var(--surface);
+  background: var(--bg);
   color: var(--text);
   font-size: 13px;
   font-weight: 500;
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
 }
 
 .profile-edit-panel {
@@ -4040,9 +4100,10 @@ h1, h2, h3, h4, h5, h6 {
   max-width: 320px;
   text-align: center;
   padding: 28px 20px;
-  background: var(--surface);
-  border: 1px dashed var(--border-strong);
+  background: var(--accent);
+  border: none;
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -4056,13 +4117,13 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
   font-size: 18px;
   font-weight: 700;
-  color: var(--text);
+  color: var(--paper-50, #fff);
 }
 .chat-empty-body {
   margin: 0;
   font-size: 13.5px;
   line-height: 1.5;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .chat-composer {
@@ -4355,11 +4416,11 @@ h1, h2, h3, h4, h5, h6 {
   flex: 0 0 auto;
   padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface);
+  border: 1.5px solid var(--border);
+  background: var(--bg);
   color: var(--text-muted);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
 }
@@ -4369,7 +4430,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .community-chip.is-active {
-  background: var(--paper-100, var(--bg));
+  background: var(--bg);
   color: var(--accent);
   border-color: var(--accent);
   font-weight: 600;
@@ -4501,9 +4562,9 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 500;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  font-weight: 400;
 }
 .plan-card-meta-sub {
   color: var(--text-muted);
@@ -5817,23 +5878,23 @@ h1, h2, h3, h4, h5, h6 {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 12px;
+  padding: 5px 13px;
   border-radius: 999px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
   transition: background 120ms ease, border-color 120ms ease;
 }
 
 .page-filter-btn:hover {
-  background: var(--surface-2);
+  border-color: var(--border-strong);
 }
 
 .page-filter-btn--active {
-  background: var(--accent-soft);
+  background: var(--bg);
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -7491,6 +7552,38 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 15px;
   line-height: 1.35;
   color: var(--text);
+}
+.poll-card-head--toggle {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  align-items: center;
+}
+.poll-card-head--toggle .poll-card-question {
+  flex: 1;
+  min-width: 0;
+}
+.poll-card-chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  transform: rotate(-90deg);
+  transition: transform 120ms ease;
+}
+.poll-card-chevron.is-open {
+  transform: rotate(0deg);
+}
+.poll-card.is-collapsed .poll-card-head--toggle {
+  margin-bottom: 0;
+}
+.poll-card-collapsed-meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .poll-card-options {
@@ -9293,7 +9386,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 11px;
 }
 .page-filter-btn--active {
-  background: var(--paper-100, var(--bg));
+  background: var(--bg);
   border-color: var(--accent);
   color: var(--accent);
   font-weight: 600;

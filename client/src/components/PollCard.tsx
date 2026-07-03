@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Avatar } from "./Avatar";
 import type { PollDTO, PublicUser } from "../types/shared";
 
@@ -18,6 +18,8 @@ interface PollCardProps {
   variant?: "card" | "pinned";
   /** Hide the question header — used when a pinned dropdown already shows it. */
   showQuestion?: boolean;
+  /** When true, tapping the question header collapses/expands the poll body. */
+  collapsible?: boolean;
   /** Disables interaction while a request is in flight. */
   busy?: boolean;
 }
@@ -31,6 +33,7 @@ export function PollCard({
   onReopen,
   variant = "card",
   showQuestion = true,
+  collapsible = false,
   busy = false,
 }: PollCardProps) {
   const byId = useMemo(() => {
@@ -39,20 +42,46 @@ export function PollCard({
     return map;
   }, [participants]);
 
+  // Collapsible polls start open; once someone has voted or it closed, keep it
+  // open so results are visible without a tap.
+  const [open, setOpen] = useState(true);
+  const collapsed = collapsible && !open;
+
   // Results stay hidden until the viewer votes (Instagram-style) or the poll
   // closes — then everyone sees the bars.
   const revealed = poll.myVote !== null || poll.closed;
   const total = poll.totalVotes;
 
   return (
-    <div className={`poll-card poll-card--${variant} ${poll.closed ? "is-closed" : ""}`}>
+    <div className={`poll-card poll-card--${variant} ${poll.closed ? "is-closed" : ""} ${collapsed ? "is-collapsed" : ""}`}>
       {showQuestion && (
-        <div className="poll-card-head">
-          <span className="poll-card-badge" aria-hidden="true">📊</span>
-          <div className="poll-card-question">{poll.question}</div>
+        collapsible ? (
+          <button
+            type="button"
+            className="poll-card-head poll-card-head--toggle"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+          >
+            <span className="poll-card-badge" aria-hidden="true">📊</span>
+            <div className="poll-card-question">{poll.question}</div>
+            <span className={`poll-card-chevron ${open ? "is-open" : ""}`} aria-hidden="true">▾</span>
+          </button>
+        ) : (
+          <div className="poll-card-head">
+            <span className="poll-card-badge" aria-hidden="true">📊</span>
+            <div className="poll-card-question">{poll.question}</div>
+          </div>
+        )
+      )}
+
+      {collapsed && (
+        <div className="poll-card-collapsed-meta">
+          {total} {total === 1 ? "vote" : "votes"}{poll.closed ? " · Final" : ""}
         </div>
       )}
 
+      {!collapsed && (
+      <>
       <ul className="poll-card-options">
         {poll.options.map((opt) => {
           const count = opt.voterIds.length;
@@ -117,6 +146,8 @@ export function PollCard({
           </button>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }
