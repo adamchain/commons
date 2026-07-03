@@ -1038,6 +1038,12 @@ function ProfileStep({
   const [photo, setPhoto] = useState<string | null>(me.avatarPhotoDataUrl ?? null);
   const [avatarParams, setAvatarParams] = useState<string | null>(me.avatarParams ?? null);
   const [busy, setBusy] = useState(false);
+
+  // COMMONS is built for women, so the illustrated placeholder (shown before a
+  // photo is added and before a name is typed) should present as a woman:
+  // long hairstyles only, no facial hair.
+  const FEMININE_AVATAR_PARAMS =
+    "facialHairProbability=0&top=bob,bun,curly,curvy,longButNotTooLong,miaWallace,straight01,straight02,straightAndStrand,bigHair";
   // Raw, uncropped image waiting on the crop+confirm step. Nothing is committed
   // to `photo` until the user confirms the crop.
   const [cropSrc, setCropSrc] = useState<string | null>(null);
@@ -1081,7 +1087,7 @@ function ProfileStep({
             seed={me.avatarSeed}
             style={me.avatarStyle}
             photoDataUrl={photo ?? undefined}
-            params={avatarParams ?? undefined}
+            params={avatarParams ?? (firstName.trim() ? undefined : FEMININE_AVATAR_PARAMS)}
             name={firstName.trim() || undefined}
             size="xl"
           />
