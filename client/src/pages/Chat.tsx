@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { LoadingScreen } from "../components/LoadingScreen";
@@ -13,6 +13,14 @@ const GROUP_WINDOW_MS = 5 * 60 * 1000;
 export function ChatPage() {
   const { planId = "" } = useParams();
   const { user } = useAuth();
+  const location = useLocation();
+  // Where "← Back" returns to depends on how the chat was opened: from the
+  // Chats/Messages inbox it goes back to the inbox; from a plan card or plan
+  // detail it returns to the plan. Default to the plan when the source is
+  // unknown (e.g. a direct link).
+  const cameFromInbox = (location.state as { from?: string } | null)?.from === "inbox";
+  const backTo = cameFromInbox ? "/messages" : `/plans/${planId}`;
+  const backLabel = cameFromInbox ? "← Inbox" : "← Back to plan";
   const [plan, setPlan] = useState<PlanDTO | null>(null);
   const [conv, setConv] = useState<ConversationDTO | null>(null);
   const [messages, setMessages] = useState<MessageDTO[]>([]);
@@ -80,7 +88,7 @@ export function ChatPage() {
   return (
     <main className="app-shell app-shell--chat">
       <header className="app-header app-header--minimal">
-        <Link to={`/plans/${planId}`} className="detail-back">← Back to plan</Link>
+        <Link to={backTo} className="detail-back">{backLabel}</Link>
       </header>
 
       <div className="chat-shell">
@@ -113,7 +121,7 @@ export function ChatPage() {
         <div ref={scrollRef} className="chat-messages">
           {grouped.length === 0 ? (
             <div className="chat-empty-card">
-              <div className="chat-empty-glyph" aria-hidden>💬</div>
+              <div className="chat-empty-glyph" aria-hidden><ChatGlyph /></div>
               <div className="chat-empty-headline">It's quiet in here</div>
               <p className="chat-empty-body">
                 Be the first to say hi — a quick hello or a logistics note goes a long way.
@@ -194,6 +202,14 @@ export function ChatPage() {
         </form>
       </div>
     </main>
+  );
+}
+
+function ChatGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </svg>
   );
 }
 

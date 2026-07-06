@@ -320,15 +320,15 @@ export function PlanDetailPage() {
 
         <div className="plan-actions-row plan-actions-row--triple">
           <button type="button" className="action-btn action-btn--stack" onClick={() => setShowGetThere(true)}>
-            <span className="action-btn-icon" aria-hidden="true">📍</span>
+            <span className="action-btn-icon" aria-hidden="true"><PinGlyph /></span>
             <span className="action-btn-label">Get there</span>
           </button>
           <button type="button" className="action-btn action-btn--stack" onClick={() => setShowInvite(true)}>
-            <span className="action-btn-icon" aria-hidden="true">＋</span>
+            <span className="action-btn-icon" aria-hidden="true"><PlusGlyph /></span>
             <span className="action-btn-label">Invite</span>
           </button>
           <button type="button" className="action-btn action-btn--stack" onClick={() => setShowShare(true)}>
-            <span className="action-btn-icon" aria-hidden="true">↗</span>
+            <span className="action-btn-icon" aria-hidden="true"><ShareGlyph /></span>
             <span className="action-btn-label">Share</span>
           </button>
         </div>
@@ -372,7 +372,10 @@ export function PlanDetailPage() {
 
       {canChat && (
         <Link to={`/plans/${plan.id}/chat`} className="chat-entry">
-          💬 Group chat ({plan.participants.going.length + plan.participants.interested.length})
+          <span className="chat-entry-label">
+            <span className="chat-entry-icon" aria-hidden="true"><ChatGlyph /></span>
+            Group chat ({plan.participants.going.length + plan.participants.interested.length})
+          </span>
           <span className="chat-entry-arrow">→</span>
         </Link>
       )}
@@ -486,6 +489,38 @@ export function PlanDetailPage() {
         <InviteSheet planId={plan.id} planTitle={plan.title} onClose={() => setShowInvite(false)} />
       )}
     </main>
+  );
+}
+
+function PinGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+function PlusGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+function ShareGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" />
+      <path d="M16 6l-4-4-4 4" />
+      <path d="M12 2v14" />
+    </svg>
+  );
+}
+function ChatGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </svg>
   );
 }
 

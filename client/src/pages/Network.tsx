@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
@@ -9,12 +9,21 @@ import type { PublicUser } from "../types/shared";
 export function NetworkPage() {
   const { user } = useAuth();
   const [network, setNetwork] = useState<PublicUser[] | null>(null);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     void api<{ users: PublicUser[] }>("/api/auth/network")
       .then((r) => setNetwork(r.users))
       .catch(() => setNetwork([]));
   }, []);
+
+  // Name search — scoped to your own network (privacy-safe: you can only
+  // search people you've already added).
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q || !network) return network ?? [];
+    return network.filter((u) => u.firstName.toLowerCase().includes(q));
+  }, [network, query]);
 
   if (network === null) return <LoadingScreen tagline="Loading network" />;
 
@@ -35,8 +44,27 @@ export function NetworkPage() {
       {network.length === 0 ? (
         <p className="form-help">Go to plans, meet people, add them after.</p>
       ) : (
+        <>
+          <div className="explore-search" style={{ marginBottom: 16 }}>
+            <SearchIcon />
+            <input
+              type="search"
+              placeholder="Search your network by name"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label="Search your network by name"
+            />
+            {query && (
+              <button type="button" className="explore-search-clear" onClick={() => setQuery("")}>
+                ×
+              </button>
+            )}
+          </div>
+          {filtered.length === 0 ? (
+            <p className="form-help">No one in your network matches “{query.trim()}”.</p>
+          ) : (
         <div className="profile-network-list">
-          {network.map((u) => (
+          {filtered.map((u) => (
             <Link
               key={u.id}
               to={`/profile/${u.id}`}
@@ -55,7 +83,18 @@ export function NetworkPage() {
             </Link>
           ))}
         </div>
+          )}
+        </>
       )}
     </main>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
   );
 }

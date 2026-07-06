@@ -215,6 +215,7 @@ export interface MeDTO {
   id: string;
   phoneNumber: string;
   firstName: string;
+  lastName?: string;
   neighborhoodId: string | null;
   neighborhoodIds?: string[];
   interests: InterestTag[];

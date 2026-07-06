@@ -5,6 +5,7 @@ import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
+import { linkHostname } from "../lib/format";
 import {
   VIBE_OPTIONS,
   type InterestTag,
@@ -217,6 +218,7 @@ export function CreatePlanPage() {
   };
 
   const [linkBusy, setLinkBusy] = useState(false);
+  const [linkTried, setLinkTried] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const fetchLinkPreview = async (rawUrl: string) => {
     setLinkError(null);
@@ -256,6 +258,7 @@ export function CreatePlanPage() {
       setForm((f) => ({ ...f, flyerLinkUrl: withScheme, flyerLinkPreview: null }));
     } finally {
       setLinkBusy(false);
+      setLinkTried(true);
     }
   };
 
@@ -276,7 +279,7 @@ export function CreatePlanPage() {
             className="path-picker-card"
             onClick={() => setPath("plan")}
           >
-            <span className="path-picker-icon path-picker-icon--neutral" aria-hidden="true">📅</span>
+            <span className="path-picker-icon path-picker-icon--neutral" aria-hidden="true"><CalendarGlyph /></span>
             <span className="path-picker-title">Make a plan</span>
             <span className="path-picker-sub">Know what you want to do? Start here.</span>
           </button>
@@ -295,7 +298,7 @@ export function CreatePlanPage() {
               setPath("idea");
             }}
           >
-            <span className="path-picker-icon path-picker-icon--accent" aria-hidden="true">💡</span>
+            <span className="path-picker-icon path-picker-icon--accent" aria-hidden="true"><BulbGlyph /></span>
             <span className="path-picker-title">Just an idea</span>
             <span className="path-picker-sub">Just a thought. See who&apos;s down.</span>
           </button>
@@ -472,70 +475,117 @@ export function CreatePlanPage() {
           </div>
         </section>
 
-        {/* Details */}
-        <section className="form-section">
-          <label className="form-question" htmlFor="description">
-            Details
-          </label>
-          <textarea
-            id="description"
-            placeholder="Anything else — vibes, dress code, who else is invited…"
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-          />
-        </section>
+        {/* Just an idea: visibility comes up into the main flow, and the free-text
+            details box is swapped for a simple cap / image. Make a plan keeps the
+            details textarea (visibility stays under More options). */}
+        {isIdea ? (
+          <>
+            <VisibilityPicker
+              value={form.visibility}
+              onChange={(v) => setForm((f) => ({ ...f, visibility: v }))}
+            />
 
-        {/* Advanced options — collapsed by default to keep the form short */}
-        <button
-          type="button"
-          className="create-more-toggle"
-          onClick={() => setShowMore((s) => !s)}
-          aria-expanded={showMore}
-        >
-          <span className="create-more-toggle-main">
-            {showMore ? "Fewer options" : "More options"}
-          </span>
-          <span className="create-more-toggle-sub">Visibility · spots · repeat · flyer</span>
-          <ChevronIcon open={showMore} />
-        </button>
-
-        {showMore && (
-          <div className="create-more">
-            {/* Visibility — who can see this plan on the feed */}
             <section className="form-section">
-              <label className="form-question">Who can see this?</label>
-              <div className="visibility-options">
-                <button
-                  type="button"
-                  className={`visibility-option ${form.visibility === "everyone" ? "is-active" : ""}`}
-                  onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
-                  aria-pressed={form.visibility === "everyone"}
-                >
-                  <span className="visibility-option-title">Everyone on COMMONS</span>
-                  <span className="visibility-option-sub">Open to anyone in your neighborhood</span>
-                </button>
-                <button
-                  type="button"
-                  className={`visibility-option ${form.visibility === "network" ? "is-active" : ""}`}
-                  onClick={() => setForm((f) => ({ ...f, visibility: "network" }))}
-                  aria-pressed={form.visibility === "network"}
-                >
-                  <span className="visibility-option-title">Your Network</span>
-                  <span className="visibility-option-sub">Only people you've added show up</span>
-                </button>
-                <button
-                  type="button"
-                  className="visibility-option is-disabled"
-                  disabled
-                  aria-disabled="true"
-                >
-                  <span className="visibility-option-title">
-                    Communities <span className="visibility-option-pill">Coming soon</span>
-                  </span>
-                  <span className="visibility-option-sub">Run clubs, book clubs, recurring crews</span>
-                </button>
+              <label className="form-question">Add a little more (optional)</label>
+              <p className="form-help">Set a cap on spots or attach an image — no essay required.</p>
+              <div className="form-row-flex">
+                <div className="form-row-flex-main">
+                  <label className="form-sublabel">Spots available</label>
+                  {!form.capacityOn ? (
+                    <p className="form-help" style={{ marginTop: 4 }}>Open — no cap on who can join</p>
+                  ) : (
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      placeholder="e.g. 6"
+                      value={form.capacity}
+                      onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))}
+                    />
+                  )}
+                </div>
+                <FlexToggle
+                  active={form.capacityOn}
+                  onClick={() => setForm((f) => ({ ...f, capacityOn: !f.capacityOn }))}
+                  label="Set cap"
+                />
+              </div>
+
+              <div className="flyer-uploader" style={{ marginTop: 12 }}>
+                {form.flyerDataUrl ? (
+                  <div className="flyer-preview">
+                    <img src={form.flyerDataUrl} alt="" />
+                    <button
+                      type="button"
+                      className="btn-link"
+                      onClick={() => setForm((f) => ({ ...f, flyerDataUrl: null }))}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn-secondary btn-block"
+                    onClick={() => flyerRef.current?.click()}
+                  >
+                    Attach an image
+                  </button>
+                )}
+                <input
+                  ref={flyerRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) onFlyerPick(f);
+                    if (flyerRef.current) flyerRef.current.value = "";
+                  }}
+                />
               </div>
             </section>
+          </>
+        ) : (
+          <section className="form-section">
+            <label className="form-question" htmlFor="description">
+              Details
+            </label>
+            <textarea
+              id="description"
+              placeholder="Anything else — vibes, dress code, who else is invited…"
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+            />
+          </section>
+        )}
+
+        {/* Advanced options — collapsed by default to keep the form short.
+            Hidden entirely on Just an idea, which surfaces visibility + cap/image
+            inline above. */}
+        {!isIdea && (
+          <button
+            type="button"
+            className="create-more-toggle"
+            onClick={() => setShowMore((s) => !s)}
+            aria-expanded={showMore}
+          >
+            <span className="create-more-toggle-main">
+              {showMore ? "Fewer options" : "More options"}
+            </span>
+            <span className="create-more-toggle-sub">Visibility · spots · repeat · flyer</span>
+            <ChevronIcon open={showMore} />
+          </button>
+        )}
+
+        {!isIdea && showMore && (
+          <div className="create-more">
+            {/* Visibility lives here for Make a plan; for Just an idea it moves
+                up into the main section (see above). */}
+            <VisibilityPicker
+              value={form.visibility}
+              onChange={(v) => setForm((f) => ({ ...f, visibility: v }))}
+            />
 
             {/* Spots — toggle for open vs capped */}
             <section className="form-section">
@@ -647,25 +697,28 @@ export function CreatePlanPage() {
             type="url"
             placeholder="https://…"
             value={form.flyerLinkUrl}
-            onChange={(e) => setForm((f) => ({ ...f, flyerLinkUrl: e.target.value }))}
+            onChange={(e) => {
+              setLinkTried(false);
+              setForm((f) => ({ ...f, flyerLinkUrl: e.target.value }));
+            }}
             onBlur={(e) => void fetchLinkPreview(e.target.value)}
             disabled={linkBusy}
           />
           {linkBusy && <p className="form-help">Loading preview…</p>}
           {linkError && <p className="form-help" style={{ color: "var(--color-danger, #c0392b)" }}>{linkError}</p>}
-          {form.flyerLinkPreview && (
+          {form.flyerLinkUrl && (form.flyerLinkPreview || linkTried) && (
             <div className="link-preview" style={{ marginTop: 8 }}>
-              {form.flyerLinkPreview.image && (
+              {form.flyerLinkPreview?.image && (
                 <img src={form.flyerLinkPreview.image} alt="" className="link-preview-image" />
               )}
               <div className="link-preview-body">
-                {form.flyerLinkPreview.siteName && (
-                  <div className="link-preview-site">{form.flyerLinkPreview.siteName}</div>
-                )}
-                {form.flyerLinkPreview.title && (
-                  <div className="link-preview-title">{form.flyerLinkPreview.title}</div>
-                )}
-                {form.flyerLinkPreview.description && (
+                <div className="link-preview-site">
+                  {form.flyerLinkPreview?.siteName ?? linkHostname(form.flyerLinkUrl)}
+                </div>
+                <div className="link-preview-title">
+                  {form.flyerLinkPreview?.title ?? "Open link"}
+                </div>
+                {form.flyerLinkPreview?.description && (
                   <div className="link-preview-desc">{form.flyerLinkPreview.description}</div>
                 )}
               </div>
@@ -742,6 +795,51 @@ export function CreatePlanPage() {
         </button>
       </form>
     </main>
+  );
+}
+
+function VisibilityPicker({
+  value,
+  onChange,
+}: {
+  value: PlanVisibility;
+  onChange: (v: PlanVisibility) => void;
+}) {
+  return (
+    <section className="form-section">
+      <label className="form-question">Who can see this?</label>
+      <div className="visibility-options">
+        <button
+          type="button"
+          className={`visibility-option ${value === "everyone" ? "is-active" : ""}`}
+          onClick={() => onChange("everyone")}
+          aria-pressed={value === "everyone"}
+        >
+          <span className="visibility-option-title">Everyone on COMMONS</span>
+          <span className="visibility-option-sub">Open to anyone in your neighborhood</span>
+        </button>
+        <button
+          type="button"
+          className={`visibility-option ${value === "network" ? "is-active" : ""}`}
+          onClick={() => onChange("network")}
+          aria-pressed={value === "network"}
+        >
+          <span className="visibility-option-title">Your Network</span>
+          <span className="visibility-option-sub">Only people you've added show up</span>
+        </button>
+        <button
+          type="button"
+          className="visibility-option is-disabled"
+          disabled
+          aria-disabled="true"
+        >
+          <span className="visibility-option-title">
+            Communities <span className="visibility-option-pill">Coming soon</span>
+          </span>
+          <span className="visibility-option-sub">Run clubs, book clubs, recurring crews</span>
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -913,7 +1011,9 @@ function PlacePicker({
           </button>
         )}
       </div>
-      {hasPickedAddress && !showDropdown && <p className="place-picker-chosen">📍 {address}</p>}
+      {hasPickedAddress && !showDropdown && (
+        <p className="place-picker-chosen"><PinIcon /> {address}</p>
+      )}
       {showDropdown && (
         <ul className="place-picker-results" role="listbox">
           {loading && results.length === 0 && <li className="place-picker-empty">Searching…</li>}
@@ -951,6 +1051,25 @@ function PinIcon() {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
       <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+function CalendarGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </svg>
+  );
+}
+
+function BulbGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 18h6" />
+      <path d="M10 22h4" />
+      <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5.76.76 1.23 1.52 1.41 2.5" />
     </svg>
   );
 }

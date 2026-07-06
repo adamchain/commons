@@ -5,7 +5,7 @@ import { api } from "../api/http";
 import { Avatar } from "./Avatar";
 import { useAuth } from "../context/AuthContext";
 import type { PlanDTO } from "../types/shared";
-import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
+import { formatPlanDate, formatPlanTime, linkHostname, sentenceCaseTitle } from "../lib/format";
 import { planHasEnded } from "../lib/planTime";
 import { useNeighborhoods } from "../lib/useNeighborhoods";
 
@@ -30,6 +30,11 @@ export function PlanCard({
   const hoods = useNeighborhoods();
   const hoodName = hoods[plan.neighborhoodId]?.name ?? null;
   const isPlanCreated = isLooking && Boolean(plan.lockedAt);
+  // When only ONE detail is loose (just location, or just time), the plan is
+  // basically set — render it like a confirmed plan (clean surface + image),
+  // not a Looking For.
+  const flexCount = (plan.isFlexibleLocation ? 1 : 0) + (plan.isFlexibleTime ? 1 : 0);
+  const singleFlex = isLooking && !isPlanCreated && flexCount === 1;
   const isCancelled = Boolean(plan.cancelledAt);
   const hasEnded = !isCancelled && planHasEnded(plan);
   const suggestions = plan.suggestions ?? [];
@@ -105,7 +110,7 @@ export function PlanCard({
           : isLooking
             ? "plan-card--looking"
             : "plan-card--confirmed"
-      } ${highlight ? "plan-card--just-posted" : ""} ${hasEnded ? "plan-card--happened" : ""} ${isCancelled ? "plan-card--cancelled" : ""} ${plan.visibility === "network" ? "plan-card--network" : ""}`}
+      } ${singleFlex ? "plan-card--single-flex" : ""} ${highlight ? "plan-card--just-posted" : ""} ${hasEnded ? "plan-card--happened" : ""} ${isCancelled ? "plan-card--cancelled" : ""} ${plan.visibility === "network" ? "plan-card--network" : ""}`}
     >
       {highlight && (
         <div className="plan-card-just-posted-banner">
@@ -149,7 +154,7 @@ export function PlanCard({
             <span className="plan-card-kind-pill is-happened">Happened</span>
           ) : isPlanCreated ? (
             <span className="plan-card-kind-pill is-plan-created">Plan created</span>
-          ) : isLooking ? (
+          ) : isLooking && !singleFlex ? (
             <span className="plan-card-kind-pill is-looking">Looking For</span>
           ) : null}
         </header>
@@ -189,13 +194,13 @@ export function PlanCard({
               <img src={plan.flyerLinkPreview.image} alt="" className="link-preview-image" />
             )}
             <div className="link-preview-body">
-              {plan.flyerLinkPreview?.siteName && (
-                <div className="link-preview-site">{plan.flyerLinkPreview.siteName}</div>
-              )}
+              <div className="link-preview-site">
+                {plan.flyerLinkPreview?.siteName ?? linkHostname(plan.flyerLinkUrl)}
+              </div>
               {plan.flyerLinkPreview?.title ? (
                 <div className="link-preview-title">{plan.flyerLinkPreview.title}</div>
               ) : (
-                <div className="link-preview-title">{plan.flyerLinkUrl}</div>
+                <div className="link-preview-title">Open link</div>
               )}
               {plan.flyerLinkPreview?.description && (
                 <div className="link-preview-desc">{plan.flyerLinkPreview.description}</div>
@@ -243,7 +248,8 @@ export function PlanCard({
           className="plan-card-chat-link"
           onClick={(e) => e.stopPropagation()}
         >
-          💬 Group chat
+          <span className="plan-card-chat-icon" aria-hidden="true"><ChatGlyph /></span>
+          {hasEnded ? "Open group chat" : "Group chat"}
         </Link>
       )}
 
@@ -280,6 +286,14 @@ export function PlanCard({
         </div>
       )}
     </div>
+  );
+}
+
+function ChatGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </svg>
   );
 }
 

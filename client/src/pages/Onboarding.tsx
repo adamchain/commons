@@ -295,9 +295,10 @@ export function OnboardingPage() {
     return (
       <ProfileStep
         me={user}
-        onSave={async (firstName, avatarSeed, avatarStyle, avatarPhotoDataUrl, avatarParams) => {
+        onSave={async (firstName, lastName, avatarSeed, avatarStyle, avatarPhotoDataUrl, avatarParams) => {
           await patchMe({
             firstName,
+            lastName,
             avatarSeed,
             avatarStyle,
             avatarPhotoDataUrl: avatarPhotoDataUrl ?? undefined,
@@ -617,45 +618,49 @@ function GuidelinesStep({ onAgree }: { onAgree: () => Promise<void> }) {
   return (
     <OnboardingShell
       title="Before you hit the feed."
-      subtitle="A quick read. We mean it."
+      subtitle="Our terms & community guidelines — a quick read. We mean it."
     >
       <ul className="guidelines-list">
         <li>
-          <span className="guidelines-icon" aria-hidden="true">🤝</span>
+          <span className="guidelines-icon" aria-hidden="true"><GuidelineHandshake /></span>
           <div>
             <strong>Show up kindly.</strong>
             <p>Respect the people you meet and the city you’re in. No harassment, hate, or bigotry.</p>
           </div>
         </li>
         <li>
-          <span className="guidelines-icon" aria-hidden="true">📅</span>
+          <span className="guidelines-icon" aria-hidden="true"><GuidelineCalendar /></span>
           <div>
             <strong>Show up when you say you will.</strong>
             <p>If something comes up, drop out early — don’t ghost. Someone else might want your spot.</p>
           </div>
         </li>
         <li>
-          <span className="guidelines-icon" aria-hidden="true">📍</span>
+          <span className="guidelines-icon" aria-hidden="true"><GuidelinePin /></span>
           <div>
             <strong>Keep it real.</strong>
             <p>Be yourself. Plans, photos, and profiles should reflect the actual you.</p>
           </div>
         </li>
         <li>
-          <span className="guidelines-icon" aria-hidden="true">🛟</span>
+          <span className="guidelines-icon" aria-hidden="true"><GuidelineShield /></span>
           <div>
             <strong>Look out for each other.</strong>
             <p>Meet in public for first plans. Report anything that feels off.</p>
           </div>
         </li>
         <li>
-          <span className="guidelines-icon" aria-hidden="true">🏙️</span>
+          <span className="guidelines-icon" aria-hidden="true"><GuidelineCity /></span>
           <div>
             <strong>Love the city.</strong>
             <p>Support local spots, tip well, and leave places better than you found them.</p>
           </div>
         </li>
       </ul>
+      <p className="onboarding-confirm-note">
+        COMMONS is a community platform built for women. By joining, you are confirming that you
+        identify as a woman.
+      </p>
       <button
         type="button"
         className="btn-primary btn-block"
@@ -669,10 +674,54 @@ function GuidelinesStep({ onAgree }: { onAgree: () => Promise<void> }) {
           }
         }}
       >
-        {busy ? "One sec…" : "I’m in — let’s go"}
+        {busy ? "One sec…" : "Agree and Continue"}
       </button>
-      <p className="onboarding-fineprint">Tapping agree confirms you’ll follow the Commons guidelines.</p>
     </OnboardingShell>
+  );
+}
+
+function GuidelineHandshake() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m11 17 2 2a1 1 0 0 0 1.4 0l4.6-4.6" />
+      <path d="m21 3-7 7-2-2" />
+      <path d="M3 7v6a2 2 0 0 0 .6 1.4L9 20l1.5-1.5" />
+      <path d="M3 7h4l5 5" />
+    </svg>
+  );
+}
+function GuidelineCalendar() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </svg>
+  );
+}
+function GuidelinePin() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+function GuidelineShield() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3 4 6v6c0 5 3.5 8.5 8 9 4.5-.5 8-4 8-9V6l-8-3Z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+function GuidelineCity() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 21h18" />
+      <path d="M5 21V7l6-4v18" />
+      <path d="M11 21V11l8 4v6" />
+      <path d="M8 9v.01M8 13v.01M8 17v.01" />
+    </svg>
   );
 }
 
@@ -724,6 +773,7 @@ function ProfileStep({
   me: MeDTO;
   onSave: (
     firstName: string,
+    lastName: string,
     seed: string,
     style: AvatarStyle,
     photoDataUrl: string | null,
@@ -731,6 +781,7 @@ function ProfileStep({
   ) => Promise<void>;
 }) {
   const [firstName, setFirstName] = useState(me.firstName);
+  const [lastName, setLastName] = useState(me.lastName ?? "");
   const [photo, setPhoto] = useState<string | null>(me.avatarPhotoDataUrl ?? null);
   const [avatarParams, setAvatarParams] = useState<string | null>(me.avatarParams ?? null);
   const [busy, setBusy] = useState(false);
@@ -763,6 +814,12 @@ function ProfileStep({
         placeholder="First name"
         value={firstName}
         onChange={(e) => setFirstName(e.target.value)}
+      />
+      <input
+        className="onboarding-input"
+        placeholder="Last name"
+        value={lastName}
+        onChange={(e) => setLastName(e.target.value)}
       />
 
       <details className="profile-photo-picker">
@@ -803,11 +860,11 @@ function ProfileStep({
       <button
         type="button"
         className="btn-primary btn-block"
-        disabled={busy || !firstName.trim()}
+        disabled={busy || !firstName.trim() || !lastName.trim()}
         onClick={async () => {
           setBusy(true);
           try {
-            await onSave(firstName.trim(), me.avatarSeed, me.avatarStyle, photo, avatarParams);
+            await onSave(firstName.trim(), lastName.trim(), me.avatarSeed, me.avatarStyle, photo, avatarParams);
           } finally {
             setBusy(false);
           }
@@ -815,7 +872,9 @@ function ProfileStep({
       >
         {busy ? "Saving…" : "Finish"}
       </button>
-      {!firstName.trim() && <p className="onboarding-fineprint">Add your first name to continue.</p>}
+      {(!firstName.trim() || !lastName.trim()) && (
+        <p className="onboarding-fineprint">Add your first and last name to continue.</p>
+      )}
     </OnboardingShell>
   );
 }

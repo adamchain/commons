@@ -134,6 +134,18 @@ export function ParticipationButtons({
               ? "Apply"
               : "Interested"}
       </button>
+      {/* Explicit drop-out: once you're in or interested, give a clear way to
+          cancel your own RSVP rather than having to re-tap the same button. */}
+      {state && !isHosting && (
+        <button
+          type="button"
+          className="btn-link participation-dropout"
+          onClick={() => void toggleState(state)}
+          disabled={pending}
+        >
+          {state === "going" ? "Can’t make it? Drop out" : "Remove interest"}
+        </button>
+      )}
       {error && <p className="onboarding-error" style={{ marginTop: 8 }}>{error}</p>}
     </div>
   );

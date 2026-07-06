@@ -18,6 +18,8 @@ export interface UserRecord {
   /** `verify` = signed up via Twilio Verify; `seed` = demo data script only. */
   accountSource?: "verify" | "seed";
   firstName: string;
+  /** Optional surname — collected at onboarding, kept private (not on PublicUser). */
+  lastName?: string;
   /** Primary hood — mirrors first of neighborhoodIds when set. */
   neighborhoodId: string | null;
   /** Optional on legacy rows. */

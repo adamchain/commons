@@ -61,7 +61,6 @@ export function SettingsPage() {
         <SettingsRow
           to={`/profile/${user.id}`}
           icon={<HeartIcon />}
-          iconAccent
           title="Interests"
           sub={interestsSub}
         />
@@ -352,7 +351,7 @@ function UserIcon() {
 }
 function HeartIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 21s-7-4.5-9.5-9C.8 8.5 2 5 5.5 5c2 0 3.5 1 4.5 2.5 1-1.5 2.5-2.5 4.5-2.5C18 5 19.2 8.5 21.5 12 19 16.5 12 21 12 21Z" />
     </svg>
   );

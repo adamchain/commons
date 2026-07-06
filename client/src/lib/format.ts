@@ -69,6 +69,19 @@ export function formatPlaceAddress(raw: string | undefined | null): string {
   return kept.join(", ");
 }
 
+/**
+ * Clean, short label for a URL — the hostname without the "www." — so link
+ * previews show "eventbrite.com" instead of a long raw URL.
+ */
+export function linkHostname(url: string): string {
+  try {
+    const u = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`);
+    return u.hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
 export function formatRelative(iso: string): string {
   const then = new Date(iso).getTime();
   const seconds = Math.max(0, Math.round((Date.now() - then) / 1000));

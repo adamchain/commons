@@ -300,6 +300,7 @@ export interface MeDTO {
   id: string;
   phoneNumber: string;
   firstName: string;
+  lastName?: string;
   /** @deprecated prefer neighborhoodIds — kept for older rows */
   neighborhoodId: string | null;
   /** Areas the user spends time in — feeds personalization. */

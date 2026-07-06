@@ -1,13 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate } from "../lib/format";
-import { fileToResizedDataUrl } from "../lib/imageResize";
 import {
-  AVATAR_PRESETS,
   HOST_TAG_LABELS,
   INTEREST_LABELS,
   type HostTag,
@@ -42,7 +40,6 @@ export function ProfilePage() {
   const [profile, setProfile] = useState<ProfilePayload | null>(null);
   const [feedPlans, setFeedPlans] = useState<PlanDTO[]>([]);
   const [network, setNetwork] = useState<PublicUser[] | null>(null);
-  const [editing, setEditing] = useState(false);
   const isSelf = user?.id === userId;
 
   const reloadProfile = () =>
@@ -89,7 +86,9 @@ export function ProfilePage() {
         />
         <div className="profile-name">{profile.user.firstName || "Unnamed"}</div>
         {profile.neighborhood && (
-          <div className="profile-neighborhood">📍 {profile.neighborhood.name}</div>
+          <div className="profile-neighborhood">
+            <PinGlyph /> {profile.neighborhood.name}
+          </div>
         )}
         {profile.socialLinks?.instagram && (
           <a
@@ -140,14 +139,9 @@ export function ProfilePage() {
         </div>
 
         {isSelf && (
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => setEditing((v) => !v)}
-            style={{ marginTop: 14 }}
-          >
-            {editing ? "Done editing" : "Edit profile"}
-          </button>
+          <Link to="/profile/edit" className="btn-secondary" style={{ marginTop: 14 }}>
+            Edit profile
+          </Link>
         )}
 
         {!isSelf && (
@@ -173,16 +167,6 @@ export function ProfilePage() {
         )}
       </section>
 
-      {isSelf && editing && user && (
-        <EditPanel
-          me={user}
-          onSaved={(me) => {
-            setUser(me);
-            reloadProfile();
-          }}
-        />
-      )}
-
       {profile.interests.length > 0 && (
         <section className="profile-block">
           <h3 className="who-block-heading">Interests</h3>
@@ -196,11 +180,52 @@ export function ProfilePage() {
         </section>
       )}
 
-      {isSelf && <ProfileMenu networkCount={network?.length ?? null} />}
+      {/* My plans + calendar combined into one view, moved above the menu. */}
+      {isSelf && (
+        <section className="profile-plans-view">
+          <CondensedCalendar plans={feedPlans} />
 
-      {isSelf && <CondensedCalendar plans={feedPlans} />}
+          {profile.upcoming.length > 0 && (
+            <div className="profile-block">
+              <h3 className="who-block-heading">Hosting soon</h3>
+              <div className="profile-list">
+                {profile.upcoming.map((p) => (
+                  <Link key={p.id} to={`/plans/${p.id}`} className="profile-list-row">
+                    <span className="profile-list-emoji">{p.hostEmoji}</span>
+                    <span className="profile-list-title">{p.title}</span>
+                    <span className="profile-list-when">{formatPlanDate(p.date)}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
 
-      {profile.upcoming.length > 0 && (
+          {profile.past.length > 0 && (
+            <div className="profile-block">
+              <h3 className="who-block-heading">Past plans</h3>
+              <div className="profile-list">
+                {profile.past.map((p) => (
+                  <Link key={p.id} to={`/plans/${p.id}`} className="profile-list-row">
+                    <span className="profile-list-title">{p.title}</span>
+                    <span className="profile-list-when">
+                      {formatPlanDate(p.date)} · {p.wentCount} went
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {profile.upcoming.length === 0 && profile.past.length === 0 && (
+            <p className="empty-state" style={{ marginTop: 8 }}>
+              Plans you host or join will show up here.
+            </p>
+          )}
+        </section>
+      )}
+
+      {/* Other people's plans (viewing someone else's profile). */}
+      {!isSelf && profile.upcoming.length > 0 && (
         <section className="profile-block">
           <h3 className="who-block-heading">Hosting soon</h3>
           <div className="profile-list">
@@ -214,8 +239,7 @@ export function ProfilePage() {
           </div>
         </section>
       )}
-
-      {profile.past.length > 0 && (
+      {!isSelf && profile.past.length > 0 && (
         <section className="profile-block">
           <h3 className="who-block-heading">Past plans</h3>
           <div className="profile-list">
@@ -231,18 +255,8 @@ export function ProfilePage() {
         </section>
       )}
 
-      {profile.upcoming.length === 0 && profile.past.length === 0 && (
-        <section className="profile-block">
-          <p className="empty-state" style={{ marginTop: 8 }}>
-            {isSelf ? "Post a plan from your profile." : "No plans yet."}
-          </p>
-          {isSelf && (
-            <Link to="/plans/new" className="btn-primary" style={{ marginTop: 12, display: "inline-block" }}>
-              Post a plan
-            </Link>
-          )}
-        </section>
-      )}
+      {/* Menu + Settings sit at the bottom of the profile. */}
+      {isSelf && <ProfileMenu networkCount={network?.length ?? null} />}
 
       {isSelf && (
         <button
@@ -312,157 +326,6 @@ function FriendButton({
     >
       {busy ? "…" : inNet ? "In your network" : "Add to network"}
     </button>
-  );
-}
-
-function EditPanel({ me, onSaved }: { me: MeDTO; onSaved: (next: MeDTO) => void }) {
-  const [firstName, setFirstName] = useState(me.firstName);
-  const [photo, setPhoto] = useState<string | null>(me.avatarPhotoDataUrl ?? null);
-  const [avatarParams, setAvatarParams] = useState<string | null>(me.avatarParams ?? null);
-  const [instagram, setInstagram] = useState(me.socialLinks?.instagram ?? "");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  function pickPhoto(dataUrl: string) {
-    setPhoto(dataUrl);
-    setAvatarParams(null);
-  }
-  function pickPreset(params: string) {
-    setAvatarParams((cur) => (cur === params ? null : params));
-    if (avatarParams !== params) setPhoto(null);
-  }
-
-  async function save() {
-    setBusy(true);
-    setError(null);
-    try {
-      const next = await api<MeDTO>("/api/auth/me", {
-        method: "PATCH",
-        body: JSON.stringify({
-          firstName: firstName.trim(),
-          avatarPhotoDataUrl: photo ?? null,
-          avatarParams: avatarParams ?? null,
-          socialLinks: { instagram: instagram.trim().replace(/^@/, "") },
-        }),
-      });
-      onSaved(next);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't save");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <section className="profile-edit-panel">
-      <label className="form-question" htmlFor="profile-edit-name">
-        Your name
-      </label>
-      <input
-        id="profile-edit-name"
-        className="onboarding-input"
-        value={firstName}
-        onChange={(e) => setFirstName(e.target.value)}
-        maxLength={40}
-      />
-
-      <label className="form-question" style={{ marginTop: 14 }}>
-        Profile image
-      </label>
-      <p className="form-help">Upload a photo or pick a character below — one or the other.</p>
-
-      <div className="profile-edit-photo-row">
-        <Avatar
-          seed={me.avatarSeed}
-          style={me.avatarStyle}
-          photoDataUrl={photo ?? undefined}
-          params={avatarParams ?? undefined}
-          name={firstName.trim() || undefined}
-          size="lg"
-        />
-        <div className="profile-edit-photo-actions">
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => fileRef.current?.click()}
-          >
-            {photo ? "Replace photo" : "Upload photo"}
-          </button>
-          {(photo || avatarParams) && (
-            <button
-              type="button"
-              className="btn-link"
-              onClick={() => {
-                setPhoto(null);
-                setAvatarParams(null);
-              }}
-            >
-              Remove
-            </button>
-          )}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            style={{ display: "none" }}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              fileToResizedDataUrl(f)
-                .then(pickPhoto)
-                .catch(() => setError("Couldn't read that image. Try another."));
-              if (fileRef.current) fileRef.current.value = "";
-            }}
-          />
-        </div>
-      </div>
-
-      <p className="profile-emoji-label" style={{ marginTop: 12 }}>Or pick a character</p>
-      <div className="profile-preset-grid">
-        {AVATAR_PRESETS.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            className={`profile-preset-pick ${avatarParams === p.params ? "is-selected" : ""}`}
-            onClick={() => pickPreset(p.params)}
-            aria-pressed={avatarParams === p.params}
-            aria-label={p.label}
-            title={p.label}
-          >
-            <Avatar seed={me.avatarSeed} style="avataaars" params={p.params} size="md" />
-          </button>
-        ))}
-      </div>
-
-      <label className="form-question" htmlFor="profile-edit-ig" style={{ marginTop: 14 }}>
-        Instagram
-      </label>
-      <p className="form-help">
-        Only visible to people you’ve actually shown up for — others have to share
-        a completed plan with you first.
-      </p>
-      <input
-        id="profile-edit-ig"
-        className="onboarding-input"
-        value={instagram}
-        placeholder="@yourhandle"
-        onChange={(e) => setInstagram(e.target.value)}
-        maxLength={40}
-      />
-
-      {error && <p className="onboarding-error" style={{ marginTop: 8 }}>{error}</p>}
-
-      <button
-        type="button"
-        className="btn-primary btn-block"
-        style={{ marginTop: 16 }}
-        disabled={busy || !firstName.trim()}
-        onClick={() => void save()}
-      >
-        {busy ? "Saving…" : "Save changes"}
-      </button>
-    </section>
   );
 }
 
@@ -583,7 +446,7 @@ function ProfileMenu({ networkCount }: { networkCount: number | null }) {
   return (
     <nav className="profile-menu" aria-label="Profile menu">
       <Link to="/network" className="profile-menu-row">
-        <span className="profile-menu-icon" aria-hidden="true">👥</span>
+        <span className="profile-menu-icon" aria-hidden="true"><UsersGlyph /></span>
         <span className="profile-menu-text">
           <span className="profile-menu-label">Your network</span>
           <span className="profile-menu-sub">{countLabel}</span>
@@ -591,7 +454,7 @@ function ProfileMenu({ networkCount }: { networkCount: number | null }) {
         <ChevronRight />
       </Link>
       <Link to="/invite" className="profile-menu-row">
-        <span className="profile-menu-icon" aria-hidden="true">✉️</span>
+        <span className="profile-menu-icon" aria-hidden="true"><MailGlyph /></span>
         <span className="profile-menu-text">
           <span className="profile-menu-label">Invite friends</span>
           <span className="profile-menu-sub">Share your codes</span>
@@ -599,7 +462,7 @@ function ProfileMenu({ networkCount }: { networkCount: number | null }) {
         <ChevronRight />
       </Link>
       <Link to="/settings" className="profile-menu-row">
-        <span className="profile-menu-icon" aria-hidden="true">⚙️</span>
+        <span className="profile-menu-icon" aria-hidden="true"><GearGlyph /></span>
         <span className="profile-menu-text">
           <span className="profile-menu-label">Settings</span>
           <span className="profile-menu-sub">Notifications, appearance, account</span>
@@ -607,6 +470,40 @@ function ProfileMenu({ networkCount }: { networkCount: number | null }) {
         <ChevronRight />
       </Link>
     </nav>
+  );
+}
+
+function UsersGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+function MailGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3 7 9 6 9-6" />
+    </svg>
+  );
+}
+function GearGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
+function PinGlyph() {
+  return (
+    <svg className="profile-neighborhood-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
   );
 }
 

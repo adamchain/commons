@@ -41,7 +41,12 @@ export function MessagesPage() {
       ) : (
         <div className="messages-list">
           {items.map((c) => (
-            <Link key={c.planId} to={`/plans/${c.planId}/chat`} className="messages-row">
+            <Link
+              key={c.planId}
+              to={`/plans/${c.planId}/chat`}
+              state={{ from: "inbox" }}
+              className="messages-row"
+            >
               <span className="messages-row-emoji" aria-hidden="true">
                 {c.hostEmoji}
               </span>
