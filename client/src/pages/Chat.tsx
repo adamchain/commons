@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { PollCard } from "../components/PollCard";
@@ -13,7 +13,11 @@ const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
 export function ChatPage() {
   const { planId = "" } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
+  const fromMessages = (location.state as { from?: string } | null)?.from === "messages";
+  const backTo = fromMessages ? "/messages" : `/plans/${planId}`;
+  const backLabel = fromMessages ? "← Messages" : "← Plan";
   const { user } = useAuth();
   const [plan, setPlan] = useState<PlanDTO | null>(null);
   const [conv, setConv] = useState<ConversationDTO | null>(null);
@@ -217,7 +221,7 @@ export function ChatPage() {
   return (
     <main className="app-shell app-shell--chat">
       <header className="app-header app-header--minimal chat-header-bar chat-header-bar--thread">
-        <Link to={`/plans/${planId}`} className="detail-back">← Plan</Link>
+        <Link to={backTo} className="detail-back">{backLabel}</Link>
         <div className="chat-thread-title">{sentenceCaseTitle(plan.title)}</div>
         <button type="button" className="btn-link chat-leave-btn" onClick={() => void leaveChat()}>
           Leave

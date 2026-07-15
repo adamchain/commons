@@ -60,7 +60,6 @@ export function SettingsPage() {
         <SettingsRow
           to="/settings/interests"
           icon={<HeartIcon />}
-          iconAccent
           title="Interests"
           sub={interestsSub}
         />

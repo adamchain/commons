@@ -5,6 +5,12 @@ import { mongoMirror } from "./mongoMirror.js";
 import type {
   AgeRange,
   AvatarStyle,
+  CommunityCategory,
+  CommunityCreationStatus,
+  CommunityMemberRole,
+  CommunityMemberStatus,
+  CommunityPostingPermission,
+  CommunityVisibility,
   InterestTag,
   JoinType,
   ParticipationState,
@@ -111,6 +117,12 @@ export interface PlanRecord {
    * posts don't need a schema migration. Null on every current plan.
    */
   communityId?: string | null;
+  /**
+   * Per-plan visibility within a community (public / community_only). Required
+   * when `communityId` is set; null otherwise. `community_only` plans are only
+   * served to that community's active members.
+   */
+  communityVisibility?: CommunityVisibility | null;
   /** Total spots including host. Null/undefined means open / no cap. */
   capacity?: number | null;
   /** How RSVPs are accepted; defaults to "open" if absent. */
@@ -173,7 +185,14 @@ export interface ParticipationRecord {
 
 export interface ConversationRecord {
   id: string;
+  /**
+   * Owning plan. Empty string ("") for a community conversation, which is
+   * anchored by `communityId` instead — this keeps `planId` a required non-null
+   * string so plan-keyed lookups never have to guard for undefined.
+   */
   planId: string;
+  /** Set only on the persistent per-community group chat. */
+  communityId?: string | null;
   type: "group" | "dm";
   participantIds: string[];
   createdAt: string;
@@ -309,6 +328,63 @@ export interface InviteCodeRecord {
   createdAt: string;
 }
 
+/**
+ * A community — a named group with a bulletin, events board, member list, and
+ * optional group chat. Owned by the organizer's normal user account. Goes live
+ * only after COMMONS admin approval (`creationStatus = approved`). V1 fields
+ * only; V2 additions (monetization_*, visibility, verified) are additive later.
+ */
+export interface CommunityRecord {
+  id: string;
+  name: string;
+  description: string;
+  coverImage?: string | null;
+  category: CommunityCategory;
+  organizerId: string;
+  /** Denormalized count of active members (organizer included). */
+  memberCount: number;
+  creationStatus: CommunityCreationStatus;
+  isFounding: boolean;
+  bulletinPermission: CommunityPostingPermission;
+  planPostingPermission: CommunityPostingPermission;
+  chatEnabled: boolean;
+  screeningQuestion?: string | null;
+  /** Optional admin note captured on rejection, shown to the creator. */
+  rejectionNote?: string | null;
+  submittedAt: string;
+  reviewedAt?: string | null;
+  reviewedBy?: string | null;
+  createdAt: string;
+}
+
+/**
+ * Community membership. Richer than a RelationshipRecord — carries approval
+ * `status` and the free-text `screeningAnswer` captured at request time.
+ * Unique on (communityId, userId).
+ */
+export interface CommunityMemberRecord {
+  id: string;
+  communityId: string;
+  userId: string;
+  role: CommunityMemberRole;
+  status: CommunityMemberStatus;
+  screeningAnswer?: string | null;
+  joinedAt: string;
+}
+
+/** Bulletin-board post. Plans live on the plan model; chat lives on chat infra. */
+export interface CommunityPostRecord {
+  id: string;
+  communityId: string;
+  authorId: string;
+  content: string;
+  image?: string | null;
+  pinned: boolean;
+  createdAt: string;
+  /** Soft delete — non-null means hidden. */
+  deletedAt?: string | null;
+}
+
 export interface NotificationRecord {
   id: string;
   userId: string;
@@ -325,12 +401,18 @@ export interface NotificationRecord {
     | "planTimeChanged"
     | "planInvite"
     | "networkRequest"
-    | "networkAccepted";
+    | "networkAccepted"
+    | "communityJoinRequest"
+    | "communityRequestApproved"
+    | "communityRequestDeclined"
+    | "communityPlanPosted";
   body: string;
   planId?: string;
   conversationId?: string;
   /** For person-centric notifications (network request/accept) — links to a profile. */
   profileUserId?: string;
+  /** For community notifications — links to the community page. */
+  communityId?: string;
   /** Idempotency key — same key blocked on re-emit. */
   dedupKey: string;
   createdAt: string;
@@ -368,6 +450,9 @@ interface Snapshot {
   relationships: RelationshipRecord[];
   inviteCodes: InviteCodeRecord[];
   cardImages: CardImageRecord[];
+  communities: CommunityRecord[];
+  communityMembers: CommunityMemberRecord[];
+  communityPosts: CommunityPostRecord[];
 }
 
 const DATA_PATH = resolve(process.cwd(), "data.json");
@@ -390,6 +475,9 @@ function emptySnapshot(): Snapshot {
     relationships: [],
     inviteCodes: [],
     cardImages: [],
+    communities: [],
+    communityMembers: [],
+    communityPosts: [],
   };
 }
 
@@ -426,6 +514,9 @@ function load(): Snapshot {
       inviteCodes: parsed.inviteCodes ?? [],
       dropouts: parsed.dropouts ?? [],
       cardImages: parsed.cardImages ?? [],
+      communities: parsed.communities ?? [],
+      communityMembers: parsed.communityMembers ?? [],
+      communityPosts: parsed.communityPosts ?? [],
     };
   } catch {
     return emptySnapshot();
@@ -558,6 +649,16 @@ export const store = {
     mongoMirror.deleteInviteCodesByOwner(userId);
     mongoMirror.deleteRelationshipsTouching(userId);
     mongoMirror.deleteDropoutsByUser(userId);
+
+    // Drop the user's community memberships and recount those communities.
+    // Communities they organized are left in place (organizer transfer is V2);
+    // their bulletin posts are preserved — the UI tolerates a missing author.
+    const affectedCommunityIds = new Set(
+      snapshot.communityMembers.filter((m) => m.userId === userId).map((m) => m.communityId),
+    );
+    snapshot.communityMembers = snapshot.communityMembers.filter((m) => m.userId !== userId);
+    mongoMirror.deleteCommunityMembersByUser(userId);
+    for (const cid of affectedCommunityIds) this.recountCommunityMembers(cid);
 
     // Finally the user record itself.
     snapshot.users = snapshot.users.filter((u) => u.id !== userId);
@@ -1321,5 +1422,257 @@ export const store = {
     persist();
     mongoMirror.deleteCardImage(id);
     return true;
+  },
+
+  // ---- Communities ----
+  listCommunities(): CommunityRecord[] {
+    return [...snapshot.communities];
+  },
+  listApprovedCommunities(): CommunityRecord[] {
+    return snapshot.communities.filter((c) => c.creationStatus === "approved");
+  },
+  listPendingCommunities(): CommunityRecord[] {
+    return snapshot.communities
+      .filter((c) => c.creationStatus === "pending")
+      .sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
+  },
+  findCommunityById(id: string): CommunityRecord | undefined {
+    return snapshot.communities.find((c) => c.id === id);
+  },
+  listCommunitiesForOrganizer(organizerId: string): CommunityRecord[] {
+    return snapshot.communities.filter((c) => c.organizerId === organizerId);
+  },
+  /**
+   * Create a community (default `pending`) and seed the organizer's active
+   * membership in one shot. `member_count` starts at 1 (the organizer).
+   */
+  createCommunity(input: {
+    name: string;
+    description: string;
+    coverImage?: string | null;
+    category: CommunityCategory;
+    organizerId: string;
+    isFounding?: boolean;
+    creationStatus?: CommunityCreationStatus;
+    screeningQuestion?: string | null;
+    bulletinPermission?: CommunityPostingPermission;
+    planPostingPermission?: CommunityPostingPermission;
+    reviewedBy?: string | null;
+  }): CommunityRecord {
+    const now = new Date().toISOString();
+    const approved = input.creationStatus === "approved";
+    const community: CommunityRecord = {
+      id: randomUUID(),
+      name: input.name,
+      description: input.description,
+      coverImage: input.coverImage ?? null,
+      category: input.category,
+      organizerId: input.organizerId,
+      memberCount: 1,
+      creationStatus: input.creationStatus ?? "pending",
+      isFounding: input.isFounding ?? false,
+      bulletinPermission: input.bulletinPermission ?? "members",
+      planPostingPermission: input.planPostingPermission ?? "organizer_only",
+      chatEnabled: true,
+      screeningQuestion: input.screeningQuestion ?? null,
+      rejectionNote: null,
+      submittedAt: now,
+      reviewedAt: approved ? now : null,
+      reviewedBy: approved ? (input.reviewedBy ?? null) : null,
+      createdAt: now,
+    };
+    snapshot.communities.push(community);
+    const membership: CommunityMemberRecord = {
+      id: randomUUID(),
+      communityId: community.id,
+      userId: input.organizerId,
+      role: "organizer",
+      status: "active",
+      screeningAnswer: null,
+      joinedAt: now,
+    };
+    snapshot.communityMembers.push(membership);
+    persist();
+    mongoMirror.upsertCommunity(community);
+    mongoMirror.upsertCommunityMember(membership);
+    return community;
+  },
+  updateCommunity(
+    id: string,
+    patch: Partial<Omit<CommunityRecord, "id" | "organizerId" | "createdAt">>,
+  ): CommunityRecord | undefined {
+    const community = snapshot.communities.find((c) => c.id === id);
+    if (!community) return undefined;
+    Object.assign(community, patch);
+    persist();
+    mongoMirror.upsertCommunity(community);
+    return community;
+  },
+
+  // ---- Community members ----
+  listCommunityMembers(communityId: string): CommunityMemberRecord[] {
+    return snapshot.communityMembers.filter((m) => m.communityId === communityId);
+  },
+  listActiveCommunityMembers(communityId: string): CommunityMemberRecord[] {
+    return snapshot.communityMembers.filter(
+      (m) => m.communityId === communityId && m.status === "active",
+    );
+  },
+  listPendingCommunityMembers(communityId: string): CommunityMemberRecord[] {
+    return snapshot.communityMembers
+      .filter((m) => m.communityId === communityId && m.status === "pending")
+      .sort((a, b) => a.joinedAt.localeCompare(b.joinedAt));
+  },
+  listCommunityMembershipsForUser(userId: string): CommunityMemberRecord[] {
+    return snapshot.communityMembers.filter((m) => m.userId === userId);
+  },
+  findCommunityMembership(communityId: string, userId: string): CommunityMemberRecord | undefined {
+    return snapshot.communityMembers.find(
+      (m) => m.communityId === communityId && m.userId === userId,
+    );
+  },
+  /** Recompute + persist a community's denormalized active member count. */
+  recountCommunityMembers(communityId: string): void {
+    const community = snapshot.communities.find((c) => c.id === communityId);
+    if (!community) return;
+    community.memberCount = snapshot.communityMembers.filter(
+      (m) => m.communityId === communityId && m.status === "active",
+    ).length;
+    mongoMirror.upsertCommunity(community);
+  },
+  upsertCommunityMembership(input: {
+    communityId: string;
+    userId: string;
+    role?: CommunityMemberRole;
+    status: CommunityMemberStatus;
+    screeningAnswer?: string | null;
+  }): CommunityMemberRecord {
+    const existing = this.findCommunityMembership(input.communityId, input.userId);
+    if (existing) {
+      existing.status = input.status;
+      if (input.role) existing.role = input.role;
+      if (input.screeningAnswer !== undefined) existing.screeningAnswer = input.screeningAnswer;
+      persist();
+      mongoMirror.upsertCommunityMember(existing);
+      this.recountCommunityMembers(input.communityId);
+      persist();
+      return existing;
+    }
+    const row: CommunityMemberRecord = {
+      id: randomUUID(),
+      communityId: input.communityId,
+      userId: input.userId,
+      role: input.role ?? "member",
+      status: input.status,
+      screeningAnswer: input.screeningAnswer ?? null,
+      joinedAt: new Date().toISOString(),
+    };
+    snapshot.communityMembers.push(row);
+    persist();
+    mongoMirror.upsertCommunityMember(row);
+    this.recountCommunityMembers(input.communityId);
+    persist();
+    return row;
+  },
+  removeCommunityMembership(communityId: string, userId: string): boolean {
+    const before = snapshot.communityMembers.length;
+    snapshot.communityMembers = snapshot.communityMembers.filter(
+      (m) => !(m.communityId === communityId && m.userId === userId),
+    );
+    if (snapshot.communityMembers.length === before) return false;
+    // Drop them from the community chat too, if one exists.
+    const conv = this.findCommunityConversation(communityId);
+    if (conv && conv.participantIds.includes(userId)) {
+      conv.participantIds = conv.participantIds.filter((id) => id !== userId);
+      mongoMirror.upsertConversation(conv);
+    }
+    persist();
+    mongoMirror.deleteCommunityMember(communityId, userId);
+    this.recountCommunityMembers(communityId);
+    persist();
+    return true;
+  },
+
+  // ---- Community bulletin posts ----
+  listCommunityPosts(communityId: string): CommunityPostRecord[] {
+    return snapshot.communityPosts
+      .filter((p) => p.communityId === communityId && !p.deletedAt)
+      .sort((a, b) => {
+        // Pinned first, then reverse-chron.
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+        return b.createdAt.localeCompare(a.createdAt);
+      });
+  },
+  findCommunityPostById(id: string): CommunityPostRecord | undefined {
+    return snapshot.communityPosts.find((p) => p.id === id && !p.deletedAt);
+  },
+  createCommunityPost(input: {
+    communityId: string;
+    authorId: string;
+    content: string;
+    image?: string | null;
+  }): CommunityPostRecord {
+    const row: CommunityPostRecord = {
+      id: randomUUID(),
+      communityId: input.communityId,
+      authorId: input.authorId,
+      content: input.content,
+      image: input.image ?? null,
+      pinned: false,
+      createdAt: new Date().toISOString(),
+      deletedAt: null,
+    };
+    snapshot.communityPosts.push(row);
+    persist();
+    mongoMirror.upsertCommunityPost(row);
+    return row;
+  },
+  setCommunityPostPinned(id: string, pinned: boolean): CommunityPostRecord | undefined {
+    const row = snapshot.communityPosts.find((p) => p.id === id);
+    if (!row) return undefined;
+    row.pinned = pinned;
+    persist();
+    mongoMirror.upsertCommunityPost(row);
+    return row;
+  },
+  softDeleteCommunityPost(id: string): CommunityPostRecord | undefined {
+    const row = snapshot.communityPosts.find((p) => p.id === id);
+    if (!row) return undefined;
+    row.deletedAt = new Date().toISOString();
+    persist();
+    mongoMirror.upsertCommunityPost(row);
+    return row;
+  },
+
+  // ---- Community chat (persistent group thread, not tied to a plan) ----
+  findCommunityConversation(communityId: string): ConversationRecord | undefined {
+    return snapshot.conversations.find(
+      (c) => c.communityId === communityId && c.type === "group",
+    );
+  },
+  ensureCommunityConversation(communityId: string, participantIds: string[]): ConversationRecord {
+    const existing = this.findCommunityConversation(communityId);
+    if (existing) {
+      existing.participantIds = Array.from(
+        new Set([...existing.participantIds, ...participantIds]),
+      );
+      persist();
+      mongoMirror.upsertConversation(existing);
+      return existing;
+    }
+    const now = new Date().toISOString();
+    const conv: ConversationRecord = {
+      id: randomUUID(),
+      planId: "",
+      communityId,
+      type: "group",
+      participantIds: Array.from(new Set(participantIds)),
+      createdAt: now,
+      lastMessageAt: now,
+    };
+    snapshot.conversations.push(conv);
+    persist();
+    mongoMirror.upsertConversation(conv);
+    return conv;
   },
 };

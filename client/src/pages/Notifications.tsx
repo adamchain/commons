@@ -146,6 +146,8 @@ function hrefFor(n: NotificationDTO): string | null {
   if ((n.kind === "networkRequest" || n.kind === "networkAccepted") && n.profileUserId) {
     return `/profile/${n.profileUserId}`;
   }
+  // Community pings route to the community page (its Members tab holds requests).
+  if (n.communityId) return `/communities/${n.communityId}`;
   if (n.planId) return `/plans/${n.planId}`;
   return null;
 }
@@ -178,5 +180,13 @@ function iconFor(kind: NotificationKind): string {
       return "🫱";
     case "networkAccepted":
       return "🤝";
+    case "communityJoinRequest":
+      return "🙋";
+    case "communityRequestApproved":
+      return "🎉";
+    case "communityRequestDeclined":
+      return "🙁";
+    case "communityPlanPosted":
+      return "📌";
   }
 }

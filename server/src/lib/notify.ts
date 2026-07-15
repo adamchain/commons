@@ -33,6 +33,12 @@ const PREF_KEY: Record<NotificationKind, keyof NotificationPrefs> = {
   // Network social pings ride on the post-plan network nudge toggle.
   networkRequest: "postPlanNetworkNudge",
   networkAccepted: "postPlanNetworkNudge",
+  // Community pings ride on the "someone joined your plan" toggle — all four are
+  // person-to-group activity. (A dedicated community toggle is a V2 refinement.)
+  communityJoinRequest: "someoneJoinedYourPlan",
+  communityRequestApproved: "someoneJoinedYourPlan",
+  communityRequestDeclined: "someoneJoinedYourPlan",
+  communityPlanPosted: "someoneJoinedYourPlan",
 };
 
 export async function emit(input: {
@@ -43,6 +49,7 @@ export async function emit(input: {
   planId?: string;
   conversationId?: string;
   profileUserId?: string;
+  communityId?: string;
 }): Promise<NotificationRecord | null> {
   const user = await findUserById(input.userId);
   if (!user) return null;
@@ -59,5 +66,6 @@ export async function emit(input: {
     planId: input.planId,
     conversationId: input.conversationId,
     profileUserId: input.profileUserId,
+    communityId: input.communityId,
   });
 }

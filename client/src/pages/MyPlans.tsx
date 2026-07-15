@@ -57,7 +57,7 @@ export function MyPlansPage() {
   return (
     <main className="app-shell app-shell--wide app-shell--with-nav app-shell--with-topbar">
       <header className="app-header app-header--minimal">
-        <Link to="/" className="detail-back">← Back</Link>
+        <Link to={`/profile/${user.id}`} className="detail-back">← Profile</Link>
       </header>
       <h1 className="brand" style={{ marginBottom: 4 }}>My plans</h1>
       <p className="brand-tagline" style={{ marginBottom: 20 }}>
@@ -91,7 +91,7 @@ export function MyPlansPage() {
                   to={`/plans/new?fromPlanId=${plan.id}&title=${encodeURIComponent(plan.title)}`}
                   className="btn-secondary btn-block my-plans-do-again"
                 >
-                  🔁 Do it again
+                  Do it again
                 </Link>
               </div>
             ))}

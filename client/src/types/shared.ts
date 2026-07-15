@@ -250,6 +250,14 @@ export interface PlanDTO {
    * don't need a migration. Coming Soon.
    */
   communityId: string | null;
+  /** Community name for the card pill — null unless communityId is set. */
+  communityName: string | null;
+  /**
+   * Per-plan visibility within a community (public / community_only). Null unless
+   * the plan is tagged to a community. `community_only` plans are only served to
+   * that community's active members.
+   */
+  communityVisibility: CommunityVisibility | null;
   /** Total spots including host. Null means open / no cap. */
   capacity: number | null;
   /** How RSVPs are accepted when capacity is set. */
@@ -311,6 +319,12 @@ export interface ConversationSummaryDTO {
   /** Host + everyone going/interested who could be in the thread. */
   participantCount: number;
   myRole: "hosting" | "going" | "interested";
+  /**
+   * Set when this row is a community group chat rather than a plan chat. The
+   * client links to /communities/:communityId and shows communityName as title.
+   */
+  communityId?: string;
+  communityName?: string;
 }
 
 /** One option in a poll, with the ids of everyone who picked it. */
@@ -437,7 +451,11 @@ export type NotificationKind =
   | "planTimeChanged"
   | "planInvite"
   | "networkRequest"
-  | "networkAccepted";
+  | "networkAccepted"
+  | "communityJoinRequest"
+  | "communityRequestApproved"
+  | "communityRequestDeclined"
+  | "communityPlanPosted";
 
 export interface NotificationDTO {
   id: string;
@@ -449,6 +467,8 @@ export interface NotificationDTO {
   conversationId?: string;
   /** Optional profile link — network request/accept route here. */
   profileUserId?: string;
+  /** Present on community notifications — links to the community page. */
+  communityId?: string;
   createdAt: string;
   readAt: string | null;
 }
@@ -470,3 +490,126 @@ export const NOTIFICATION_LABELS: Record<keyof NotificationPrefs, string> = {
   weeklyFridayDigest: "Weekly Friday: what's happening in Philly",
   lookingForRecovery: "Reminder when a Looking For plan needs a host",
 };
+
+// ---- Communities (V1) ----
+// A community is a named group with a bulletin, events board, member list, and
+// optional group chat. Created by an organizer, approved by COMMONS admin before
+// going live, joined by members. All V1 communities are public.
+
+export type CommunityCategory =
+  | "run_club"
+  | "book_club"
+  | "fitness"
+  | "food_drink"
+  | "arts"
+  | "social"
+  | "wellness"
+  | "other";
+
+export const COMMUNITY_CATEGORY_LABELS: Record<CommunityCategory, string> = {
+  run_club: "Run Club",
+  book_club: "Book Club",
+  fitness: "Fitness",
+  food_drink: "Food & Drink",
+  arts: "Arts",
+  social: "Social",
+  wellness: "Wellness",
+  other: "Other",
+};
+
+export const ALL_COMMUNITY_CATEGORIES: CommunityCategory[] = [
+  "run_club",
+  "book_club",
+  "fitness",
+  "food_drink",
+  "arts",
+  "social",
+  "wellness",
+  "other",
+];
+
+export type CommunityCreationStatus = "pending" | "approved" | "rejected";
+/** Who may post to a given surface — organizer-controlled toggle. */
+export type CommunityPostingPermission = "organizer_only" | "members";
+export type CommunityMemberRole = "organizer" | "member";
+export type CommunityMemberStatus = "pending" | "active";
+/** Per-plan visibility within a community. Required when a plan has a communityId. */
+export type CommunityVisibility = "public" | "community_only";
+
+/** The viewer's membership relative to a community (null = not a member). */
+export interface CommunityMembershipView {
+  role: CommunityMemberRole;
+  status: CommunityMemberStatus;
+}
+
+export interface CommunityDTO {
+  id: string;
+  name: string;
+  description: string;
+  coverImage: string | null;
+  category: CommunityCategory;
+  organizer: PublicUser;
+  memberCount: number;
+  isFounding: boolean;
+  creationStatus: CommunityCreationStatus;
+  bulletinPermission: CommunityPostingPermission;
+  planPostingPermission: CommunityPostingPermission;
+  chatEnabled: boolean;
+  /** Only exposed to the organizer/admin (others get null). */
+  screeningQuestion: string | null;
+  /** True when a screening question is set (all viewers, so Join can branch). */
+  hasScreening: boolean;
+  createdAt: string;
+  /** The viewer's membership, or null if they're a visitor. */
+  myMembership: CommunityMembershipView | null;
+  /** True when the viewer created it (or is a COMMONS admin). */
+  isOrganizer: boolean;
+  /** Viewer may post to the bulletin (permission + active membership). */
+  canPostBulletin: boolean;
+  /** Viewer may post a plan tagged to this community. */
+  canPostPlan: boolean;
+}
+
+export interface CommunityMemberDTO {
+  user: PublicUser;
+  role: CommunityMemberRole;
+  status: CommunityMemberStatus;
+  /** Screening answer — only populated for the organizer/admin viewing requests. */
+  screeningAnswer: string | null;
+  joinedAt: string;
+}
+
+export interface CommunityPostDTO {
+  id: string;
+  author: PublicUser;
+  authorIsOrganizer: boolean;
+  content: string;
+  image: string | null;
+  pinned: boolean;
+  createdAt: string;
+  /** Viewer may delete this post (own post, or organizer/admin on any). */
+  canDelete: boolean;
+}
+
+/** Compact card for the Explore rail + profile "Communities" list. */
+export interface CommunityCardDTO {
+  id: string;
+  name: string;
+  coverImage: string | null;
+  category: CommunityCategory;
+  memberCount: number;
+  isFounding: boolean;
+  /** The viewer's role, when they belong — drives the "Organizer" label on profile. */
+  myRole: CommunityMemberRole | null;
+}
+
+/** Row in the admin "Pending communities" review queue. */
+export interface PendingCommunityDTO {
+  id: string;
+  name: string;
+  description: string;
+  category: CommunityCategory;
+  organizer: PublicUser;
+  submittedAt: string;
+  creationStatus: CommunityCreationStatus;
+}

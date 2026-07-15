@@ -55,13 +55,20 @@ export function MessagesPage() {
         <div className="messages-card">
           <div className="messages-list">
             {items.map((c) => (
-              <Link key={c.planId} to={`/plans/${c.planId}/chat`} className="messages-row">
+              <Link
+                key={c.communityId ? `comm-${c.communityId}` : c.planId}
+                to={c.communityId ? `/communities/${c.communityId}/chat` : `/plans/${c.planId}/chat`}
+                state={{ from: "messages" }}
+                className="messages-row"
+              >
               <span className="messages-row-emoji" aria-hidden="true">
                 {c.hostEmoji}
               </span>
               <div className="messages-row-body">
                 <div className="messages-row-top">
-                  <span className="messages-row-title">{c.planTitle}</span>
+                  <span className="messages-row-title">
+                    {c.communityName ?? c.planTitle}
+                  </span>
                   {c.lastMessageAt && (
                     <span className="messages-row-time">{formatRelative(c.lastMessageAt)}</span>
                   )}
@@ -70,7 +77,7 @@ export function MessagesPage() {
                   {c.lastMessagePreview ?? "No messages yet — say hi 👋"}
                 </div>
                 <div className="messages-row-meta">
-                  {ROLE_LABEL[c.myRole]} · {c.participantCount}{" "}
+                  {c.communityId ? "Community" : ROLE_LABEL[c.myRole]} · {c.participantCount}{" "}
                   {c.participantCount === 1 ? "person" : "people"}
                 </div>
               </div>

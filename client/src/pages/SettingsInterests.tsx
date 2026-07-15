@@ -67,7 +67,7 @@ export function SettingsInterestsPage() {
             <button
               key={t}
               type="button"
-              className={`community-chip ${isPicked ? "is-active" : ""}`}
+              className={`settings-interest-pill ${isPicked ? "is-active" : ""}`}
               onClick={() => toggle(t)}
               aria-pressed={isPicked}
             >

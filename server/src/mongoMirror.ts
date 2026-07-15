@@ -14,6 +14,9 @@
 import { isMongoConnected } from "./lib/db.js";
 import {
   CardImageModel,
+  CommunityMemberModel,
+  CommunityModel,
+  CommunityPostModel,
   ConversationModel,
   DeclineModel,
   DropoutModel,
@@ -31,6 +34,9 @@ import { RelationshipModel } from "./models/Relationship.js";
 import { UserModel } from "./models/User.js";
 import type {
   CardImageRecord,
+  CommunityMemberRecord,
+  CommunityPostRecord,
+  CommunityRecord,
   ConversationRecord,
   DeclineRecord,
   DropoutRecord,
@@ -258,5 +264,33 @@ export const mongoMirror = {
   // Invite codes
   upsertInviteCode(c: InviteCodeRecord): void {
     upsert(InviteCodeModel as never, c, `upsertInviteCode ${c.id}`);
+  },
+
+  // Communities
+  upsertCommunity(c: CommunityRecord): void {
+    upsert(CommunityModel as never, c, `upsertCommunity ${c.id}`);
+  },
+  deleteCommunity(id: string): void {
+    removeById(CommunityModel as never, id, `deleteCommunity ${id}`);
+  },
+  upsertCommunityMember(m: CommunityMemberRecord): void {
+    upsert(CommunityMemberModel as never, m, `upsertCommunityMember ${m.id}`);
+  },
+  deleteCommunityMember(communityId: string, userId: string): void {
+    if (!isMongoConnected()) return;
+    const p = CommunityMemberModel.deleteOne({ communityId, userId })
+      .exec()
+      .catch((err) => fail(`deleteCommunityMember ${communityId}/${userId}`, err));
+    track(p);
+  },
+  deleteCommunityMembersByUser(userId: string): void {
+    if (!isMongoConnected()) return;
+    const p = CommunityMemberModel.deleteMany({ userId })
+      .exec()
+      .catch((err) => fail(`deleteCommunityMembersByUser ${userId}`, err));
+    track(p);
+  },
+  upsertCommunityPost(p: CommunityPostRecord): void {
+    upsert(CommunityPostModel as never, p, `upsertCommunityPost ${p.id}`);
   },
 };

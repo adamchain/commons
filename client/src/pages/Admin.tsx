@@ -496,6 +496,176 @@ function AdminUserDetailModal({ userId, onClose }: { userId: string; onClose: ()
   );
 }
 
+interface AdminCommunityRow {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  organizer: { id: string; firstName: string; lastName: string };
+  memberCount: number;
+  isFounding: boolean;
+  submittedAt: string;
+  creationStatus: "pending" | "approved" | "rejected";
+}
+
+// Pending-communities review queue + Founding Community creation.
+function CommunitiesReview() {
+  const [rows, setRows] = useState<AdminCommunityRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [founding, setFounding] = useState({ name: "", description: "", category: "run_club", organizer: "" });
+  const [foundingBusy, setFoundingBusy] = useState(false);
+  const [foundingMsg, setFoundingMsg] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await api<{ communities: AdminCommunityRow[] }>("/api/admin/communities?status=pending");
+      setRows(r.communities);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Failed to load");
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function decide(id: string, action: "approve" | "reject") {
+    setBusyId(id);
+    try {
+      const body =
+        action === "reject"
+          ? JSON.stringify({ note: window.prompt("Optional note to the creator:") ?? "" })
+          : undefined;
+      await api(`/api/admin/communities/${id}/${action}`, { method: "POST", body });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Action failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function createFounding() {
+    if (!founding.name.trim() || !founding.description.trim() || !founding.organizer.trim()) {
+      setFoundingMsg("Name, description, and organizer are required.");
+      return;
+    }
+    setFoundingBusy(true);
+    setFoundingMsg(null);
+    try {
+      await api("/api/admin/communities/founding", {
+        method: "POST",
+        body: JSON.stringify(founding),
+      });
+      setFounding({ name: "", description: "", category: "run_club", organizer: "" });
+      setFoundingMsg("Founding community created and approved.");
+      await load();
+    } catch (e) {
+      setFoundingMsg(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Could not create");
+    } finally {
+      setFoundingBusy(false);
+    }
+  }
+
+  return (
+    <section className="admin-section">
+      <h2 className="admin-section-title">Pending communities</h2>
+      <div className="admin-card">
+        {error && <p className="error-text">{error}</p>}
+        {!rows ? (
+          <p>Loading…</p>
+        ) : rows.length === 0 ? (
+          <p style={{ opacity: 0.7, margin: 0 }}>No communities awaiting review. 🎉</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            {rows.map((c) => (
+              <div
+                key={c.id}
+                style={{
+                  border: "1px solid rgba(0,0,0,0.1)",
+                  borderRadius: 12,
+                  padding: "0.75rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.35rem",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem" }}>
+                  <strong>{c.name}</strong>
+                  <span style={{ fontSize: 12, opacity: 0.6 }}>{c.category}</span>
+                </div>
+                <div style={{ fontSize: 13, opacity: 0.85 }}>{c.description}</div>
+                <div style={{ fontSize: 12, opacity: 0.6 }}>
+                  by {c.organizer.firstName} {c.organizer.lastName} · submitted{" "}
+                  {new Date(c.submittedAt).toLocaleDateString()}
+                </div>
+                <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem" }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={busyId === c.id}
+                    onClick={() => void decide(c.id, "approve")}
+                  >
+                    Approve
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={busyId === c.id}
+                    onClick={() => void decide(c.id, "reject")}
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <h3 className="admin-section-title" style={{ marginTop: "1.25rem", marginBottom: "0.5rem" }}>
+          Create Founding Community
+        </h3>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <input
+            placeholder="Name"
+            value={founding.name}
+            onChange={(e) => setFounding((f) => ({ ...f, name: e.target.value }))}
+          />
+          <textarea
+            placeholder="Description"
+            value={founding.description}
+            onChange={(e) => setFounding((f) => ({ ...f, description: e.target.value }))}
+            rows={2}
+          />
+          <select
+            value={founding.category}
+            onChange={(e) => setFounding((f) => ({ ...f, category: e.target.value }))}
+          >
+            {["run_club", "book_club", "fitness", "food_drink", "arts", "social", "wellness", "other"].map(
+              (c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ),
+            )}
+          </select>
+          <input
+            placeholder="Organizer user id or E.164 phone"
+            value={founding.organizer}
+            onChange={(e) => setFounding((f) => ({ ...f, organizer: e.target.value }))}
+          />
+          <button type="button" className="btn btn-primary" disabled={foundingBusy} onClick={() => void createFounding()}>
+            {foundingBusy ? "Creating…" : "Create + approve"}
+          </button>
+          {foundingMsg && <p style={{ fontSize: 13, margin: 0 }}>{foundingMsg}</p>}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function AdminPage() {
   const [summary, setSummary] = useState<AdminSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -755,6 +925,8 @@ export function AdminPage() {
             </section>
 
             <CardImagesManager />
+
+            <CommunitiesReview />
 
             <section className="admin-section">
               <h2 className="admin-section-title">Users</h2>

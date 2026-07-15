@@ -27,10 +27,6 @@ import {
   type NeighborhoodDTO,
 } from "../types/shared";
 
-// Public legal docs — update these to the live URLs before launch.
-const TERMS_URL = "https://jointhecommons.com/terms";
-const PRIVACY_URL = "https://jointhecommons.com/privacy";
-
 // TEMP launch gate: after verifying their phone, every (non-admin) member must
 // enter this exclusive code to finalize account setup. Stored client-side once
 // passed so it isn't re-prompted on refresh. Remove this gate (the EXCLUSIVE_CODE
@@ -53,8 +49,7 @@ type Step =
   | "interests"
   | "profile"
   | "age"
-  | "legal"
-  | "guidelines";
+  | "legal";
 
 export function OnboardingPage() {
   const { user, refreshUser, setUser } = useAuth();
@@ -399,26 +394,18 @@ export function OnboardingPage() {
       <LegalConsentStep
         onBack={() => setStep("age")}
         onAgree={async () => {
-          // termsAccepted/privacyAccepted are server-side action flags (they
-          // stamp *AcceptedAt), not MeDTO fields — call the endpoint directly.
-          const me = await api<MeDTO>("/api/auth/me", {
-            method: "PATCH",
-            body: JSON.stringify({ termsAccepted: true, privacyAccepted: true }),
-          });
-          setUser(me);
-          setStep("guidelines");
-        }}
-      />
-    );
-  }
-  if (step === "guidelines") {
-    return (
-      <GuidelinesStep
-        onBack={() => setStep("legal")}
-        onAgree={async () => {
+          // Terms, Privacy, and the community guidelines are all accepted on this
+          // one screen now, so stamp every consent flag and finish onboarding in a
+          // single request. termsAccepted/privacyAccepted/guidelinesAcknowledged are
+          // server-side action flags (they stamp *AcceptedAt), not MeDTO fields.
           await api<MeDTO>("/api/auth/me", {
             method: "PATCH",
-            body: JSON.stringify({ guidelinesAcknowledged: true, onboardingComplete: true }),
+            body: JSON.stringify({
+              termsAccepted: true,
+              privacyAccepted: true,
+              guidelinesAcknowledged: true,
+              onboardingComplete: true,
+            }),
           });
           await refreshUser();
           navigate("/", { replace: true });
@@ -442,9 +429,11 @@ function pickInitial(user: MeDTO | null, gatePassed: boolean): Step {
   if (user.interests.length < 1) return "interests";
   if (!user.firstName.trim()) return "profile";
   if (!user.ageConfirmedAt) return "age";
-  if (!user.termsAcceptedAt || !user.privacyAcceptedAt) return "legal";
-  if (!user.guidelinesAcknowledgedAt) return "guidelines";
-  return "guidelines";
+  // Terms, Privacy, and community-guidelines consent are all captured on the one
+  // combined "legal" step, so any missing consent flag routes back to it.
+  if (!user.termsAcceptedAt || !user.privacyAcceptedAt || !user.guidelinesAcknowledgedAt)
+    return "legal";
+  return "legal";
 }
 
 function formatError(e: unknown): string {
@@ -586,21 +575,6 @@ function OnboardingShell({
 
   return (
     <div className={`onboarding-shell ${landing ? "onboarding-shell--landing" : ""}`}>
-      {onBack && (
-        <button type="button" className="onboarding-back" onClick={onBack} aria-label="Back">
-          ← Back
-        </button>
-      )}
-      {showExit && (
-        <button
-          type="button"
-          className="onboarding-exit"
-          onClick={() => void handleExit()}
-          aria-label="Exit setup"
-        >
-          Exit
-        </button>
-      )}
       {landing && (
         <div className="loader-icons" aria-hidden="true">
           {ONBOARDING_ICONS.map((icon) => {
@@ -626,6 +600,21 @@ function OnboardingShell({
           !landing && (onBack || showExit) ? "onboarding-card--has-nav" : ""
         }`}
       >
+        {onBack && (
+          <button type="button" className="onboarding-back" onClick={onBack} aria-label="Back">
+            ← Back
+          </button>
+        )}
+        {showExit && (
+          <button
+            type="button"
+            className="onboarding-exit"
+            onClick={() => void handleExit()}
+            aria-label="Exit setup"
+          >
+            Exit
+          </button>
+        )}
         {landing ? (
           <h1 className="loader-wordmark">COMMONS</h1>
         ) : (
@@ -773,6 +762,9 @@ function LocationStep({
  * unlocks — required for new users during onboarding. Reading state is tracked
  * per document and persists across tab switches.
  */
+// Combined consent gate: the community guidelines, Terms of Service, and Privacy
+// Policy all live on one screen so members agree to everything in a single flow
+// rather than clearing two near-identical "agree & continue" steps back to back.
 function LegalConsentStep({
   onAgree,
   onBack,
@@ -815,85 +807,8 @@ function LegalConsentStep({
 
   return (
     <OnboardingShell
-      title="The legal bit."
-      subtitle="Please read our Terms and Privacy Policy. Scroll to the bottom of each to continue."
-      onBack={onBack}
-      showExit
-    >
-      <div className="legal-consent-tabs">
-        {(["terms", "privacy"] as const).map((slug) => (
-          <button
-            key={slug}
-            type="button"
-            className={`legal-consent-tab ${active === slug ? "is-active" : ""}`}
-            onClick={() => setActive(slug)}
-          >
-            {read[slug] && (
-              <span className="legal-consent-tab-check" aria-hidden="true">
-                ✓
-              </span>
-            )}
-            {LEGAL_DOCS[slug].title}
-          </button>
-        ))}
-      </div>
-
-      <div className="legal-consent-panel" ref={panelRef} onScroll={markIfAtBottom}>
-        <LegalContent doc={doc} />
-        {!read[active] && <div className="legal-consent-scrollhint">Scroll to continue ↓</div>}
-      </div>
-
-      <p className={`legal-consent-status ${bothRead ? "is-done" : ""}`}>
-        {bothRead
-          ? "Thanks for reading both documents."
-          : read.terms
-            ? "Now read the Privacy Policy."
-            : read.privacy
-              ? "Now read the Terms of Service."
-              : "Scroll to the bottom of each document to continue."}
-      </p>
-
-      <p className="onboarding-women-note">
-        COMMONS is built for women. By joining, you&rsquo;re confirming that you identify as a woman.
-      </p>
-
-      <label className="guidelines-agree">
-        <input
-          type="checkbox"
-          checked={agreed}
-          disabled={!bothRead}
-          onChange={(e) => setAgreed(e.target.checked)}
-        />
-        <span>I have read and agree to the Terms of Service and Privacy Policy.</span>
-      </label>
-
-      <button
-        type="button"
-        className="btn-primary btn-block"
-        disabled={busy || !bothRead || !agreed}
-        onClick={async () => {
-          setBusy(true);
-          try {
-            await onAgree();
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        {busy ? "One sec…" : "Agree & continue"}
-      </button>
-    </OnboardingShell>
-  );
-}
-
-function GuidelinesStep({ onAgree, onBack }: { onAgree: () => Promise<void>; onBack?: () => void }) {
-  const [busy, setBusy] = useState(false);
-  // Explicit agreement gate — the user must tick the box before continuing.
-  const [agreed, setAgreed] = useState(false);
-  return (
-    <OnboardingShell
-      title="Before you hit the feed."
-      subtitle="A quick read. We mean it."
+      title="Before you join."
+      subtitle="Our community guidelines, Terms, and Privacy Policy — one quick read."
       onBack={onBack}
       showExit
     >
@@ -935,23 +850,61 @@ function GuidelinesStep({ onAgree, onBack }: { onAgree: () => Promise<void>; onB
         </li>
       </ul>
 
+      <div className="legal-consent-tabs">
+        {(["terms", "privacy"] as const).map((slug) => (
+          <button
+            key={slug}
+            type="button"
+            className={`legal-consent-tab ${active === slug ? "is-active" : ""}`}
+            onClick={() => setActive(slug)}
+          >
+            {read[slug] && (
+              <span className="legal-consent-tab-check" aria-hidden="true">
+                ✓
+              </span>
+            )}
+            {LEGAL_DOCS[slug].title}
+          </button>
+        ))}
+      </div>
+
+      <div className="legal-consent-panel" ref={panelRef} onScroll={markIfAtBottom}>
+        <LegalContent doc={doc} />
+        {!read[active] && <div className="legal-consent-scrollhint">Scroll to continue ↓</div>}
+      </div>
+
+      {!bothRead && (
+        <p className="legal-consent-status">
+          {read.terms
+            ? "Now read the Privacy Policy."
+            : read.privacy
+              ? "Now read the Terms of Service."
+              : "Scroll to the bottom of each document to continue."}
+        </p>
+      )}
+
+      <p className="onboarding-women-note">
+        COMMONS is a community platform built for women. By joining, you are confirming that you
+        identify as a woman.
+      </p>
+
       <label className="guidelines-agree">
         <input
           type="checkbox"
           checked={agreed}
+          disabled={!bothRead}
           onChange={(e) => setAgreed(e.target.checked)}
         />
         <span>
-          I agree to the Commons community guidelines, and the{" "}
-          <a href={TERMS_URL} target="_blank" rel="noreferrer">Terms &amp; Conditions</a>{" "}
-          and <a href={PRIVACY_URL} target="_blank" rel="noreferrer">Privacy Policy</a>.
+          I have read and agree to the Commons Community Guidelines, Terms of Service, and Privacy
+          Policy.
         </span>
       </label>
 
       <button
         type="button"
         className="btn-primary btn-block"
-        disabled={busy || !agreed}
+        disabled={busy || !bothRead || !agreed}
         onClick={async () => {
           setBusy(true);
           try {
@@ -963,12 +916,6 @@ function GuidelinesStep({ onAgree, onBack }: { onAgree: () => Promise<void>; onB
       >
         {busy ? "One sec…" : "Agree & continue"}
       </button>
-
-      <p className="onboarding-guidelines-links">
-        <a href={TERMS_URL} target="_blank" rel="noreferrer">Terms &amp; Conditions</a>
-        <span aria-hidden="true"> · </span>
-        <a href={PRIVACY_URL} target="_blank" rel="noreferrer">Privacy Policy</a>
-      </p>
     </OnboardingShell>
   );
 }
@@ -1141,11 +1088,9 @@ function ProfileStep({
       </button>
       {!canContinue && (
         <p className="onboarding-fineprint">
-          {!firstName.trim()
-            ? "Add your first name to continue."
-            : !lastName.trim()
-              ? "Add your last name to continue."
-              : "Add a photo to continue."}
+          {!firstName.trim() || !lastName.trim()
+            ? "Add your first and last name to continue."
+            : "Add a photo to continue."}
         </p>
       )}
 

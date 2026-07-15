@@ -27,7 +27,8 @@ export function PlanCard({
   onHideKind?: (kind: "happened" | "cancelled") => void;
 }) {
   const title = sentenceCaseTitle(plan.title);
-  const isLooking = plan.planKind === "looking_for";
+  const flexCount = (plan.isFlexibleTime ? 1 : 0) + (plan.isFlexibleLocation ? 1 : 0);
+  const isLooking = plan.planKind === "looking_for" && flexCount > 1;
   const coverPool = useCardImages();
   const coverImage = plan.flyerDataUrl ?? pickCoverImage(coverPool, plan.id);
   const hoods = useNeighborhoods();
@@ -39,6 +40,8 @@ export function PlanCard({
   const isHosting = !!user && plan.creator.id === user.id;
   const isSaved = !!user?.savedPlanIds?.includes(plan.id);
   const [savePending, setSavePending] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const cardNavigate = useNavigate();
 
   async function toggleSave(e: MouseEvent) {
     e.preventDefault();
@@ -155,6 +158,27 @@ export function PlanCard({
             ) : hasEnded ? (
               <span className="plan-card-kind-pill is-happened">Happened</span>
             ) : null}
+            {plan.communityId && plan.communityName ? (
+              <span
+                className="plan-card-community-pill"
+                role="link"
+                tabIndex={0}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  cardNavigate(`/communities/${plan.communityId}`);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cardNavigate(`/communities/${plan.communityId}`);
+                  }
+                }}
+              >
+                🏙️ {plan.communityName}
+              </span>
+            ) : null}
           </header>
           <h3 className="plan-card-title">{title}</h3>
           <p className="plan-card-meta-line">
@@ -174,7 +198,15 @@ export function PlanCard({
           )}
 
           {plan.flyerLinkUrl && (
-            <div className="link-preview link-preview--card" aria-hidden="true">
+            <button
+              type="button"
+              className="link-preview link-preview--card"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setLinkOpen(true);
+              }}
+            >
               {plan.flyerLinkPreview?.image && (
                 <img src={plan.flyerLinkPreview.image} alt="" className="link-preview-image" />
               )}
@@ -185,13 +217,13 @@ export function PlanCard({
                 {plan.flyerLinkPreview?.title ? (
                   <div className="link-preview-title">{plan.flyerLinkPreview.title}</div>
                 ) : (
-                  <div className="link-preview-title">{plan.flyerLinkUrl}</div>
+                  <div className="link-preview-title">View link</div>
                 )}
                 {plan.flyerLinkPreview?.description && (
                   <div className="link-preview-desc">{plan.flyerLinkPreview.description}</div>
                 )}
               </div>
-            </div>
+            </button>
           )}
 
           <footer className="plan-card-footer-row">
@@ -216,7 +248,7 @@ export function PlanCard({
                 <span className="plan-card-going-count">{footerCount}</span>
               )}
             </div>
-            {!isHosting && !hasEnded && !isCancelled && (
+            {!isHosting && !hasEnded && !isCancelled && isLooking && (
               <QuickJoin
                 planId={plan.id}
                 isLooking={isLooking}
@@ -233,6 +265,44 @@ export function PlanCard({
         <Link to="/plans/new" className="plan-card-host-again" onClick={(e) => e.stopPropagation()}>
           Host another like this →
         </Link>
+      )}
+
+      {linkOpen && plan.flyerLinkUrl && (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setLinkOpen(false)}
+        >
+          <div className="modal-card link-preview-modal" onClick={(e) => e.stopPropagation()}>
+            {plan.flyerLinkPreview?.image && (
+              <img src={plan.flyerLinkPreview.image} alt="" className="link-preview-image" />
+            )}
+            <div className="link-preview-body">
+              {plan.flyerLinkPreview?.siteName && (
+                <div className="link-preview-site">{plan.flyerLinkPreview.siteName}</div>
+              )}
+              <div className="link-preview-title">
+                {plan.flyerLinkPreview?.title ?? "Shared link"}
+              </div>
+              {plan.flyerLinkPreview?.description && (
+                <div className="link-preview-desc">{plan.flyerLinkPreview.description}</div>
+              )}
+            </div>
+            <a
+              href={plan.flyerLinkUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary btn-block"
+              style={{ marginTop: 12 }}
+            >
+              Open link
+            </a>
+            <button type="button" className="btn-link" style={{ marginTop: 8 }} onClick={() => setLinkOpen(false)}>
+              Close
+            </button>
+          </div>
+        </div>
       )}
 
     </div>

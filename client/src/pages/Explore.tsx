@@ -1,10 +1,12 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { api } from "../api/http";
+import { COMMUNITY_CATEGORY_LABELS, type CommunityCardDTO } from "../types/shared";
 
 // Explore is locked to an editorial "Coming Soon" state for launch (no live
-// search / nearby calls). The layout below is the real, designed page — a
-// masthead, a coming-soon pitch, a browse-categories mosaic, and a communities
-// preview — rendered as a visual showcase. Restore the functional search +
-// nearby version from git history when Explore ships.
+// search / nearby calls) — EXCEPT the Communities rail, which is the one live
+// element at launch (per the Communities V1 spec). Restore the functional
+// search + nearby version from git history when the rest of Explore ships.
 
 // Browse categories — photo + label tiles arranged in the mosaic.
 const CATEGORIES: Array<{ label: string; photo: string }> = [
@@ -16,13 +18,27 @@ const CATEGORIES: Array<{ label: string; photo: string }> = [
   { label: "Culture", photo: "https://images.unsplash.com/photo-1518998053901-5348d3961a04?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400&q=80" },
 ];
 
-const COMMUNITIES: Array<{ name: string; sub: string; photo: string }> = [
-  { name: "Saturday Long Run", sub: "Fishtown · 18 members", photo: "https://images.unsplash.com/photo-1607962837359-5e7e89f86776?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=800&q=80" },
-  { name: "Rittenhouse Book Club", sub: "Monthly · 9 members", photo: "https://images.unsplash.com/photo-1763896081109-ed6bf56ae955?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=800&q=80" },
-  { name: "Trivia Tuesdays", sub: "South Philly · 14 members", photo: "https://images.unsplash.com/photo-1538488881038-e252a119ace7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=800&q=80" },
-];
-
 export function ExplorePage() {
+  const [communities, setCommunities] = useState<CommunityCardDTO[]>([]);
+  const [loadedComm, setLoadedComm] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    api<{ communities: CommunityCardDTO[] }>("/api/communities")
+      .then((r) => {
+        if (alive) setCommunities(r.communities);
+      })
+      .catch(() => {
+        /* rail just stays empty on error */
+      })
+      .finally(() => {
+        if (alive) setLoadedComm(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   return (
     <main className="app-shell app-shell--wide app-shell--with-nav app-shell--with-topbar xpl">
       {/* Masthead — neighbourhood eyebrow + big title + inert search pill */}
@@ -39,9 +55,11 @@ export function ExplorePage() {
 
       <div className="xpl-divider" />
 
-      {/* Coming soon — large editorial pitch, no card */}
+      {/* Coming soon — compact button, not oversized headline */}
       <section className="xpl-pitch" aria-label="Explore — coming soon">
-        <div className="xpl-pitch-eyebrow">Coming soon</div>
+        <button type="button" className="xpl-coming-soon-btn" disabled aria-disabled="true">
+          Coming soon
+        </button>
         <h2 className="xpl-pitch-head">
           Browse spots.<br />Make plans<br />there.
         </h2>
@@ -73,28 +91,52 @@ export function ExplorePage() {
 
       <div className="xpl-divider" />
 
-      {/* Communities — numbered photo rows */}
-      <section className="xpl-communities" aria-label="Communities — coming soon">
+      {/* Communities — the one live Explore element at launch */}
+      <section className="xpl-communities" aria-label="Communities">
         <div className="xpl-section-head">
-          <div className="xpl-eyebrow">Communities · Soon</div>
+          <div className="xpl-eyebrow">Communities</div>
           <h2 className="xpl-section-title">Find your people</h2>
+          <Link to="/communities" className="xpl-pitch-cta">
+            See all →
+          </Link>
         </div>
-        <ul className="xpl-comm-list">
-          {COMMUNITIES.map((c, i) => (
-            <li key={c.name} className="xpl-comm-card">
-              <img src={c.photo} alt="" loading="lazy" />
-              <div className="xpl-comm-overlay" aria-hidden="true" />
-              <div className="xpl-comm-body">
-                <span className="xpl-comm-num">{String(i + 1).padStart(2, "0")}</span>
-                <div>
-                  <div className="xpl-comm-name">{c.name}</div>
-                  <div className="xpl-comm-sub">{c.sub}</div>
-                </div>
-              </div>
-              <ChevronIcon />
-            </li>
-          ))}
-        </ul>
+        {communities.length > 0 ? (
+          <ul className="xpl-comm-list">
+            {communities.map((c, i) => (
+              <li key={c.id} className="xpl-comm-card-wrap">
+                <Link to={`/communities/${c.id}`} className="xpl-comm-card">
+                  {c.coverImage ? (
+                    <img src={c.coverImage} alt="" loading="lazy" />
+                  ) : (
+                    <div className="xpl-comm-cover-fallback" aria-hidden="true" />
+                  )}
+                  <div className="xpl-comm-overlay" aria-hidden="true" />
+                  <div className="xpl-comm-body">
+                    <span className="xpl-comm-num">{String(i + 1).padStart(2, "0")}</span>
+                    <div>
+                      <div className="xpl-comm-name">
+                        {c.name}
+                        {c.isFounding ? <span className="xpl-comm-founding">Founding</span> : null}
+                      </div>
+                      <div className="xpl-comm-sub">
+                        {COMMUNITY_CATEGORY_LABELS[c.category]} · {c.memberCount}{" "}
+                        {c.memberCount === 1 ? "member" : "members"}
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronIcon />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : loadedComm ? (
+          <div className="xpl-comm-empty">
+            <p>No communities yet — be the first to start one.</p>
+            <Link to="/communities/new" className="xpl-pitch-cta">
+              Start a community →
+            </Link>
+          </div>
+        ) : null}
       </section>
     </main>
   );

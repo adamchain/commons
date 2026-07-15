@@ -10,6 +10,7 @@ const NotificationSchema = new mongoose.Schema<NotificationRecord>(
     planId: { type: String },
     conversationId: { type: String },
     profileUserId: { type: String },
+    communityId: { type: String },
     dedupKey: { type: String, required: true },
     createdAt: { type: String, required: true },
     readAt: { type: String, default: null },

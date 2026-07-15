@@ -9,6 +9,9 @@
 import mongoose, { Schema, type Model } from "mongoose";
 import type {
   CardImageRecord,
+  CommunityMemberRecord,
+  CommunityPostRecord,
+  CommunityRecord,
   ConversationRecord,
   DeclineRecord,
   DropoutRecord,
@@ -66,6 +69,7 @@ const PlanSchema = new Schema<PlanRecord>(
     visibility: { type: String, enum: ["everyone", "community", "network"], default: "everyone" },
     visibilityCommunityTag: { type: String, default: null },
     communityId: { type: String, default: null },
+    communityVisibility: { type: String, enum: ["public", "community_only", null], default: null },
     capacity: { type: Number, default: null },
     joinType: { type: String, enum: ["open", "approve"], default: "open" },
     isRecurring: { type: Boolean, default: false },
@@ -136,7 +140,10 @@ export const DropoutModel = compile<DropoutRecord>("Dropout", DropoutSchema);
 const ConversationSchema = new Schema<ConversationRecord>(
   {
     id: { type: String, required: true },
-    planId: { type: String, required: true },
+    // Empty string for community conversations (anchored by communityId), so
+    // this stays a non-null string without failing `required` on "".
+    planId: { type: String, default: "" },
+    communityId: { type: String, default: null },
     type: { type: String, enum: ["group", "dm"], required: true },
     participantIds: { type: [String], default: [] },
     createdAt: { type: String, required: true },
@@ -146,6 +153,7 @@ const ConversationSchema = new Schema<ConversationRecord>(
 );
 ConversationSchema.index({ id: 1 }, { unique: true });
 ConversationSchema.index({ planId: 1, type: 1 });
+ConversationSchema.index({ communityId: 1, type: 1 });
 export const ConversationModel = compile<ConversationRecord>("Conversation", ConversationSchema);
 
 // Messages
@@ -245,3 +253,72 @@ const CardImageSchema = new Schema<CardImageRecord>(
 );
 CardImageSchema.index({ id: 1 }, { unique: true });
 export const CardImageModel = compile<CardImageRecord>("CardImage", CardImageSchema);
+
+// Communities
+const CommunitySchema = new Schema<CommunityRecord>(
+  {
+    id: { type: String, required: true },
+    name: { type: String, required: true },
+    description: { type: String, default: "" },
+    coverImage: { type: String, default: null },
+    category: {
+      type: String,
+      enum: ["run_club", "book_club", "fitness", "food_drink", "arts", "social", "wellness", "other"],
+      required: true,
+    },
+    organizerId: { type: String, required: true },
+    memberCount: { type: Number, default: 1 },
+    creationStatus: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
+    isFounding: { type: Boolean, default: false },
+    bulletinPermission: { type: String, enum: ["organizer_only", "members"], default: "members" },
+    planPostingPermission: { type: String, enum: ["organizer_only", "members"], default: "organizer_only" },
+    chatEnabled: { type: Boolean, default: true },
+    screeningQuestion: { type: String, default: null },
+    rejectionNote: { type: String, default: null },
+    submittedAt: { type: String, required: true },
+    reviewedAt: { type: String, default: null },
+    reviewedBy: { type: String, default: null },
+    createdAt: { type: String, required: true },
+  },
+  { collection: "communities" },
+);
+CommunitySchema.index({ id: 1 }, { unique: true });
+CommunitySchema.index({ creationStatus: 1 });
+CommunitySchema.index({ organizerId: 1 });
+export const CommunityModel = compile<CommunityRecord>("Community", CommunitySchema);
+
+// Community members — unique on (communityId, userId).
+const CommunityMemberSchema = new Schema<CommunityMemberRecord>(
+  {
+    id: { type: String, required: true },
+    communityId: { type: String, required: true },
+    userId: { type: String, required: true },
+    role: { type: String, enum: ["organizer", "member"], default: "member" },
+    status: { type: String, enum: ["pending", "active"], default: "active" },
+    screeningAnswer: { type: String, default: null },
+    joinedAt: { type: String, required: true },
+  },
+  { collection: "communityMembers" },
+);
+CommunityMemberSchema.index({ id: 1 }, { unique: true });
+CommunityMemberSchema.index({ communityId: 1, userId: 1 }, { unique: true });
+CommunityMemberSchema.index({ userId: 1 });
+export const CommunityMemberModel = compile<CommunityMemberRecord>("CommunityMember", CommunityMemberSchema);
+
+// Community bulletin posts
+const CommunityPostSchema = new Schema<CommunityPostRecord>(
+  {
+    id: { type: String, required: true },
+    communityId: { type: String, required: true },
+    authorId: { type: String, required: true },
+    content: { type: String, default: "" },
+    image: { type: String, default: null },
+    pinned: { type: Boolean, default: false },
+    createdAt: { type: String, required: true },
+    deletedAt: { type: String, default: null },
+  },
+  { collection: "communityPosts" },
+);
+CommunityPostSchema.index({ id: 1 }, { unique: true });
+CommunityPostSchema.index({ communityId: 1, createdAt: -1 });
+export const CommunityPostModel = compile<CommunityPostRecord>("CommunityPost", CommunityPostSchema);

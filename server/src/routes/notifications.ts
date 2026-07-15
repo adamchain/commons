@@ -15,6 +15,7 @@ notificationsRouter.get("/", requireAuth, (req, res) => {
     planId: n.planId,
     conversationId: n.conversationId,
     profileUserId: n.profileUserId,
+    communityId: n.communityId,
     createdAt: n.createdAt,
     readAt: n.readAt,
   }));

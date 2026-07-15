@@ -102,11 +102,6 @@ export function PlanDetailPage() {
   const showGroupPrompt = groupAtThreshold && isHosting;
   const canChat =
     isHosting || plan.myState === "going" || plan.myState === "interested";
-  // Once a non-host has committed (interested/going), the group chat becomes the
-  // primary thing — surface it up top and demote the drop-out toggle to the
-  // very bottom of the page.
-  const committed = plan.myState === "going" || plan.myState === "interested";
-  const showDropoutBottom = !isPast && committed && !isHosting;
 
   async function cancelPlan() {
     if (!plan) return;
@@ -236,15 +231,17 @@ export function PlanDetailPage() {
             <p className="plan-past-note">This one's a wrap. Want to run it back?</p>
             <button
               type="button"
-              className="btn-primary btn-block"
+              className="btn-primary btn-block plan-past-action-btn"
               onClick={() =>
                 navigate(`/plans/new?fromPlanId=${plan.id}&title=${encodeURIComponent(plan.title)}`)
               }
             >
-              🔁 Do it again
+              <RepeatIcon />
+              Do it again
             </button>
-            <Link to={`/plans/${plan.id}/chat`} className="btn-secondary btn-block">
-              💬 Open group chat
+            <Link to={`/plans/${plan.id}/chat`} className="btn-secondary btn-block plan-past-action-btn">
+              <ChatBubbleIcon />
+              Open group chat
             </Link>
           </div>
         )}
@@ -335,23 +332,29 @@ export function PlanDetailPage() {
           </div>
         )}
 
-        {!isPast && !showDropoutBottom && !(isHosting && isLookingFor) && (
-          <ParticipationButtons
-            planId={plan.id}
-            initialState={plan.myState}
-            onChange={onStateChange}
-            planKind={plan.planKind}
-            capacity={plan.capacity}
-            goingCount={plan.participants.going.length}
-            joinType={plan.joinType}
-            isHosting={isHosting}
-            onJustMarkedInterested={() => setShowInvite(true)}
-          />
+        {!isPast && !(isHosting && isLookingFor) && !isHosting && (
+          <div className="plan-participation-slot">
+            <ParticipationButtons
+              planId={plan.id}
+              initialState={plan.myState}
+              onChange={onStateChange}
+              planKind={plan.planKind}
+              capacity={plan.capacity}
+              goingCount={plan.participants.going.length}
+              joinType={plan.joinType}
+              isHosting={isHosting}
+              onJustMarkedInterested={() => setShowInvite(true)}
+            />
+          </div>
         )}
 
         {!isPast && canChat && (
-          <Link to={`/plans/${plan.id}/chat`} className="chat-entry chat-entry--prominent plan-detail-card">
-            <span className="chat-entry-icon" aria-hidden="true">💬</span>
+          <Link
+            to={`/plans/${plan.id}/chat`}
+            state={{ from: "plan" }}
+            className="chat-entry chat-entry--prominent plan-detail-card"
+          >
+            <span className="chat-entry-icon" aria-hidden="true"><ChatBubbleIcon /></span>
             <span className="chat-entry-text">
               Group chat ({plan.participants.going.length + plan.participants.interested.length})
             </span>
@@ -550,24 +553,6 @@ export function PlanDetailPage() {
         )}
       </section>
 
-      {/* Drop-out / withdraw lives at the very bottom once you've committed —
-          out of the way so the chat + roster lead. */}
-      {showDropoutBottom && (
-        <div className="plan-dropout-row">
-          <ParticipationButtons
-            planId={plan.id}
-            initialState={plan.myState}
-            onChange={onStateChange}
-            planKind={plan.planKind}
-            capacity={plan.capacity}
-            goingCount={plan.participants.going.length}
-            joinType={plan.joinType}
-            isHosting={isHosting}
-            onJustMarkedInterested={() => setShowInvite(true)}
-          />
-        </div>
-      )}
-
       {showShare && <ShareSheet plan={plan} onClose={() => setShowShare(false)} />}
       {showGetThere && <GetThereSheet plan={plan} onClose={() => setShowGetThere(false)} />}
       {showInvite && (
@@ -680,6 +665,25 @@ function ShareIcon() {
       <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
       <polyline points="16 6 12 2 8 6" />
       <line x1="12" x2="12" y1="2" y2="15" />
+    </svg>
+  );
+}
+
+function ChatBubbleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </svg>
+  );
+}
+
+function RepeatIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M17 1l4 4-4 4" />
+      <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+      <path d="M7 23l-4-4 4-4" />
+      <path d="M21 13v2a4 4 0 0 1-4 4H3" />
     </svg>
   );
 }

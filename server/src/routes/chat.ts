@@ -65,6 +65,37 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
     });
   }
 
+  // Community group chats — one persistent thread per community the user is an
+  // active member of (and chat is enabled). They ride the same inbox as plan
+  // chats but link to the community page.
+  for (const membership of store.listCommunityMembershipsForUser(userId)) {
+    if (membership.status !== "active") continue;
+    const community = store.findCommunityById(membership.communityId);
+    if (!community || !community.chatEnabled || community.creationStatus !== "approved") continue;
+    const conv = store.findCommunityConversation(community.id);
+    if (conv && !conv.participantIds.includes(userId)) continue;
+    const msgs = conv ? store.listMessagesForConversation(conv.id) : [];
+    const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
+    summaries.push({
+      planId: "",
+      planTitle: community.name,
+      hostEmoji: "🏙️",
+      planDate: community.createdAt.slice(0, 10),
+      conversationId: conv?.id ?? null,
+      lastMessageAt: conv && msgs.length ? conv.lastMessageAt : null,
+      lastMessagePreview: lastMsg
+        ? lastMsg.kind === "poll"
+          ? `📊 ${truncate(lastMsg.body, 78)}`
+          : truncate(lastMsg.body, 80)
+        : null,
+      unreadCount: conv ? msgs.filter((m) => !m.readBy.includes(userId)).length : 0,
+      participantCount: community.memberCount,
+      myRole: community.organizerId === userId ? "hosting" : "going",
+      communityId: community.id,
+      communityName: community.name,
+    });
+  }
+
   // Most recent chatter first; then upcoming-but-quiet plans by date.
   summaries.sort((a, b) => {
     if (a.lastMessageAt && b.lastMessageAt) return a.lastMessageAt < b.lastMessageAt ? 1 : -1;

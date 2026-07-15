@@ -37,6 +37,14 @@ function combinedNeighborhoodScope(me: UserRecord): string[] | null {
 }
 
 function planVisibleToViewer(plan: PlanRecord, me: UserRecord): boolean {
+  // Community-only plans are visible only to that community's active members
+  // (the creator always sees their own). Public community plans fall through to
+  // the normal audience rules below and surface for everyone.
+  if (plan.communityId && plan.communityVisibility === "community_only") {
+    if (plan.creatorId === me.id) return true;
+    const membership = store.findCommunityMembership(plan.communityId, me.id);
+    if (membership?.status !== "active") return false;
+  }
   const v: PlanVisibility = plan.visibility ?? "everyone";
   if (v === "network") {
     // Visible to the creator, anyone in the creator's network, or anyone
@@ -137,6 +145,10 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     visibility,
     visibilityCommunityTag: plan.visibilityCommunityTag ?? null,
     communityId: plan.communityId ?? null,
+    communityName: plan.communityId
+      ? store.findCommunityById(plan.communityId)?.name ?? null
+      : null,
+    communityVisibility: plan.communityId ? plan.communityVisibility ?? "public" : null,
     capacity: plan.capacity ?? null,
     joinType: plan.joinType ?? "open",
     isRecurring: plan.isRecurring ?? false,
@@ -275,13 +287,31 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   const resolvedLocationName = locationName || "Flexible location";
   const resolvedAddress = locationAddress || resolvedLocationName;
 
-  // Accept communityId from the client now so the field round-trips, but real
-  // community records don't exist yet — never validate against anything, just
-  // sanitize to string|null. Coming Soon. The whole feature is gated on a
-  // future Communities model; the rest of the server ignores this field.
+  // Community tagging. When set, validate the community is live, the poster is
+  // allowed (plan_posting_permission), and capture the per-plan visibility.
   const rawCommunityId = req.body?.communityId;
-  const communityId =
+  let communityId =
     typeof rawCommunityId === "string" && rawCommunityId.trim() ? rawCommunityId.trim() : null;
+  let communityVisibility: "public" | "community_only" | null = null;
+  if (communityId) {
+    const community = store.findCommunityById(communityId);
+    if (!community || community.creationStatus !== "approved") {
+      res.status(400).json({ error: "Community not found" });
+      return;
+    }
+    const membership = store.findCommunityMembership(communityId, userId);
+    const isOrganizer = community.organizerId === userId;
+    const isActiveMember = membership?.status === "active";
+    const mayPost =
+      isOrganizer ||
+      (community.planPostingPermission === "members" && isActiveMember);
+    if (!mayPost) {
+      res.status(403).json({ error: "You don't have permission to post plans to this community" });
+      return;
+    }
+    const rawCv = String(req.body?.communityVisibility ?? "public");
+    communityVisibility = rawCv === "community_only" ? "community_only" : "public";
+  }
 
   const rawCapacity = req.body?.capacity;
   let capacity: number | null = null;
@@ -351,6 +381,7 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     visibility,
     visibilityCommunityTag,
     communityId,
+    communityVisibility,
     capacity,
     joinType,
     isRecurring,
@@ -418,6 +449,22 @@ plansRouter.post("/", requireAuth, async (req, res) => {
 
   store.log("plan_created", { planId: plan.id, creatorId: userId, coHosts: coHostIds.length });
   void onPlanCreatedVenueNudge(plan).catch((err) => console.error("[nudge] venue", err));
+
+  // Ping the organizer when a member (not the organizer) tags a plan to their
+  // community, so they know activity is landing on their events board.
+  if (communityId) {
+    const community = store.findCommunityById(communityId);
+    if (community && community.organizerId !== userId) {
+      await emit({
+        userId: community.organizerId,
+        kind: "communityPlanPosted",
+        body: `${me.firstName || "Someone"} posted "${title}" to ${community.name}`,
+        planId: plan.id,
+        communityId,
+        dedupKey: `communityPlanPosted:${plan.id}`,
+      });
+    }
+  }
 
   res.status(201).json(await planSummary(plan, userId));
 });

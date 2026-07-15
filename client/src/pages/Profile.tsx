@@ -1,16 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import { clearAuthToken } from "../api/authToken";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate } from "../lib/format";
-import { fileToResizedDataUrl } from "../lib/imageResize";
-import { pickPhotoNative } from "../lib/photoPicker";
-import { isNative } from "../lib/platform";
 import {
-  AVATAR_PRESETS,
+  COMMUNITY_CATEGORY_LABELS,
   INTEREST_LABELS,
+  type CommunityCardDTO,
   type InterestTag,
   type MeDTO,
   type PlanDTO,
@@ -43,7 +41,7 @@ export function ProfilePage() {
   const [profile, setProfile] = useState<ProfilePayload | null>(null);
   const [feedPlans, setFeedPlans] = useState<PlanDTO[]>([]);
   const [network, setNetwork] = useState<PublicUser[] | null>(null);
-  const [editing, setEditing] = useState(false);
+  const [communities, setCommunities] = useState<CommunityCardDTO[]>([]);
   const [plansView, setPlansView] = useState<"list" | "calendar">("list");
   const isSelf = user?.id === userId;
 
@@ -57,6 +55,9 @@ export function ProfilePage() {
   useEffect(() => {
     if (isSelf) {
       void api<PlanDTO[]>("/api/plans").then(setFeedPlans).catch(() => setFeedPlans([]));
+      void api<{ communities: CommunityCardDTO[] }>("/api/communities/mine")
+        .then((r) => setCommunities(r.communities))
+        .catch(() => setCommunities([]));
     }
   }, [isSelf]);
 
@@ -92,10 +93,9 @@ export function ProfilePage() {
         <div className="profile-hero-top">
           <div className="profile-hero-main">
             {isSelf ? (
-              <button
-                type="button"
+              <Link
+                to={`/profile/${userId}/edit`}
                 className="profile-hero-avatar-btn"
-                onClick={() => setEditing(true)}
                 aria-label="Update profile photo"
               >
                 <Avatar
@@ -107,7 +107,7 @@ export function ProfilePage() {
                   size="xl"
                 />
                 <span className="profile-hero-avatar-edit" aria-hidden="true">✎</span>
-              </button>
+              </Link>
             ) : (
               <Avatar
                 seed={profile.user.avatarSeed}
@@ -147,17 +147,17 @@ export function ProfilePage() {
               </div>
             </div>
           </div>
-          {isSelf && !editing && (
-            <button type="button" className="profile-edit-btn" onClick={() => setEditing(true)}>
+          {isSelf && (
+            <Link to={`/profile/${userId}/edit`} className="profile-edit-btn">
               Edit
-            </button>
+            </Link>
           )}
         </div>
         <SocialPills
           isSelf={isSelf}
           instagram={profile.socialLinks?.instagram}
           tiktok={profile.socialLinks?.tiktok}
-          onEdit={() => setEditing(true)}
+          onEdit={() => navigate(`/profile/${userId}/edit`)}
         />
         {!isSelf && profile.socialLinks === null && (
           <p className="profile-social-locked">
@@ -201,18 +201,6 @@ export function ProfilePage() {
         {!isSelf && <FriendButton profile={profile} onUpdated={reloadProfile} />}
       </section>
 
-      {isSelf && editing && user && (
-        <EditPanel
-          me={user}
-          onSaved={(me) => {
-            setUser(me);
-            reloadProfile();
-            setEditing(false);
-          }}
-          onCancel={() => setEditing(false)}
-        />
-      )}
-
       {profile.interests.length > 0 && !isSelf && (
         <section className="profile-block">
           <h3 className="profile-section-label">Interests</h3>
@@ -226,16 +214,29 @@ export function ProfilePage() {
         </section>
       )}
 
-      {isSelf && (
-        <ProfileMenu
-          network={network}
-          onOpenCalendar={() => {
-            setPlansView("calendar");
-            setTimeout(() => {
-              document.getElementById("profile-plans-block")?.scrollIntoView({ behavior: "smooth" });
-            }, 50);
-          }}
-        />
+      {isSelf && communities.length > 0 && (
+        <section className="profile-block">
+          <h3 className="profile-section-label">Communities</h3>
+          <div className="profile-communities-list">
+            {communities.map((c) => (
+              <Link key={c.id} to={`/communities/${c.id}`} className="profile-community-row">
+                {c.coverImage ? (
+                  <img src={c.coverImage} alt="" className="profile-community-thumb" loading="lazy" />
+                ) : (
+                  <span className="profile-community-thumb profile-community-thumb--fallback" aria-hidden="true" />
+                )}
+                <span className="profile-community-info">
+                  <span className="profile-community-name">{c.name}</span>
+                  <span className="profile-community-meta">
+                    {c.myRole === "organizer" ? "Organizer · " : ""}
+                    {COMMUNITY_CATEGORY_LABELS[c.category]} · {c.memberCount}{" "}
+                    {c.memberCount === 1 ? "member" : "members"}
+                  </span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
 
       {(profile.upcoming.length > 0 || profile.past.length > 0) && (
@@ -251,18 +252,21 @@ export function ProfilePage() {
         />
       )}
 
-      {profile.upcoming.length === 0 && profile.past.length === 0 && (
+      {profile.upcoming.length === 0 && profile.past.length === 0 && isSelf && (
         <section className="profile-block">
           <p className="empty-state" style={{ marginTop: 8 }}>
-            {isSelf ? "Post a plan from your profile." : "No plans yet."}
+            No plans yet — join something from the feed or post your own.
           </p>
-          {isSelf && (
-            <Link to="/plans/new" className="btn-primary" style={{ marginTop: 12, display: "inline-block" }}>
-              Post a plan
-            </Link>
-          )}
         </section>
       )}
+
+      {profile.upcoming.length === 0 && profile.past.length === 0 && !isSelf && (
+        <section className="profile-block">
+          <p className="empty-state" style={{ marginTop: 8 }}>No plans yet.</p>
+        </section>
+      )}
+
+      {isSelf && <ProfileMenu network={network} />}
 
       {isSelf && (
         <a
@@ -503,237 +507,6 @@ function FriendButton({
   );
 }
 
-function EditPanel({
-  me,
-  onSaved,
-  onCancel,
-}: {
-  me: MeDTO;
-  onSaved: (next: MeDTO) => void;
-  onCancel: () => void;
-}) {
-  const [firstName, setFirstName] = useState(me.firstName);
-  const [lastName, setLastName] = useState(me.lastName ?? "");
-  const [bio, setBio] = useState(me.bio ?? "");
-  const [photo, setPhoto] = useState<string | null>(me.avatarPhotoDataUrl ?? null);
-  const [avatarParams, setAvatarParams] = useState<string | null>(me.avatarParams ?? null);
-  const [presetOpen, setPresetOpen] = useState(false);
-  const [instagram, setInstagram] = useState(me.socialLinks?.instagram ?? "");
-  const [tiktok, setTiktok] = useState(me.socialLinks?.tiktok ?? "");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  function pickPhoto(dataUrl: string) {
-    setPhoto(dataUrl);
-    setAvatarParams(null);
-  }
-  function pickPreset(params: string) {
-    setAvatarParams((cur) => (cur === params ? null : params));
-    if (avatarParams !== params) setPhoto(null);
-  }
-
-  async function save() {
-    setBusy(true);
-    setError(null);
-    try {
-      const next = await api<MeDTO>("/api/auth/me", {
-        method: "PATCH",
-        body: JSON.stringify({
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
-          bio: bio.trim(),
-          avatarPhotoDataUrl: photo ?? null,
-          avatarParams: avatarParams ?? null,
-          socialLinks: {
-            instagram: instagram.trim().replace(/^@/, ""),
-            tiktok: tiktok.trim().replace(/^@/, ""),
-          },
-        }),
-      });
-      onSaved(next);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't save");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <section className="profile-edit-panel">
-      <label className="form-question" htmlFor="profile-edit-name">
-        First name
-      </label>
-      <input
-        id="profile-edit-name"
-        className="onboarding-input"
-        value={firstName}
-        onChange={(e) => setFirstName(e.target.value)}
-        maxLength={40}
-      />
-
-      <label className="form-question" htmlFor="profile-edit-last" style={{ marginTop: 10 }}>
-        Last name
-      </label>
-      <input
-        id="profile-edit-last"
-        className="onboarding-input"
-        value={lastName}
-        onChange={(e) => setLastName(e.target.value)}
-        maxLength={40}
-      />
-
-      <label className="form-question" htmlFor="profile-edit-bio" style={{ marginTop: 10 }}>
-        Bio
-      </label>
-      <textarea
-        id="profile-edit-bio"
-        className="onboarding-input profile-edit-bio"
-        value={bio}
-        onChange={(e) => setBio(e.target.value)}
-        maxLength={160}
-        rows={3}
-        placeholder="A short line about you…"
-      />
-
-      <label className="form-question" style={{ marginTop: 14 }}>
-        Profile image
-      </label>
-      <p className="form-help">Upload a photo or pick a character below — one or the other.</p>
-
-      <div className="profile-edit-photo-row">
-        <Avatar
-          seed={me.avatarSeed}
-          style={me.avatarStyle}
-          photoDataUrl={photo ?? undefined}
-          params={avatarParams ?? undefined}
-          name={firstName.trim() || undefined}
-          size="lg"
-        />
-        <div className="profile-edit-photo-actions">
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={async () => {
-              if (isNative()) {
-                try {
-                  const dataUrl = await pickPhotoNative({ maxPx: 512, quality: 0.82 });
-                  if (dataUrl) pickPhoto(dataUrl);
-                } catch {
-                  /* user canceled */
-                }
-                return;
-              }
-              fileRef.current?.click();
-            }}
-          >
-            {photo ? "Replace photo" : "Upload photo"}
-          </button>
-          {(photo || avatarParams) && (
-            <button
-              type="button"
-              className="btn-link"
-              onClick={() => {
-                setPhoto(null);
-                setAvatarParams(null);
-              }}
-            >
-              Remove
-            </button>
-          )}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            style={{ display: "none" }}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              fileToResizedDataUrl(f)
-                .then(pickPhoto)
-                .catch(() => setError("Couldn't read that image. Try another."));
-              if (fileRef.current) fileRef.current.value = "";
-            }}
-          />
-        </div>
-      </div>
-
-      <details
-        className="profile-preset-disclosure"
-        open={presetOpen}
-        onToggle={(e) => setPresetOpen((e.target as HTMLDetailsElement).open)}
-      >
-        <summary>Pick an avatar</summary>
-        <div className="profile-preset-grid" style={{ marginTop: 10 }}>
-        {AVATAR_PRESETS.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            className={`profile-preset-pick ${avatarParams === p.params ? "is-selected" : ""}`}
-            onClick={() => pickPreset(p.params)}
-            aria-pressed={avatarParams === p.params}
-            aria-label={p.label}
-            title={p.label}
-          >
-            <Avatar seed={me.avatarSeed} style="avataaars" params={p.params} size="md" />
-          </button>
-        ))}
-        </div>
-      </details>
-
-      <label className="form-question" htmlFor="profile-edit-ig" style={{ marginTop: 14 }}>
-        Instagram
-      </label>
-      <p className="form-help">
-        Only visible to people you’ve actually shown up for — others have to share
-        a completed plan with you first.
-      </p>
-      <input
-        id="profile-edit-ig"
-        className="onboarding-input"
-        value={instagram}
-        placeholder="@yourhandle"
-        onChange={(e) => setInstagram(e.target.value)}
-        maxLength={40}
-      />
-
-      <label className="form-question" htmlFor="profile-edit-tt" style={{ marginTop: 14 }}>
-        TikTok
-      </label>
-      <input
-        id="profile-edit-tt"
-        className="onboarding-input"
-        value={tiktok}
-        placeholder="@yourhandle"
-        onChange={(e) => setTiktok(e.target.value)}
-        maxLength={40}
-      />
-
-      {error && <p className="onboarding-error" style={{ marginTop: 8 }}>{error}</p>}
-
-      <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-        <button
-          type="button"
-          className="btn-secondary"
-          style={{ flex: 1 }}
-          onClick={onCancel}
-          disabled={busy}
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          className="btn-primary"
-          style={{ flex: 2 }}
-          disabled={busy || !firstName.trim() || !lastName.trim()}
-          onClick={() => void save()}
-        >
-          {busy ? "Saving…" : "Save changes"}
-        </button>
-      </div>
-    </section>
-  );
-}
 
 function MonthCalendar({ plans }: { plans: PlanDTO[] }) {
   const [monthOffset, setMonthOffset] = useState(0);
@@ -875,14 +648,19 @@ function YourPlansBlock({
       ) : (
       <>
       {isSelf && (
-        <Link to="/my-plans" className="btn-link profile-block-see-all">
-          See all →
-        </Link>
+        <>
+          <Link to="/my-plans" className="btn-link profile-block-see-all" style={{ display: "inline-block", marginTop: 6 }}>
+            See all plans & saved →
+          </Link>
+          <p className="form-help" style={{ marginTop: 6 }}>
+            Tap ★ on any plan card to save it — saved plans live under My plans.
+          </p>
+        </>
       )}
       <div className="profile-list">
         {visibleUpcoming.map((p) => {
           const youStarted = viewerId !== undefined && p.creator.id === viewerId;
-          const badge = youStarted ? "YOUR PLAN" : "INTERESTED";
+          const badge = youStarted ? "Your plan" : "Interested";
           return (
             <Link
               key={p.id}
@@ -953,36 +731,13 @@ function YourPlansBlock({
   );
 }
 
-function ProfileMenu({
-  network,
-  onOpenCalendar,
-}: {
-  network: PublicUser[] | null;
-  onOpenCalendar: () => void;
-}) {
+function ProfileMenu({ network }: { network: PublicUser[] | null }) {
   return (
     <nav className="profile-menu" aria-label="Profile menu">
-      <button type="button" className="profile-menu-row" onClick={onOpenCalendar}>
-        <span className="profile-menu-icon" aria-hidden="true">📅</span>
-        <span className="profile-menu-text">
-          <span className="profile-menu-label">Calendar</span>
-          <span className="profile-menu-sub">Month view of your plans</span>
-        </span>
-        <ChevronRight />
-      </button>
-      <Link to="/my-plans" className="profile-menu-row">
-        <span className="profile-menu-icon" aria-hidden="true">📋</span>
-        <span className="profile-menu-text">
-          <span className="profile-menu-label">My plans</span>
-          <span className="profile-menu-sub">Hosting, going, interested, saved</span>
-        </span>
-        <ChevronRight />
-      </Link>
-
       <NetworkCard network={network} />
 
       <Link to="/invite" className="profile-menu-row">
-        <span className="profile-menu-icon" aria-hidden="true">✉️</span>
+        <span className="profile-menu-icon" aria-hidden="true"><MailIcon /></span>
         <span className="profile-menu-text">
           <span className="profile-menu-label">Invite friends</span>
           <span className="profile-menu-sub">Share your codes</span>
@@ -990,7 +745,7 @@ function ProfileMenu({
         <ChevronRight />
       </Link>
       <Link to="/settings" className="profile-menu-row profile-menu-row--settings">
-        <span className="profile-menu-icon" aria-hidden="true">⚙️</span>
+        <span className="profile-menu-icon" aria-hidden="true"><SettingsIcon /></span>
         <span className="profile-menu-text">
           <span className="profile-menu-label">Settings</span>
           <span className="profile-menu-sub">Notifications, interests, account</span>
@@ -998,6 +753,24 @@ function ProfileMenu({
         <ChevronRight />
       </Link>
     </nav>
+  );
+}
+
+function MailIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3 7 9 6 9-6" />
+    </svg>
+  );
+}
+
+function SettingsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+    </svg>
   );
 }
 

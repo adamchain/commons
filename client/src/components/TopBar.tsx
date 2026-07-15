@@ -23,7 +23,8 @@ export function TopBar() {
     pathname.startsWith("/admin") ||
     pathname === "/plans/new" ||
     pathname.startsWith("/notifications") ||
-    /^\/plans\/[^/]+(\/chat)?$/.test(pathname);
+    /^\/plans\/[^/]+(\/chat)?$/.test(pathname) ||
+    /^\/communities\/[^/]+\/chat$/.test(pathname);
 
   // Keep the bell's unread dot fresh — same lightweight visibility-aware poll
   // the bottom nav uses for the Messages badge.

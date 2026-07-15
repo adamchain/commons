@@ -49,7 +49,8 @@ export function BottomNav() {
     pathname.startsWith("/onboarding") ||
     pathname.startsWith("/login") ||
     pathname === "/plans/new" ||
-    pathname.match(/^\/plans\/[^/]+\/chat$/);
+    pathname.match(/^\/plans\/[^/]+\/chat$/) ||
+    pathname.match(/^\/communities\/[^/]+\/chat$/);
   if (hide) return null;
 
   const profileTo = user ? `/profile/${user.id}` : "/onboarding";

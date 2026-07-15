@@ -428,4 +428,109 @@ adminRouter.delete("/card-images/:id", (req, res) => {
   res.json({ ok: true });
 });
 
+// ---- Communities review ----
+
+// GET /api/admin/communities?status=pending — review queue (default pending).
+adminRouter.get("/communities", async (req, res) => {
+  const status = String(req.query.status ?? "pending");
+  const all = store.listCommunities();
+  const filtered =
+    status === "all" ? all : all.filter((c) => c.creationStatus === status);
+  filtered.sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
+  const rows = await Promise.all(
+    filtered.map(async (c) => {
+      const organizer = await findUserById(c.organizerId);
+      return {
+        id: c.id,
+        name: c.name,
+        description: c.description,
+        category: c.category,
+        organizer: organizer
+          ? { id: organizer.id, firstName: organizer.firstName, lastName: organizer.lastName ?? "" }
+          : { id: c.organizerId, firstName: "Unknown", lastName: "" },
+        memberCount: c.memberCount,
+        isFounding: c.isFounding,
+        submittedAt: c.submittedAt,
+        creationStatus: c.creationStatus,
+      };
+    }),
+  );
+  res.json({ communities: rows });
+});
+
+// POST /api/admin/communities/:id/approve — goes live immediately.
+adminRouter.post("/communities/:id/approve", (req, res) => {
+  const community = store.findCommunityById(String(req.params.id));
+  if (!community) {
+    res.status(404).json({ error: "Community not found" });
+    return;
+  }
+  const updated = store.updateCommunity(community.id, {
+    creationStatus: "approved",
+    rejectionNote: null,
+    reviewedAt: new Date().toISOString(),
+    reviewedBy: req.userId ?? "admin",
+  });
+  store.log("community_approved", { communityId: community.id });
+  res.json({ ok: true, community: updated });
+});
+
+// POST /api/admin/communities/:id/reject { note? } — creator may edit + resubmit.
+adminRouter.post("/communities/:id/reject", (req, res) => {
+  const community = store.findCommunityById(String(req.params.id));
+  if (!community) {
+    res.status(404).json({ error: "Community not found" });
+    return;
+  }
+  const note =
+    typeof req.body?.note === "string" && req.body.note.trim()
+      ? req.body.note.trim().slice(0, 500)
+      : null;
+  const updated = store.updateCommunity(community.id, {
+    creationStatus: "rejected",
+    rejectionNote: note,
+    reviewedAt: new Date().toISOString(),
+    reviewedBy: req.userId ?? "admin",
+  });
+  store.log("community_rejected", { communityId: community.id });
+  res.json({ ok: true, community: updated });
+});
+
+// POST /api/admin/communities/founding — create-and-approve a Founding Community,
+// assigning the organizer by user lookup (phone or id).
+adminRouter.post("/communities/founding", async (req, res) => {
+  const name = String(req.body?.name ?? "").trim().slice(0, 80);
+  const description = String(req.body?.description ?? "").trim().slice(0, 2000);
+  const category = String(req.body?.category ?? "other");
+  const organizerLookup = String(req.body?.organizer ?? "").trim();
+  if (!name || !description || !organizerLookup) {
+    res.status(400).json({ error: "name, description, and organizer are required" });
+    return;
+  }
+  // Resolve organizer by user id first, then by phone.
+  let organizer = await findUserById(organizerLookup);
+  if (!organizer) {
+    const users = await listAllUsers();
+    organizer = users.find(
+      (u) => u.phoneNumber === organizerLookup || u.phoneNumber === `+${organizerLookup.replace(/\D/g, "")}`,
+    );
+  }
+  if (!organizer) {
+    res.status(404).json({ error: "Organizer user not found (pass a user id or E.164 phone)" });
+    return;
+  }
+  const community = store.createCommunity({
+    name,
+    description,
+    category: category as never,
+    organizerId: organizer.id,
+    isFounding: true,
+    creationStatus: "approved",
+    reviewedBy: req.userId ?? "admin",
+    coverImage: typeof req.body?.coverImage === "string" ? req.body.coverImage.slice(0, 2048) : null,
+  });
+  store.log("community_founding_created", { communityId: community.id, organizerId: organizer.id });
+  res.status(201).json({ ok: true, community });
+});
+
 export { adminRouter };

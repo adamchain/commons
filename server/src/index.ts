@@ -10,6 +10,7 @@ import { adminRouter } from "./routes/admin.js";
 import { authRouter } from "./routes/auth.js";
 import { cardImagesRouter } from "./routes/cardImages.js";
 import { chatRouter } from "./routes/chat.js";
+import { communitiesRouter } from "./routes/communities.js";
 import { devicesRouter } from "./routes/devices.js";
 import { feedbackRouter } from "./routes/feedback.js";
 import { neighborhoodsRouter } from "./routes/neighborhoods.js";
@@ -59,6 +60,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/admin", adminRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/card-images", cardImagesRouter);
+app.use("/api/communities", communitiesRouter);
 app.use("/api/devices", devicesRouter);
 app.use("/api/plans", plansRouter);
 app.use("/api/places", placesRouter);

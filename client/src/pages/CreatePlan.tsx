@@ -121,6 +121,29 @@ export function CreatePlanPage() {
   // navigating on the first tap.
   const [pendingPath, setPendingPath] = useState<"plan" | "idea" | null>(null);
   const [network, setNetwork] = useState<PublicUser[] | null>(null);
+
+  // Community tagging — when arriving from a community's "Post a plan" button
+  // (?communityId=…), the plan is tagged to that community and the host picks
+  // whether it's public (feed + community) or community-only.
+  const communityId = searchParams.get("communityId");
+  const [communityName, setCommunityName] = useState<string | null>(null);
+  const [communityVisibility, setCommunityVisibility] = useState<"public" | "community_only">(
+    "public",
+  );
+  useEffect(() => {
+    if (!communityId) return;
+    let alive = true;
+    api<{ name: string }>(`/api/communities/${communityId}`)
+      .then((c) => {
+        if (alive) setCommunityName(c.name);
+      })
+      .catch(() => {
+        /* tag still sends; banner just won't show a name */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [communityId]);
   const [invitedIds, setInvitedIds] = useState<Set<string>>(() => {
     const seed = new Set<string>();
     if (inviteUserId) seed.add(inviteUserId);
@@ -238,6 +261,8 @@ export function CreatePlanPage() {
           flyerLinkUrl: form.flyerLinkUrl.trim() || undefined,
           flyerLinkPreview: form.flyerLinkPreview ?? undefined,
           fromPlanId: fromPlanId ?? undefined,
+          communityId: communityId ?? undefined,
+          communityVisibility: communityId ? communityVisibility : undefined,
         }),
       });
       // The co-host (seeded inviteUser) is already added server-side — don't
@@ -402,14 +427,40 @@ export function CreatePlanPage() {
   // "Make a plan" experience.
   if (isIdea) {
     return (
-      <IdeaForm
-        form={form}
-        setForm={setForm}
-        submit={submit}
-        submitting={submitting}
-        error={error}
-        onBack={() => setPath("choose")}
-      />
+      <>
+        <IdeaForm
+          form={form}
+          setForm={setForm}
+          submit={submit}
+          submitting={submitting}
+          error={error}
+          onBack={() => setPath("choose")}
+          onOpenFlyer={() => void openFlyerPicker()}
+          onShowCoverLib={() => setShowCoverLib(true)}
+          onClearFlyer={() => setForm((f) => ({ ...f, flyerDataUrl: null }))}
+        />
+        <input
+          ref={flyerRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) onFlyerPick(f);
+            if (flyerRef.current) flyerRef.current.value = "";
+          }}
+        />
+        {showCoverLib && (
+          <CoverLibraryModal
+            coverPool={coverPool}
+            onPick={(url) => {
+              setForm((f) => ({ ...f, flyerDataUrl: url }));
+              setShowCoverLib(false);
+            }}
+            onClose={() => setShowCoverLib(false)}
+          />
+        )}
+      </>
     );
   }
 
@@ -621,7 +672,6 @@ export function CreatePlanPage() {
                 onClick={() => toggleVibe(opt.id)}
                 aria-pressed={selected}
               >
-                <span className="vibe-tile-emoji" aria-hidden="true">{opt.emoji}</span>
                 <span className="vibe-tile-label">{opt.label}</span>
               </button>
             );
@@ -879,52 +929,94 @@ export function CreatePlanPage() {
           {submitting ? "Posting…" : "Post it"}
         </button>
 
-        <p className="create-communities-footer">
-          <strong>Communities</strong> <span className="visibility-option-pill">Coming soon</span>
-          <br />
-          Run clubs, book clubs, recurring crews.
-        </p>
+        {communityId ? (
+          <div className="create-community-tag">
+            <p className="create-community-tag-title">
+              🏙️ Posting to <strong>{communityName ?? "your community"}</strong>
+            </p>
+            <div className="seg-toggle" role="group" aria-label="Community visibility">
+              <button
+                type="button"
+                className={`seg-toggle-btn ${communityVisibility === "public" ? "is-active" : ""}`}
+                onClick={() => setCommunityVisibility("public")}
+                aria-pressed={communityVisibility === "public"}
+              >
+                Public
+              </button>
+              <button
+                type="button"
+                className={`seg-toggle-btn ${communityVisibility === "community_only" ? "is-active" : ""}`}
+                onClick={() => setCommunityVisibility("community_only")}
+                aria-pressed={communityVisibility === "community_only"}
+              >
+                Community only
+              </button>
+            </div>
+            <p className="create-community-tag-hint">
+              {communityVisibility === "public"
+                ? "Shows on the main feed with a community tag, and on the community's events board."
+                : "Only community members can see this — it won't appear on the main feed."}
+            </p>
+          </div>
+        ) : (
+          <p className="create-communities-footer">
+            <strong>Communities</strong>{" "}
+            <Link to="/communities" className="visibility-option-pill">
+              Explore →
+            </Link>
+            <br />
+            Run clubs, book clubs, recurring crews.
+          </p>
+        )}
       </form>
 
       {showCoverLib && (
-        <div
-          className="cover-lib-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Choose a cover image"
-          onClick={() => setShowCoverLib(false)}
-        >
-          <div className="cover-lib" onClick={(e) => e.stopPropagation()}>
-            <div className="cover-lib-head">
-              <span className="cover-lib-title">Choose a cover</span>
-              <button
-                type="button"
-                className="cover-lib-close"
-                onClick={() => setShowCoverLib(false)}
-                aria-label="Close"
-              >
-                ×
-              </button>
-            </div>
-            <div className="cover-lib-grid">
-              {coverPool.map((url) => (
-                <button
-                  key={url}
-                  type="button"
-                  className="cover-lib-tile"
-                  onClick={() => {
-                    setForm((f) => ({ ...f, flyerDataUrl: url }));
-                    setShowCoverLib(false);
-                  }}
-                >
-                  <img src={url} alt="" loading="lazy" />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+        <CoverLibraryModal
+          coverPool={coverPool}
+          onPick={(url) => {
+            setForm((f) => ({ ...f, flyerDataUrl: url }));
+            setShowCoverLib(false);
+          }}
+          onClose={() => setShowCoverLib(false)}
+        />
       )}
     </main>
+  );
+}
+
+function CoverLibraryModal({
+  coverPool,
+  onPick,
+  onClose,
+}: {
+  coverPool: string[];
+  onPick: (url: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="cover-lib-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Choose a cover image"
+      onClick={onClose}
+    >
+      <div className="cover-lib" onClick={(e) => e.stopPropagation()}>
+        <div className="cover-lib-head">
+          <span className="cover-lib-title">Choose a cover</span>
+          <button type="button" className="cover-lib-close" onClick={onClose} aria-label="Close">
+            ×
+          </button>
+        </div>
+        <div className="cover-lib-grid">
+          {coverPool.map((url) => (
+            <button key={url} type="button" className="cover-lib-tile" onClick={() => onPick(url)}>
+              <img src={url} alt="" loading="lazy" />
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -972,6 +1064,9 @@ function IdeaForm({
   submitting,
   error,
   onBack,
+  onOpenFlyer,
+  onShowCoverLib,
+  onClearFlyer,
 }: {
   form: FormShape;
   setForm: (updater: (f: FormShape) => FormShape) => void;
@@ -979,9 +1074,10 @@ function IdeaForm({
   submitting: boolean;
   error: string | null;
   onBack: () => void;
+  onOpenFlyer: () => void;
+  onShowCoverLib: () => void;
+  onClearFlyer: () => void;
 }) {
-  // Both "a little context" and visibility now live behind one optional
-  // disclosure, hidden by default so the field is just the open text box.
   const [detailsOpen, setDetailsOpen] = useState(false);
   return (
     <main className="app-shell app-shell--mid">
@@ -1007,6 +1103,26 @@ function IdeaForm({
           />
         </section>
 
+        <p className="form-eyebrow idea-visibility-label">Who can see this?</p>
+        <div className="seg-toggle idea-visibility-toggle" role="group" aria-label="Visibility">
+          <button
+            type="button"
+            className={`seg-toggle-btn ${form.visibility === "everyone" ? "is-active" : ""}`}
+            onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
+            aria-pressed={form.visibility === "everyone"}
+          >
+            Everyone
+          </button>
+          <button
+            type="button"
+            className={`seg-toggle-btn ${form.visibility === "network" ? "is-active" : ""}`}
+            onClick={() => setForm((f) => ({ ...f, visibility: "network" }))}
+            aria-pressed={form.visibility === "network"}
+          >
+            Your network
+          </button>
+        </div>
+
         <button
           type="button"
           className="idea-disclosure"
@@ -1018,34 +1134,53 @@ function IdeaForm({
         </button>
         {detailsOpen && (
           <div className="idea-details">
-            <label className="form-question" htmlFor="idea-context">A little context</label>
-            <textarea
-              id="idea-context"
-              className="idea-context"
-              placeholder="Anything else worth knowing? (optional)"
-              value={form.description}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              rows={3}
-            />
-            <label className="form-question" style={{ marginTop: 12 }}>Visibility</label>
-            <div className="visibility-options" style={{ marginTop: 6 }}>
-              <button
-                type="button"
-                className={`visibility-option ${form.visibility === "everyone" ? "is-active" : ""}`}
-                onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
-                aria-pressed={form.visibility === "everyone"}
-              >
-                <span className="visibility-option-title">Everyone on COMMONS</span>
-              </button>
-              <button
-                type="button"
-                className={`visibility-option ${form.visibility === "network" ? "is-active" : ""}`}
-                onClick={() => setForm((f) => ({ ...f, visibility: "network" }))}
-                aria-pressed={form.visibility === "network"}
-              >
-                <span className="visibility-option-title">Your Network</span>
-              </button>
+            <div className="form-row-flex">
+              <div className="form-row-flex-main">
+                <label className="form-question">Spots available</label>
+                {!form.capacityOn ? (
+                  <p className="form-help" style={{ marginTop: 4 }}>Open — no cap</p>
+                ) : (
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    placeholder="e.g. 6"
+                    className="idea-detail-input"
+                    value={form.capacity}
+                    onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))}
+                  />
+                )}
+              </div>
+              <FlexToggle
+                active={form.capacityOn}
+                onClick={() => setForm((f) => ({ ...f, capacityOn: !f.capacityOn }))}
+                label="Set cap"
+              />
             </div>
+
+            <label className="form-question" style={{ marginTop: 14 }}>Cover image</label>
+            {form.flyerDataUrl ? (
+              <div className="idea-cover-preview">
+                <img src={form.flyerDataUrl} alt="" />
+                <div className="idea-cover-actions">
+                  <button type="button" className="btn-secondary" onClick={onShowCoverLib}>
+                    Change
+                  </button>
+                  <button type="button" className="btn-link" onClick={onClearFlyer}>
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="idea-cover-actions idea-cover-actions--empty">
+                <button type="button" className="btn-secondary" onClick={onShowCoverLib}>
+                  Choose from library
+                </button>
+                <button type="button" className="btn-secondary" onClick={onOpenFlyer}>
+                  Upload
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -1056,7 +1191,10 @@ function IdeaForm({
         </button>
 
         <p className="create-communities-footer">
-          <strong>Communities</strong> <span className="visibility-option-pill">Coming soon</span>
+          <strong>Communities</strong>{" "}
+          <Link to="/communities" className="visibility-option-pill">
+            Explore →
+          </Link>
           <br />
           Run clubs, book clubs, recurring crews.
         </p>

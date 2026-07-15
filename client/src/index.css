@@ -118,6 +118,7 @@ html,
 body,
 #root {
   margin: 0;
+  font-size: 15px;
   min-height: 100vh;
   /* Dynamic viewport — avoids 1px overflow that would push the fixed bottom-nav
      out of the visible area on mobile Safari (URL bar dynamic height). */
@@ -134,7 +135,7 @@ body,
 }
 
 body {
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -2355,6 +2356,7 @@ h1, h2, h3, h4, h5, h6 {
   display: none;
 }
 .onboarding-card {
+  position: relative;
   width: 100%;
   max-width: 420px;
   background: var(--surface);
@@ -2852,8 +2854,8 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   justify-content: center;
   border-radius: 10px;
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: transparent;
+  color: var(--text-muted);
   font-size: 16px;
   line-height: 1;
 }
@@ -3446,9 +3448,17 @@ h1, h2, h3, h4, h5, h6 {
   transform: translateY(-1px);
 }
 .profile-menu-icon {
-  font-size: 22px;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: var(--text-muted);
   flex-shrink: 0;
+}
+.profile-menu-icon svg {
+  width: 20px;
+  height: 20px;
 }
 .profile-menu-text {
   flex: 1;
@@ -3607,12 +3617,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 .profile-list-when { color: var(--text-muted); font-size: 13px; white-space: nowrap; }
 .profile-list-badge {
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
   padding: 3px 8px;
   border-radius: 999px;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .profile-list-badge.is-host {
   background: var(--accent);
@@ -4057,8 +4067,10 @@ h1, h2, h3, h4, h5, h6 {
 /* Profile "Your plans" header row + do-again */
 .profile-block-heading-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 .profile-block-see-all { font-size: 13px; }
 
@@ -4067,14 +4079,20 @@ h1, h2, h3, h4, h5, h6 {
   display: inline-flex;
   gap: 2px;
   padding: 2px;
+  max-width: 100%;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 999px;
+  box-sizing: border-box;
 }
 .profile-plans-toggle button {
+  flex: 1 1 0;
+  min-width: 0;
   padding: 5px 12px;
   font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
+  text-align: center;
   color: var(--text-muted);
   border-radius: 999px;
   background: transparent;
@@ -4144,7 +4162,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 .chat-composer:focus-within {
   border-color: var(--accent);
-  background: var(--surface-2);
+  background: var(--surface);
 }
 .chat-composer-input {
   flex: 1;
@@ -4485,10 +4503,10 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: var(--shadow-card);
 }
 
-/* Looking For — white card with red border per wireframe. */
+/* Looking For — red left rail only per wireframe. */
 .plan-card--looking > .plan-card {
   background: var(--surface);
-  border: 1.5px solid var(--accent);
+  border: none;
   border-left: 4px solid var(--accent);
   box-shadow: var(--shadow-card);
 }
@@ -4510,12 +4528,36 @@ h1, h2, h3, h4, h5, h6 {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
   padding: 4px 10px;
   border-radius: 999px;
+}
+
+/* Community pill on a plan card — taps through to the community page. */
+.plan-card-community-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: var(--community-pink);
+  background: var(--community-pink-soft);
+  border: 1px solid var(--community-pink-border);
+  cursor: pointer;
+}
+/* When both a kind pill and community pill show, don't fight over margin-left:auto. */
+.plan-card-poster-row .plan-card-kind-pill + .plan-card-community-pill {
+  margin-left: 6px;
 }
 
 /* New plan-card layout — poster row, meta lines, footer with avatar stack. */
@@ -4783,8 +4825,8 @@ h1, h2, h3, h4, h5, h6 {
 /* "Looks like you've got a group" prompt on Looking-For plan detail */
 
 .lock-prompt {
-  background: var(--accent-soft);
-  border: 1px solid var(--accent);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px 16px;
   margin: 16px 0 8px;
@@ -4798,8 +4840,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .lock-prompt-headline {
-  color: var(--accent);
-  font-weight: 700;
+  color: var(--text);
+  font-weight: 600;
   font-size: 14px;
 }
 
@@ -5118,7 +5160,7 @@ h1, h2, h3, h4, h5, h6 {
   flex-direction: row;
   align-items: center;
   gap: 7px;
-  padding: 9px 14px;
+  padding: 6px 11px;
   border-radius: var(--r-pill);
   border: 1px solid var(--border);
   background: var(--surface);
@@ -5144,7 +5186,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .vibe-tile-label {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
   color: inherit;
 }
@@ -5197,8 +5239,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .coordination-banner {
-  background: var(--surface-2);
-  border: 1px dashed var(--border-strong);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 12px 14px;
   margin-bottom: 12px;
@@ -7057,10 +7099,10 @@ h1, h2, h3, h4, h5, h6 {
   margin-top: 22px;
 }
 .settings-group-label {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--text-muted);
   margin: 0 14px 10px;
 }
@@ -8038,14 +8080,14 @@ h1, h2, h3, h4, h5, h6 {
   border-color: var(--accent);
 }
 
-/* Section eyebrow — 9px / 600 / tracking 2 / uppercase. */
+/* Section eyebrow — compact muted label. */
 .form-eyebrow {
   margin: 6px 0 -4px;
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--faint, #a8a8b4);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-muted);
 }
 
 /* Settings card — visibility segmented toggle + collapsible options. */
@@ -8417,6 +8459,183 @@ h1, h2, h3, h4, h5, h6 {
 }
 .xpl-comm-card:hover .xpl-comm-chevron {
   color: rgba(255, 255, 255, 0.9);
+}
+.xpl-comm-card-wrap {
+  list-style: none;
+}
+/* The live rail wraps each card in a <Link> — keep it looking like the card. */
+a.xpl-comm-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+.xpl-comm-cover-fallback {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--community-pink) 0%, #2b2b3a 100%);
+}
+.xpl-comm-founding {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.22);
+  vertical-align: middle;
+}
+.xpl-comm-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 2px 4px;
+  color: var(--ink-500, #6b7280);
+  font-size: 14px;
+}
+
+/* Community group chat (lightweight, reuses .chat-composer* + .chat-system-line). */
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--hairline, rgba(0, 0, 0, 0.08));
+  background: var(--paper-50, #fff);
+}
+.chat-back {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ink-900, #16161a);
+  text-decoration: none;
+  max-width: 70%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-header-sub {
+  font-size: 12px;
+  color: var(--ink-500, #6b7280);
+  flex-shrink: 0;
+}
+.chat-scroll {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+.chat-empty {
+  margin: auto;
+  color: var(--ink-500, #6b7280);
+  font-size: 14px;
+}
+.chat-msg {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 82%;
+}
+.chat-msg--mine {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+.chat-msg-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 16px;
+  background: var(--paper-100, #f1f1f4);
+}
+.chat-msg--mine .chat-msg-bubble {
+  background: var(--community-pink);
+  color: #fff;
+}
+.chat-msg-sender {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--community-pink);
+}
+.chat-msg-body {
+  font-size: 14px;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.chat-msg-time {
+  font-size: 10px;
+  opacity: 0.6;
+  align-self: flex-end;
+}
+
+/* CreatePlan — "posting to a community" tag + visibility choice. */
+.create-community-tag {
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: var(--r-lg, 16px);
+  background: var(--community-pink-soft);
+  border: 1px solid var(--community-pink-border);
+}
+.create-community-tag-title {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: var(--ink-900, #16161a);
+}
+.create-community-tag-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--ink-500, #6b7280);
+  line-height: 1.4;
+}
+
+/* Profile — "Communities" section. */
+.profile-communities-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.profile-community-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: var(--r-lg, 16px);
+  background: var(--paper-100, #f6f6f8);
+  text-decoration: none;
+  color: inherit;
+}
+.profile-community-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.profile-community-thumb--fallback {
+  background: linear-gradient(135deg, var(--community-pink) 0%, #2b2b3a 100%);
+}
+.profile-community-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.profile-community-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-900, #16161a);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profile-community-meta {
+  font-size: 12px;
+  color: var(--ink-500, #6b7280);
 }
 
 /* ============================================================
@@ -9062,8 +9281,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 .legal-consent-tab.is-active {
   border-color: var(--accent);
-  color: var(--text);
-  background: var(--accent-soft);
+  color: var(--accent);
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 .legal-consent-tab-check {
   display: inline-flex;
@@ -9401,4 +9621,187 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.settings-interest-pill {
+  padding: 9px 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+.settings-interest-pill.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.network-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+}
+.network-search-wrap svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.network-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--text);
+  padding: 0;
+}
+.network-search-input:focus {
+  outline: none;
+}
+
+.plan-participation-slot {
+  min-height: 76px;
+  margin-bottom: 12px;
+}
+.plan-participation-slot .participation {
+  margin: 0;
+}
+
+.plan-past-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.plan-past-action-btn svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.idea-visibility-label {
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+.idea-visibility-toggle {
+  width: 100%;
+  margin-bottom: 12px;
+}
+.idea-details {
+  margin-top: 8px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.idea-detail-input,
+.idea-details input,
+.idea-details textarea {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  padding: 10px 12px;
+  color: var(--text);
+}
+.idea-details .form-question {
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.idea-cover-preview {
+  margin-top: 8px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.idea-cover-preview img {
+  display: block;
+  width: 100%;
+  max-height: 160px;
+  object-fit: cover;
+}
+.idea-cover-actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  background: var(--surface);
+}
+.idea-cover-actions--empty {
+  padding: 0;
+  margin-top: 8px;
+}
+
+.xpl-coming-soon-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  margin-bottom: 12px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.xpl-pitch-head {
+  font-size: 28px;
+}
+
+.create-more .form-section {
+  background: var(--surface);
+}
+.create-more input,
+.create-more select,
+.create-more textarea {
+  background: var(--surface);
+  font-size: 13px;
+}
+.create-more .flex-toggle-btn.is-active {
+  background: var(--surface);
+}
+
+/* Global: drop shouty all-caps on common UI labels */
+.settings-group-label,
+.form-eyebrow,
+.community-chip,
+.plan-card-state-pill,
+.my-plans-section-title {
+  text-transform: none;
+  letter-spacing: 0;
+}
+.community-chip {
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.community-chip.is-active {
+  background: var(--surface);
+}
+
+.link-preview--card {
+  cursor: pointer;
+}
+.link-preview-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
