@@ -20,6 +20,9 @@ import { profileRouter } from "./routes/profile.js";
 import { placesRouter } from "./routes/places.js";
 import { venuesRouter } from "./routes/venues.js";
 import { linkPreviewRouter } from "./routes/linkPreview.js";
+import { shareRouter, injectPlanMeta, planIdFromDetailPath } from "./routes/share.js";
+import { store } from "./store.js";
+import { readFileSync } from "node:fs";
 import { startNudgeSchedulers } from "./lib/nudges.js";
 import { seedIfEmpty } from "./seed.js";
 
@@ -72,12 +75,37 @@ app.use("/api/notifications", notificationsRouter);
 app.use("/api/link-preview", linkPreviewRouter);
 app.use("/api", chatRouter); // chat router defines its own paths under /plans/.../conversation and /conversations/...
 
+// Public share-card image endpoint (no auth — crawlers fetch it). Reachable in
+// dev (localhost:4000) and prod alike, before the SPA catch-all.
+app.use(shareRouter);
+
+// Absolute public base for og:* URLs: prefer the configured origin, else derive
+// from the request so previews work on any deploy/preview host.
+function publicOrigin(req: express.Request): string {
+  const env = process.env.APP_URL?.trim();
+  if (env && /^https?:\/\//.test(env)) return env.replace(/\/$/, "");
+  const proto = (req.headers["x-forwarded-proto"] as string)?.split(",")[0] || req.protocol;
+  return `${proto}://${req.get("host")}`;
+}
+
 if (isProduction) {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const clientDist = path.resolve(here, "../../client/dist");
+  const indexHtml = readFileSync(path.join(clientDist, "index.html"), "utf8");
   app.use(express.static(clientDist));
   app.use((req, res, next) => {
     if (req.path.startsWith("/api")) return next();
+    // Give plan-detail links (/plans/:id) their own social preview by injecting
+    // plan-specific OG/Twitter tags; the SPA still boots on top for real users.
+    const planId = planIdFromDetailPath(req.path);
+    if (planId) {
+      const plan = store.findPlanById(planId);
+      if (plan) {
+        res.setHeader("Cache-Control", "public, max-age=120");
+        res.type("html").send(injectPlanMeta(indexHtml, plan, publicOrigin(req)));
+        return;
+      }
+    }
     res.sendFile(path.join(clientDist, "index.html"));
   });
 }
