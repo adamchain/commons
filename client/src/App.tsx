@@ -16,6 +16,7 @@ import { LandingPage } from "./pages/Landing";
 import { LegalPage } from "./pages/Legal";
 import { isNative } from "./lib/platform";
 import { PlanDetailPage } from "./pages/PlanDetail";
+import { PublicEventPage } from "./pages/PublicEvent";
 import { AdminPage } from "./pages/Admin";
 import { ProfilePage } from "./pages/Profile";
 import { EditProfilePage } from "./pages/EditProfile";
@@ -59,6 +60,29 @@ function Protected({
   return <>{children}</>;
 }
 
+// A shared plan link (/plans/:id) is the one deep link a logged-out visitor can
+// hit. Instead of bouncing them to the marketing landing, show a public event
+// page that converts them (number → onboarding → app). Signed-in members get
+// the normal detail page.
+function PlanRoute() {
+  const { user, loading } = useAuth();
+  const [bootSplashDone, setBootSplashDone] = useState(
+    () => Date.now() - APP_BOOT_AT >= MIN_BOOT_SPLASH_MS,
+  );
+  useEffect(() => {
+    if (bootSplashDone) return;
+    const remaining = MIN_BOOT_SPLASH_MS - (Date.now() - APP_BOOT_AT);
+    const t = setTimeout(() => setBootSplashDone(true), Math.max(0, remaining));
+    return () => clearTimeout(t);
+  }, [bootSplashDone]);
+  if (loading || !bootSplashDone) return <LoadingScreen simple tagline="A place for plans meant to be shared." />;
+  if (user && user.onboardingComplete) return <PlanDetailPage />;
+  if (user && !user.onboardingComplete) return <Navigate to="/onboarding" replace />;
+  // Logged out: native users go to onboarding; web visitors get the public page.
+  if (isNative()) return <Navigate to="/onboarding" replace />;
+  return <PublicEventPage />;
+}
+
 export default function App() {
   return (
     <>
@@ -81,7 +105,7 @@ export default function App() {
         <Route path="/my-plans" element={<Protected><MyPlansPage /></Protected>} />
         <Route path="/plans/new" element={<Protected><CreatePlanPage /></Protected>} />
         <Route path="/plans/:id/edit" element={<Protected><EditPlanPage /></Protected>} />
-        <Route path="/plans/:id" element={<Protected><PlanDetailPage /></Protected>} />
+        <Route path="/plans/:id" element={<PlanRoute />} />
         <Route path="/plans/:planId/chat" element={<Protected><ChatPage /></Protected>} />
         <Route path="/network" element={<Protected><NetworkPage /></Protected>} />
         <Route path="/invite" element={<Protected><InvitePage /></Protected>} />

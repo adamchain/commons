@@ -81,3 +81,28 @@ export function formatRelative(iso: string): string {
   if (days < 7) return `${days}d ago`;
   return new Date(iso).toLocaleDateString();
 }
+
+/** Progressive phone formatting for the onboarding / public-event number field. */
+export function formatPhoneInput(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("+")) {
+    const inner = trimmed.slice(1).replace(/\D/g, "").slice(0, 15);
+    // Pretty NANP: +1 (484) 571-2062
+    if (inner.length === 11 && inner.startsWith("1")) {
+      const n = inner.slice(1);
+      if (n.length === 10) {
+        return `+1 (${n.slice(0, 3)}) ${n.slice(3, 6)}-${n.slice(6)}`;
+      }
+    }
+    return `+${inner}`;
+  }
+  let digits = trimmed.replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("1")) {
+    digits = digits.slice(1);
+  }
+  digits = digits.slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}

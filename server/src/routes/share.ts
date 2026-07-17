@@ -76,7 +76,7 @@ function hashPick<T>(pool: T[], key: string): T {
 }
 
 /** Resolve a cover source for the plan (flyer → link-preview → curated → fallback). */
-function coverUrlFor(plan: PlanRecord): string {
+export function coverUrlFor(plan: PlanRecord): string {
   if (plan.flyerDataUrl) return plan.flyerDataUrl;
   if (plan.flyerLinkPreview?.image) return plan.flyerLinkPreview.image;
   const curated = store.listCardImages().map((c) => c.url);

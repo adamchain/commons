@@ -17,6 +17,8 @@ import {
 import { onPlanCreatedVenueNudge, notifyInterestedPlanLocked } from "../lib/nudges.js";
 import { emit } from "../lib/notify.js";
 import { plansOverlap } from "../lib/planTime.js";
+import { coverUrlFor } from "./share.js";
+import type { PublicPlanDTO } from "../types/shared.js";
 
 export const plansRouter = Router();
 
@@ -179,6 +181,37 @@ plansRouter.get("/preview", async (_req, res) => {
     .slice(0, 6);
   const summaries = await Promise.all(upcoming.map((p) => planSummary(p, null)));
   res.json(summaries);
+});
+
+// Public, unauthenticated event page payload. Powers the web landing a
+// logged-out visitor sees after clicking a shared plan link (see the client's
+// PublicEventPage). Intentionally minimal — no participant identities, just the
+// event essentials and live counts, matching the social share card.
+plansRouter.get("/:id/public", (req, res) => {
+  const plan = store.findPlanById(req.params.id);
+  if (!plan) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  const parts = store.listParticipationsForPlan(plan.id);
+  const host = store.findUserById(plan.creatorId);
+  const dto: PublicPlanDTO = {
+    id: plan.id,
+    title: plan.title,
+    date: plan.date,
+    time: plan.time,
+    isFlexibleTime: plan.isFlexibleTime,
+    isFlexibleLocation: plan.isFlexibleLocation ?? false,
+    locationName: plan.isFlexibleLocation ? "Flexible location" : plan.location?.name ?? "",
+    hostFirstName: host?.firstName ?? "A host",
+    hostEmoji: plan.hostEmoji || "✨",
+    coverImage: coverUrlFor(plan),
+    tags: plan.tags,
+    goingCount: parts.filter((p) => p.state === "going").length,
+    interestedCount: parts.filter((p) => p.state === "interested").length,
+    cancelled: Boolean(plan.cancelledAt),
+  };
+  res.json(dto);
 });
 
 plansRouter.get("/", requireAuth, async (req, res) => {

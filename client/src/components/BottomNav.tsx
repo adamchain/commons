@@ -50,7 +50,10 @@ export function BottomNav() {
     pathname.startsWith("/login") ||
     pathname === "/plans/new" ||
     pathname.match(/^\/plans\/[^/]+\/chat$/) ||
-    pathname.match(/^\/communities\/[^/]+\/chat$/);
+    pathname.match(/^\/communities\/[^/]+\/chat$/) ||
+    // Logged-out visitor on a public shared-event page — no app chrome, its
+    // links point at member-only routes.
+    (!user && Boolean(pathname.match(/^\/plans\/[^/]+$/)));
   if (hide) return null;
 
   const profileTo = user ? `/profile/${user.id}` : "/onboarding";

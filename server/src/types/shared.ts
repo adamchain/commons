@@ -114,6 +114,28 @@ export interface PlanSuggestionDTO {
   createdAt: string;
 }
 
+/**
+ * Minimal, unauthenticated event payload for the public web landing shown when a
+ * logged-out visitor opens a shared plan link. No participant identities — just
+ * the essentials and live counts. Served by GET /api/plans/:id/public.
+ */
+export interface PublicPlanDTO {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  isFlexibleTime: boolean;
+  isFlexibleLocation: boolean;
+  locationName: string;
+  hostFirstName: string;
+  hostEmoji: string;
+  coverImage: string;
+  tags: InterestTag[];
+  goingCount: number;
+  interestedCount: number;
+  cancelled: boolean;
+}
+
 export interface PlanDTO {
   id: string;
   title: string;

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import type { CSSProperties, ReactNode } from "react";
 import { api } from "../api/http";
+import { formatPhoneInput } from "../lib/format";
+import { APP_STORE_URL } from "../lib/appStore";
 import { setAuthToken, clearAuthToken } from "../api/authToken";
 import { Avatar } from "../components/Avatar";
 import { AvatarCropModal } from "../components/AvatarCropModal";
@@ -49,19 +51,44 @@ type Step =
   | "interests"
   | "profile"
   | "age"
-  | "legal";
+  | "legal"
+  | "download";
+
+/**
+ * Handoff from the public event page (PublicEventPage). When a logged-out
+ * visitor enters their number on a shared plan link, we request the code there
+ * and route into onboarding pre-advanced to the code step — with the gate
+ * bypassed (event referral counts as the invite) and a redirect back to the
+ * event once setup finishes.
+ */
+interface OnboardingNavState {
+  eventRef?: boolean;
+  redirect?: string;
+  phoneNumber?: string;
+  authMode?: "verify" | "dev";
+  smsConfigured?: boolean;
+}
 
 export function OnboardingPage() {
   const { user, refreshUser, setUser } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const nav = (location.state ?? null) as OnboardingNavState | null;
+  // Event-referred signups bypass the invite-only launch gate and, on finish,
+  // route back to the event they came from instead of the home feed.
+  const eventRef = Boolean(nav?.eventRef);
+  const redirectTo = nav?.redirect && nav.redirect.startsWith("/") ? nav.redirect : "/";
   // TEMP launch gate: whether this device has already cleared the access-code
   // step. Read once so a refresh mid-onboarding doesn't re-prompt or bypass it.
-  const [gatePassed, setGatePassed] = useState<boolean>(isGatePassed);
-  const [step, setStep] = useState<Step>(() => pickInitial(user, gatePassed));
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [smsConfigured, setSmsConfigured] = useState<boolean | null>(null);
+  const [gatePassed, setGatePassed] = useState<boolean>(() => isGatePassed() || eventRef);
+  const [phoneNumber, setPhoneNumber] = useState(nav?.phoneNumber ?? "");
+  const [smsConfigured, setSmsConfigured] = useState<boolean | null>(nav?.smsConfigured ?? null);
   /** Set after requesting a code; drives code length rules (Verify vs local dev). */
-  const [authMode, setAuthMode] = useState<"verify" | "dev" | null>(null);
+  const [authMode, setAuthMode] = useState<"verify" | "dev" | null>(nav?.authMode ?? null);
+  // Start on the code step when the public event page already sent the SMS.
+  const [step, setStep] = useState<Step>(() =>
+    nav?.phoneNumber ? "code" : pickInitial(user, isGatePassed() || eventRef),
+  );
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -76,10 +103,12 @@ export function OnboardingPage() {
     return new URLSearchParams(window.location.search).get("invite") ?? "";
   });
 
-  // If logged-in user lands here with onboarding done, send them home.
+  // If a logged-in, already-onboarded user lands here, move them on (to the
+  // event they came from, or home). Skip on the "download" step — that's the
+  // deliberate post-completion app nudge, which navigates on its own.
   useEffect(() => {
-    if (user?.onboardingComplete) navigate("/", { replace: true });
-  }, [user, navigate]);
+    if (user?.onboardingComplete && step !== "download") navigate(redirectTo, { replace: true });
+  }, [user, step, redirectTo, navigate]);
 
   useEffect(() => {
     if (!user) return;
@@ -407,13 +436,54 @@ export function OnboardingPage() {
               onboardingComplete: true,
             }),
           });
-          await refreshUser();
-          navigate("/", { replace: true });
+          // The app is iOS-only, so web finishers get a "get the app" nudge
+          // before continuing (to the event they came from, or the feed). Set
+          // the step BEFORE refreshUser resolves so the completion guard above
+          // sees "download" and doesn't redirect out from under it.
+          if (!isNative()) {
+            setStep("download");
+            await refreshUser();
+          } else {
+            await refreshUser();
+            navigate(redirectTo, { replace: true });
+          }
         }}
       />
     );
   }
+  if (step === "download") {
+    return <DownloadAppStep redirectTo={redirectTo} onContinue={() => navigate(redirectTo, { replace: true })} />;
+  }
   return null;
+}
+
+/**
+ * Final web step: nudge the freshly-onboarded member to install the iOS app.
+ * Commons runs natively on iOS, so web signups (including the shared-event
+ * funnel) land here before continuing to the event or feed. Skippable — the web
+ * app keeps working for anyone who'd rather stay in the browser.
+ */
+function DownloadAppStep({ redirectTo, onContinue }: { redirectTo: string; onContinue: () => void }) {
+  const goingToEvent = redirectTo.startsWith("/plans/");
+  return (
+    <OnboardingShell
+      title="You're in! 🎉"
+      subtitle="Commons lives on your phone. Get the app for notifications when plans fill up, chat, and one-tap RSVPs."
+    >
+      <div className="download-app">
+        {APP_STORE_URL ? (
+          <a className="btn-primary btn-block" href={APP_STORE_URL} target="_blank" rel="noopener noreferrer">
+             Download for iPhone
+          </a>
+        ) : (
+          <div className="download-app-soon">📱 iPhone app coming soon — we'll text you the link.</div>
+        )}
+        <button className="btn-link btn-block" type="button" onClick={onContinue}>
+          {goingToEvent ? "Continue to the event on web →" : "Continue on the web →"}
+        </button>
+      </div>
+    </OnboardingShell>
+  );
 }
 
 function pickInitial(user: MeDTO | null, gatePassed: boolean): Step {
@@ -448,30 +518,6 @@ function formatError(e: unknown): string {
 }
 
 /** Formats US numbers as users type, while still allowing +country input. */
-function formatPhoneInput(raw: string): string {
-  const trimmed = raw.trim();
-  if (!trimmed) return "";
-  if (trimmed.startsWith("+")) {
-    const inner = trimmed.slice(1).replace(/\D/g, "").slice(0, 15);
-    // Pretty NANP: +1 (484) 571-2062
-    if (inner.length === 11 && inner.startsWith("1")) {
-      const n = inner.slice(1);
-      if (n.length === 10) {
-        return `+1 (${n.slice(0, 3)}) ${n.slice(3, 6)}-${n.slice(6)}`;
-      }
-    }
-    return `+${inner}`;
-  }
-  let digits = trimmed.replace(/\D/g, "");
-  if (digits.length === 11 && digits.startsWith("1")) {
-    digits = digits.slice(1);
-  }
-  digits = digits.slice(0, 10);
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
-  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-}
-
 /** Floating activity icons — same vocabulary as LoadingScreen to make sign-in feel continuous. */
 const ONBOARDING_ICONS: Array<{
   key: string;
