@@ -47,10 +47,10 @@ export function ExplorePage() {
           <div className="xpl-eyebrow">Philadelphia</div>
           <h1 className="xpl-title">Explore</h1>
         </div>
-        <button type="button" className="xpl-search-pill" disabled aria-disabled="true">
+        <Link to="/search" className="xpl-search-pill">
           <SearchIcon />
           <span>Search</span>
-        </button>
+        </Link>
       </header>
 
       <div className="xpl-divider" />

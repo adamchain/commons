@@ -6,9 +6,11 @@
 //   2. A dedupKey — same key blocks re-emit so a 10-min scheduler doesn't
 //      re-send the same "your plan is tomorrow" every tick.
 //
-// No push delivery here — this is the in-app event log surfaced via
-// /api/notifications. When/if we add web push, the same `emit` is the hook.
+// After a fresh in-app row lands, we also fan out an APNs push (best-effort,
+// never blocks/fails the in-app write) so the notification reaches the lock
+// screen, not just the in-app feed.
 
+import { sendPushToUser } from "./apns.js";
 import { store, type NotificationRecord } from "../store.js";
 import { findUserById } from "../userRepo.js";
 import { DEFAULT_NOTIFICATION_PREFS, type NotificationPrefs } from "../types/shared.js";
@@ -39,6 +41,10 @@ const PREF_KEY: Record<NotificationKind, keyof NotificationPrefs> = {
   communityRequestApproved: "someoneJoinedYourPlan",
   communityRequestDeclined: "someoneJoinedYourPlan",
   communityPlanPosted: "someoneJoinedYourPlan",
+  planDayOf: "planTomorrow",
+  interestedNudge: "planTomorrow",
+  didThisHappen: "postPlanNetworkNudge",
+  planSpotReopen: "someoneJoinedYourPlan",
 };
 
 export async function emit(input: {
@@ -58,7 +64,12 @@ export async function emit(input: {
     ...(user.notificationPrefs ?? {}),
   };
   if (prefs[PREF_KEY[input.kind]] === false) return null;
-  return store.insertNotificationIfNew({
+  // Muted chats stay quiet — the conversation itself still works, it just
+  // doesn't ping. Only applies to notifications tied to a specific thread.
+  if (input.conversationId && (user.mutedConversationIds ?? []).includes(input.conversationId)) {
+    return null;
+  }
+  const row = store.insertNotificationIfNew({
     userId: input.userId,
     kind: input.kind,
     body: input.body,
@@ -68,4 +79,15 @@ export async function emit(input: {
     profileUserId: input.profileUserId,
     communityId: input.communityId,
   });
+  if (row) {
+    const data: Record<string, string> = {};
+    if (input.planId) data.planId = input.planId;
+    if (input.conversationId) data.conversationId = input.conversationId;
+    if (input.communityId) data.communityId = input.communityId;
+    // Fire-and-forget — a push failure should never fail the in-app write.
+    void sendPushToUser(input.userId, { title: "Commons", body: input.body, data }).catch((err) => {
+      console.error("[notify] push send failed", err instanceof Error ? err.message : err);
+    });
+  }
+  return row;
 }

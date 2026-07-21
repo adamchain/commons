@@ -8,32 +8,27 @@ import type { MeDTO, PlanDTO } from "../types/shared";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
 import { planHasEnded } from "../lib/planTime";
 import { useNeighborhoods } from "../lib/useNeighborhoods";
-import { useCardImages, pickCoverImage } from "../lib/cardImages";
 
 /**
- * Compact event card — title, time, details. Card type (confirmed / looking_for)
- * drives shading; quick RSVP sits below the card link. Invite / Share / Get
- * there and the group chat live on the plan detail page, not the feed card.
+ * Compact event card. Looking-for (2+ flexible fields) gets a red left edge;
+ * confirmed plans are plain white. No stock cover images — photo only if uploaded.
  */
 export function PlanCard({
   plan,
   onPlanRefresh,
   highlight = false,
-  onHideKind,
 }: {
   plan: PlanDTO;
   onPlanRefresh?: () => void;
   highlight?: boolean;
-  onHideKind?: (kind: "happened" | "cancelled") => void;
 }) {
   const title = sentenceCaseTitle(plan.title);
   const flexCount = (plan.isFlexibleTime ? 1 : 0) + (plan.isFlexibleLocation ? 1 : 0);
-  const isLooking = plan.planKind === "looking_for" && flexCount > 1;
-  const coverPool = useCardImages();
-  const coverImage = plan.flyerDataUrl ?? pickCoverImage(coverPool, plan.id);
+  // Only 2+ flexible fields = Looking For card. One flexible field = confirmed.
+  const isLooking = plan.planKind === "looking_for" && flexCount > 1 && !plan.lockedAt;
+  const coverImage = plan.flyerDataUrl ?? null;
   const hoods = useNeighborhoods();
   const hoodName = hoods[plan.neighborhoodId]?.name ?? null;
-  const isPlanCreated = isLooking && Boolean(plan.lockedAt);
   const isCancelled = Boolean(plan.cancelledAt);
   const hasEnded = !isCancelled && planHasEnded(plan);
   const { user, setUser } = useAuth();
@@ -61,14 +56,26 @@ export function PlanCard({
     }
   }
 
-  const whenLine = plan.isFlexibleTime
-    ? `${formatPlanDate(plan.date)} · Flexible time`
-    : `${formatPlanDate(plan.date)} · ${formatPlanTime(plan.time, plan.isFlexibleTime)}`;
+  // Flexible parts say "flexible" — never invent a fixed date that contradicts Lock It In.
+  const whenParts: string[] = [];
+  if (plan.isFlexibleTime) {
+    whenParts.push(formatPlanDate(plan.date));
+    whenParts.push("flexible");
+  } else {
+    whenParts.push(formatPlanDate(plan.date));
+    whenParts.push(formatPlanTime(plan.time, false));
+  }
+  const locationPart = plan.isFlexibleLocation
+    ? "flexible"
+    : hoodName
+      ? `${plan.location.name}`
+      : plan.location.name;
+  const metaLine = [...whenParts, locationPart].filter(Boolean).join(" · ");
 
   const goingCount = plan.participants.going.length;
   const interestedCount = plan.participants.interested.length;
   const totalRsvps = goingCount + interestedCount;
-  const almostPlan = isLooking && !isPlanCreated && !hasEnded && totalRsvps >= 2;
+  const almostPlan = isLooking && !hasEnded && totalRsvps >= 2;
   const spotsRemaining =
     plan.capacity !== null && !hasEnded && !isCancelled
       ? Math.max(0, plan.capacity - goingCount)
@@ -76,14 +83,7 @@ export function PlanCard({
   const showSpotsRemaining =
     spotsRemaining !== null && plan.capacity !== null && spotsRemaining > 0 && spotsRemaining <= 3;
   const isFull = plan.capacity !== null && goingCount >= plan.capacity;
-  const locationLine = plan.isFlexibleLocation
-    ? "Flexible location"
-    : hoodName
-      ? `${plan.location.name} · ${hoodName}`
-      : plan.location.name;
 
-  const goingLabel = `${goingCount} going`;
-  const interestedLabel = interestedCount > 0 ? ` · ${interestedCount} interested` : "";
   const footerCount = almostPlan
     ? `${totalRsvps} interested · almost a plan`
     : hasEnded && goingCount >= 1
@@ -93,19 +93,20 @@ export function PlanCard({
         : showSpotsRemaining
           ? `${goingCount} going · ${spotsRemaining} spot${spotsRemaining === 1 ? "" : "s"} left`
           : goingCount >= 1 || interestedCount >= 1
-            ? `${goingLabel}${interestedLabel}`
+            ? `${goingCount} going${interestedCount > 0 ? ` · ${interestedCount} interested` : ""}`
             : null;
+
+  // Host-only banner, few minutes after posting, never on past/cancelled.
+  const showBanner = highlight && isHosting && !hasEnded && !isCancelled;
 
   return (
     <div
       data-plan-id={plan.id}
       className={`plan-card-outer ${
-        isLooking && !isPlanCreated
-          ? "plan-card--looking"
-          : "plan-card--confirmed"
-      } ${highlight ? "plan-card--just-posted" : ""} ${hasEnded ? "plan-card--happened" : ""} ${isCancelled ? "plan-card--cancelled" : ""} ${plan.visibility === "network" ? "plan-card--network" : ""}`}
+        isLooking ? "plan-card--looking" : "plan-card--confirmed"
+      } ${showBanner ? "plan-card--just-posted" : ""} ${hasEnded ? "plan-card--happened" : ""} ${isCancelled ? "plan-card--cancelled" : ""} ${plan.visibility === "network" ? "plan-card--network" : ""}`}
     >
-      {highlight && (
+      {showBanner && (
         <div className="plan-card-just-posted-banner">
           Just posted · {plan.visibility === "network"
             ? "Only your network can see this"
@@ -114,31 +115,21 @@ export function PlanCard({
               : "Live on the feed"}
         </div>
       )}
-      {(isCancelled || hasEnded) && onHideKind && (
-        <button
-          type="button"
-          className="plan-card-hide-btn"
-          onClick={() => onHideKind(isCancelled ? "cancelled" : "happened")}
-          aria-label={isCancelled ? "Hide cancelled plans" : "Hide past plans"}
-        >
-          Hide {isCancelled ? "cancelled" : "past"}
-        </button>
-      )}
       {user && (
         <button
           type="button"
-          className={`plan-card-save-btn ${isSaved ? "is-saved" : ""}`}
+          className={`plan-card-save-btn ${isSaved ? "is-saved" : ""} ${!coverImage ? "plan-card-save-btn--body" : ""}`}
           onClick={(e) => void toggleSave(e)}
           disabled={savePending}
           aria-pressed={isSaved}
-          aria-label={isSaved ? "Saved — tap to unsave" : "Save to My Plans"}
+          aria-label={isSaved ? "Saved — tap to unsave" : "Save to Your plans"}
           title={isSaved ? "Saved" : "Save"}
         >
           {isSaved ? "★" : "☆"}
         </button>
       )}
       <Link to={`/plans/${plan.id}`} className="plan-card plan-card-link plan-card--compact">
-        {!isLooking || isPlanCreated ? (
+        {coverImage ? (
           <div className="plan-card-flyer">
             <img src={coverImage} alt="" loading="lazy" />
           </div>
@@ -176,35 +167,26 @@ export function PlanCard({
                   }
                 }}
               >
-                🏙️ {plan.communityName}
+                {plan.communityName}
               </span>
             ) : null}
           </header>
           <h3 className="plan-card-title">{title}</h3>
-          <p className="plan-card-meta-line">
-            <span className="plan-card-meta-icon" aria-hidden="true">
-              <CalendarIcon />
-            </span>
-            <span>{whenLine}</span>
-          </p>
-          <p className="plan-card-meta-line plan-card-meta-line--location">
-            <span className="plan-card-meta-icon" aria-hidden="true">
-              <PinIcon />
-            </span>
-            <span>{locationLine}</span>
+          <p className="plan-card-meta-line plan-card-meta-line--single">
+            <span>{metaLine}</span>
           </p>
           {plan.description && (
             <p className="plan-card-description">{plan.description}</p>
           )}
 
           {plan.flyerLinkUrl && (
-            <button
-              type="button"
+            <a
+              href={plan.flyerLinkUrl}
+              target="_blank"
+              rel="noopener noreferrer"
               className="link-preview link-preview--card"
               onClick={(e) => {
-                e.preventDefault();
                 e.stopPropagation();
-                setLinkOpen(true);
               }}
             >
               {plan.flyerLinkPreview?.image && (
@@ -223,7 +205,7 @@ export function PlanCard({
                   <div className="link-preview-desc">{plan.flyerLinkPreview.description}</div>
                 )}
               </div>
-            </button>
+            </a>
           )}
 
           <footer className="plan-card-footer-row">
@@ -248,12 +230,12 @@ export function PlanCard({
                 <span className="plan-card-going-count">{footerCount}</span>
               )}
             </div>
-            {!isHosting && !hasEnded && !isCancelled && isLooking && (
+            {!isHosting && !hasEnded && !isCancelled && (
               <QuickJoin
                 planId={plan.id}
                 isLooking={isLooking}
                 state={plan.myState ?? null}
-                disabled={isFull && !isLooking}
+                isFull={isFull}
                 onPlanRefresh={onPlanRefresh}
               />
             )}
@@ -262,7 +244,12 @@ export function PlanCard({
       </Link>
 
       {hasEnded && isHosting && (
-        <Link to="/plans/new" className="plan-card-host-again" onClick={(e) => e.stopPropagation()}>
+        <Link
+          to="/plans/new"
+          state={{ hostAgainFrom: plan.id }}
+          className="plan-card-host-again"
+          onClick={(e) => e.stopPropagation()}
+        >
           Host another like this →
         </Link>
       )}
@@ -304,7 +291,6 @@ export function PlanCard({
           </div>
         </div>
       )}
-
     </div>
   );
 }
@@ -313,39 +299,36 @@ function QuickJoin({
   planId,
   isLooking,
   state,
-  disabled,
+  isFull,
   onPlanRefresh,
 }: {
   planId: string;
   isLooking: boolean;
   state: "going" | "interested" | null;
-  disabled?: boolean;
+  isFull?: boolean;
   onPlanRefresh?: () => void;
 }) {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
+  // Feed: one outlined Join pill. Interested lives only on plan detail.
   const target: "going" | "interested" = isLooking ? "interested" : "going";
-  const active = state === target;
+  const active = state === "going" || state === "interested";
 
   async function commit(e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (busy) return;
+    if (busy || (isFull && !active && !isLooking)) return;
+    if (active) {
+      navigate(`/plans/${planId}`);
+      return;
+    }
     setBusy(true);
     try {
-      if (active) {
-        await api(`/api/plans/${planId}/participation`, { method: "DELETE" });
-        onPlanRefresh?.();
-      } else {
-        await api(`/api/plans/${planId}/participation`, {
-          method: "PUT",
-          body: JSON.stringify({ state: target }),
-        });
-        onPlanRefresh?.();
-        if (isLooking) {
-          navigate(`/plans/${planId}/chat`);
-        }
-      }
+      await api(`/api/plans/${planId}/participation`, {
+        method: "PUT",
+        body: JSON.stringify({ state: target }),
+      });
+      onPlanRefresh?.();
     } catch {
       /* surface nothing on the card */
     } finally {
@@ -353,38 +336,24 @@ function QuickJoin({
     }
   }
 
-  const label = active
-    ? "You're in"
-    : isLooking
-      ? "Interested"
-      : "I'm in";
+  if (isFull && !active && !isLooking) {
+    return (
+      <span className="plan-card-quick-join is-full" aria-disabled="true">
+        Full
+      </span>
+    );
+  }
+
+  const label = active ? "You're in ✓" : "Join";
 
   return (
     <button
       type="button"
       className={`plan-card-quick-join ${active ? "is-active" : ""}`}
       onClick={(e) => void commit(e)}
-      disabled={busy || disabled}
+      disabled={busy}
     >
       {busy ? "…" : label}
     </button>
-  );
-}
-
-function CalendarIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="3" y="4" width="18" height="18" rx="2" />
-      <path d="M16 2v4M8 2v4M3 10h18" />
-    </svg>
-  );
-}
-
-function PinIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-      <circle cx="12" cy="10" r="3" />
-    </svg>
   );
 }

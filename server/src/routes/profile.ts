@@ -15,6 +15,11 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
     res.status(404).json({ error: "User not found" });
     return;
   }
+  // Blocking hides the profile both ways — don't reveal which side blocked.
+  if (targetId !== viewerId && store.isBlockedEitherWay(viewerId, targetId)) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
   const neighborhood = target.neighborhoodId
     ? store.findNeighborhoodById(target.neighborhoodId)
     : null;

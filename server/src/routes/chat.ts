@@ -375,6 +375,27 @@ chatRouter.post("/conversations/:id/leave", requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// POST /api/conversations/:id/mute { muted: boolean } — quiets notifications
+// for this thread without leaving it. Toggle-only; body is optional (defaults
+// to flipping the current state).
+chatRouter.post("/conversations/:id/mute", requireAuth, (req, res) => {
+  const convId = String(req.params.id);
+  const userId = String(req.userId);
+  const conv = store.findConversationById(convId);
+  if (!conv) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
+  if (!conv.participantIds.includes(userId)) {
+    res.status(403).json({ error: "Not a participant" });
+    return;
+  }
+  const next =
+    typeof req.body?.muted === "boolean" ? req.body.muted : !store.isConversationMuted(userId, convId);
+  store.setConversationMuted(userId, convId, next);
+  res.json({ ok: true, muted: next });
+});
+
 // POST /api/conversations/:id/messages/:msgId/react { emoji }
 // Toggle the caller's reaction on a message. Only ❤️ is offered today, but the
 // store handles any emoji so the UI can grow.
@@ -410,6 +431,9 @@ async function toConversationDto(
 ): Promise<ConversationDTO> {
   const messages = store.listMessagesForConversation(conv.id);
   const users = await findUsersByIds(conv.participantIds);
+  const hostId = conv.communityId
+    ? store.findCommunityById(conv.communityId)?.organizerId ?? ""
+    : store.findPlanById(conv.planId)?.creatorId ?? "";
   return {
     id: conv.id,
     planId: conv.planId,
@@ -422,6 +446,9 @@ async function toConversationDto(
     }),
     lastMessageAt: conv.lastMessageAt,
     unreadCount: messages.filter((m) => !m.readBy.includes(_viewerId)).length,
+    muted: store.isConversationMuted(_viewerId, conv.id),
+    isHost: hostId === _viewerId,
+    hostId,
   };
 }
 

@@ -38,7 +38,13 @@ function combinedNeighborhoodScope(me: UserRecord): string[] | null {
   return [...set];
 }
 
-function planVisibleToViewer(plan: PlanRecord, me: UserRecord): boolean {
+export function planVisibleToViewer(plan: PlanRecord, me: UserRecord): boolean {
+  // Blocking hides a plan both ways — the host's blocked list and the
+  // viewer's own blocked list are checked so it doesn't matter who blocked
+  // whom first.
+  if (plan.creatorId !== me.id && store.isBlockedEitherWay(me.id, plan.creatorId)) {
+    return false;
+  }
   // Community-only plans are visible only to that community's active members
   // (the creator always sees their own). Public community plans fall through to
   // the normal audience rules below and surface for everyone.
@@ -135,6 +141,7 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     coHosts,
     neighborhoodId: plan.neighborhoodId,
     location: plan.location,
+    createdAt: plan.createdAt,
     date: plan.date,
     time: plan.time,
     isFlexibleTime: plan.isFlexibleTime,
@@ -158,6 +165,7 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     lockedAt: plan.lockedAt ?? null,
     cancelledAt: plan.cancelledAt ?? null,
     upForGrabsAt: plan.upForGrabsAt ?? null,
+    happenedOutcome: plan.happenedOutcome ?? null,
     flyerDataUrl: plan.flyerDataUrl,
     flyerLinkUrl: plan.flyerLinkUrl,
     flyerLinkPreview: plan.flyerLinkPreview,
@@ -631,8 +639,39 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
     }
   }
 
+  // Detect venue / whereabouts changes before applying so we can notify Going.
+  const venueChanged =
+    (patch.neighborhoodId !== undefined && patch.neighborhoodId !== plan.neighborhoodId) ||
+    (patch.isFlexibleLocation !== undefined &&
+      patch.isFlexibleLocation !== Boolean(plan.isFlexibleLocation)) ||
+    (patch.location !== undefined &&
+      (patch.location.name !== plan.location?.name ||
+        patch.location.address !== plan.location?.address));
+
   store.updatePlan(planId, patch);
   const updated = store.findPlanById(planId)!;
+
+  if (venueChanged) {
+    const stamp = new Date().toISOString();
+    const venueLabel = updated.isFlexibleLocation
+      ? "Flexible location"
+      : updated.location?.name || "a new spot";
+    const conv = store.findGroupConversationByPlan(planId);
+    if (conv) {
+      store.createSystemMessage(conv.id, `Venue updated — now ${venueLabel}`);
+    }
+    for (const p of store.listParticipationsForPlan(planId)) {
+      if (p.userId === userId || p.state !== "going") continue;
+      void emit({
+        userId: p.userId,
+        kind: "planTimeChanged",
+        planId,
+        body: `"${updated.title}" moved to ${venueLabel}`,
+        dedupKey: `planVenueChanged:${planId}:${stamp}`,
+      });
+    }
+  }
+
   res.json(await planSummary(updated, userId));
 });
 
@@ -704,15 +743,27 @@ plansRouter.post("/:id/apply-time", requireAuth, async (req, res) => {
     isFlexibleTime: proposal.isFlexibleTime,
     pendingTimeProposal: null,
   });
-  const parts = store.listParticipationsForPlan(planId);
+  const dayLabel = new Date(proposal.date).toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+  const timeLabel = proposal.isFlexibleTime
+    ? "flexible time"
+    : proposal.time || "time TBD";
+  const conv = store.findGroupConversationByPlan(planId);
+  if (conv) {
+    store.createSystemMessage(conv.id, `Date/time updated — ${dayLabel} · ${timeLabel}`);
+  }
+  // Push only to Going — Interested already got the propose-time ping.
   const stamp = new Date().toISOString();
-  for (const p of parts) {
-    if (p.userId === userId) continue;
+  for (const p of store.listParticipationsForPlan(planId)) {
+    if (p.userId === userId || p.state !== "going") continue;
     void emit({
       userId: p.userId,
       kind: "planTimeChanged",
       planId,
-      body: `"${plan.title}" moved to a new date/time`,
+      body: `"${plan.title}" moved to ${dayLabel} · ${timeLabel}`,
       dedupKey: `planTimeChanged:${planId}:${stamp}`,
     });
   }
@@ -1032,6 +1083,15 @@ plansRouter.delete("/:id/participation", requireAuth, async (req, res) => {
   const planId = String(req.params.id);
   const userId = String(req.userId);
   const existing = store.findParticipation(planId, userId);
+  const plan = store.findPlanById(planId);
+  // Capture fullness *before* the drop — a reopen only matters when the plan
+  // was at capacity and a Going seat frees up.
+  const goingBefore = store
+    .listParticipationsForPlan(planId)
+    .filter((p) => p.state === "going").length;
+  const wasFull =
+    Boolean(plan?.capacity) && goingBefore >= (plan?.capacity as number);
+
   store.deleteParticipation(planId, userId);
   // A removal counts as a soft "decline" for the recommendation algo, and
   // separately gets timestamped on the `dropouts` log for analytics (only
@@ -1052,7 +1112,6 @@ plansRouter.delete("/:id/participation", requireAuth, async (req, res) => {
   // the one dropping (handled via cancel/transfer) and skips when the user
   // was only "interested" (tentative — not worth pinging).
   if (existing?.state === "going") {
-    const plan = store.findPlanById(planId);
     if (plan && plan.creatorId !== userId && !plan.cancelledAt) {
       const leaver = await findUserById(userId);
       const leaverName = leaver?.firstName || "Someone";
@@ -1063,6 +1122,20 @@ plansRouter.delete("/:id/participation", requireAuth, async (req, res) => {
         planId: plan.id,
         dedupKey: `dropOut:${plan.id}:${userId}:${Date.now()}`,
       });
+      const conv = store.findGroupConversationByPlan(planId);
+      if (conv) {
+        store.createSystemMessage(conv.id, `${leaverName} can no longer make it`);
+      }
+      // Spot reopened on a previously-full plan — nudge the host to fill it.
+      if (wasFull) {
+        await emit({
+          userId: plan.creatorId,
+          kind: "planSpotReopen",
+          body: `A spot opened up on "${plan.title}"`,
+          planId: plan.id,
+          dedupKey: `planSpotReopen:${plan.id}:${userId}:${Date.now()}`,
+        });
+      }
     }
   }
   res.json({ ok: true });
@@ -1225,6 +1298,15 @@ plansRouter.post("/:id/cancel", requireAuth, async (req, res) => {
   const cancelledAt = new Date().toISOString();
   store.updatePlan(planId, { cancelledAt });
 
+  const conv = store.findGroupConversationByPlan(planId);
+  if (conv) {
+    const host = await findUserById(userId);
+    store.createSystemMessage(
+      conv.id,
+      `${host?.firstName ?? "The host"} cancelled this plan.`,
+    );
+  }
+
   const participants = store.listParticipationsForPlan(planId);
   const recipientIds = Array.from(
     new Set(
@@ -1245,4 +1327,27 @@ plansRouter.post("/:id/cancel", requireAuth, async (req, res) => {
   }
   store.log("plan_cancelled", { planId, by: userId, notified: recipientIds.length });
   res.json({ ok: true, cancelledAt });
+});
+
+/** Host answers "Did this happen?" — yes / no / rescheduled (metric #1). */
+plansRouter.post("/:id/happened-outcome", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const planId = String(req.params.id);
+  const outcome = String(req.body?.outcome ?? "");
+  if (outcome !== "yes" && outcome !== "no" && outcome !== "rescheduled") {
+    res.status(400).json({ error: "outcome must be yes, no, or rescheduled" });
+    return;
+  }
+  const plan = store.findPlanById(planId);
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  if (plan.creatorId !== userId) {
+    res.status(403).json({ error: "Only the host can answer" });
+    return;
+  }
+  store.updatePlan(planId, { happenedOutcome: outcome });
+  store.log("plan_happened_outcome", { planId, by: userId, outcome });
+  res.json({ ok: true, happenedOutcome: outcome });
 });

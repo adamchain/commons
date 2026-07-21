@@ -21,6 +21,11 @@ import {
   DeclineModel,
   DropoutModel,
   FeedbackModel,
+  ForumMembershipModel,
+  ForumPostLikeModel,
+  ForumPostModel,
+  ForumReplyModel,
+  InterestForumModel,
   LogModel,
   MessageModel,
   NeighborhoodModel,
@@ -28,6 +33,7 @@ import {
   PlanModel,
   PlanSuggestionModel,
 } from "./models/index.js";
+import { DeviceModel } from "./models/Device.js";
 import { InviteCodeModel } from "./models/InviteCode.js";
 import { NotificationModel } from "./models/Notification.js";
 import { RelationshipModel } from "./models/Relationship.js";
@@ -39,8 +45,14 @@ import type {
   CommunityRecord,
   ConversationRecord,
   DeclineRecord,
+  DeviceRecord,
   DropoutRecord,
   FeedbackRecord,
+  ForumMembershipRecord,
+  ForumPostLikeRecord,
+  ForumPostRecord,
+  ForumReplyRecord,
+  InterestForumRecord,
   InviteCodeRecord,
   LogRecord,
   MessageRecord,
@@ -103,6 +115,29 @@ function removeById(
     }
   )
     .deleteOne({ id })
+    .exec()
+    .catch((err) => fail(tag, err));
+  track(p);
+}
+
+/** Upsert keyed on an arbitrary unique filter (composite keys without a UUID `id`). */
+function upsertByFilter(
+  model: { updateOne: (...args: unknown[]) => { exec: () => Promise<unknown> } },
+  filter: object,
+  record: object,
+  tag: string,
+): void {
+  if (!isMongoConnected()) return;
+  const p = (
+    model as unknown as {
+      updateOne: (
+        filter: object,
+        update: object,
+        opts: object,
+      ) => { exec: () => Promise<unknown> };
+    }
+  )
+    .updateOne(filter, { $set: record }, { upsert: true })
     .exec()
     .catch((err) => fail(tag, err));
   track(p);
@@ -292,5 +327,75 @@ export const mongoMirror = {
   },
   upsertCommunityPost(p: CommunityPostRecord): void {
     upsert(CommunityPostModel as never, p, `upsertCommunityPost ${p.id}`);
+  },
+
+  // Interest Forums
+  upsertInterestForum(f: InterestForumRecord): void {
+    upsert(InterestForumModel as never, f, `upsertInterestForum ${f.id}`);
+  },
+  upsertForumMembership(m: ForumMembershipRecord): void {
+    upsertByFilter(
+      ForumMembershipModel as never,
+      { userId: m.userId, interestTag: m.interestTag },
+      m,
+      `upsertForumMembership ${m.userId}/${m.interestTag}`,
+    );
+  },
+  upsertForumPost(p: ForumPostRecord): void {
+    upsert(ForumPostModel as never, p, `upsertForumPost ${p.id}`);
+  },
+  deleteForumPost(id: string): void {
+    removeById(ForumPostModel as never, id, `deleteForumPost ${id}`);
+  },
+  upsertForumReply(r: ForumReplyRecord): void {
+    upsert(ForumReplyModel as never, r, `upsertForumReply ${r.id}`);
+  },
+  deleteForumRepliesByPost(postId: string): void {
+    if (!isMongoConnected()) return;
+    const p = ForumReplyModel.deleteMany({ postId })
+      .exec()
+      .catch((err) => fail(`deleteForumRepliesByPost ${postId}`, err));
+    track(p);
+  },
+  upsertForumPostLike(l: ForumPostLikeRecord): void {
+    upsertByFilter(
+      ForumPostLikeModel as never,
+      { postId: l.postId, userId: l.userId },
+      l,
+      `upsertForumPostLike ${l.postId}/${l.userId}`,
+    );
+  },
+  deleteForumPostLike(postId: string, userId: string): void {
+    if (!isMongoConnected()) return;
+    const p = ForumPostLikeModel.deleteOne({ postId, userId })
+      .exec()
+      .catch((err) => fail(`deleteForumPostLike ${postId}/${userId}`, err));
+    track(p);
+  },
+  deleteForumPostLikesByPost(postId: string): void {
+    if (!isMongoConnected()) return;
+    const p = ForumPostLikeModel.deleteMany({ postId })
+      .exec()
+      .catch((err) => fail(`deleteForumPostLikesByPost ${postId}`, err));
+    track(p);
+  },
+
+  // Devices (push notification tokens)
+  upsertDevice(d: DeviceRecord): void {
+    upsert(DeviceModel as never, d, `upsertDevice ${d.id}`);
+  },
+  deleteDeviceByToken(token: string): void {
+    if (!isMongoConnected()) return;
+    const p = DeviceModel.deleteOne({ token })
+      .exec()
+      .catch((err) => fail(`deleteDeviceByToken ${token}`, err));
+    track(p);
+  },
+  deleteDevicesByUser(userId: string): void {
+    if (!isMongoConnected()) return;
+    const p = DeviceModel.deleteMany({ userId })
+      .exec()
+      .catch((err) => fail(`deleteDevicesByUser ${userId}`, err));
+    track(p);
   },
 };

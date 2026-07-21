@@ -226,6 +226,128 @@ export async function runPostPlanReviewPrompts(): Promise<void> {
 }
 
 /**
+ * Day-of reminder (6.1) — morning of the plan (6–10am local window) OR ~3 hours
+ * before start if the plan is later that day. Everyone Going + host.
+ */
+const DAY_OF_SENT = new Set<string>();
+export async function runDayOfReminders(): Promise<void> {
+  const now = Date.now();
+  for (const plan of store.listPlans()) {
+    if (plan.cancelledAt) continue;
+    if (plan.isFlexibleTime && !plan.time) continue;
+    if (planHasEnded(plan)) continue;
+    const start = planStartTimestamp(plan);
+    const hoursUntil = (start - now) / (60 * 60 * 1000);
+    // Fire in a ~20-min window around either 3h-before OR morning-of (8am local).
+    const threeHourHit = hoursUntil >= 2.85 && hoursUntil <= 3.15;
+    const startDate = new Date(start);
+    const morning = new Date(startDate);
+    morning.setHours(8, 0, 0, 0);
+    const morningHit =
+      startDate.toDateString() === new Date(now).toDateString() &&
+      Math.abs(now - morning.getTime()) < 15 * 60 * 1000 &&
+      hoursUntil > 3.2;
+    if (!threeHourHit && !morningHit) continue;
+
+    const going = store
+      .listParticipationsForPlan(plan.id)
+      .filter((p) => p.state === "going")
+      .map((p) => p.userId);
+    const userIds = Array.from(new Set([...going, plan.creatorId]));
+    const goingCount = going.length;
+    const timeLabel = plan.time?.trim() ? plan.time : "flexible time";
+
+    for (const uid of userIds) {
+      const key = `dayof:${plan.id}:${uid}`;
+      if (DAY_OF_SENT.has(key)) continue;
+      const created = await emit({
+        userId: uid,
+        kind: "planDayOf",
+        body: `Today: ${plan.title} · ${timeLabel} · ${goingCount} going.`,
+        planId: plan.id,
+        dedupKey: `planDayOf:${plan.id}:${uid}`,
+      });
+      if (created) {
+        DAY_OF_SENT.add(key);
+        const u = await findUserById(uid);
+        if (u?.phoneNumber) {
+          try {
+            await sendTransactionalSms(
+              u.phoneNumber,
+              `Today: ${plan.title} · ${timeLabel} · ${goingCount} going. ${appOrigin()}/plans/${plan.id}`,
+            );
+          } catch (e) {
+            console.error("[nudge] day-of sms", e);
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Interested nudge (6.2) — ~24h before, Interested people get a convert/remove prompt.
+ */
+const INTERESTED_NUDGE_SENT = new Set<string>();
+export async function runInterestedNudges(): Promise<void> {
+  const now = Date.now();
+  const windowStart = now + 23.5 * 60 * 60 * 1000;
+  const windowEnd = now + 24.5 * 60 * 60 * 1000;
+
+  for (const plan of store.listPlans()) {
+    if (plan.cancelledAt) continue;
+    if (plan.isFlexibleTime && !plan.time) continue;
+    if (planHasEnded(plan)) continue;
+    const start = planStartTimestamp(plan);
+    if (start < windowStart || start > windowEnd) continue;
+
+    const interested = store
+      .listParticipationsForPlan(plan.id)
+      .filter((p) => p.state === "interested" && p.userId !== plan.creatorId);
+
+    for (const row of interested) {
+      const key = `${plan.id}:${row.userId}`;
+      if (INTERESTED_NUDGE_SENT.has(key)) continue;
+      const created = await emit({
+        userId: row.userId,
+        kind: "interestedNudge",
+        body: `Still thinking about it? ${plan.title} is tomorrow.`,
+        planId: plan.id,
+        dedupKey: `interestedNudge:${plan.id}:${row.userId}`,
+      });
+      if (created) INTERESTED_NUDGE_SENT.add(key);
+    }
+  }
+}
+
+/**
+ * "Did this happen?" (6.4) — ~2h after start, host gets Yes / No / Rescheduled.
+ */
+const DID_HAPPEN_SENT = new Set<string>();
+export async function runDidThisHappenPrompts(): Promise<void> {
+  const now = Date.now();
+  for (const plan of store.listPlans()) {
+    if (plan.cancelledAt) continue;
+    if (plan.happenedOutcome) continue;
+    if (plan.isFlexibleTime && !plan.time) continue;
+    const start = planStartTimestamp(plan);
+    const elapsed = now - start;
+    if (elapsed < 1.9 * 60 * 60 * 1000 || elapsed > 3 * 60 * 60 * 1000) continue;
+
+    const key = plan.id;
+    if (DID_HAPPEN_SENT.has(key)) continue;
+    const created = await emit({
+      userId: plan.creatorId,
+      kind: "didThisHappen",
+      body: `Did "${plan.title}" happen?`,
+      planId: plan.id,
+      dedupKey: `didThisHappen:${plan.id}`,
+    });
+    if (created) DID_HAPPEN_SENT.add(key);
+  }
+}
+
+/**
  * Looking-For recovery — two paths:
  *   • Group case (≥2 RSVPs, not locked 12h after the group formed): nudge
  *     everyone in the thread so someone steps up to lock it in.
@@ -296,6 +418,9 @@ export function startNudgeSchedulers(): void {
   const tick = () => {
     void runPlanReminders().catch((e) => console.error(e));
     void runPlanTomorrowReminders().catch((e) => console.error(e));
+    void runDayOfReminders().catch((e) => console.error(e));
+    void runInterestedNudges().catch((e) => console.error(e));
+    void runDidThisHappenPrompts().catch((e) => console.error(e));
     void runWeekendNudgeIfWeekendEve().catch((e) => console.error(e));
     void runPostPlanReviewPrompts().catch((e) => console.error(e));
     void runLookingForRecoveryNudges().catch((e) => console.error(e));

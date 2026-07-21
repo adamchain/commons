@@ -49,6 +49,9 @@ const UserSchema = new mongoose.Schema<UserRecord>(
       },
       default: undefined,
     },
+    blockedUserIds: { type: [String], default: undefined },
+    discoverableBySearch: { type: Boolean, default: undefined },
+    mutedConversationIds: { type: [String], default: undefined },
   },
   { collection: "users" },
 );

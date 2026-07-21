@@ -13,6 +13,7 @@ import { chatRouter } from "./routes/chat.js";
 import { communitiesRouter } from "./routes/communities.js";
 import { devicesRouter } from "./routes/devices.js";
 import { feedbackRouter } from "./routes/feedback.js";
+import { forumsRouter } from "./routes/forums.js";
 import { neighborhoodsRouter } from "./routes/neighborhoods.js";
 import { notificationsRouter } from "./routes/notifications.js";
 import { plansRouter } from "./routes/plans.js";
@@ -20,6 +21,8 @@ import { profileRouter } from "./routes/profile.js";
 import { placesRouter } from "./routes/places.js";
 import { venuesRouter } from "./routes/venues.js";
 import { linkPreviewRouter } from "./routes/linkPreview.js";
+import { searchRouter } from "./routes/search.js";
+import { usersRouter } from "./routes/users.js";
 import { shareRouter, injectPlanMeta, planIdFromDetailPath } from "./routes/share.js";
 import { store } from "./store.js";
 import { readFileSync } from "node:fs";
@@ -70,9 +73,12 @@ app.use("/api/places", placesRouter);
 app.use("/api/venues", venuesRouter);
 app.use("/api/neighborhoods", neighborhoodsRouter);
 app.use("/api/feedback", feedbackRouter);
+app.use("/api/forums", forumsRouter);
 app.use("/api/profile", profileRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/link-preview", linkPreviewRouter);
+app.use("/api/search", searchRouter);
+app.use("/api/users", usersRouter);
 app.use("/api", chatRouter); // chat router defines its own paths under /plans/.../conversation and /conversations/...
 
 // Public share-card image endpoint (no auth — crawlers fetch it). Reachable in
@@ -117,6 +123,9 @@ async function bootstrap(): Promise<void> {
   // container start. If Mongo isn't connected (no MONGODB_URI), the snapshot
   // keeps whatever it loaded from data.json (local dev).
   await hydrateSnapshotFromMongo();
+  // Idempotent — fills any missing InterestTag forum rows after hydrate (or
+  // when Mongo is offline and the snapshot came from data.json).
+  store.ensureForumsForInterests();
   await seedIfEmpty();
   startNudgeSchedulers();
 

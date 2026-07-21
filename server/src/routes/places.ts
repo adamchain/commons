@@ -84,6 +84,16 @@ interface NewPlace {
   rating?: number;
   userRatingCount?: number;
   currentOpeningHours?: { openNow?: boolean };
+  addressComponents?: Array<{ longText?: string; shortText?: string; types?: string[] }>;
+}
+
+/** Best-effort "Fishtown"-style neighborhood name from Places address components. */
+function neighborhoodOf(p: NewPlace): string | undefined {
+  const comps = p.addressComponents ?? [];
+  const hit = comps.find((c) => c.types?.includes("neighborhood"))
+    ?? comps.find((c) => c.types?.includes("sublocality_level_1"))
+    ?? comps.find((c) => c.types?.includes("sublocality"));
+  return hit?.longText ?? hit?.shortText;
 }
 
 const SEARCH_FIELD_MASK = [
@@ -94,6 +104,7 @@ const SEARCH_FIELD_MASK = [
   "places.photos",
   "places.rating",
   "places.userRatingCount",
+  "places.addressComponents",
 ].join(",");
 
 /**
@@ -133,6 +144,7 @@ placesRouter.get("/search", requireAuth, async (req, res) => {
       placeId: p.id,
       name: p.displayName?.text ?? "",
       address: p.formattedAddress ?? "",
+      neighborhood: neighborhoodOf(p),
       lat: p.location?.latitude,
       lng: p.location?.longitude,
       photoRef: p.photos?.[0]?.name,

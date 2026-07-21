@@ -533,4 +533,42 @@ adminRouter.post("/communities/founding", async (req, res) => {
   res.status(201).json({ ok: true, community });
 });
 
+// ---- Interest Forums review ----
+
+// GET /api/admin/forums/pending-posts — sponsored posts awaiting approval.
+adminRouter.get("/forums/pending-posts", (_req, res) => {
+  const pending = store.listPendingForumPosts();
+  const rows = pending.map((p) => ({
+    id: p.id,
+    interestTag: p.interestTag,
+    content: p.content,
+    imageUrl: p.imageUrl ?? null,
+    sponsorName: p.sponsorName ?? null,
+    createdAt: p.createdAt,
+  }));
+  res.json({ posts: rows });
+});
+
+// POST /api/admin/forums/posts/:id/approve
+adminRouter.post("/forums/posts/:id/approve", (req, res) => {
+  const post = store.setForumPostApprovalStatus(String(req.params.id), "approved");
+  if (!post) {
+    res.status(404).json({ error: "Post not found" });
+    return;
+  }
+  store.log("forum_post_approved", { postId: post.id });
+  res.json({ ok: true, post });
+});
+
+// POST /api/admin/forums/posts/:id/reject
+adminRouter.post("/forums/posts/:id/reject", (req, res) => {
+  const post = store.setForumPostApprovalStatus(String(req.params.id), "rejected");
+  if (!post) {
+    res.status(404).json({ error: "Post not found" });
+    return;
+  }
+  store.log("forum_post_rejected", { postId: post.id });
+  res.json({ ok: true, post });
+});
+
 export { adminRouter };

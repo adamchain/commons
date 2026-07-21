@@ -23,7 +23,7 @@ export function planEndTimestamp(plan: PlanRecord): number {
     const end = new Date(`${day}T${timeToHms(plan.endTime)}`);
     if (!Number.isNaN(end.getTime())) return end.getTime();
   }
-  return start.getTime() + 3 * 60 * 60 * 1000;
+  return start.getTime() + 4 * 60 * 60 * 1000;
 }
 
 export function planHasEnded(plan: PlanRecord, now = new Date()): boolean {

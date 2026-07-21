@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { PlanDTO } from "../types/shared";
 import { getPublicWebOrigin } from "../lib/platform";
+import { getActiveInviteCode } from "../lib/inviteCode";
 import { API_BASE } from "../api/http";
 
 // Share sheet with a live social-card preview. The card image and the injected
@@ -10,12 +11,28 @@ import { API_BASE } from "../api/http";
 export function ShareSheet({ plan, onClose }: { plan: PlanDTO; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
 
   const going = plan.participants.going.length;
   const interested = plan.participants.interested.length;
 
+  // If the sharer still has an unused invite code, stamp it on the link so a
+  // recipient who isn't a member yet gets credited to it on signup.
+  useEffect(() => {
+    let active = true;
+    void getActiveInviteCode().then((code) => {
+      if (active) setInviteCode(code);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // Public link others open — the server injects per-plan OG tags here.
-  const url = useMemo(() => `${getPublicWebOrigin()}/plans/${plan.id}`, [plan.id]);
+  const url = useMemo(() => {
+    const base = `${getPublicWebOrigin()}/plans/${plan.id}`;
+    return inviteCode ? `${base}?invite=${encodeURIComponent(inviteCode)}` : base;
+  }, [plan.id, inviteCode]);
   // Live preview image, served by the API host. Count query keeps it fresh.
   const previewSrc = useMemo(
     () => `${API_BASE}/plans/${plan.id}/og-image.png?c=${going}&i=${interested}`,

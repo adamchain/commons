@@ -157,9 +157,16 @@ function iconFor(kind: NotificationKind): string {
     case "someoneJoinedYourPlan":
       return "👤";
     case "planTomorrow":
+    case "planDayOf":
       return "📅";
     case "planInTwoHours":
       return "⏰";
+    case "interestedNudge":
+      return "💭";
+    case "didThisHappen":
+      return "✅";
+    case "planSpotReopen":
+      return "🔓";
     case "newGroupChatMessage":
       return "💬";
     case "postPlanNetworkNudge":

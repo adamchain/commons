@@ -61,6 +61,9 @@ export function FeedPage() {
   const [hideHappened, setHideHappened] = useState(() => loadPersistedFilters().hideHappened);
   const [hideCancelled, setHideCancelled] = useState(() => loadPersistedFilters().hideCancelled);
   const [filterOpen, setFilterOpen] = useState(false);
+  // Past plans (ended or cancelled) collapse behind a toggle at the bottom of
+  // the feed instead of a per-card "Hide past" chip — default collapsed.
+  const [pastOpen, setPastOpen] = useState(false);
   const [view, setView] = useState<"all" | "mine">("all");
   const { user, setUser } = useAuth();
   const [networkPrompt, setNetworkPrompt] = useState<NetworkPromptDTO | null>(null);
@@ -229,8 +232,10 @@ export function FeedPage() {
     if (!highlightId || !feedReady) return;
     const el = document.querySelector(`[data-plan-id="${highlightId}"]`);
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
-    // Fade the banner/glow but keep the plan pinned to the top of the feed.
-    const t = setTimeout(() => setHighlightId(null), 4500);
+    // Fade the banner/glow a few minutes after posting — keep the plan pinned
+    // to the top of the feed (via justPostedId) but don't let the "Just
+    // posted" banner stick around forever.
+    const t = setTimeout(() => setHighlightId(null), 3 * 60 * 1000);
     return () => clearTimeout(t);
   }, [highlightId, feedReady]);
 
@@ -257,7 +262,15 @@ export function FeedPage() {
     }
   }, [selectedTag, selectedHoodId, selectedAgeRange, hideHappened, hideCancelled]);
 
-  const filteredPlans = useMemo(() => {
+  // Looking-for card with 2+ flexible fields and not locked in yet — mirrors
+  // PlanCard's own isLooking check so the feed groups exactly what the cards
+  // visually flag as "idea" cards.
+  const isIdeaPlan = useCallback((p: PlanDTO) => {
+    const flexCount = (p.isFlexibleTime ? 1 : 0) + (p.isFlexibleLocation ? 1 : 0);
+    return p.planKind === "looking_for" && flexCount > 1 && !p.lockedAt;
+  }, []);
+
+  const { activePlans, pastPlans } = useMemo(() => {
     let list = plans ?? [];
     if (view === "mine") {
       // For "Looking for / my plans" view: plans the user is going or
@@ -271,26 +284,39 @@ export function FeedPage() {
     // Happened = ended and not cancelled (mirrors PlanCard badge logic).
     if (hideHappened) list = list.filter((p) => p.cancelledAt || !planHasEnded(p));
     if (hideCancelled) list = list.filter((p) => !p.cancelledAt);
-    // Active plans first (soonest day at top); cancelled + past plans sink to
-    // the bottom, most-recent first, so the feed always leads with what's live.
-    const isInactive = (p: PlanDTO) => Boolean(p.cancelledAt) || planHasEnded(p);
-    list = [...list].sort((a, b) => {
-      const ia = isInactive(a) ? 1 : 0;
-      const ib = isInactive(b) ? 1 : 0;
-      if (ia !== ib) return ia - ib;
-      return ia === 0 ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date);
-    });
+
+    // Req 3.7 ordering: upcoming confirmed plans soonest-first, then ideas by
+    // recency, then past (ended/cancelled) plans collapsed at the bottom.
+    const upcoming: PlanDTO[] = [];
+    const ideas: PlanDTO[] = [];
+    const past: PlanDTO[] = [];
+    for (const p of list) {
+      if (Boolean(p.cancelledAt) || planHasEnded(p)) {
+        past.push(p);
+      } else if (isIdeaPlan(p)) {
+        ideas.push(p);
+      } else {
+        upcoming.push(p);
+      }
+    }
+    upcoming.sort((a, b) => `${a.date}T${a.time || "23:59"}`.localeCompare(`${b.date}T${b.time || "23:59"}`));
+    ideas.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+    past.sort((a, b) => b.date.localeCompare(a.date));
+
+    const active = [...upcoming, ...ideas];
     // A just-posted plan is pinned to the very top regardless of its date, so
     // the user immediately sees what they created.
     if (justPostedId) {
-      const idx = list.findIndex((p) => p.id === justPostedId);
+      const idx = active.findIndex((p) => p.id === justPostedId);
       if (idx > 0) {
-        const [pinned] = list.splice(idx, 1);
-        if (pinned) list.unshift(pinned);
+        const [pinned] = active.splice(idx, 1);
+        if (pinned) active.unshift(pinned);
       }
     }
-    return list;
-  }, [plans, view, selectedTag, selectedHoodId, selectedAgeRange, selectedDayIso, hideHappened, hideCancelled, justPostedId]);
+    return { activePlans: active, pastPlans: past };
+  }, [plans, view, selectedTag, selectedHoodId, selectedAgeRange, selectedDayIso, hideHappened, hideCancelled, justPostedId, isIdeaPlan]);
+
+  const filteredPlans = activePlans;
 
   const activeFilterCount =
     (selectedTag ? 1 : 0) +
@@ -396,15 +422,38 @@ export function FeedPage() {
                   plan={plan}
                   onPlanRefresh={refreshPlans}
                   highlight={highlightId === plan.id}
-                  onHideKind={(kind) => {
-                    if (kind === "happened") setHideHappened(true);
-                    else setHideCancelled(true);
-                  }}
                 />
               ))}
             </div>
           )}
         </div>
+
+        {pastPlans.length > 0 && (
+          <div className="feed-past-section">
+            <button
+              type="button"
+              className="feed-past-toggle"
+              onClick={() => setPastOpen((v) => !v)}
+              aria-expanded={pastOpen}
+            >
+              <span className="feed-past-toggle-label">Past plans</span>
+              <span className="feed-past-count">{pastPlans.length}</span>
+              <ChevronIcon open={pastOpen} />
+            </button>
+            {pastOpen && (
+              <div className="plan-grid plan-grid--past">
+                {pastPlans.map((plan) => (
+                  <PlanCard
+                    key={plan.id}
+                    plan={plan}
+                    onPlanRefresh={refreshPlans}
+                    highlight={highlightId === plan.id}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {inviteForPlanId && (
@@ -503,6 +552,23 @@ function FilterIcon() {
       <path d="M3 6h18" />
       <path d="M6 12h12" />
       <path d="M10 18h4" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      className={`feed-past-chevron ${open ? "is-open" : ""}`}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="m6 9 6 6 6-6" />
     </svg>
   );
 }

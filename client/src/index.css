@@ -1,38 +1,34 @@
-/* ---------- Theme tokens (Commons Brand 2.0 + IG-flat surfaces) ----------
-   Palette: vivid red #C01313, pink #EFD5D6, orange #DB6923,
-   dark indigo #0C0A1E / #141130, light #EBE4DA. Shadows stay minimal (border-led). */
+/* ---------- Theme tokens — Final Dev Feedback palette ----------
+   Red #C13B3B only. App bg #EDE8E0. Cards/inputs #FDFAF7. Tan for pills only.
+   No pale-pink fills. Commons is light-only. */
 
 :root {
-  /* ===== COMMONS Design System v0.4 — paper / ink / signal =====
-     Warm paper surfaces, deep navy ink for type, a single signal red for
-     every decision. Commons is light-only. */
-
   /* --- Primitives --- */
   --paper-50:  #faf5ec;
   --paper-100: #ede8e0;
-  --paper-200: #ecdfc8;
+  --paper-200: #ede5d8; /* tan — interest tags, icon containers, pills */
   --paper-300: #d9c9aa;
 
   --ink-900: #1a1a2e;
   --ink-800: #1c1c4a;
   --ink-700: #2a2a5e;
   --ink-600: #4a4a72;
-  --ink-500: #6b6b85;
-  --ink-400: #9b9bad;
+  --ink-500: #7a7a8a; /* muted */
+  --ink-400: #a8a8b4; /* faint */
 
-  --signal-100: #fbe1e1;
+  --signal-100: #f5eaea; /* legacy alias — do not use for fills */
   --signal-300: #e89a9b;
   --signal-500: #c13b3b;
   --signal-600: #a62525;
   --signal-700: #8c1e1e;
+  --looking-orange: #c13b3b; /* ideas use red left edge only */
 
-  /* Wireframe tints — idea cards, subtle fills */
-  --idea-tint: #fef4f4;
+  --tan: #ede5d8;
   --tan-mid: #e0d5c8;
   --faint: #a8a8b4;
 
-  --hairline: rgba(20, 20, 58, 0.10);
-  --hairline-strong: rgba(20, 20, 58, 0.22);
+  --hairline: #e8e0d4;
+  --hairline-strong: #d4c9b8;
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
@@ -43,24 +39,18 @@
   /* Radius scale — cards sit on --r-lg (20px) per brand spec. */
   --r-sm: 8px; --r-md: 14px; --r-lg: 20px; --r-xl: 32px; --r-pill: 999px;
 
-  /* Fonts — Inter everywhere per the handoff (the COMMONS wordmark is a PNG
-     asset, so no display face is needed). --font-display is kept as an alias
-     so existing heading rules keep working. */
   --font-display: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-ui: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  /* Legacy alias — any title that requested the old serif now reads as UI. */
   --font-serif: var(--font-ui);
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
-  /* --- Semantic mapping: default = PAPER (light) --- */
+  /* --- Semantic mapping --- */
   --accent-rgb: 193, 59, 59;
-  --bg: #f0e9df;
+  --bg: #ede8e0;
   --bg-gradient: var(--bg);
-  /* Cards/surfaces sit on the warm paper background as a warm off-white
-     (never pure white, per brand). Surface-2 stays a sand tint for hovers. */
   --surface: #fdfaf7;
-  --surface-2: var(--paper-200);
-  --surface-hover: var(--paper-300);
+  --surface-2: var(--tan); /* pills / icon chips only — never inputs */
+  --surface-hover: var(--tan-mid);
   --border: var(--hairline);
   --border-strong: var(--hairline-strong);
   --text: var(--ink-900);
@@ -68,16 +58,15 @@
   --text-subtle: var(--ink-400);
   --accent: var(--signal-500);
   --accent-hover: var(--signal-600);
-  --accent-soft: var(--signal-100);
-  --accent-on: var(--paper-50);
+  --accent-soft: transparent; /* no pink washes — selected = red outline on white */
+  --accent-on: #ffffff;
   --success: #2f8f55;
-  --success-bg: rgba(47, 143, 85, 0.14);
-  --success-border: rgba(47, 143, 85, 0.28);
+  --success-bg: #e8f5ee;
+  --success-border: #b5dcc6;
   --warning: #c97a1a;
-  /* Looking For accent — design-system orange left border. */
-  --looking-orange: #f5821f;
   --danger: var(--signal-500);
-  --shadow-card: 0 1px 0 rgba(180, 160, 140, 0.18), 0 4px 20px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  /* Card layers: solid fill + hairline border + warm drop shadow + inner light line */
+  --shadow-card: 0 2px 8px rgba(180, 160, 140, 0.22), 0 1px 2px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.85);
   --shadow-sm: 0 1px 0 rgba(180, 160, 140, 0.15), 0 2px 8px rgba(0, 0, 0, 0.05);
   --shadow-elevate: var(--shadow-sm);
   --shadow-fab: 0 4px 16px rgba(193, 59, 59, 0.42), 0 2px 6px rgba(0, 0, 0, 0.12);
@@ -93,6 +82,9 @@
   color: var(--text);
   background: var(--bg);
   color-scheme: light;
+  /* Cap Dynamic Type so iOS accessibility text sizes don't blow layouts */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 
   /* layout + community tints */
   --nav-height: 72px;
@@ -161,10 +153,11 @@ input,
 textarea,
 select {
   font: inherit;
+  font-size: 15px;
   color: var(--text);
-  background: var(--surface-2);
+  background: var(--surface); /* white fields — never tan */
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 14px;
   padding: 12px 14px;
   outline: none;
   transition: border-color 120ms ease, background-color 120ms ease;
@@ -177,10 +170,16 @@ select {
   max-width: 100%;
 }
 
+input::placeholder,
+textarea::placeholder {
+  color: var(--faint);
+}
+
 input:focus,
 textarea:focus,
 select:focus {
   border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
 textarea {
@@ -194,8 +193,8 @@ label {
   font-size: 13px;
   color: var(--text-muted);
   margin-bottom: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  text-transform: none;
+  letter-spacing: 0;
   font-weight: 600;
 }
 
@@ -2087,6 +2086,28 @@ h1, h2, h3, h4, h5, h6 {
   margin-top: 4px;
 }
 
+/* Inline date/time validation under the When card (req 3.1). */
+.luma-inline-error {
+  margin: -6px 2px 0;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+/* Failed post — keeps the draft on screen and offers a one-tap retry (req 6.8). */
+.form-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--signal-100);
+  border: 1px solid var(--signal-300);
+  border-radius: var(--r-md);
+}
+.form-error-banner .error-text {
+  margin: 0;
+}
+
 .you-pill {
   display: inline-flex;
   font-size: 11px;
@@ -2478,12 +2499,15 @@ h1, h2, h3, h4, h5, h6 {
 .onboarding-input {
   width: 100%;
   padding: 14px;
-  font-size: 16px;
-  border-radius: 12px;
+  font-size: 15px;
+  border-radius: 14px;
   border: 1px solid var(--border);
-  background: var(--bg);
+  background: var(--surface);
   color: var(--text);
   font-family: inherit;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .onboarding-input-code {
   letter-spacing: 0.4em;
@@ -2506,7 +2530,14 @@ h1, h2, h3, h4, h5, h6 {
   cursor: pointer;
   box-shadow: none;
 }
-.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary:disabled,
+.btn:disabled.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  opacity: 0.38;
+  cursor: not-allowed;
+  transform: none;
+}
 .btn-secondary {
   background: transparent;
   color: var(--text);
@@ -2848,13 +2879,13 @@ h1, h2, h3, h4, h5, h6 {
 }
 .plan-meta-icon {
   flex: none;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  background: transparent;
+  border-radius: 12px;
+  background: var(--tan);
   color: var(--text-muted);
   font-size: 16px;
   line-height: 1;
@@ -2886,11 +2917,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 13px;
   color: var(--accent);
   margin-top: 2px;
-}
-.plan-meta-row--link:hover .plan-meta-maps,
-.plan-meta-row--link:focus-visible .plan-meta-maps {
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  text-decoration: none;
 }
 .host-row {
   display: flex;
@@ -3139,6 +3166,15 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 15px;
 }
 .sheet-cancel { margin-top: 8px; }
+.sheet-link--danger {
+  color: var(--danger);
+}
+.invite-prompt-copy {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 4px 0 14px;
+}
 
 /* Share sheet — live social-card preview + channel grid */
 .share-preview {
@@ -3521,10 +3557,11 @@ h1, h2, h3, h4, h5, h6 {
   gap: 0;
 }
 .messages-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
   align-items: center;
-  gap: 12px;
-  padding: 13px 14px;
+  column-gap: 12px;
+  padding: 14px 16px;
   background: transparent;
   border: none;
   border-bottom: 1px solid var(--border);
@@ -3536,20 +3573,21 @@ h1, h2, h3, h4, h5, h6 {
   border-bottom: none;
 }
 .messages-row:hover {
-  background: var(--surface-2);
+  background: #f7f2eb;
   transform: none;
 }
 .messages-row-emoji {
-  font-size: 17px;
+  font-size: 20px;
   line-height: 1;
   flex-shrink: 0;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--paper-200);
-  border-radius: 13px;
+  background: var(--tan);
+  border-radius: 12px;
+  grid-row: 1 / span 2;
 }
 .feed-toolbar {
   display: flex;
@@ -3612,6 +3650,59 @@ h1, h2, h3, h4, h5, h6 {
   .plan-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Past plans — collapsed behind a toggle at the bottom of the feed (req 3.7),
+   replacing the old per-card "Hide past" chip. */
+.feed-past-section {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+.feed-past-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+}
+.feed-past-toggle:hover {
+  color: var(--text);
+}
+.feed-past-toggle-label {
+  flex: 1;
+}
+.feed-past-count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border-radius: 999px;
+}
+.feed-past-chevron {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  transition: transform 160ms ease;
+}
+.feed-past-chevron.is-open {
+  transform: rotate(180deg);
+}
+.plan-grid--past {
+  padding-top: 4px;
 }
 .profile-block {
   margin-top: 24px;
@@ -3807,40 +3898,6 @@ h1, h2, h3, h4, h5, h6 {
   white-space: nowrap;
 }
 .profile-list-when { color: var(--text-muted); font-size: 13px; white-space: nowrap; }
-.profile-list-badge {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0;
-  padding: 3px 8px;
-  border-radius: 999px;
-  text-transform: none;
-}
-.profile-list-badge.is-host {
-  background: var(--accent);
-  color: var(--paper-50);
-}
-.profile-list-badge.is-interested {
-  background: var(--surface-2);
-  color: var(--text-muted);
-  border: 1px solid var(--border);
-}
-.profile-list-badge.is-past {
-  background: transparent;
-  color: var(--text-muted);
-  border: 1px solid var(--border);
-}
-.profile-list-show-more {
-  display: block;
-  width: 100%;
-  margin-top: 8px;
-  padding: 10px;
-  background: transparent;
-  border: 1px dashed var(--border-strong);
-  border-radius: 12px;
-  color: var(--accent);
-  font-weight: 600;
-  font-size: 14px;
-}
 .profile-past-toggle {
   display: flex;
   align-items: center;
@@ -3864,6 +3921,80 @@ h1, h2, h3, h4, h5, h6 {
 }
 .profile-past-chevron.is-open {
   transform: rotate(-90deg);
+}
+
+/* Combined "Your plans" card — one white card, thin dividers between rows,
+   replacing the old per-row bordered cards. */
+.profile-plan-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg, 16px);
+  overflow: hidden;
+}
+.profile-plan-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--text);
+}
+.profile-plan-row:last-child {
+  border-bottom: none;
+}
+.profile-plan-row:hover {
+  background: var(--surface-2);
+}
+/* Outlined "Your plan" chip — red text + red outline, transparent fill (never solid). */
+.profile-plan-chip {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  padding: 3px 9px;
+  border-radius: 999px;
+  text-transform: none;
+  white-space: nowrap;
+  background: transparent;
+}
+.profile-plan-chip--host {
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+.profile-plan-chip--interested {
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+/* Plain red text row — no dashed box, just a tappable line inside the card. */
+.profile-show-more-row {
+  display: block;
+  width: 100%;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 14px;
+  text-align: left;
+}
+.profile-show-more-row:hover {
+  background: var(--surface-2);
+}
+.profile-see-all-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.profile-hero-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.profile-block-btn {
+  font-size: 13px;
 }
 
 /* Profile-menu avatar stack — preview row of first N network avatars. */
@@ -4184,9 +4315,57 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   justify-content: space-between;
 }
-.chat-leave-btn {
-  font-size: 13px;
+.chat-header-menu-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.chat-header-menu-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
   color: var(--text-muted);
+}
+.chat-header-menu-btn:hover {
+  background: var(--surface-2);
+}
+.chat-header-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 190px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  padding: 6px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+}
+.chat-header-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 14px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.chat-header-menu button:hover {
+  background: var(--surface-2);
+}
+/* "Leave chat" reads as red text, no underline, no filled background. */
+.chat-header-menu-leave {
+  color: var(--danger);
 }
 
 .friend-button-connected {
@@ -4687,19 +4866,20 @@ h1, h2, h3, h4, h5, h6 {
  * at a glance. Confirmed: clean surface, success-tinted pill. Looking For:
  * accent-tinted background with dashed border to signal "not locked in yet". */
 
+/* Confirmed plans — white card, no left edge. */
 .plan-card--confirmed > .plan-card {
   background: var(--surface);
   border: none;
-  border-left: 3px solid var(--accent);
-  box-shadow: var(--shadow-card);
+  border-left: none;
+  box-shadow: none;
 }
 
-/* Looking For — red left rail only per wireframe. */
+/* Looking For / ideas — only card type with red left edge. */
 .plan-card--looking > .plan-card {
   background: var(--surface);
   border: none;
-  border-left: 4px solid var(--accent);
-  box-shadow: var(--shadow-card);
+  border-left: 3px solid var(--accent);
+  box-shadow: none;
 }
 
 /* Network-only posts — green border so the audience scope reads at a glance. */
@@ -4957,19 +5137,21 @@ h1, h2, h3, h4, h5, h6 {
 
 .plan-card-host-again {
   display: block;
-  margin-top: 8px;
-  padding: 8px 12px;
-  font-size: 13px;
+  margin-top: 0;
+  padding: 12px 16px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--accent);
   text-decoration: none;
-  border-radius: 10px;
-  background: var(--accent-soft);
+  border-radius: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
   text-align: center;
-  transition: background 120ms ease;
+  transition: color 120ms ease;
 }
 .plan-card-host-again:hover {
-  background: rgba(var(--accent-rgb), 0.18);
+  color: var(--accent-hover);
+  background: var(--surface);
 }
 
 .plan-card-kind-pill.is-confirmed::before {
@@ -4998,15 +5180,22 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.16);
 }
 .plan-card-just-posted-banner {
+  position: relative;
+  z-index: 3;
   background: var(--accent);
   color: #fff;
   text-align: center;
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 6px 8px;
-  border-radius: 10px 10px 0 0;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 8px 12px;
+  border-radius: 0;
+}
+/* Banner occupies the top — push floating controls below it */
+.plan-card--just-posted .plan-card-save-btn,
+.plan-card--just-posted .plan-card-hide-btn {
+  top: 44px;
 }
 @keyframes just-posted-pulse {
   0%, 100% { transform: translateY(0); }
@@ -5594,8 +5783,7 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--accent-hover);
 }
 
-/* On-card quick RSVP — bright, full-width, sits under the card body so
-   "I'm in" is one tap from the feed. */
+/* Outlined Join pill — one main action per feed card. */
 .plan-card-quick-join {
   display: inline-flex;
   align-items: center;
@@ -5603,27 +5791,35 @@ h1, h2, h3, h4, h5, h6 {
   width: auto;
   margin-left: auto;
   padding: 7px 16px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0;
-  color: var(--paper-50);
-  background: var(--accent);
+  color: var(--accent);
+  background: transparent;
   border: 1.5px solid var(--accent);
-  border-radius: 22px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 120ms ease, color 120ms ease;
 }
 .plan-card-quick-join:hover:not(:disabled) {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
+  background: rgba(var(--accent-rgb), 0.06);
 }
 .plan-card-quick-join.is-active {
-  background: var(--surface);
-  color: var(--accent);
+  background: var(--accent);
+  color: #fff;
   border-color: var(--accent);
 }
-
+.plan-card-quick-join.is-full {
+  color: var(--text-muted);
+  border-color: var(--border-strong);
+  background: var(--tan-mid);
+  cursor: default;
+}
 .plan-card-quick-join:disabled {
   opacity: 0.55;
-  cursor: default;
+  cursor: not-allowed;
 }
 
 .plan-card-suggest {
@@ -5878,6 +6074,27 @@ h1, h2, h3, h4, h5, h6 {
 
 .coordination-banner--expanded .onboarding-input {
   width: 100%;
+}
+
+.lock-time-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.lock-time-row .onboarding-input {
+  flex: 1;
+  min-width: 0;
+}
+.lock-time-row .flex-toggle-btn {
+  margin-top: 0;
+  flex-shrink: 0;
+}
+.lock-flex-text {
+  flex: 1;
+  font-size: 15px;
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .profile-month-calendar {
@@ -7587,10 +7804,14 @@ h1, h2, h3, h4, h5, h6 {
   padding: 10px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: var(--surface-2, var(--surface));
+  background: var(--surface);
   text-decoration: none;
   color: inherit;
-  transition: border-color 120ms ease, background-color 120ms ease;
+  transition: border-color 120ms ease;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .link-preview--card {
@@ -7606,35 +7827,34 @@ h1, h2, h3, h4, h5, h6 {
   height: 72px;
   object-fit: cover;
   border-radius: 8px;
-  flex: 0 0 auto;
+  flex: 0 0 72px;
 }
 
 .link-preview-body {
   flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
 }
 
 .link-preview-site {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-  font-weight: 700;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--faint);
+  font-weight: 500;
 }
 
 .link-preview-title {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 600;
   margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  white-space: nowrap;
 }
 
 .link-preview-desc {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
   margin-top: 4px;
   overflow: hidden;
@@ -8248,6 +8468,10 @@ h1, h2, h3, h4, h5, h6 {
   background: transparent;
   padding-left: 0;
 }
+.location-row-flex-text {
+  display: block;
+  padding: 13px 0;
+}
 
 /* Description — borderless textarea card. */
 .create-desc-input {
@@ -8827,6 +9051,66 @@ a.xpl-comm-card {
 .profile-community-meta {
   font-size: 12px;
   color: var(--ink-500, #6b7280);
+}
+
+/* Search page — people results */
+.search-people-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.search-person-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--text);
+}
+.search-person-row:hover {
+  background: var(--surface-2);
+}
+.search-person-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.search-person-name {
+  font-size: 14px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-person-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-person-chevron {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+/* Settings → Blocked list */
+.blocked-row {
+  gap: 12px;
+}
+.blocked-unblock-btn {
+  font-size: 13px;
+  color: var(--accent);
+  margin-left: auto;
+  text-decoration: none;
 }
 
 /* ============================================================
@@ -9782,16 +10066,61 @@ a.xpl-comm-card {
   display: flex;
   flex-direction: column;
 }
-.messages-row-title {
-  font-weight: 700;
-  font-size: 14px;
+.messages-row-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
-.messages-row-preview,
+.messages-row-top {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.messages-row-title {
+  font-weight: 600;
+  font-size: 16px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.messages-row-preview {
+  font-size: 14px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .messages-row-meta {
-  font-size: 11px;
+  display: none;
 }
 .messages-row-time {
-  font-size: 10px;
+  font-size: 12px;
+  color: var(--faint);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.messages-row-unread {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  grid-column: 3;
+  grid-row: 1 / span 2;
 }
 .chat-bubble-body {
   font-size: 14px;
@@ -9901,10 +10230,11 @@ a.xpl-comm-card {
 .idea-details input,
 .idea-details textarea {
   width: 100%;
-  background: var(--surface);
+  background: var(--surface); /* white text boxes, never tan */
   border: 1px solid var(--border);
   border-radius: 10px;
-  font-size: 13px;
+  font-size: 15px;
+  text-transform: none;
   padding: 10px 12px;
   color: var(--text);
 }
@@ -9961,8 +10291,9 @@ a.xpl-comm-card {
 .create-more input,
 .create-more select,
 .create-more textarea {
-  background: var(--surface);
-  font-size: 13px;
+  background: var(--surface); /* white text boxes */
+  font-size: 15px;
+  text-transform: none;
 }
 .create-more .flex-toggle-btn.is-active {
   background: var(--surface);
@@ -9973,7 +10304,8 @@ a.xpl-comm-card {
 .form-eyebrow,
 .community-chip,
 .plan-card-state-pill,
-.my-plans-section-title {
+.my-plans-section-title,
+.who-block-heading {
   text-transform: none;
   letter-spacing: 0;
 }
@@ -9995,4 +10327,323 @@ a.xpl-comm-card {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
+}
+
+/* ---------- Interest Forums ---------- */
+
+.forum-join-more {
+  display: block;
+  text-align: center;
+  padding: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.forum-leave-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 4px;
+  white-space: nowrap;
+}
+
+.forum-leave-btn:hover {
+  color: var(--accent);
+}
+
+.forum-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 16px 0;
+  flex-wrap: wrap;
+}
+
+.forum-make-plan-btn {
+  white-space: nowrap;
+}
+
+.forum-composer-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  padding: 14px;
+  margin-bottom: 18px;
+}
+
+.forum-composer-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  text-align: left;
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 4px;
+}
+
+.forum-composer-trigger:hover {
+  color: var(--text);
+}
+
+.forum-composer-form {
+  display: grid;
+  gap: 10px;
+}
+
+.forum-composer-textarea {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: var(--font-ui);
+  resize: vertical;
+  min-height: 72px;
+}
+
+.forum-composer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.forum-post-list {
+  display: grid;
+  gap: 12px;
+}
+
+.forum-post-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  padding: 16px;
+}
+
+.forum-post-card-link {
+  display: block;
+  color: var(--text);
+}
+
+.forum-post-card--detail {
+  margin-bottom: 20px;
+}
+
+.forum-post-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.forum-post-head-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.forum-post-author {
+  font-weight: 600;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.forum-sponsored-badge {
+  font-size: 10px;
+  padding: 3px 8px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.forum-post-time {
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+
+.forum-post-content {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.forum-post-image {
+  width: 100%;
+  border-radius: var(--r-md);
+  margin-top: 10px;
+  display: block;
+}
+
+.forum-post-footer {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.forum-like-btn,
+.forum-reply-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.forum-like-btn:hover,
+.forum-reply-link:hover {
+  color: var(--accent);
+}
+
+.forum-like-btn.is-active {
+  color: var(--accent);
+}
+
+.forum-reply-list {
+  margin-bottom: 20px;
+}
+
+.forum-reply-row {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.forum-reply-row:last-child {
+  border-bottom: none;
+}
+
+.forum-reply-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.forum-reply-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.forum-reply-author {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.forum-reply-time {
+  font-size: 11px;
+  color: var(--text-subtle);
+}
+
+.forum-reply-content {
+  margin: 2px 0 0;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.forum-reply-composer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 8px 10px;
+  box-shadow: var(--shadow-card);
+}
+
+.forum-reply-composer input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  padding: 6px 4px;
+}
+
+.forum-reply-composer input:focus {
+  outline: none;
+}
+
+/* Messages Plans / Interests tab switcher */
+.messages-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 16px;
+  padding: 4px;
+  background: var(--tan-mid);
+  border-radius: 999px;
+  width: fit-content;
+  max-width: 100%;
+}
+.messages-tab {
+  padding: 8px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-radius: 999px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.messages-tab.is-active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.plan-card-save-btn--body {
+  top: 12px;
+  right: 12px;
+}
+
+/* Did this happen? */
+.did-happen-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.did-happen-q {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.did-happen-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.did-happen-actions .btn-secondary {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+.did-happen-saved {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 12px;
 }

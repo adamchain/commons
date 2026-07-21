@@ -40,9 +40,10 @@ export function ProfilePage() {
   const { user, setUser } = useAuth();
   const [profile, setProfile] = useState<ProfilePayload | null>(null);
   const [feedPlans, setFeedPlans] = useState<PlanDTO[]>([]);
+  const [savedPlans, setSavedPlans] = useState<PlanDTO[]>([]);
   const [network, setNetwork] = useState<PublicUser[] | null>(null);
   const [communities, setCommunities] = useState<CommunityCardDTO[]>([]);
-  const [plansView, setPlansView] = useState<"list" | "calendar">("list");
+  const [plansView, setPlansView] = useState<"list" | "calendar" | "saved">("list");
   const isSelf = user?.id === userId;
 
   const reloadProfile = () =>
@@ -67,6 +68,26 @@ export function ProfilePage() {
       .then((r) => setNetwork(r.users))
       .catch(() => setNetwork([]));
   }, [isSelf, user?.networkUserIds?.length]);
+
+  // Saved plans (bookmarked, not necessarily going/interested/hosting) — the
+  // feed already covers most of them; backfill any saved ids the feed's
+  // neighborhood scope left out.
+  useEffect(() => {
+    if (!isSelf) return;
+    const savedIds = user?.savedPlanIds ?? [];
+    if (savedIds.length === 0) {
+      setSavedPlans([]);
+      return;
+    }
+    const have = new Set(feedPlans.map((p) => p.id));
+    const missing = savedIds.filter((id) => !have.has(id));
+    void Promise.all(missing.map((id) => api<PlanDTO>(`/api/plans/${id}`).catch(() => null))).then((extra) => {
+      setSavedPlans([
+        ...feedPlans.filter((p) => savedIds.includes(p.id)),
+        ...extra.filter((p): p is PlanDTO => !!p),
+      ]);
+    });
+  }, [isSelf, feedPlans, user?.savedPlanIds]);
 
   if (!profile) {
     return (
@@ -198,7 +219,12 @@ export function ProfilePage() {
           </Link>
         )}
 
-        {!isSelf && <FriendButton profile={profile} onUpdated={reloadProfile} />}
+        {!isSelf && (
+          <div className="profile-hero-actions-row">
+            <FriendButton profile={profile} onUpdated={reloadProfile} />
+            <BlockButton profileUserId={profile.user.id} firstName={profile.user.firstName} />
+          </div>
+        )}
       </section>
 
       {profile.interests.length > 0 && !isSelf && (
@@ -244,6 +270,7 @@ export function ProfilePage() {
           id="profile-plans-block"
           upcoming={profile.upcoming}
           past={profile.past}
+          saved={savedPlans}
           isSelf={isSelf}
           viewerId={user?.id}
           calendarPlans={isSelf ? feedPlans : profile.upcoming}
@@ -591,6 +618,7 @@ function YourPlansBlock({
   id,
   upcoming,
   past,
+  saved,
   isSelf,
   viewerId,
   calendarPlans,
@@ -600,134 +628,196 @@ function YourPlansBlock({
   id?: string;
   upcoming: PlanDTO[];
   past: Array<{ id: string; title: string; date: string; wentCount: number }>;
+  saved: PlanDTO[];
   isSelf: boolean;
   viewerId: string | undefined;
   calendarPlans: PlanDTO[];
-  view: "list" | "calendar";
-  onViewChange: (v: "list" | "calendar") => void;
+  view: "list" | "calendar" | "saved";
+  onViewChange: (v: "list" | "calendar" | "saved") => void;
 }) {
   const [upcomingExpanded, setUpcomingExpanded] = useState(false);
   const [pastOpen, setPastOpen] = useState(false);
   const visibleUpcoming = upcomingExpanded ? upcoming : upcoming.slice(0, 3);
   const hiddenCount = Math.max(0, upcoming.length - visibleUpcoming.length);
+
+  const seeAllLink = (
+    <Link to="/my-plans" className="profile-see-all-link" style={{ display: "inline-block", marginTop: 10 }}>
+      See all plans &amp; saved →
+    </Link>
+  );
+
   return (
     <section className="profile-block" id={id}>
       <div className="profile-block-heading-row">
         <h3 className="who-block-heading">{isSelf ? "Your plans" : "Plans"}</h3>
-        <div className="profile-plans-toggle" role="tablist" aria-label="Plans view">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={view === "list"}
-            className={view === "list" ? "is-active" : ""}
-            onClick={() => onViewChange("list")}
-          >
-            List
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={view === "calendar"}
-            className={view === "calendar" ? "is-active" : ""}
-            onClick={() => onViewChange("calendar")}
-          >
-            Calendar
-          </button>
-        </div>
+        {isSelf && (
+          <div className="profile-plans-toggle" role="tablist" aria-label="Plans view">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === "list"}
+              className={view === "list" ? "is-active" : ""}
+              onClick={() => onViewChange("list")}
+            >
+              List
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === "calendar"}
+              className={view === "calendar" ? "is-active" : ""}
+              onClick={() => onViewChange("calendar")}
+            >
+              Calendar
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === "saved"}
+              className={view === "saved" ? "is-active" : ""}
+              onClick={() => onViewChange("saved")}
+            >
+              Saved
+            </button>
+          </div>
+        )}
       </div>
 
-      {view === "calendar" ? (
+      {view === "calendar" && (
         <>
           <MonthCalendar plans={calendarPlans} />
-          {isSelf && (
-            <Link to="/my-plans" className="btn-link profile-block-see-all" style={{ display: "inline-block", marginTop: 10 }}>
-              See all →
-            </Link>
-          )}
+          {isSelf && seeAllLink}
         </>
-      ) : (
-      <>
-      {isSelf && (
-        <>
-          <Link to="/my-plans" className="btn-link profile-block-see-all" style={{ display: "inline-block", marginTop: 6 }}>
-            See all plans & saved →
-          </Link>
-          <p className="form-help" style={{ marginTop: 6 }}>
-            Tap ★ on any plan card to save it — saved plans live under My plans.
-          </p>
-        </>
-      )}
-      <div className="profile-list">
-        {visibleUpcoming.map((p) => {
-          const youStarted = viewerId !== undefined && p.creator.id === viewerId;
-          const badge = youStarted ? "Your plan" : "Interested";
-          return (
-            <Link
-              key={p.id}
-              to={`/plans/${p.id}`}
-              className={`profile-list-row ${youStarted ? "profile-list-row--hosting" : ""}`}
-            >
-              <span className="profile-list-emoji">{p.hostEmoji}</span>
-              <span className="profile-list-title">{p.title}</span>
-              <span className="profile-list-when">{formatPlanDate(p.date)}</span>
-              <span className={`profile-list-badge ${youStarted ? "is-host" : "is-interested"}`}>
-                {badge}
-              </span>
-            </Link>
-          );
-        })}
-      </div>
-      {hiddenCount > 0 && (
-        <button
-          type="button"
-          className="profile-list-show-more"
-          onClick={() => setUpcomingExpanded(true)}
-        >
-          Show {hiddenCount} more
-        </button>
-      )}
-      {upcomingExpanded && upcoming.length > 3 && (
-        <button
-          type="button"
-          className="profile-list-show-more"
-          onClick={() => setUpcomingExpanded(false)}
-        >
-          Show less
-        </button>
       )}
 
-      {past.length > 0 && (
+      {view === "saved" && (
         <>
-          <button
-            type="button"
-            className="profile-past-toggle"
-            aria-expanded={pastOpen}
-            onClick={() => setPastOpen((v) => !v)}
-          >
-            <span>Past · {past.length}</span>
-            <span className={`profile-past-chevron ${pastOpen ? "is-open" : ""}`}>›</span>
-          </button>
-          {pastOpen && (
-            <div className="profile-list profile-list--past-group">
-              {past.map((p) => (
-                // Past events are just a record: title + date. "Do it again"
-                // lives on the event page itself, not as a per-row button.
-                <Link
-                  key={p.id}
-                  to={`/plans/${p.id}`}
-                  className="profile-list-row profile-list-row--past"
-                >
+          {saved.length === 0 ? (
+            <p className="empty-state" style={{ marginTop: 8 }}>
+              No saved plans yet — tap the ★ on any plan card to save it.
+            </p>
+          ) : (
+            <div className="profile-plan-card">
+              {saved.map((p) => (
+                <Link key={p.id} to={`/plans/${p.id}`} className="profile-plan-row">
+                  <span className="profile-list-emoji">{p.hostEmoji}</span>
                   <span className="profile-list-title">{p.title}</span>
                   <span className="profile-list-when">{formatPlanDate(p.date)}</span>
                 </Link>
               ))}
             </div>
           )}
+          {isSelf && seeAllLink}
         </>
       )}
-      </>
+
+      {view === "list" && (
+        <>
+          {isSelf && (
+            <Link
+              to="/my-plans"
+              className="profile-see-all-link"
+              style={{ display: "inline-block", marginTop: 6, marginBottom: 10 }}
+            >
+              See all plans &amp; saved →
+            </Link>
+          )}
+          {visibleUpcoming.length > 0 ? (
+            <div className="profile-plan-card">
+              {visibleUpcoming.map((p) => {
+                const youStarted = viewerId !== undefined && p.creator.id === viewerId;
+                const badge = youStarted ? "Your plan" : "Interested";
+                return (
+                  <Link key={p.id} to={`/plans/${p.id}`} className="profile-plan-row">
+                    <span className="profile-list-emoji">{p.hostEmoji}</span>
+                    <span className="profile-list-title">{p.title}</span>
+                    <span className="profile-list-when">{formatPlanDate(p.date)}</span>
+                    <span
+                      className={`profile-plan-chip ${youStarted ? "profile-plan-chip--host" : "profile-plan-chip--interested"}`}
+                    >
+                      {badge}
+                    </span>
+                  </Link>
+                );
+              })}
+              {hiddenCount > 0 && (
+                <button type="button" className="profile-show-more-row" onClick={() => setUpcomingExpanded(true)}>
+                  Show {hiddenCount} more
+                </button>
+              )}
+              {upcomingExpanded && upcoming.length > 3 && (
+                <button type="button" className="profile-show-more-row" onClick={() => setUpcomingExpanded(false)}>
+                  Show less
+                </button>
+              )}
+            </div>
+          ) : (
+            <p className="empty-state" style={{ marginTop: 8 }}>No upcoming plans yet.</p>
+          )}
+
+          {past.length > 0 && (
+            <>
+              <button
+                type="button"
+                className="profile-past-toggle"
+                aria-expanded={pastOpen}
+                onClick={() => setPastOpen((v) => !v)}
+              >
+                <span>Past · {past.length}</span>
+                <span className={`profile-past-chevron ${pastOpen ? "is-open" : ""}`}>›</span>
+              </button>
+              {pastOpen && (
+                <div className="profile-plan-card" style={{ marginTop: 8 }}>
+                  {past.map((p) => (
+                    // Past events are just a record: title + date. "Do it again"
+                    // lives on the event page itself, not as a per-row button.
+                    <Link key={p.id} to={`/plans/${p.id}`} className="profile-plan-row">
+                      <span className="profile-list-title">{p.title}</span>
+                      <span className="profile-list-when">{formatPlanDate(p.date)}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </>
       )}
     </section>
+  );
+}
+
+function BlockButton({ profileUserId, firstName }: { profileUserId: string; firstName: string }) {
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
+
+  async function block() {
+    if (busy) return;
+    const name = firstName || "this person";
+    if (
+      !window.confirm(
+        `Block ${name}? They won't be able to see your plans or profile, and you won't see theirs.`,
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await api(`/api/users/${profileUserId}/block`, { method: "POST" });
+      navigate("/", { replace: true });
+    } catch {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className="btn-link friend-remove-btn profile-block-btn"
+      onClick={() => void block()}
+      disabled={busy}
+    >
+      {busy ? "…" : "Block"}
+    </button>
   );
 }
 

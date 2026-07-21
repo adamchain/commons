@@ -253,6 +253,8 @@ export interface PlanDTO {
      *  plans by venue for the (post-launch) Spots grid + venue history. */
     placeId?: string;
   };
+  /** ISO timestamp when the plan was posted — drives recency sort for ideas. */
+  createdAt: string;
   date: string;
   time: string;
   isFlexibleTime: boolean;
@@ -292,6 +294,8 @@ export interface PlanDTO {
   /** ISO timestamp when the host cancelled this plan, or null if active. */
   cancelledAt: string | null;
   upForGrabsAt?: string | null;
+  /** Host answer to "Did this happen?" */
+  happenedOutcome?: "yes" | "no" | "rescheduled" | null;
   /** Optional flyer image (data URL). People screenshot flyers — attach one. */
   flyerDataUrl?: string;
   /** Optional shareable link (event page, ticket page, etc.). */
@@ -325,6 +329,11 @@ export interface ConversationDTO {
   participants: PublicUser[];
   lastMessageAt: string;
   unreadCount: number;
+  /** True when the viewer has muted this conversation — chat still works, notifications go quiet. */
+  muted: boolean;
+  /** True when the viewer hosts the underlying plan — drives the "Block host" chat menu option. */
+  isHost: boolean;
+  hostId: string;
 }
 
 /** A row in the unified Messages inbox — one per accessible plan group chat. */
@@ -429,6 +438,12 @@ export interface MeDTO {
   privacyAcceptedAt?: string | null;
   /** Notification toggles. Missing keys fall back to DEFAULT_NOTIFICATION_PREFS. */
   notificationPrefs?: NotificationPrefs;
+  /** UserIds this person has blocked. */
+  blockedUserIds?: string[];
+  /** Whether this user's name surfaces in People search results. Defaults to true. */
+  discoverableBySearch: boolean;
+  /** Conversation ids this user has muted. */
+  mutedConversationIds?: string[];
 }
 
 export interface NetworkPromptDTO {
@@ -477,7 +492,11 @@ export type NotificationKind =
   | "communityJoinRequest"
   | "communityRequestApproved"
   | "communityRequestDeclined"
-  | "communityPlanPosted";
+  | "communityPlanPosted"
+  | "planDayOf"
+  | "interestedNudge"
+  | "didThisHappen"
+  | "planSpotReopen";
 
 export interface NotificationDTO {
   id: string;
@@ -634,4 +653,84 @@ export interface PendingCommunityDTO {
   organizer: PublicUser;
   submittedAt: string;
   creationStatus: CommunityCreationStatus;
+}
+
+// ---- Interest Forums (V1) ----
+// A citywide, topic-based discussion board per interest category — structurally
+// separate from plan group chats. Forum-style (posts + flat replies), not
+// real-time chat. Every InterestTag gets exactly one forum; users auto-join the
+// forums matching their onboarding/settings interests but can leave without
+// dropping the underlying interest (membership is decoupled from profile tags).
+
+export type ForumSort = "recent" | "popular";
+export type ForumPostApprovalStatus = "pending" | "approved" | "rejected";
+
+/** Row in the Messages → Interests tab — one per forum the viewer has joined. */
+export interface ForumSummaryDTO {
+  interestTag: InterestTag;
+  label: string;
+  emoji: string;
+  latestPost: {
+    authorName: string;
+    preview: string;
+    createdAt: string;
+  } | null;
+  /** Stub for future unread tracking — always false in V1. */
+  hasUnread: boolean;
+}
+
+export interface ForumPostDTO {
+  id: string;
+  interestTag: InterestTag;
+  author: PublicUser;
+  content: string;
+  imageUrl: string | null;
+  isSponsored: boolean;
+  sponsorName: string | null;
+  createdAt: string;
+  replyCount: number;
+  likeCount: number;
+  /** Whether the viewer has liked this post. */
+  likedByMe: boolean;
+  /** Viewer may delete this post (own post, or COMMONS admin). */
+  canDelete: boolean;
+}
+
+export interface ForumReplyDTO {
+  id: string;
+  postId: string;
+  author: PublicUser;
+  content: string;
+  createdAt: string;
+}
+
+export interface ForumPostDetailDTO {
+  post: ForumPostDTO;
+  replies: ForumReplyDTO[];
+}
+
+/** Row in the admin review queue for pending sponsored forum posts. */
+export interface AdminForumPostDTO {
+  id: string;
+  interestTag: InterestTag;
+  label: string;
+  content: string;
+  imageUrl: string | null;
+  sponsorName: string | null;
+  createdAt: string;
+}
+
+// ---- Search ----
+
+/** A person result on the /search page. */
+export interface PersonSearchResultDTO {
+  user: PublicUser;
+  neighborhoodName: string | null;
+  /** Count of plans the viewer and this person have both been part of (hosted or joined). */
+  sharedPlansCount: number;
+}
+
+export interface SearchResultsDTO {
+  plans: PlanDTO[];
+  people: PersonSearchResultDTO[];
 }

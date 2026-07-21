@@ -67,6 +67,9 @@ interface OnboardingNavState {
   phoneNumber?: string;
   authMode?: "verify" | "dev";
   smsConfigured?: boolean;
+  /** Invite code carried over from a shared plan link (`?invite=CODE`) or a
+   *  deep link into `/plans/:id`, prefilled on the launch-gate step. */
+  inviteCode?: string;
 }
 
 export function OnboardingPage() {
@@ -97,8 +100,11 @@ export function OnboardingPage() {
   const verifyInFlight = useRef(false);
   // Access code for the launch gate. Accepts the shared exclusive code OR a
   // personal invite code from an existing member. Prefilled from ?invite= on a
-  // share link so invite-link users just tap Continue.
+  // share link, or from location.state.inviteCode when handed off from the
+  // public event page / a plan deep link, so invite-link users just tap
+  // Continue.
   const [accessCode, setAccessCode] = useState<string>(() => {
+    if (nav?.inviteCode) return nav.inviteCode;
     if (typeof window === "undefined") return "";
     return new URLSearchParams(window.location.search).get("invite") ?? "";
   });

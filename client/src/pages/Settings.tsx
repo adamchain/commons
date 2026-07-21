@@ -84,10 +84,10 @@ export function SettingsPage() {
           sub="Manage what reaches you"
         />
         <SettingsRow
+          to="/settings/privacy"
           icon={<LockIcon />}
           title="Privacy"
-          sub="Who can see your plans"
-          comingSoon
+          sub="Search, blocking"
         />
       </SettingsGroup>
 

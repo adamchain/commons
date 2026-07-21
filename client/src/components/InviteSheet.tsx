@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/http";
 import { Avatar } from "./Avatar";
 import { getPublicWebOrigin } from "../lib/platform";
+import { getActiveInviteCode } from "../lib/inviteCode";
 import type { PublicUser } from "../types/shared";
 
 /**
@@ -24,6 +25,7 @@ export function InviteSheet({
   const [sent, setSent] = useState(0);
   const [hiddenWarn, setHiddenWarn] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
 
   useEffect(() => {
     void api<{ users: PublicUser[] }>("/api/auth/network")
@@ -31,7 +33,22 @@ export function InviteSheet({
       .catch(() => setNetwork([]));
   }, []);
 
-  const planUrl = `${getPublicWebOrigin()}/plans/${planId}`;
+  // If the sharer still has an unused invite code, stamp it on the link so a
+  // recipient who isn't a member yet gets credited to it on signup.
+  useEffect(() => {
+    let active = true;
+    void getActiveInviteCode().then((code) => {
+      if (active) setInviteCode(code);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const planUrl = useMemo(() => {
+    const base = `${getPublicWebOrigin()}/plans/${planId}`;
+    return inviteCode ? `${base}?invite=${encodeURIComponent(inviteCode)}` : base;
+  }, [planId, inviteCode]);
   const smsBody = `Come to ${planTitle} on Commons — ${planUrl}`;
 
   async function shareSms() {

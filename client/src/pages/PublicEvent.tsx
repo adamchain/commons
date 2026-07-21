@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/http";
 import { formatPhoneInput, formatPlanDate, formatPlanTime } from "../lib/format";
 import { INTEREST_EMOJI, INTEREST_LABELS, type PublicPlanDTO } from "../types/shared";
@@ -13,6 +13,10 @@ import wordmark from "../assets/wordmark.png";
 export function PublicEventPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Credits the sharer's invite code when this visitor signs up (see
+  // requirement 5.1/5.5) — carried through onboarding as `?invite=CODE`.
+  const inviteCode = searchParams.get("invite");
 
   const [plan, setPlan] = useState<PublicPlanDTO | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -50,6 +54,7 @@ export function PublicEventPage() {
           phoneNumber: result.phoneNumber,
           authMode: result.authMode ?? (result.smsConfigured ? "verify" : "dev"),
           smsConfigured: result.smsConfigured,
+          inviteCode: inviteCode ?? undefined,
         },
       });
     } catch (e) {

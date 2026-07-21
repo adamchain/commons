@@ -31,9 +31,11 @@ export function ChatPage() {
   const [busyPollId, setBusyPollId] = useState<string | null>(null);
   const [pinnedPollsOpen, setPinnedPollsOpen] = useState(false);
   const [composerMenuOpen, setComposerMenuOpen] = useState(false);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [chatReady, setChatReady] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const composerMenuRef = useRef<HTMLDivElement>(null);
+  const headerMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     void (async () => {
@@ -79,6 +81,17 @@ export function ChatPage() {
     return () => document.removeEventListener("mousedown", close);
   }, [composerMenuOpen]);
 
+  useEffect(() => {
+    if (!headerMenuOpen) return;
+    const close = (e: MouseEvent) => {
+      if (headerMenuRef.current && !headerMenuRef.current.contains(e.target as Node)) {
+        setHeaderMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [headerMenuOpen]);
+
   const grouped = useMemo(() => groupMessages(messages), [messages]);
 
   if (!chatReady || !conv || !user || !plan) {
@@ -110,6 +123,39 @@ export function ChatPage() {
     if (!window.confirm("Leave this chat? It'll disappear from your Messages. You stay on the plan.")) return;
     try {
       await api(`/api/conversations/${conv.id}/leave`, { method: "POST" });
+      navigate("/messages");
+    } catch {
+      /* swallow */
+    }
+  }
+
+  async function toggleMute() {
+    if (!conv) return;
+    setHeaderMenuOpen(false);
+    try {
+      const r = await api<{ ok: boolean; muted: boolean }>(`/api/conversations/${conv.id}/mute`, {
+        method: "POST",
+        body: JSON.stringify({ muted: !conv.muted }),
+      });
+      setConv((prev) => (prev ? { ...prev, muted: r.muted } : prev));
+    } catch {
+      /* swallow — they can tap again */
+    }
+  }
+
+  async function blockHost() {
+    if (!conv) return;
+    setHeaderMenuOpen(false);
+    const host = conv.participants.find((p) => p.id === conv.hostId);
+    const name = host?.firstName || "the host";
+    if (
+      !window.confirm(`Block ${name}? You'll leave this chat, and won't see their plans or profile.`)
+    ) {
+      return;
+    }
+    try {
+      await api(`/api/users/${conv.hostId}/block`, { method: "POST" });
+      await api(`/api/conversations/${conv.id}/leave`, { method: "POST" }).catch(() => undefined);
       navigate("/messages");
     } catch {
       /* swallow */
@@ -223,9 +269,40 @@ export function ChatPage() {
       <header className="app-header app-header--minimal chat-header-bar chat-header-bar--thread">
         <Link to={backTo} className="detail-back">{backLabel}</Link>
         <div className="chat-thread-title">{sentenceCaseTitle(plan.title)}</div>
-        <button type="button" className="btn-link chat-leave-btn" onClick={() => void leaveChat()}>
-          Leave
-        </button>
+        <div className="chat-header-menu-wrap" ref={headerMenuRef}>
+          <button
+            type="button"
+            className="chat-header-menu-btn"
+            onClick={() => setHeaderMenuOpen((v) => !v)}
+            aria-label="Chat options"
+            aria-expanded={headerMenuOpen}
+          >
+            <MoreIcon />
+          </button>
+          {headerMenuOpen && (
+            <div className="chat-header-menu" role="menu">
+              <button type="button" role="menuitem" onClick={() => void toggleMute()}>
+                {conv.muted ? "Unmute notifications" : "Mute notifications"}
+              </button>
+              {!conv.isHost && (
+                <button type="button" role="menuitem" onClick={() => void blockHost()}>
+                  Block host
+                </button>
+              )}
+              <button
+                type="button"
+                role="menuitem"
+                className="chat-header-menu-leave"
+                onClick={() => {
+                  setHeaderMenuOpen(false);
+                  void leaveChat();
+                }}
+              >
+                Leave chat
+              </button>
+            </div>
+          )}
+        </div>
       </header>
 
       <div className="chat-shell">
@@ -525,6 +602,16 @@ export function ChatPage() {
         </div>
       )}
     </main>
+  );
+}
+
+function MoreIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="12" cy="5" r="1.8" />
+      <circle cx="12" cy="12" r="1.8" />
+      <circle cx="12" cy="19" r="1.8" />
+    </svg>
   );
 }
 

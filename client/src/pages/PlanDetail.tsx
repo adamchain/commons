@@ -9,16 +9,22 @@ import { LoadingScreen } from "../components/LoadingScreen";
 import { ParticipationButtons } from "../components/ParticipationButtons";
 import { ShareSheet } from "../components/ShareSheet";
 import { useAuth } from "../context/AuthContext";
-import { useCardImages, pickCoverImage } from "../lib/cardImages";
 import { planHasEnded } from "../lib/planTime";
 import { formatPlaceAddress, formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
 import { type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
+
+/** Same "set parts + · flexible" convention as the feed card — never show a
+ *  specific time/date next to a field that's still open. */
+function formatWhen(date: string, time: string, isFlexibleTime: boolean): string {
+  return isFlexibleTime
+    ? `${formatPlanDate(date)} · flexible`
+    : `${formatPlanDate(date)} · ${formatPlanTime(time, false)}`;
+}
 
 export function PlanDetailPage() {
   const { id = "" } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const coverPool = useCardImages();
   const [plan, setPlan] = useState<PlanDTO | null>(null);
   const [showShare, setShowShare] = useState(false);
   const [showGetThere, setShowGetThere] = useState(false);
@@ -51,8 +57,14 @@ export function PlanDetailPage() {
     setLockVenueAddr(plan.location.address ?? "");
     setLockLat(plan.location.lat);
     setLockLng(plan.location.lng);
+    // plan.date is stored as a plain "YYYY-MM-DD" string (never a full
+    // timestamp) — slice defensively but don't round-trip it through `new
+    // Date()`, which parses bare date strings as UTC and can shift the day
+    // by one depending on the viewer's timezone.
     setLockDate(plan.date.slice(0, 10));
-    setLockTime(plan.time && !plan.isFlexibleTime ? plan.time : "19:00");
+    // Flexible time means genuinely empty — not a "19:00" placeholder — so
+    // the field reads correctly if the host un-flexes it.
+    setLockTime(plan.time && !plan.isFlexibleTime ? plan.time : "");
     setLockFlexTime(plan.isFlexibleTime);
   }, [plan?.id, plan?.date, plan?.lockedAt, plan?.isFlexibleTime, plan?.isFlexibleLocation]);
 
@@ -153,7 +165,7 @@ export function PlanDetailPage() {
     if (!lockVenue.trim() || !lockDate) return;
     setLockBusy(true);
     try {
-      const updated = await api<PlanDTO>(`/api/plans/${id}/lock`, {
+      await api<PlanDTO>(`/api/plans/${id}/lock`, {
         method: "POST",
         body: JSON.stringify({
           location: {
@@ -163,17 +175,22 @@ export function PlanDetailPage() {
             lng: lockLng,
           },
           date: lockDate,
-          time: lockFlexTime ? "" : lockTime,
+          time: lockFlexTime ? "" : lockTime || "19:00",
           isFlexibleTime: lockFlexTime,
         }),
       });
-      setPlan(updated);
+      // Reload rather than trust the response shape — the group chat also
+      // gets an automatic "locked in" system line server-side, so a full
+      // refetch keeps the chat entry count and everything else in sync.
+      await load();
     } finally {
       setLockBusy(false);
     }
   }
 
-  const coverSrc = plan.flyerDataUrl ?? pickCoverImage(coverPool, plan.id);
+  // No stock cover photos — a real flyer/photo or nothing (the hero falls
+  // back to the tan surface color, matching the feed card treatment).
+  const coverSrc = plan.flyerDataUrl ?? null;
   const prettyAddress = formatPlaceAddress(plan.location.address);
   const showAddressLine = prettyAddress && prettyAddress !== plan.location.name;
   const mapsQuery = encodeURIComponent(
@@ -187,14 +204,14 @@ export function PlanDetailPage() {
   return (
     <main className="app-shell app-shell--wide app-shell--with-nav plan-detail-page">
       <div className="plan-detail-hero">
-        <img src={coverSrc} alt="" loading="lazy" />
+        {coverSrc && <img src={coverSrc} alt="" loading="lazy" />}
         <div className="plan-detail-hero-overlay" aria-hidden="true" />
         <Link to="/" className="plan-detail-back" aria-label="Back">
           ←
         </Link>
         <div className="plan-detail-hero-text">
           <div className="plan-detail-hero-when">
-            {formatPlanDate(plan.date)} · {formatPlanTime(plan.time, plan.isFlexibleTime)}
+            {formatWhen(plan.date, plan.time, plan.isFlexibleTime)}
           </div>
           <h1>{sentenceCaseTitle(plan.title)}</h1>
         </div>
@@ -229,11 +246,38 @@ export function PlanDetailPage() {
         {isPast && (
           <div className="plan-past-actions">
             <p className="plan-past-note">This one's a wrap. Want to run it back?</p>
+            {isHosting && !plan.happenedOutcome && (
+              <div className="did-happen-card" role="group" aria-label="Did this happen?">
+                <p className="did-happen-q">Did this happen?</p>
+                <div className="did-happen-actions">
+                  {(["yes", "no", "rescheduled"] as const).map((outcome) => (
+                    <button
+                      key={outcome}
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => {
+                        void api(`/api/plans/${plan.id}/happened-outcome`, {
+                          method: "POST",
+                          body: JSON.stringify({ outcome }),
+                        }).then(() => load());
+                      }}
+                    >
+                      {outcome === "yes" ? "Yes" : outcome === "no" ? "No" : "Rescheduled"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {isHosting && plan.happenedOutcome && (
+              <p className="did-happen-saved">
+                Saved: {plan.happenedOutcome === "yes" ? "Yes, it happened" : plan.happenedOutcome === "no" ? "No" : "Rescheduled"}
+              </p>
+            )}
             <button
               type="button"
               className="btn-primary btn-block plan-past-action-btn"
               onClick={() =>
-                navigate(`/plans/new?fromPlanId=${plan.id}&title=${encodeURIComponent(plan.title)}`)
+                navigate(`/plans/new`, { state: { hostAgainFrom: plan.id } })
               }
             >
               <RepeatIcon />
@@ -304,19 +348,11 @@ export function PlanDetailPage() {
               value={lockDate}
               onChange={(e) => setLockDate(e.target.value)}
             />
-            <label className="flex-toggle">
-              <input
-                type="checkbox"
-                checked={lockFlexTime}
-                onChange={(e) => setLockFlexTime(e.target.checked)}
-              />
-              Flexible time
+            <label className="form-question" htmlFor="lock-time">
+              Time
             </label>
-            {!lockFlexTime && (
-              <>
-                <label className="form-question" htmlFor="lock-time">
-                  Time
-                </label>
+            <div className="lock-time-row">
+              {!lockFlexTime ? (
                 <input
                   id="lock-time"
                   className="onboarding-input"
@@ -324,8 +360,11 @@ export function PlanDetailPage() {
                   value={lockTime}
                   onChange={(e) => setLockTime(e.target.value)}
                 />
-              </>
-            )}
+              ) : (
+                <span className="lock-flex-text">Flexible time</span>
+              )}
+              <FlexChip active={lockFlexTime} onClick={() => setLockFlexTime((v) => !v)} />
+            </div>
             <button type="button" className="btn-primary btn-block" disabled={lockBusy || !lockVenue.trim() || !lockDate} onClick={() => void lockIn()}>
               {lockBusy ? "Saving…" : "Lock it in"}
             </button>
@@ -368,7 +407,7 @@ export function PlanDetailPage() {
             <div className="plan-meta-text">
               <span className="plan-meta-label">Date &amp; time</span>
               <span className="plan-meta-value">
-                {formatPlanDate(plan.date)} · {formatPlanTime(plan.time, plan.isFlexibleTime)}
+                {formatWhen(plan.date, plan.time, plan.isFlexibleTime)}
               </span>
             </div>
           </div>
@@ -377,8 +416,7 @@ export function PlanDetailPage() {
               <span className="plan-meta-icon" aria-hidden="true"><PinIcon /></span>
               <div className="plan-meta-text">
                 <span className="plan-meta-label">Location</span>
-                <span className="plan-meta-value">{plan.location.name}</span>
-                {showAddressLine && <span className="plan-meta-sub">{prettyAddress}</span>}
+                <span className="plan-meta-value">Flexible</span>
               </div>
             </div>
           ) : (
@@ -622,6 +660,31 @@ function ParticipantsRow({
         </ul>
       )}
     </>
+  );
+}
+
+/** Tan chip Flexible toggle — same pattern as CreatePlan's FlexToggle. */
+function FlexChip({ active, onClick }: { active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className={`flex-toggle-btn ${active ? "is-active" : ""}`}
+      onClick={onClick}
+      aria-pressed={active}
+      title="Flexible"
+    >
+      <FlexIcon />
+      <span>Flexible</span>
+    </button>
+  );
+}
+
+function FlexIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 12h14" />
+      <path d="m12 5 7 7-7 7" />
+    </svg>
   );
 }
 

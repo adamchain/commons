@@ -7,6 +7,7 @@
 // All `findOne({ id })` lookups are O(1) via the unique index.
 
 import mongoose, { Schema, type Model } from "mongoose";
+import { ALL_INTERESTS } from "../types/shared.js";
 import type {
   CardImageRecord,
   CommunityMemberRecord,
@@ -16,6 +17,11 @@ import type {
   DeclineRecord,
   DropoutRecord,
   FeedbackRecord,
+  ForumMembershipRecord,
+  ForumPostLikeRecord,
+  ForumPostRecord,
+  ForumReplyRecord,
+  InterestForumRecord,
   LogRecord,
   MessageRecord,
   NeighborhoodRecord,
@@ -322,3 +328,87 @@ const CommunityPostSchema = new Schema<CommunityPostRecord>(
 CommunityPostSchema.index({ id: 1 }, { unique: true });
 CommunityPostSchema.index({ communityId: 1, createdAt: -1 });
 export const CommunityPostModel = compile<CommunityPostRecord>("CommunityPost", CommunityPostSchema);
+
+// Interest Forums — one row per InterestTag (citywide topic boards).
+const InterestForumSchema = new Schema<InterestForumRecord>(
+  {
+    id: { type: String, required: true },
+    interestTag: { type: String, enum: ALL_INTERESTS, required: true },
+    createdAt: { type: String, required: true },
+  },
+  { collection: "interestForums" },
+);
+InterestForumSchema.index({ id: 1 }, { unique: true });
+InterestForumSchema.index({ interestTag: 1 }, { unique: true });
+export const InterestForumModel = compile<InterestForumRecord>("InterestForum", InterestForumSchema);
+
+// Forum memberships — no UUID `id`; unique on (userId, interestTag). Soft-leave via leftAt.
+const ForumMembershipSchema = new Schema<ForumMembershipRecord>(
+  {
+    userId: { type: String, required: true },
+    interestTag: { type: String, enum: ALL_INTERESTS, required: true },
+    joinedAt: { type: String, required: true },
+    leftAt: { type: String, default: null },
+  },
+  { collection: "forumMemberships" },
+);
+ForumMembershipSchema.index({ userId: 1, interestTag: 1 }, { unique: true });
+ForumMembershipSchema.index({ interestTag: 1 });
+export const ForumMembershipModel = compile<ForumMembershipRecord>(
+  "ForumMembership",
+  ForumMembershipSchema,
+);
+
+// Forum posts
+const ForumPostSchema = new Schema<ForumPostRecord>(
+  {
+    id: { type: String, required: true },
+    interestTag: { type: String, enum: ALL_INTERESTS, required: true },
+    authorId: { type: String, required: true },
+    content: { type: String, required: true },
+    imageUrl: { type: String, default: null },
+    isSponsored: { type: Boolean, default: false },
+    sponsorName: { type: String, default: null },
+    approvalStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      required: true,
+    },
+    createdAt: { type: String, required: true },
+    replyCount: { type: Number, default: 0 },
+    likeCount: { type: Number, default: 0 },
+  },
+  { collection: "forumPosts" },
+);
+ForumPostSchema.index({ id: 1 }, { unique: true });
+ForumPostSchema.index({ interestTag: 1, createdAt: -1 });
+ForumPostSchema.index({ approvalStatus: 1 });
+export const ForumPostModel = compile<ForumPostRecord>("ForumPost", ForumPostSchema);
+
+// Forum replies (flat thread under a post)
+const ForumReplySchema = new Schema<ForumReplyRecord>(
+  {
+    id: { type: String, required: true },
+    postId: { type: String, required: true },
+    authorId: { type: String, required: true },
+    content: { type: String, required: true },
+    createdAt: { type: String, required: true },
+  },
+  { collection: "forumReplies" },
+);
+ForumReplySchema.index({ id: 1 }, { unique: true });
+ForumReplySchema.index({ postId: 1, createdAt: 1 });
+export const ForumReplyModel = compile<ForumReplyRecord>("ForumReply", ForumReplySchema);
+
+// Forum post likes — no UUID `id`; unique on (postId, userId).
+const ForumPostLikeSchema = new Schema<ForumPostLikeRecord>(
+  {
+    postId: { type: String, required: true },
+    userId: { type: String, required: true },
+    createdAt: { type: String, required: true },
+  },
+  { collection: "forumPostLikes" },
+);
+ForumPostLikeSchema.index({ postId: 1, userId: 1 }, { unique: true });
+ForumPostLikeSchema.index({ userId: 1 });
+export const ForumPostLikeModel = compile<ForumPostLikeRecord>("ForumPostLike", ForumPostLikeSchema);

@@ -13,6 +13,11 @@ import {
   DeclineModel,
   DropoutModel,
   FeedbackModel,
+  ForumMembershipModel,
+  ForumPostLikeModel,
+  ForumPostModel,
+  ForumReplyModel,
+  InterestForumModel,
   LogModel,
   MessageModel,
   NeighborhoodModel,
@@ -20,6 +25,7 @@ import {
   PlanModel,
   PlanSuggestionModel,
 } from "./models/index.js";
+import { DeviceModel } from "./models/Device.js";
 import { InviteCodeModel } from "./models/InviteCode.js";
 import { NotificationModel } from "./models/Notification.js";
 import { RelationshipModel } from "./models/Relationship.js";
@@ -51,6 +57,12 @@ export async function hydrateSnapshotFromMongo(): Promise<void> {
       communities,
       communityMembers,
       communityPosts,
+      devices,
+      interestForums,
+      forumMemberships,
+      forumPosts,
+      forumReplies,
+      forumPostLikes,
     ] = await Promise.all([
       UserModel.find({}).lean(),
       NeighborhoodModel.find({}).lean(),
@@ -70,6 +82,12 @@ export async function hydrateSnapshotFromMongo(): Promise<void> {
       CommunityModel.find({}).lean(),
       CommunityMemberModel.find({}).lean(),
       CommunityPostModel.find({}).lean(),
+      DeviceModel.find({}).lean(),
+      InterestForumModel.find({}).lean(),
+      ForumMembershipModel.find({}).lean(),
+      ForumPostModel.find({}).lean(),
+      ForumReplyModel.find({}).lean(),
+      ForumPostLikeModel.find({}).lean(),
     ]);
 
     // `reset` replaces the snapshot wholesale. We bypass mirror here — Mongo
@@ -94,10 +112,19 @@ export async function hydrateSnapshotFromMongo(): Promise<void> {
       communities,
       communityMembers,
       communityPosts,
+      devices,
+      interestForums,
+      forumMemberships,
+      forumPosts,
+      forumReplies,
+      forumPostLikes,
     });
 
+    // Ensure one forum row per InterestTag even if Mongo was empty / partial.
+    store.ensureForumsForInterests();
+
     console.log(
-      `[hydrate] loaded from Mongo: ${users.length} users, ${neighborhoods.length} hoods, ${plans.length} plans, ${participations.length} rsvps, ${conversations.length} convos, ${messages.length} msgs`,
+      `[hydrate] loaded from Mongo: ${users.length} users, ${neighborhoods.length} hoods, ${plans.length} plans, ${participations.length} rsvps, ${conversations.length} convos, ${messages.length} msgs, ${interestForums.length} forums, ${forumPosts.length} forumPosts`,
     );
   } catch (err) {
     console.error("[hydrate] failed to load from Mongo — running with stale snapshot", err);

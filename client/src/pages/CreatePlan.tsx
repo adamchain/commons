@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
@@ -12,6 +12,7 @@ import {
   VIBE_OPTIONS,
   type InterestTag,
   type JoinType,
+  type PlanDTO,
   type PlanVisibility,
   type PublicUser,
   type VibeIcon,
@@ -20,6 +21,14 @@ import {
 const today = (): string => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+const MIN_LEAD_MINUTES = 15;
+
+/** "HH:MM" floor for a same-day time picker — now plus a grace window. */
+const minTimeForToday = (): string => {
+  const d = new Date(Date.now() + MIN_LEAD_MINUTES * 60 * 1000);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
 
 // Recurrence cadence for the "Repeats" dropdown (Zoom-style). Maps to the
@@ -41,6 +50,13 @@ const weekdayOf = (iso: string) => {
 export function CreatePlanPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
+  // "Host another like this →" on a past plan's card navigates here with
+  // { hostAgainFrom: planId } in nav state — prefill from that plan below.
+  const hostAgainFrom = (location.state as { hostAgainFrom?: string } | null)?.hostAgainFrom ?? null;
+  // "Make this a plan" from an Interest Forum navigates here with
+  // { fromForumTag: tag } — preselect that interest as the plan's vibe.
+  const fromForumTag = (location.state as { fromForumTag?: string } | null)?.fromForumTag ?? null;
   const prefillName = searchParams.get("name") ?? "";
   const prefillAddress = searchParams.get("address") ?? "";
   // "Do it again" seeds the title from a past plan, and carries that plan's
@@ -68,13 +84,21 @@ export function CreatePlanPage() {
     return opt?.id ?? null;
   }, [prefillTagParam]);
 
+  const forumVibe: VibeIcon | null = useMemo(() => {
+    if (!fromForumTag) return null;
+    const opt = VIBE_OPTIONS.find((o) => o.tag === fromForumTag);
+    return opt?.id ?? null;
+  }, [fromForumTag]);
+
   // Interests start empty so the host consciously tags the plan — pre-checking
   // their onboarding interests led to mis-tagged plans. A prefill from Explore
-  // (e.g. a venue's vibe) still seeds a single tag.
+  // (e.g. a venue's vibe) or "Make this a plan" from a forum still seeds a
+  // single tag.
   const defaultVibes = useMemo<VibeIcon[]>(() => {
+    if (forumVibe) return [forumVibe];
     if (prefillVibe) return [prefillVibe];
     return [];
-  }, [prefillVibe]);
+  }, [forumVibe, prefillVibe]);
 
   const [form, setForm] = useState({
     title: prefillTitle,
@@ -115,8 +139,13 @@ export function CreatePlanPage() {
   // Skipped automatically when arriving with an invite seed.
   type Path = "choose" | "plan" | "idea";
   const [path, setPath] = useState<Path>(
-    inviteUserId || inviteUserIds.length > 0 || prefillTitle || prefillName ? "plan" : "choose",
+    inviteUserId || inviteUserIds.length > 0 || prefillTitle || prefillName || hostAgainFrom || fromForumTag
+      ? "plan"
+      : "choose",
   );
+  // Carries the source plan id server-side so "Host another like this" also
+  // pulls the previous crew + group chat forward, same as "Do it again".
+  const [carryFromId, setCarryFromId] = useState<string | null>(fromPlanId);
   // The path selector now requires an explicit pick + Continue rather than
   // navigating on the first tap.
   const [pendingPath, setPendingPath] = useState<"plan" | "idea" | null>(null);
@@ -186,6 +215,44 @@ export function CreatePlanPage() {
     }
   }, [user, form.neighborhoodId]);
 
+  // "Host another like this" — prefill the form from the past plan, but
+  // never carry its (now-past) date/time forward.
+  useEffect(() => {
+    if (!hostAgainFrom) return;
+    let alive = true;
+    void api<PlanDTO>(`/api/plans/${hostAgainFrom}`)
+      .then((prev) => {
+        if (!alive) return;
+        const vibeIds = Array.from(
+          new Set(VIBE_OPTIONS.filter((o) => prev.tags.includes(o.tag)).map((o) => o.id)),
+        );
+        setForm((f) => ({
+          ...f,
+          title: prev.title,
+          locationName: prev.isFlexibleLocation ? "" : prev.location.name,
+          locationAddress: prev.isFlexibleLocation ? "" : prev.location.address,
+          locationLat: prev.isFlexibleLocation ? undefined : prev.location.lat,
+          locationLng: prev.isFlexibleLocation ? undefined : prev.location.lng,
+          locationPlaceId: prev.isFlexibleLocation ? undefined : prev.location.placeId,
+          neighborhoodId: prev.neighborhoodId || f.neighborhoodId,
+          isFlexibleLocation: false,
+          vibes: vibeIds.length ? vibeIds : f.vibes,
+          description: prev.description ?? "",
+          visibility: prev.visibility,
+          capacityOn: prev.capacity !== null,
+          capacity: prev.capacity !== null ? String(prev.capacity) : f.capacity,
+          joinType: prev.joinType,
+          flyerDataUrl: prev.flyerDataUrl ?? null,
+        }));
+        setCarryFromId(hostAgainFrom);
+        setPath("plan");
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [hostAgainFrom]);
+
   const resolvedTags = useMemo<InterestTag[]>(() => {
     const set = new Set<InterestTag>();
     for (const id of form.vibes) {
@@ -201,28 +268,56 @@ export function CreatePlanPage() {
     ? "looking_for"
     : "standard";
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
+  // Req 3.1 — block past dates outright, and same-day times need at least
+  // MIN_LEAD_MINUTES of runway. Derived (not state) so it re-evaluates live
+  // as the host edits the form; also re-checked on submit as the source of truth.
+  const dateError =
+    !form.isFlexibleDate && form.date && form.date < today()
+      ? "Pick today or a future date."
+      : null;
+  const timeError =
+    !dateError && !form.isFlexibleDate && !form.isFlexibleTime && form.date === today() && form.time
+      ? form.time < minTimeForToday()
+        ? `Pick a time at least ${MIN_LEAD_MINUTES} minutes from now.`
+        : null
+      : null;
+
+  const validate = (): boolean => {
     setError(null);
     if (!form.title.trim()) {
       setError("Give your plan a title.");
-      return;
+      return false;
     }
     if (!form.neighborhoodId && !form.isFlexibleLocation) {
       setError("Pick a neighborhood or toggle flexible.");
-      return;
+      return false;
     }
     if (!form.isFlexibleDate && !form.date) {
       setError("Pick a day or toggle date flexible.");
-      return;
+      return false;
     }
-
+    if (dateError) {
+      setError(dateError);
+      return false;
+    }
+    if (timeError) {
+      setError(timeError);
+      return false;
+    }
     const capacityNum = form.capacityOn ? Number(form.capacity) : null;
     if (capacityNum !== null && (!Number.isFinite(capacityNum) || capacityNum < 1)) {
       setError("Spots must be a positive number, or leave open.");
-      return;
+      return false;
     }
+    return true;
+  };
 
+  // Req 6.8 — on failure, the form/draft is left exactly as the host typed
+  // it (we never clear `form`), and postPlan can be re-invoked from the
+  // error banner's Retry button without re-entering anything.
+  const postPlan = async () => {
+    setError(null);
+    const capacityNum = form.capacityOn ? Number(form.capacity) : null;
     setSubmitting(true);
     try {
       const created = await api<{ id: string }>("/api/plans", {
@@ -260,7 +355,7 @@ export function CreatePlanPage() {
           flyerDataUrl: form.flyerDataUrl ?? undefined,
           flyerLinkUrl: form.flyerLinkUrl.trim() || undefined,
           flyerLinkPreview: form.flyerLinkPreview ?? undefined,
-          fromPlanId: fromPlanId ?? undefined,
+          fromPlanId: carryFromId ?? undefined,
           communityId: communityId ?? undefined,
           communityVisibility: communityId ? communityVisibility : undefined,
         }),
@@ -280,11 +375,27 @@ export function CreatePlanPage() {
       }
       navigate("/", { state: { justPostedId: created.id, openInviteForPlanId: created.id } });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't post");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Couldn't post — check your connection and try again.",
+      );
     } finally {
       setSubmitting(false);
     }
   };
+
+  const runSubmit = async () => {
+    if (!validate()) return;
+    await postPlan();
+  };
+
+  const submit = (event?: FormEvent) => {
+    event?.preventDefault();
+    void runSubmit();
+  };
+
+  const retry = () => void runSubmit();
 
   const toggleVibe = (id: VibeIcon) => {
     setForm((prev) => ({
@@ -432,6 +543,7 @@ export function CreatePlanPage() {
           form={form}
           setForm={setForm}
           submit={submit}
+          retry={retry}
           submitting={submitting}
           error={error}
           onBack={() => setPath("choose")}
@@ -499,7 +611,7 @@ export function CreatePlanPage() {
         </div>
       ) : null}
 
-      <form id="create-plan-form" onSubmit={(event) => void submit(event)} className="create-form">
+      <form id="create-plan-form" onSubmit={submit} className="create-form">
         {/* Cover image — prominent at the top, per New Plan handoff. */}
         {form.flyerDataUrl ? (
           <div className="cover-picker cover-picker--filled">
@@ -555,7 +667,8 @@ export function CreatePlanPage() {
         />
 
         {/* When — Date + Time as Luma-style rows, each with its own Flexible
-            pill. Borderless rows on the card, hairline-divided. */}
+            pill. Borderless rows on the card, hairline-divided. Req 3.1 —
+            past dates are blocked and same-day times need runway. */}
         <div className="luma-card">
           <div className="luma-row">
             <span className="luma-label">Date</span>
@@ -565,7 +678,9 @@ export function CreatePlanPage() {
                   id="date"
                   type="date"
                   className="luma-input"
+                  min={today()}
                   value={form.date}
+                  aria-invalid={Boolean(dateError)}
                   onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
                 />
               ) : (
@@ -586,7 +701,9 @@ export function CreatePlanPage() {
                   id="time"
                   type="time"
                   className="luma-input"
+                  min={!form.isFlexibleDate && form.date === today() ? minTimeForToday() : undefined}
                   value={form.time}
+                  aria-invalid={Boolean(timeError)}
                   onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
                 />
               ) : (
@@ -600,51 +717,76 @@ export function CreatePlanPage() {
             </div>
           </div>
         </div>
+        {(dateError || timeError) && (
+          <p className="luma-inline-error">{dateError || timeError}</p>
+        )}
 
         {/* Location — single row, Google-Places-backed, flexible toggle inline.
             Neighborhood is kept from the user's default when a place is picked;
-            isFlexibleLocation supersedes. */}
+            picking a place and toggling Flexible are mutually exclusive —
+            each one clears the other (req: location fixes). */}
         <div className="luma-card">
           <div className="location-row">
             <div className="location-row-main">
-              <PlacePicker
-                value={form.locationName}
-                address={form.locationAddress}
-                placeholder="Choose location"
-                onChange={(name) =>
-                  setForm((f) => ({
-                    ...f,
-                    locationName: name,
-                    locationLat: undefined,
-                    locationLng: undefined,
-                    locationPlaceId: undefined,
-                  }))
-                }
-                onSelect={(p) =>
-                  setForm((f) => ({
-                    ...f,
-                    locationName: p.name,
-                    locationAddress: p.address,
-                    locationLat: p.lat,
-                    locationLng: p.lng,
-                    locationPlaceId: p.placeId,
-                  }))
-                }
-                onClear={() =>
-                  setForm((f) => ({
-                    ...f,
-                    locationName: "",
-                    locationAddress: "",
-                    locationLat: undefined,
-                    locationLng: undefined,
-                    locationPlaceId: undefined,
-                  }))
-                }
-              />
+              {!form.isFlexibleLocation ? (
+                <PlacePicker
+                  value={form.locationName}
+                  address={form.locationAddress}
+                  placeholder="Search a venue, or type your own — e.g. Somewhere in Fishtown"
+                  onChange={(name) =>
+                    setForm((f) => ({
+                      ...f,
+                      locationName: name,
+                      locationAddress: "",
+                      locationLat: undefined,
+                      locationLng: undefined,
+                      locationPlaceId: undefined,
+                    }))
+                  }
+                  onSelect={(p) =>
+                    setForm((f) => ({
+                      ...f,
+                      locationName: p.name,
+                      locationAddress: p.address,
+                      locationLat: p.lat,
+                      locationLng: p.lng,
+                      locationPlaceId: p.placeId,
+                      isFlexibleLocation: false,
+                    }))
+                  }
+                  onClear={() =>
+                    setForm((f) => ({
+                      ...f,
+                      locationName: "",
+                      locationAddress: "",
+                      locationLat: undefined,
+                      locationLng: undefined,
+                      locationPlaceId: undefined,
+                    }))
+                  }
+                />
+              ) : (
+                <span className="luma-flex-text location-row-flex-text">Flexible location</span>
+              )}
             </div>
             <FlexToggle
               active={form.isFlexibleLocation}
-              onClick={() => setForm((f) => ({ ...f, isFlexibleLocation: !f.isFlexibleLocation }))}
+              onClick={() =>
+                setForm((f) => {
+                  const next = !f.isFlexibleLocation;
+                  return next
+                    ? {
+                        ...f,
+                        isFlexibleLocation: true,
+                        locationName: "",
+                        locationAddress: "",
+                        locationLat: undefined,
+                        locationLng: undefined,
+                        locationPlaceId: undefined,
+                      }
+                    : { ...f, isFlexibleLocation: false };
+                })
+              }
               label="Flexible"
             />
           </div>
@@ -923,7 +1065,14 @@ export function CreatePlanPage() {
           </section>
         )}
 
-        {error && <p className="error-text">{error}</p>}
+        {error && (
+          <div className="form-error-banner">
+            <p className="error-text">{error}</p>
+            <button type="button" className="btn-link" onClick={retry} disabled={submitting}>
+              Try again
+            </button>
+          </div>
+        )}
 
         <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
           {submitting ? "Posting…" : "Post it"}
@@ -1061,6 +1210,7 @@ function IdeaForm({
   form,
   setForm,
   submit,
+  retry,
   submitting,
   error,
   onBack,
@@ -1070,7 +1220,8 @@ function IdeaForm({
 }: {
   form: FormShape;
   setForm: (updater: (f: FormShape) => FormShape) => void;
-  submit: (event: FormEvent) => void;
+  submit: (event?: FormEvent) => void;
+  retry: () => void;
   submitting: boolean;
   error: string | null;
   onBack: () => void;
@@ -1159,32 +1310,47 @@ function IdeaForm({
             </div>
 
             <label className="form-question" style={{ marginTop: 14 }}>Cover image</label>
+            {/* Same cover component as the full "New plan" form — Choose from
+                library / Upload, pinstripe placeholder when empty. */}
             {form.flyerDataUrl ? (
-              <div className="idea-cover-preview">
-                <img src={form.flyerDataUrl} alt="" />
-                <div className="idea-cover-actions">
-                  <button type="button" className="btn-secondary" onClick={onShowCoverLib}>
+              <div className="cover-picker cover-picker--filled">
+                <img src={form.flyerDataUrl} alt="" className="cover-picker-img" />
+                <div className="cover-picker-overlay">
+                  <button type="button" className="cover-chip" onClick={onShowCoverLib}>
                     Change
                   </button>
-                  <button type="button" className="btn-link" onClick={onClearFlyer}>
+                  <button type="button" className="cover-chip" onClick={onClearFlyer}>
                     Remove
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="idea-cover-actions idea-cover-actions--empty">
-                <button type="button" className="btn-secondary" onClick={onShowCoverLib}>
-                  Choose from library
-                </button>
-                <button type="button" className="btn-secondary" onClick={onOpenFlyer}>
-                  Upload
-                </button>
+              <div className="cover-picker">
+                <span className="cover-picker-title">Add a cover image</span>
+                <span className="cover-picker-sub">Make your idea stand out</span>
+                <div className="cover-picker-buttons">
+                  <button type="button" className="cover-btn" onClick={onShowCoverLib}>
+                    <LibraryIcon />
+                    Choose from library
+                  </button>
+                  <button type="button" className="cover-btn" onClick={onOpenFlyer}>
+                    <UploadIcon />
+                    Upload
+                  </button>
+                </div>
               </div>
             )}
           </div>
         )}
 
-        {error && <p className="error-text">{error}</p>}
+        {error && (
+          <div className="form-error-banner">
+            <p className="error-text">{error}</p>
+            <button type="button" className="btn-link" onClick={retry} disabled={submitting}>
+              Try again
+            </button>
+          </div>
+        )}
 
         <button type="submit" className="btn btn-primary btn-block" disabled={submitting || !form.title.trim()}>
           {submitting ? "Posting…" : "Put it out there"}
@@ -1316,6 +1482,8 @@ interface PlaceHit {
   placeId: string;
   name: string;
   address: string;
+  /** e.g. "Fishtown" — parsed server-side from Places address components. */
+  neighborhood?: string;
   lat?: number;
   lng?: number;
 }
@@ -1455,7 +1623,9 @@ function PlacePicker({
                 }}
               >
                 <span className="place-picker-result-name">{p.name}</span>
-                {p.address && <span className="place-picker-result-addr">{p.address}</span>}
+                {(p.neighborhood || p.address) && (
+                  <span className="place-picker-result-addr">{p.neighborhood ?? p.address}</span>
+                )}
               </button>
             </li>
           ))}

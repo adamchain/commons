@@ -11,12 +11,15 @@ import type {
   CommunityMemberStatus,
   CommunityPostingPermission,
   CommunityVisibility,
+  ForumPostApprovalStatus,
+  ForumSort,
   InterestTag,
   JoinType,
   ParticipationState,
   PlanKind,
   PlanVisibility,
 } from "./types/shared.js";
+import { ALL_INTERESTS } from "./types/shared.js";
 
 export interface UserRecord {
   id: string;
@@ -67,6 +70,12 @@ export interface UserRecord {
     weeklyFridayDigest: boolean;
     lookingForRecovery: boolean;
   }>;
+  /** UserIds this person has blocked. Blocking is one-directional but visibility checks treat it as mutual. */
+  blockedUserIds?: string[];
+  /** Whether this user's name surfaces in People search results. Missing/undefined defaults to true. */
+  discoverableBySearch?: boolean;
+  /** Conversation ids this user has muted — chat still works, notifications go quiet. */
+  mutedConversationIds?: string[];
 }
 
 export interface NeighborhoodRecord {
@@ -164,6 +173,11 @@ export interface PlanRecord {
   cancelledAt?: string | null;
   /** ISO timestamp when the host put hosting up for grabs (anyone can claim). */
   upForGrabsAt?: string | null;
+  /**
+   * Host answer to "Did this happen?" ~2h after start.
+   * yes | no | rescheduled — null/absent = unanswered.
+   */
+  happenedOutcome?: "yes" | "no" | "rescheduled" | null;
   createdAt: string;
 }
 
@@ -405,7 +419,11 @@ export interface NotificationRecord {
     | "communityJoinRequest"
     | "communityRequestApproved"
     | "communityRequestDeclined"
-    | "communityPlanPosted";
+    | "communityPlanPosted"
+    | "planDayOf"
+    | "interestedNudge"
+    | "didThisHappen"
+    | "planSpotReopen";
   body: string;
   planId?: string;
   conversationId?: string;
@@ -433,6 +451,75 @@ export interface CardImageRecord {
   createdAt: string;
 }
 
+/**
+ * Interest Forums (V1) — citywide, topic-based discussion boards, one per
+ * InterestTag. Structurally separate from plan group chats: forum-style
+ * (posts + flat replies), not real-time chat.
+ */
+export interface InterestForumRecord {
+  id: string;
+  interestTag: InterestTag;
+  createdAt: string;
+}
+
+/**
+ * Membership is intentionally decoupled from the user's profile `interests`
+ * array — leaving a forum does NOT remove the interest from the profile, and
+ * saving interests only ever adds forum memberships (never auto-leaves).
+ * `leftAt` is set (not deleted) so re-joining is a clean toggle.
+ */
+export interface ForumMembershipRecord {
+  userId: string;
+  interestTag: InterestTag;
+  joinedAt: string;
+  leftAt: string | null;
+}
+
+export interface ForumPostRecord {
+  id: string;
+  interestTag: InterestTag;
+  authorId: string;
+  content: string;
+  imageUrl?: string | null;
+  isSponsored: boolean;
+  sponsorName?: string | null;
+  /** Non-sponsored posts are auto-approved; sponsored posts wait for admin review. */
+  approvalStatus: ForumPostApprovalStatus;
+  createdAt: string;
+  /** Denormalized counts, kept in sync by createReply/toggleLike. */
+  replyCount: number;
+  likeCount: number;
+}
+
+export interface ForumReplyRecord {
+  id: string;
+  postId: string;
+  authorId: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface ForumPostLikeRecord {
+  postId: string;
+  userId: string;
+  createdAt: string;
+}
+
+/**
+ * A registered push-notification device token. Keyed unique on `token` — a
+ * given installation belongs to whichever account most recently registered
+ * it (re-registering under a new account reassigns `userId`, it doesn't
+ * duplicate the row). `platform` gates which provider (APNs today; FCM would
+ * key off "android") a token gets sent through.
+ */
+export interface DeviceRecord {
+  id: string;
+  userId: string;
+  token: string;
+  platform: "ios" | "android" | "web";
+  updatedAt: string;
+}
+
 interface Snapshot {
   users: UserRecord[];
   neighborhoods: NeighborhoodRecord[];
@@ -453,6 +540,12 @@ interface Snapshot {
   communities: CommunityRecord[];
   communityMembers: CommunityMemberRecord[];
   communityPosts: CommunityPostRecord[];
+  interestForums: InterestForumRecord[];
+  forumMemberships: ForumMembershipRecord[];
+  forumPosts: ForumPostRecord[];
+  forumReplies: ForumReplyRecord[];
+  forumPostLikes: ForumPostLikeRecord[];
+  devices: DeviceRecord[];
 }
 
 const DATA_PATH = resolve(process.cwd(), "data.json");
@@ -478,6 +571,12 @@ function emptySnapshot(): Snapshot {
     communities: [],
     communityMembers: [],
     communityPosts: [],
+    interestForums: [],
+    forumMemberships: [],
+    forumPosts: [],
+    forumReplies: [],
+    forumPostLikes: [],
+    devices: [],
   };
 }
 
@@ -517,6 +616,12 @@ function load(): Snapshot {
       communities: parsed.communities ?? [],
       communityMembers: parsed.communityMembers ?? [],
       communityPosts: parsed.communityPosts ?? [],
+      interestForums: parsed.interestForums ?? [],
+      forumMemberships: parsed.forumMemberships ?? [],
+      forumPosts: parsed.forumPosts ?? [],
+      forumReplies: parsed.forumReplies ?? [],
+      forumPostLikes: parsed.forumPostLikes ?? [],
+      devices: parsed.devices ?? [],
     };
   } catch {
     return emptySnapshot();
@@ -644,11 +749,13 @@ export const store = {
       (r) => r.userId !== userId && r.targetId !== userId,
     );
     snapshot.dropouts = snapshot.dropouts.filter((d) => d.userId !== userId);
+    snapshot.devices = snapshot.devices.filter((d) => d.userId !== userId);
     mongoMirror.deleteParticipationsByUser(userId);
     mongoMirror.deleteNotificationsByUser(userId);
     mongoMirror.deleteInviteCodesByOwner(userId);
     mongoMirror.deleteRelationshipsTouching(userId);
     mongoMirror.deleteDropoutsByUser(userId);
+    mongoMirror.deleteDevicesByUser(userId);
 
     // Drop the user's community memberships and recount those communities.
     // Communities they organized are left in place (organizer transfer is V2);
@@ -666,6 +773,84 @@ export const store = {
 
     persist();
     return true;
+  },
+
+  // ---- Blocking ----
+  /**
+   * Block `targetId` on behalf of `userId`. Best-effort cleanup: drops any
+   * existing network connection both ways, and removes the blocked user from
+   * any group chat `userId` hosts (their own plans' conversations) so the
+   * block takes effect in chats immediately without touching chats hosted by
+   * someone else.
+   */
+  blockUser(userId: string, targetId: string): UserRecord | undefined {
+    const user = snapshot.users.find((u) => u.id === userId);
+    if (!user) return undefined;
+    const set = new Set(user.blockedUserIds ?? []);
+    set.add(targetId);
+    user.blockedUserIds = [...set];
+
+    // Drop any existing mutual network connection.
+    if (user.networkIds?.includes(targetId)) {
+      user.networkIds = user.networkIds.filter((id) => id !== targetId);
+    }
+    const target = snapshot.users.find((u) => u.id === targetId);
+    if (target?.networkIds?.includes(userId)) {
+      target.networkIds = target.networkIds.filter((id) => id !== userId);
+      mongoMirror.upsertUser(target);
+    }
+    this.deleteRelationship(userId, targetId, "network");
+    this.deleteRelationship(targetId, userId, "network");
+
+    // Remove the blocked user from any group chat this user hosts.
+    for (const plan of snapshot.plans) {
+      if (plan.creatorId !== userId) continue;
+      const conv = snapshot.conversations.find((c) => c.planId === plan.id && c.type === "group");
+      if (conv && conv.participantIds.includes(targetId)) {
+        conv.participantIds = conv.participantIds.filter((id) => id !== targetId);
+        mongoMirror.upsertConversation(conv);
+      }
+    }
+
+    persist();
+    mongoMirror.upsertUser(user);
+    return user;
+  },
+  unblockUser(userId: string, targetId: string): UserRecord | undefined {
+    const user = snapshot.users.find((u) => u.id === userId);
+    if (!user) return undefined;
+    if (!user.blockedUserIds?.includes(targetId)) return user;
+    user.blockedUserIds = user.blockedUserIds.filter((id) => id !== targetId);
+    persist();
+    mongoMirror.upsertUser(user);
+    return user;
+  },
+  listBlockedUserIds(userId: string): string[] {
+    return snapshot.users.find((u) => u.id === userId)?.blockedUserIds ?? [];
+  },
+  /** True when either user has blocked the other — used to gate visibility both ways. */
+  isBlockedEitherWay(aId: string, bId: string): boolean {
+    const a = snapshot.users.find((u) => u.id === aId);
+    const b = snapshot.users.find((u) => u.id === bId);
+    if (a?.blockedUserIds?.includes(bId)) return true;
+    if (b?.blockedUserIds?.includes(aId)) return true;
+    return false;
+  },
+
+  // ---- Muted conversations ----
+  setConversationMuted(userId: string, conversationId: string, muted: boolean): UserRecord | undefined {
+    const user = snapshot.users.find((u) => u.id === userId);
+    if (!user) return undefined;
+    const set = new Set(user.mutedConversationIds ?? []);
+    if (muted) set.add(conversationId);
+    else set.delete(conversationId);
+    user.mutedConversationIds = [...set];
+    persist();
+    mongoMirror.upsertUser(user);
+    return user;
+  },
+  isConversationMuted(userId: string, conversationId: string): boolean {
+    return (snapshot.users.find((u) => u.id === userId)?.mutedConversationIds ?? []).includes(conversationId);
   },
 
   // Neighborhoods
@@ -1674,5 +1859,283 @@ export const store = {
     persist();
     mongoMirror.upsertConversation(conv);
     return conv;
+  },
+
+  // ---- Interest Forums (V1) ----
+
+  listForums(): InterestForumRecord[] {
+    return [...snapshot.interestForums];
+  },
+  findForumByTag(tag: InterestTag): InterestForumRecord | undefined {
+    return snapshot.interestForums.find((f) => f.interestTag === tag);
+  },
+  /** Idempotent bootstrap — one forum row per InterestTag, created on demand. */
+  ensureForumsForInterests(): void {
+    let changed = false;
+    for (const tag of ALL_INTERESTS) {
+      if (this.findForumByTag(tag)) continue;
+      const row: InterestForumRecord = {
+        id: randomUUID(),
+        interestTag: tag,
+        createdAt: new Date().toISOString(),
+      };
+      snapshot.interestForums.push(row);
+      mongoMirror.upsertInterestForum(row);
+      changed = true;
+    }
+    if (changed) persist();
+  },
+  findForumMembership(userId: string, tag: InterestTag): ForumMembershipRecord | undefined {
+    return snapshot.forumMemberships.find((m) => m.userId === userId && m.interestTag === tag);
+  },
+  /** Active (not-left) memberships for a user. */
+  listActiveForumMemberships(userId: string): ForumMembershipRecord[] {
+    return snapshot.forumMemberships.filter((m) => m.userId === userId && m.leftAt === null);
+  },
+  /** Join (or re-join) a forum. Idempotent — a no-op if already active. */
+  joinForum(userId: string, tag: InterestTag): ForumMembershipRecord {
+    const existing = this.findForumMembership(userId, tag);
+    if (existing) {
+      if (existing.leftAt !== null) {
+        existing.leftAt = null;
+        existing.joinedAt = new Date().toISOString();
+        persist();
+        mongoMirror.upsertForumMembership(existing);
+      }
+      return existing;
+    }
+    const row: ForumMembershipRecord = {
+      userId,
+      interestTag: tag,
+      joinedAt: new Date().toISOString(),
+      leftAt: null,
+    };
+    snapshot.forumMemberships.push(row);
+    persist();
+    mongoMirror.upsertForumMembership(row);
+    return row;
+  },
+  /**
+   * Leave a forum. Does NOT touch the user's profile `interests` — membership
+   * is intentionally decoupled so leaving a forum isn't the same as dropping
+   * the interest.
+   */
+  leaveForum(userId: string, tag: InterestTag): ForumMembershipRecord | undefined {
+    const existing = this.findForumMembership(userId, tag);
+    if (!existing || existing.leftAt !== null) return existing;
+    existing.leftAt = new Date().toISOString();
+    persist();
+    mongoMirror.upsertForumMembership(existing);
+    return existing;
+  },
+  /**
+   * Auto-join every forum matching the user's current interests. Called from
+   * onboarding completion and the interests settings save. Only ever adds
+   * memberships — never auto-leaves when an interest is removed, since a user
+   * may still want to follow a forum they no longer list as an interest.
+   */
+  syncForumMembershipsFromInterests(userId: string, interests: InterestTag[]): void {
+    this.ensureForumsForInterests();
+    for (const tag of interests) {
+      this.joinForum(userId, tag);
+    }
+  },
+  /**
+   * Active memberships for a user, each with a lightweight preview of the
+   * forum's latest approved post (used by the Messages → Interests tab).
+   */
+  listForumsForUser(
+    userId: string,
+  ): Array<{
+    interestTag: InterestTag;
+    joinedAt: string;
+    latestPost: { authorId: string; content: string; createdAt: string } | null;
+  }> {
+    return this.listActiveForumMemberships(userId)
+      .sort((a, b) => b.joinedAt.localeCompare(a.joinedAt))
+      .map((m) => {
+        const latest = this.listPosts(m.interestTag, "recent")[0];
+        return {
+          interestTag: m.interestTag,
+          joinedAt: m.joinedAt,
+          latestPost: latest
+            ? { authorId: latest.authorId, content: latest.content, createdAt: latest.createdAt }
+            : null,
+        };
+      });
+  },
+  /** Public feed for a forum — approved posts only, sponsored included once approved. */
+  listPosts(tag: InterestTag, sort: ForumSort = "recent"): ForumPostRecord[] {
+    const posts = snapshot.forumPosts.filter(
+      (p) => p.interestTag === tag && p.approvalStatus === "approved",
+    );
+    if (sort === "popular") {
+      return posts.sort((a, b) => {
+        if (b.likeCount !== a.likeCount) return b.likeCount - a.likeCount;
+        return b.createdAt.localeCompare(a.createdAt);
+      });
+    }
+    return posts.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+  findForumPostById(id: string): ForumPostRecord | undefined {
+    return snapshot.forumPosts.find((p) => p.id === id);
+  },
+  createPost(input: {
+    interestTag: InterestTag;
+    authorId: string;
+    content: string;
+    imageUrl?: string | null;
+    isSponsored?: boolean;
+    sponsorName?: string | null;
+  }): ForumPostRecord {
+    const isSponsored = input.isSponsored ?? false;
+    const row: ForumPostRecord = {
+      id: randomUUID(),
+      interestTag: input.interestTag,
+      authorId: input.authorId,
+      content: input.content,
+      imageUrl: input.imageUrl ?? null,
+      isSponsored,
+      sponsorName: isSponsored ? input.sponsorName ?? null : null,
+      // Sponsored posts wait for admin approval; everything else is live immediately.
+      approvalStatus: isSponsored ? "pending" : "approved",
+      createdAt: new Date().toISOString(),
+      replyCount: 0,
+      likeCount: 0,
+    };
+    snapshot.forumPosts.push(row);
+    persist();
+    mongoMirror.upsertForumPost(row);
+    return row;
+  },
+  deleteForumPost(id: string): boolean {
+    const before = snapshot.forumPosts.length;
+    snapshot.forumPosts = snapshot.forumPosts.filter((p) => p.id !== id);
+    if (snapshot.forumPosts.length === before) return false;
+    snapshot.forumReplies = snapshot.forumReplies.filter((r) => r.postId !== id);
+    snapshot.forumPostLikes = snapshot.forumPostLikes.filter((l) => l.postId !== id);
+    persist();
+    mongoMirror.deleteForumPost(id);
+    mongoMirror.deleteForumRepliesByPost(id);
+    mongoMirror.deleteForumPostLikesByPost(id);
+    return true;
+  },
+  listReplies(postId: string): ForumReplyRecord[] {
+    return snapshot.forumReplies
+      .filter((r) => r.postId === postId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  },
+  createReply(postId: string, authorId: string, content: string): ForumReplyRecord | undefined {
+    const post = this.findForumPostById(postId);
+    if (!post) return undefined;
+    const row: ForumReplyRecord = {
+      id: randomUUID(),
+      postId,
+      authorId,
+      content,
+      createdAt: new Date().toISOString(),
+    };
+    snapshot.forumReplies.push(row);
+    post.replyCount += 1;
+    persist();
+    mongoMirror.upsertForumReply(row);
+    mongoMirror.upsertForumPost(post);
+    return row;
+  },
+  hasLikedPost(postId: string, userId: string): boolean {
+    return snapshot.forumPostLikes.some((l) => l.postId === postId && l.userId === userId);
+  },
+  /** Toggle the viewer's like on a post. Returns the updated post, or undefined if not found. */
+  toggleLike(postId: string, userId: string): ForumPostRecord | undefined {
+    const post = this.findForumPostById(postId);
+    if (!post) return undefined;
+    const already = this.hasLikedPost(postId, userId);
+    if (already) {
+      snapshot.forumPostLikes = snapshot.forumPostLikes.filter(
+        (l) => !(l.postId === postId && l.userId === userId),
+      );
+      post.likeCount = Math.max(0, post.likeCount - 1);
+      mongoMirror.deleteForumPostLike(postId, userId);
+    } else {
+      const like: ForumPostLikeRecord = {
+        postId,
+        userId,
+        createdAt: new Date().toISOString(),
+      };
+      snapshot.forumPostLikes.push(like);
+      post.likeCount += 1;
+      mongoMirror.upsertForumPostLike(like);
+    }
+    persist();
+    mongoMirror.upsertForumPost(post);
+    return post;
+  },
+  // ---- Admin: sponsored forum post review ----
+  listPendingForumPosts(): ForumPostRecord[] {
+    return snapshot.forumPosts
+      .filter((p) => p.approvalStatus === "pending")
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  },
+  setForumPostApprovalStatus(
+    id: string,
+    status: ForumPostApprovalStatus,
+  ): ForumPostRecord | undefined {
+    const post = this.findForumPostById(id);
+    if (!post) return undefined;
+    post.approvalStatus = status;
+    persist();
+    mongoMirror.upsertForumPost(post);
+    return post;
+  },
+
+  // ---- Devices (push notification tokens) ----
+  listDevicesForUser(userId: string): DeviceRecord[] {
+    return snapshot.devices.filter((d) => d.userId === userId);
+  },
+  listAllDevices(): DeviceRecord[] {
+    return [...snapshot.devices];
+  },
+  /**
+   * Register (or reassign) a device token. Tokens are unique per
+   * installation — re-registering under a different account (sign out/in on
+   * the same device) moves the existing row rather than creating a duplicate.
+   */
+  registerDevice(
+    userId: string,
+    token: string,
+    platform: DeviceRecord["platform"],
+  ): DeviceRecord {
+    const existing = snapshot.devices.find((d) => d.token === token);
+    const now = new Date().toISOString();
+    if (existing) {
+      existing.userId = userId;
+      existing.platform = platform;
+      existing.updatedAt = now;
+      persist();
+      mongoMirror.upsertDevice(existing);
+      return existing;
+    }
+    const row: DeviceRecord = { id: randomUUID(), userId, token, platform, updatedAt: now };
+    snapshot.devices.push(row);
+    persist();
+    mongoMirror.upsertDevice(row);
+    return row;
+  },
+  unregisterDevice(userId: string, token: string): boolean {
+    const before = snapshot.devices.length;
+    snapshot.devices = snapshot.devices.filter((d) => !(d.userId === userId && d.token === token));
+    if (snapshot.devices.length === before) return false;
+    persist();
+    mongoMirror.deleteDeviceByToken(token);
+    return true;
+  },
+  /** Drop a token regardless of owner — used when APNs reports it as dead (410). */
+  unregisterDeviceByToken(token: string): boolean {
+    const before = snapshot.devices.length;
+    snapshot.devices = snapshot.devices.filter((d) => d.token !== token);
+    if (snapshot.devices.length === before) return false;
+    persist();
+    mongoMirror.deleteDeviceByToken(token);
+    return true;
   },
 };

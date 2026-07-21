@@ -86,6 +86,9 @@ function meFromUser(user: UserRecord): MeDTO {
     termsAcceptedAt: user.termsAcceptedAt ?? null,
     privacyAcceptedAt: user.privacyAcceptedAt ?? null,
     notificationPrefs: { ...DEFAULT_NOTIFICATION_PREFS, ...(user.notificationPrefs ?? {}) },
+    blockedUserIds: user.blockedUserIds?.length ? user.blockedUserIds : [],
+    discoverableBySearch: user.discoverableBySearch !== false,
+    mutedConversationIds: user.mutedConversationIds?.length ? user.mutedConversationIds : [],
   };
 }
 
@@ -234,6 +237,9 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
   if (req.body?.privacyAccepted === true) {
     patch.privacyAcceptedAt = new Date().toISOString();
   }
+  if (typeof req.body?.discoverableBySearch === "boolean") {
+    patch.discoverableBySearch = req.body.discoverableBySearch;
+  }
   if (req.body?.socialLinks && typeof req.body.socialLinks === "object") {
     const ig = String(req.body.socialLinks.instagram ?? "").replace(/^@/, "").trim();
     const tt = String(req.body.socialLinks.tiktok ?? "").replace(/^@/, "").trim();
@@ -252,6 +258,11 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
     patch.notificationPrefs = { ...existing, ...next };
   }
   await updateUser(userId, patch);
+  // Auto-join the forum for each interest the user just saved (onboarding or
+  // Settings → Interests). Never auto-leaves — see syncForumMembershipsFromInterests.
+  if (patch.interests) {
+    store.syncForumMembershipsFromInterests(userId, patch.interests);
+  }
   const me = await userToMe(userId);
   if (!me) {
     res.status(401).json({ error: "Unauthorized" });
