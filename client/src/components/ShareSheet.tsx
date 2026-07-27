@@ -8,8 +8,9 @@ import { API_BASE } from "../api/http";
 // link metadata are rendered server-side (see server/src/routes/share.ts), so
 // whatever a friend sees on Facebook / iMessage / X matches the thumbnail here —
 // real cover art, live "N going · M interested" count and all.
-export function ShareSheet({ plan, onClose }: { plan: PlanDTO; onClose: () => void }) {
+export function ShareSheet({ plan, isOwn = false, onClose }: { plan: PlanDTO; isOwn?: boolean; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
+  const [igCopied, setIgCopied] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
 
@@ -39,8 +40,9 @@ export function ShareSheet({ plan, onClose }: { plan: PlanDTO; onClose: () => vo
     [plan.id, going, interested],
   );
 
-  const shareText = `${plan.title} on Commons`;
-  const smsBody = encodeURIComponent(`Want to come to "${plan.title}" on Commons? ${url}`);
+  // F.14 — "my plan" when the viewer is the host, "this plan" otherwise.
+  const shareText = isOwn ? "Join my plan on COMMONS" : "Join this plan on COMMONS";
+  const smsBody = encodeURIComponent(`${shareText}: "${plan.title}" ${url}`);
   const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   async function nativeShare() {
@@ -66,7 +68,39 @@ export function ShareSheet({ plan, onClose }: { plan: PlanDTO; onClose: () => vo
     }
   }
 
+  // Instagram has no web share-intent URL that accepts prefilled text/links —
+  // copy the link and hand off to the app so it can be pasted into a Story,
+  // DM, or bio. Best-effort deep link; silently no-ops if IG isn't installed.
+  async function shareToInstagram() {
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      /* clipboard unavailable — the deep link still opens the app */
+    }
+    setIgCopied(true);
+    setTimeout(() => setIgCopied(false), 2200);
+    window.location.href = "instagram://app";
+  }
+
   const channels: { key: string; label: string; icon: string; onClick: () => void }[] = [
+    {
+      key: "sms",
+      label: "Messages",
+      icon: "💬",
+      onClick: () => openExternal(`sms:?&body=${smsBody}`),
+    },
+    {
+      key: "instagram",
+      label: igCopied ? "Link copied!" : "Instagram",
+      icon: "📸",
+      onClick: () => void shareToInstagram(),
+    },
+    {
+      key: "whatsapp",
+      label: "WhatsApp",
+      icon: "🟢",
+      onClick: () => openExternal(`https://wa.me/?text=${encodeURIComponent(`${shareText} ${url}`)}`),
+    },
     {
       key: "facebook",
       label: "Facebook",
@@ -82,25 +116,13 @@ export function ShareSheet({ plan, onClose }: { plan: PlanDTO; onClose: () => vo
           `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`,
         ),
     },
-    {
-      key: "whatsapp",
-      label: "WhatsApp",
-      icon: "🟢",
-      onClick: () => openExternal(`https://wa.me/?text=${encodeURIComponent(`${shareText} ${url}`)}`),
-    },
-    {
-      key: "sms",
-      label: "Messages",
-      icon: "💬",
-      onClick: () => openExternal(`sms:?&body=${smsBody}`),
-    },
   ];
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-handle" />
-        <div className="sheet-title">Share this plan</div>
+        <div className="sheet-title">Share your plan</div>
 
         {/* Live preview of the exact card friends will see. */}
         <div className="share-preview">

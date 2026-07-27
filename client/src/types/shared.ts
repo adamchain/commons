@@ -1,88 +1,108 @@
 // Commons v2 shared types — kept in sync between client/src/types/shared.ts
 // and server/src/types/shared.ts. Edit both when changing.
 
-/** Community interest filters — launch set. */
+// Community interest filters — final launch set (~16).
+// NOTE: internal tag ids stay stable for data compatibility. `events` is
+// relabeled "Local events" rather than renamed; `clubs` was removed.
 export type InterestTag =
   | "coffee"
-  | "cowork"
-  | "events"
-  | "drinks"
   | "food"
+  | "drinks"
+  | "events"
+  | "night_out"
   | "music"
-  | "clubs"
+  | "books"
+  | "walks"
+  | "workouts"
+  | "wellness"
   | "creative"
   | "games"
-  | "night_out"
-  | "workouts"
-  | "moms";
+  | "cowork"
+  | "moms"
+  | "new_to_philly"
+  | "sober";
 
 export const INTEREST_LABELS: Record<InterestTag, string> = {
   coffee: "Coffee",
-  cowork: "Co-Work",
-  events: "Events",
-  drinks: "Drinks",
   food: "Food",
+  drinks: "Drinks",
+  events: "Local events",
+  night_out: "Night Out",
   music: "Music",
-  clubs: "Clubs",
+  books: "Books",
+  walks: "Walks & Outdoors",
+  workouts: "Workouts",
+  wellness: "Wellness",
   creative: "Creative",
   games: "Games",
-  night_out: "Night Out",
-  workouts: "Workouts",
+  cowork: "Co-Work",
   moms: "Moms",
+  new_to_philly: "New to Philly",
+  sober: "Sober",
 };
 
 export const INTEREST_EMOJI: Record<InterestTag, string> = {
   coffee: "☕",
-  cowork: "💻",
-  events: "🎉",
-  drinks: "🍸",
   food: "🍔",
+  drinks: "🍸",
+  events: "🎉",
+  night_out: "🌙",
   music: "🎵",
-  clubs: "🪩",
+  books: "📚",
+  walks: "🌳",
+  workouts: "💪",
+  wellness: "🧘",
   creative: "🎨",
   games: "🎲",
-  night_out: "🌙",
-  workouts: "💪",
+  cowork: "💻",
   moms: "👩‍👧",
+  new_to_philly: "🗽",
+  sober: "🌱",
 };
 
 export const ALL_INTERESTS: InterestTag[] = [
   "coffee",
-  "cowork",
-  "events",
-  "drinks",
   "food",
+  "drinks",
+  "events",
+  "night_out",
   "music",
-  "clubs",
+  "books",
+  "walks",
+  "workouts",
+  "wellness",
   "creative",
   "games",
-  "night_out",
-  "workouts",
+  "cowork",
   "moms",
+  "new_to_philly",
+  "sober",
+];
+
+// 2.6 — forums only launch for the highest-density interests; everything
+// else stays a feed filter. Keep this in sync with server/src/store.ts.
+export const FORUM_INTERESTS: InterestTag[] = [
+  "coffee",
+  "food",
+  "drinks",
+  "events",
+  "night_out",
+  "music",
+  "books",
+  "walks",
+  "workouts",
+  "new_to_philly",
 ];
 
 /** Same set as interests — used in create-plan vibe picker. */
 export const VIBE_TAGS = ALL_INTERESTS;
 
 /**
- * Curated 8-emoji vibe picker for post-time. Each option resolves to one of the
- * underlying InterestTag values so the feed/algorithm still operates on the
- * existing tag set. Multiple emojis can collapse to the same tag (Martini and
- * Burger both → food_drinks); the resolved tag list de-duplicates.
+ * Vibe picker for post-time. Each option resolves to one of the underlying
+ * InterestTag values so the feed/algorithm still operates on the existing tag
+ * set.
  */
-export type VibeIcon =
-  | "coffee"
-  | "cowork"
-  | "events"
-  | "drinks"
-  | "food"
-  | "music"
-  | "clubs"
-  | "creative"
-  | "games"
-  | "night_out"
-  | "workouts"
-  | "moms";
+export type VibeIcon = InterestTag;
 
 export interface VibeOption {
   id: VibeIcon;
@@ -91,30 +111,24 @@ export interface VibeOption {
   tag: InterestTag;
 }
 
-export const VIBE_OPTIONS: VibeOption[] = [
-  { id: "coffee",    emoji: "☕", label: "Coffee",     tag: "coffee" },
-  { id: "cowork",    emoji: "💻", label: "Co-Work",    tag: "cowork" },
-  { id: "events",    emoji: "🎉", label: "Events",     tag: "events" },
-  { id: "drinks",    emoji: "🍸", label: "Drinks",     tag: "drinks" },
-  { id: "food",      emoji: "🍔", label: "Food",       tag: "food" },
-  { id: "music",     emoji: "🎵", label: "Music",      tag: "music" },
-  { id: "clubs",     emoji: "🪩", label: "Clubs",      tag: "clubs" },
-  { id: "creative",  emoji: "🎨", label: "Creative",   tag: "creative" },
-  { id: "games",     emoji: "🎲", label: "Games",      tag: "games" },
-  { id: "night_out", emoji: "🌙", label: "Night Out",  tag: "night_out" },
-  { id: "workouts",  emoji: "💪", label: "Workouts",   tag: "workouts" },
-  { id: "moms",      emoji: "👩‍👧", label: "Moms",       tag: "moms" },
-];
+export const VIBE_OPTIONS: VibeOption[] = ALL_INTERESTS.map((tag) => ({
+  id: tag,
+  emoji: INTEREST_EMOJI[tag],
+  label: INTEREST_LABELS[tag],
+  tag,
+}));
 
 export type PlanKind = "standard" | "looking_for";
 
 /** User-selected age bracket for filters and onboarding. */
 export type AgeRange = "18_24" | "25_35" | "35_50" | "50_plus";
 
+// NOTE: ids stay stable for data compatibility; only labels changed
+// (non-overlapping brackets per final-pass copy fix).
 export const AGE_RANGE_LABELS: Record<AgeRange, string> = {
   "18_24": "18–24",
-  "25_35": "25–35",
-  "35_50": "35–50",
+  "25_35": "25–34",
+  "35_50": "35–49",
   "50_plus": "50+",
 };
 
@@ -496,7 +510,8 @@ export type NotificationKind =
   | "planDayOf"
   | "interestedNudge"
   | "didThisHappen"
-  | "planSpotReopen";
+  | "planSpotReopen"
+  | "welcome";
 
 export interface NotificationDTO {
   id: string;
@@ -576,6 +591,9 @@ export type CommunityMemberRole = "organizer" | "member";
 export type CommunityMemberStatus = "pending" | "active";
 /** Per-plan visibility within a community. Required when a plan has a communityId. */
 export type CommunityVisibility = "public" | "community_only";
+/** Who can see inside a community (bulletin/events/members). Discovery info
+ *  (name, cover, description, member count) is always visible regardless. */
+export type CommunityAccessLevel = "everyone" | "members_only";
 
 /** The viewer's membership relative to a community (null = not a member). */
 export interface CommunityMembershipView {
@@ -596,6 +614,8 @@ export interface CommunityDTO {
   bulletinPermission: CommunityPostingPermission;
   planPostingPermission: CommunityPostingPermission;
   chatEnabled: boolean;
+  /** Who can see inside (bulletin/events/members) — discovery info is always public. */
+  visibility: CommunityAccessLevel;
   /** Only exposed to the organizer/admin (others get null). */
   screeningQuestion: string | null;
   /** True when a screening question is set (all viewers, so Join can branch). */
@@ -609,6 +629,8 @@ export interface CommunityDTO {
   canPostBulletin: boolean;
   /** Viewer may post a plan tagged to this community. */
   canPostPlan: boolean;
+  /** Count of pending join requests — only populated for the organizer/admin (0 otherwise). */
+  pendingRequestCount: number;
 }
 
 export interface CommunityMemberDTO {
@@ -642,6 +664,10 @@ export interface CommunityCardDTO {
   isFounding: boolean;
   /** The viewer's role, when they belong — drives the "Organizer" label on profile. */
   myRole: CommunityMemberRole | null;
+  /** The viewer's membership status, or null if they're a visitor — drives the Explore rail join CTA. */
+  myMembershipStatus: CommunityMemberStatus | null;
+  /** True when a screening question is set (join CTA reads "Request" instead of "Join"). */
+  hasScreening: boolean;
 }
 
 /** Row in the admin "Pending communities" review queue. */

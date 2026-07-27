@@ -53,6 +53,10 @@ export function MyPlansPage() {
     interested.length === 0 &&
     saved.length === 0 &&
     past.length === 0;
+  // 2.13 — a couple lonely RSVPs still feel thin; nudge toward Explore/Communities
+  // rather than leaving the page looking done.
+  const activeCount = hosting.length + going.length + interested.length + saved.length;
+  const isThin = !empty && activeCount > 0 && activeCount < 3;
 
   return (
     <main className="app-shell app-shell--wide app-shell--with-nav app-shell--with-topbar">
@@ -67,11 +71,20 @@ export function MyPlansPage() {
       {empty && (
         <div className="feed-empty" role="status">
           <div className="feed-empty-glyph" aria-hidden="true">📌</div>
-          <h2 className="feed-empty-headline">Nothing here yet.</h2>
-          <p className="feed-empty-body">Join a plan or tap the ★ on any card to save it for later.</p>
+          <h2 className="feed-empty-headline">No plans yet</h2>
+          <p className="feed-empty-body">Join something from the feed — see what's happening this week.</p>
           <div className="feed-empty-actions">
-            <Link to="/" className="btn-primary">Browse plans</Link>
+            <Link to="/" className="btn-primary">See what's happening →</Link>
+            <Link to="/explore" className="btn-secondary">Explore communities</Link>
           </div>
+        </div>
+      )}
+
+      {isThin && (
+        <div className="my-plans-explore-cta">
+          <p>
+            Want more on your plate? <Link to="/explore">Explore communities</Link> to find your people.
+          </p>
         </div>
       )}
 

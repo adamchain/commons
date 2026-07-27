@@ -45,6 +45,9 @@ const PREF_KEY: Record<NotificationKind, keyof NotificationPrefs> = {
   interestedNudge: "planTomorrow",
   didThisHappen: "postPlanNetworkNudge",
   planSpotReopen: "someoneJoinedYourPlan",
+  // F.9 — one-time welcome ping on signup; rides the same toggle as other
+  // person/system-to-user pings since there's no dedicated onboarding pref.
+  welcome: "someoneJoinedYourPlan",
 };
 
 export async function emit(input: {

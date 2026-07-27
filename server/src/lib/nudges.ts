@@ -254,8 +254,13 @@ export async function runDayOfReminders(): Promise<void> {
       .filter((p) => p.state === "going")
       .map((p) => p.userId);
     const userIds = Array.from(new Set([...going, plan.creatorId]));
-    const goingCount = going.length;
+    // +1 so the count reads as "everyone going" (participants + host) rather
+    // than excluding the host from their own headcount.
+    const goingCount = new Set([...going, plan.creatorId]).size;
     const timeLabel = plan.time?.trim() ? plan.time : "flexible time";
+    const venue = plan.location?.name?.trim();
+    const whenWhere = venue ? `${plan.title}, ${timeLabel} at ${venue}` : `${plan.title}, ${timeLabel}`;
+    const body = `Today's the day — ${whenWhere}. ${goingCount} going!`;
 
     for (const uid of userIds) {
       const key = `dayof:${plan.id}:${uid}`;
@@ -263,7 +268,7 @@ export async function runDayOfReminders(): Promise<void> {
       const created = await emit({
         userId: uid,
         kind: "planDayOf",
-        body: `Today: ${plan.title} · ${timeLabel} · ${goingCount} going.`,
+        body,
         planId: plan.id,
         dedupKey: `planDayOf:${plan.id}:${uid}`,
       });
@@ -272,10 +277,7 @@ export async function runDayOfReminders(): Promise<void> {
         const u = await findUserById(uid);
         if (u?.phoneNumber) {
           try {
-            await sendTransactionalSms(
-              u.phoneNumber,
-              `Today: ${plan.title} · ${timeLabel} · ${goingCount} going. ${appOrigin()}/plans/${plan.id}`,
-            );
+            await sendTransactionalSms(u.phoneNumber, `${body} ${appOrigin()}/plans/${plan.id}`);
           } catch (e) {
             console.error("[nudge] day-of sms", e);
           }

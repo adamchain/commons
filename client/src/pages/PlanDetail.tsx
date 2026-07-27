@@ -203,6 +203,7 @@ export function PlanDetailPage() {
 
   return (
     <main className="app-shell app-shell--wide app-shell--with-nav plan-detail-page">
+      <div className="plan-detail-safe-scrim" aria-hidden="true" />
       <div className="plan-detail-hero">
         {coverSrc && <img src={coverSrc} alt="" loading="lazy" />}
         <div className="plan-detail-hero-overlay" aria-hidden="true" />
@@ -250,7 +251,7 @@ export function PlanDetailPage() {
               <div className="did-happen-card" role="group" aria-label="Did this happen?">
                 <p className="did-happen-q">Did this happen?</p>
                 <div className="did-happen-actions">
-                  {(["yes", "no", "rescheduled"] as const).map((outcome) => (
+                  {(["yes", "no"] as const).map((outcome) => (
                     <button
                       key={outcome}
                       type="button"
@@ -262,7 +263,7 @@ export function PlanDetailPage() {
                         }).then(() => load());
                       }}
                     >
-                      {outcome === "yes" ? "Yes" : outcome === "no" ? "No" : "Rescheduled"}
+                      {outcome === "yes" ? "Yes" : "No"}
                     </button>
                   ))}
                 </div>
@@ -270,7 +271,7 @@ export function PlanDetailPage() {
             )}
             {isHosting && plan.happenedOutcome && (
               <p className="did-happen-saved">
-                Saved: {plan.happenedOutcome === "yes" ? "Yes, it happened" : plan.happenedOutcome === "no" ? "No" : "Rescheduled"}
+                Saved: {plan.happenedOutcome === "yes" ? "Yes, it happened" : "No"}
               </p>
             )}
             <button
@@ -591,7 +592,7 @@ export function PlanDetailPage() {
         )}
       </section>
 
-      {showShare && <ShareSheet plan={plan} onClose={() => setShowShare(false)} />}
+      {showShare && <ShareSheet plan={plan} isOwn={isHosting} onClose={() => setShowShare(false)} />}
       {showGetThere && <GetThereSheet plan={plan} onClose={() => setShowGetThere(false)} />}
       {showInvite && (
         <InviteSheet planId={plan.id} planTitle={plan.title} onClose={() => setShowInvite(false)} />

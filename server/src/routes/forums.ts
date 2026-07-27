@@ -1,11 +1,10 @@
 import { Router } from "express";
 import { isAdminPhone } from "../lib/adminPhones.js";
 import { requireAuth } from "../middleware/requireAuth.js";
-import { store, type ForumPostRecord, type ForumReplyRecord } from "../store.js";
+import { FORUM_INTERESTS, store, type ForumPostRecord, type ForumReplyRecord } from "../store.js";
 import { findUserById, findUsersByIds } from "../userRepo.js";
 import { userToPublic } from "./plans.js";
 import {
-  ALL_INTERESTS,
   INTEREST_EMOJI,
   INTEREST_LABELS,
   type ForumPostDTO,
@@ -22,8 +21,11 @@ const MAX_POST_LENGTH = 4000;
 const MAX_REPLY_LENGTH = 2000;
 const PREVIEW_LENGTH = 140;
 
+// 2.6 — only the highest-density interests have a live forum; the rest are
+// feed filters only. `ALL_INTERESTS` still backs "Join more forums" on the
+// client, but the forum endpoints themselves only ever serve FORUM_INTERESTS.
 function isInterestTag(value: string): value is InterestTag {
-  return (ALL_INTERESTS as string[]).includes(value);
+  return (FORUM_INTERESTS as string[]).includes(value);
 }
 
 async function isCommonsAdmin(userId: string): Promise<boolean> {

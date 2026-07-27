@@ -6,14 +6,15 @@ import { getPublicWebOrigin } from "../lib/platform";
 import type { InviteCodeDTO } from "../types/shared";
 
 /**
- * Launch-mechanic invite codes — three per user. Each code is shown with its
- * own share button; the deep link drops the recipient on onboarding with the
- * code prefilled. Redeemed codes show who used them.
+ * Launch-mechanic invite codes — five per user (2.10). Each code is shown
+ * with its own share button; the deep link drops the recipient on onboarding
+ * with the code prefilled. Redeemed codes show who used them.
  */
 export function InvitePage() {
   const { user } = useAuth();
   const firstName = user?.firstName ?? "a friend";
   const [codes, setCodes] = useState<InviteCodeDTO[] | null>(null);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   useEffect(() => {
     void api<{ codes: InviteCodeDTO[] }>("/api/auth/invite-codes")
@@ -42,6 +43,8 @@ export function InvitePage() {
     } catch {
       window.prompt("Copy this link", url);
     }
+    setCopiedCode(code);
+    window.setTimeout(() => setCopiedCode((c) => (c === code ? null : c)), 2000);
   }
 
   const active = (codes ?? []).filter((c) => c.redeemedAt === null);
@@ -51,12 +54,12 @@ export function InvitePage() {
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">
       <header className="app-header app-header--minimal">
-        <Link to="/settings" className="detail-back">
-          ← Settings
+        <Link to={`/profile/${user?.id ?? ""}`} className="detail-back">
+          ← Profile
         </Link>
       </header>
       <h1 className="brand" style={{ marginBottom: 6 }}>
-        Invite codes
+        Invite your friends
       </h1>
       <p className="brand-tagline" style={{ marginBottom: 20, textTransform: "none", letterSpacing: 0 }}>
         You’ve got <strong>{remaining}</strong> code{remaining === 1 ? "" : "s"} left. Each one gets one person in.
@@ -73,8 +76,20 @@ export function InvitePage() {
                   <li key={c.code} className="invite-code-row">
                     <code className="invite-code-value">{c.code}</code>
                     <div className="invite-code-actions">
-                      <button type="button" className="btn-pill-ghost" onClick={() => void copyCode(c.code)}>
-                        <span aria-hidden="true">⧉</span> Copy
+                      <button
+                        type="button"
+                        className={`btn-pill-ghost ${copiedCode === c.code ? "is-copied" : ""}`}
+                        onClick={() => void copyCode(c.code)}
+                      >
+                        {copiedCode === c.code ? (
+                          <>
+                            <span aria-hidden="true">✓</span> Copied
+                          </>
+                        ) : (
+                          <>
+                            <span aria-hidden="true">⧉</span> Copy
+                          </>
+                        )}
                       </button>
                       <button type="button" className="btn-pill-accent" onClick={() => shareCode(c.code)}>
                         Share
@@ -101,10 +116,15 @@ export function InvitePage() {
           )}
 
           <aside className="invite-limit-callout">
-            <strong>Why are invites limited?</strong>
+            <strong>Why only a few invites?</strong>
             <p>
-              We’re keeping Philly close-knit while we get started. When the people you bring in show
-              up, you get more codes.
+              COMMONS works because of who’s in it — women who actually show up for each other. So
+              we’re growing it the way it started: one person passing it to someone they’d genuinely
+              want to make plans with.
+            </p>
+            <p>
+              The more of us who show up like that, the better this gets for everyone. So think about
+              who’d make it better — and bring them in.
             </p>
           </aside>
         </>

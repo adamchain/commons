@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { useAuth } from "../context/AuthContext";
 import { formatRelative } from "../lib/format";
-import type { NotificationDTO, NotificationKind } from "../types/shared";
+import type { NotificationDTO, NotificationKind, PlanDTO } from "../types/shared";
 
 /**
  * In-app notification feed. Backed by /api/notifications — server emits events
@@ -12,13 +13,24 @@ import type { NotificationDTO, NotificationKind } from "../types/shared";
  */
 export function NotificationsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [items, setItems] = useState<NotificationDTO[] | null>(null);
+  // F.8 — the empty state reads differently once you're actually plugged
+  // into a plan; find out before deciding which warm line to show.
+  const [hasPlans, setHasPlans] = useState(false);
 
   useEffect(() => {
     void api<{ notifications: NotificationDTO[] }>("/api/notifications")
       .then((r) => setItems(r.notifications))
       .catch(() => setItems([]));
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    void api<PlanDTO[]>("/api/plans")
+      .then((plans) => setHasPlans(plans.some((p) => p.creator.id === user.id || p.myState !== null)))
+      .catch(() => setHasPlans(false));
+  }, [user]);
 
   const sorted = useMemo(() => {
     if (!items) return [];
@@ -89,7 +101,20 @@ export function NotificationsPage() {
       )}
 
       {sorted.length === 0 ? (
-        <p className="empty-state">Nothing new — you're all caught up.</p>
+        <div className="feed-empty" role="status">
+          <div className="feed-empty-glyph" aria-hidden="true">🔔</div>
+          <h2 className="feed-empty-headline">{hasPlans ? "All quiet." : "Nothing yet."}</h2>
+          <p className="feed-empty-body">
+            {hasPlans
+              ? "We'll ping you when someone joins or a plan updates."
+              : "Join a plan and this is where you'll hear about it."}
+          </p>
+          {!hasPlans && (
+            <div className="feed-empty-actions">
+              <Link to="/" className="btn-primary">See what's happening</Link>
+            </div>
+          )}
+        </div>
       ) : (
         <section className="notif-section">
           <div className="notif-list">
@@ -195,5 +220,7 @@ function iconFor(kind: NotificationKind): string {
       return "🙁";
     case "communityPlanPosted":
       return "📌";
+    case "welcome":
+      return "👋";
   }
 }

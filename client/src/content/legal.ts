@@ -307,17 +307,6 @@ export const PRIVACY_POLICY: LegalDocument = {
         { type: "p", text: "The date at the top of this page always reflects the most recent version." },
       ],
     },
-    {
-      n: "14",
-      title: "Contact Us",
-      blocks: [
-        { type: "p", text: "Questions, requests, or concerns about your privacy:" },
-        {
-          type: "p",
-          text: "On Commons LLC, 200 S. Broad Street, Philadelphia, Pennsylvania 19102. privacy@oncommons.co. www.oncommons.co",
-        },
-      ],
-    },
   ],
 };
 

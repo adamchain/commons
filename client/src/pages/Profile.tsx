@@ -100,7 +100,6 @@ export function ProfilePage() {
   }
 
   const displayName = [profile.user.firstName, profile.user.lastName].filter(Boolean).join(" ") || "Unnamed";
-  const networkCount = isSelf ? (network?.length ?? 0) : profile.network.mutualCount;
 
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar profile-shell">
@@ -159,12 +158,6 @@ export function ProfilePage() {
                   <span className="profile-stat-num">{profile.stats.joined}</span>
                   <span className="profile-stat-label">Joined</span>
                 </div>
-                {isSelf && (
-                  <div className="profile-stat">
-                    <span className="profile-stat-num">{networkCount}</span>
-                    <span className="profile-stat-label">Friends</span>
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -642,7 +635,7 @@ function YourPlansBlock({
 
   const seeAllLink = (
     <Link to="/my-plans" className="profile-see-all-link" style={{ display: "inline-block", marginTop: 10 }}>
-      See all plans &amp; saved →
+      See all plans →
     </Link>
   );
 
@@ -719,7 +712,7 @@ function YourPlansBlock({
               className="profile-see-all-link"
               style={{ display: "inline-block", marginTop: 6, marginBottom: 10 }}
             >
-              See all plans &amp; saved →
+              See all plans →
             </Link>
           )}
           {visibleUpcoming.length > 0 ? (

@@ -116,7 +116,7 @@ export function InviteSheet({
 
         <div className="invite-sheet-actions">
           <button type="button" className="btn-primary btn-block" onClick={() => void shareSms()}>
-            Text the link
+            Share your plan
           </button>
           <button type="button" className="btn-secondary btn-block" onClick={() => void copyLink()}>
             {copied ? "Copied ✓" : "Copy link"}

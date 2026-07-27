@@ -5,10 +5,17 @@ import { FilterSheet } from "../components/FilterSheet";
 import { InviteSheet } from "../components/InviteSheet";
 import { NetworkPromptModal } from "../components/NetworkPromptModal";
 import { PlanCard } from "../components/PlanCard";
+import { PostSuccessSheet } from "../components/PostSuccessSheet";
 import { WeekStrip } from "../components/WeekStrip";
 import { useAuth } from "../context/AuthContext";
 import { planHasEnded } from "../lib/planTime";
+import { FORUM_INTERESTS, INTEREST_LABELS } from "../types/shared";
 import type { AgeRange, InterestTag, MeDTO, NeighborhoodDTO, NetworkPromptDTO, PlanDTO } from "../types/shared";
+
+// F.2 — shown once on the first Home load, pointing new users at a forum
+// matching one of their picked interests. Dismissible; never reappears once
+// dismissed (or once it's been shown and clicked through).
+const HOME_FORUM_SUGGESTION_KEY = "commons.homeForumSuggestion.v1.dismissed";
 
 // Feed filters persist across navigation + reload — losing "hide cancelled"
 // every time you left the feed was a papercut.
@@ -69,15 +76,42 @@ export function FeedPage() {
   const [networkPrompt, setNetworkPrompt] = useState<NetworkPromptDTO | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const navState = location.state as { justPostedId?: string; openInviteForPlanId?: string } | null;
+  const navState = location.state as {
+    justPostedId?: string;
+    openInviteForPlanId?: string;
+    showPostSuccess?: boolean;
+  } | null;
   // justPostedId pins the freshly-created plan to the very top for the whole
   // feed session; highlightId drives the transient "Just posted" banner/glow
   // and fades on its own a few seconds later.
   const [justPostedId] = useState<string | null>(navState?.justPostedId ?? null);
   const [highlightId, setHighlightId] = useState<string | null>(navState?.justPostedId ?? null);
+  const [highlightFading, setHighlightFading] = useState(false);
   const [inviteForPlanId, setInviteForPlanId] = useState<string | null>(
     navState?.openInviteForPlanId ?? null,
   );
+  const [postSuccessId, setPostSuccessId] = useState<string | null>(
+    navState?.showPostSuccess ? navState?.justPostedId ?? null : null,
+  );
+  const [forumSuggestionDismissed, setForumSuggestionDismissed] = useState(() => {
+    try {
+      return localStorage.getItem(HOME_FORUM_SUGGESTION_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const suggestedForumTag = useMemo<InterestTag | null>(() => {
+    if (!user?.interests?.length) return null;
+    return user.interests.find((t) => FORUM_INTERESTS.includes(t)) ?? null;
+  }, [user?.interests]);
+  const dismissForumSuggestion = useCallback(() => {
+    setForumSuggestionDismissed(true);
+    try {
+      localStorage.setItem(HOME_FORUM_SUGGESTION_KEY, "1");
+    } catch {
+      /* storage unavailable — the card will just show again next load */
+    }
+  }, []);
 
   const [refreshing, setRefreshing] = useState(false);
   const refreshingRef = useRef(false);
@@ -232,11 +266,19 @@ export function FeedPage() {
     if (!highlightId || !feedReady) return;
     const el = document.querySelector(`[data-plan-id="${highlightId}"]`);
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
-    // Fade the banner/glow a few minutes after posting — keep the plan pinned
-    // to the top of the feed (via justPostedId) but don't let the "Just
-    // posted" banner stick around forever.
-    const t = setTimeout(() => setHighlightId(null), 3 * 60 * 1000);
-    return () => clearTimeout(t);
+    // Fade the "Just posted" chip a few minutes after posting — keep the plan
+    // pinned to the top of the feed (via justPostedId) but don't let the chip
+    // stick around forever. Flip a fading flag first so the opacity
+    // transition can play before the chip actually unmounts.
+    const fadeT = setTimeout(() => setHighlightFading(true), 3 * 60 * 1000);
+    const clearT = setTimeout(() => {
+      setHighlightId(null);
+      setHighlightFading(false);
+    }, 3 * 60 * 1000 + 600);
+    return () => {
+      clearTimeout(fadeT);
+      clearTimeout(clearT);
+    };
   }, [highlightId, feedReady]);
 
   useEffect(() => {
@@ -358,6 +400,29 @@ export function FeedPage() {
 
         <div className="feed-divider" />
 
+        {!forumSuggestionDismissed && suggestedForumTag && (
+          <div className="feed-forum-suggestion" role="status">
+            <span className="feed-forum-suggestion-glyph" aria-hidden="true">
+              <MessageCircleIcon />
+            </span>
+            <Link
+              to={`/forums/${suggestedForumTag}`}
+              className="feed-forum-suggestion-text"
+              onClick={dismissForumSuggestion}
+            >
+              New here? The {INTEREST_LABELS[suggestedForumTag]} forum is a good place to say hi →
+            </Link>
+            <button
+              type="button"
+              className="feed-forum-suggestion-dismiss"
+              onClick={dismissForumSuggestion}
+              aria-label="Dismiss suggestion"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
         <div className="feed-toolbar">
           <div className="segmented segmented-feed-view" role="tablist" aria-label="Feed scope">
             <button
@@ -422,6 +487,7 @@ export function FeedPage() {
                   plan={plan}
                   onPlanRefresh={refreshPlans}
                   highlight={highlightId === plan.id}
+                  highlightFading={highlightId === plan.id && highlightFading}
                 />
               ))}
             </div>
@@ -455,6 +521,16 @@ export function FeedPage() {
           </div>
         )}
       </div>
+
+      {postSuccessId && (
+        <PostSuccessSheet
+          onInvite={() => {
+            setInviteForPlanId(postSuccessId);
+            setPostSuccessId(null);
+          }}
+          onDone={() => setPostSuccessId(null)}
+        />
+      )}
 
       {inviteForPlanId && (
         <InviteSheet
@@ -513,8 +589,8 @@ function FeedEmptyState({
     headline = "Nothing matches those filters.";
     body = "Try clearing them — there's more going on across the city.";
   } else if (view === "mine") {
-    headline = "You haven't joined anything yet.";
-    body = "Tap All plans to see what's happening this week.";
+    headline = "Nothing on your plate yet.";
+    body = "Join something from the feed — see what's happening this week →";
   } else if (hasAnyPlans) {
     // Edge case: plans exist but none in the filtered view (rare without filters
     // — usually a stale state). Treat like the slow-week message.
@@ -538,11 +614,25 @@ function FeedEmptyState({
             Clear filters
           </button>
         ) : null}
-        <Link to="/plans/new" className="btn-primary">
-          Post a plan
-        </Link>
+        {view === "mine" && !hasFilters ? (
+          <Link to="/" className="btn-primary">
+            See what's happening
+          </Link>
+        ) : (
+          <Link to="/plans/new" className="btn-primary">
+            Post a plan
+          </Link>
+        )}
       </div>
     </div>
+  );
+}
+
+function MessageCircleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+    </svg>
   );
 }
 

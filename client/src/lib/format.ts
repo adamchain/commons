@@ -82,6 +82,22 @@ export function formatRelative(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
+/** True when the string is a valid US (NANP) or +E.164 phone number. */
+export function isValidPhoneInput(raw: string): boolean {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return false;
+  const isNanp10 = (n: string) => /^[2-9]\d{2}[2-9]\d{6}$/.test(n);
+  if (/^1\d{10}$/.test(digits)) return isNanp10(digits.slice(1));
+  if (/^\d{10}$/.test(digits)) return isNanp10(digits);
+  const compact = raw.replace(/\s/g, "").trim();
+  if (compact.startsWith("+")) {
+    const rest = compact.slice(1).replace(/\D/g, "");
+    if (rest.startsWith("1") && rest.length === 11) return isNanp10(rest.slice(1));
+    return /^\d{6,14}$/.test(rest);
+  }
+  return false;
+}
+
 /** Progressive phone formatting for the onboarding / public-event number field. */
 export function formatPhoneInput(raw: string): string {
   const trimmed = raw.trim();

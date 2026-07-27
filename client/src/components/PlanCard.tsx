@@ -17,10 +17,12 @@ export function PlanCard({
   plan,
   onPlanRefresh,
   highlight = false,
+  highlightFading = false,
 }: {
   plan: PlanDTO;
   onPlanRefresh?: () => void;
   highlight?: boolean;
+  highlightFading?: boolean;
 }) {
   const title = sentenceCaseTitle(plan.title);
   const flexCount = (plan.isFlexibleTime ? 1 : 0) + (plan.isFlexibleLocation ? 1 : 0);
@@ -106,15 +108,6 @@ export function PlanCard({
         isLooking ? "plan-card--looking" : "plan-card--confirmed"
       } ${showBanner ? "plan-card--just-posted" : ""} ${hasEnded ? "plan-card--happened" : ""} ${isCancelled ? "plan-card--cancelled" : ""} ${plan.visibility === "network" ? "plan-card--network" : ""}`}
     >
-      {showBanner && (
-        <div className="plan-card-just-posted-banner">
-          Just posted · {plan.visibility === "network"
-            ? "Only your network can see this"
-            : plan.visibility === "community"
-              ? "Visible to your community"
-              : "Live on the feed"}
-        </div>
-      )}
       {user && (
         <button
           type="button"
@@ -172,9 +165,16 @@ export function PlanCard({
             ) : null}
           </header>
           <h3 className="plan-card-title">{title}</h3>
-          <p className="plan-card-meta-line plan-card-meta-line--single">
-            <span>{metaLine}</span>
-          </p>
+          <div className="plan-card-meta-row">
+            <p className="plan-card-meta-line plan-card-meta-line--single">
+              <span>{metaLine}</span>
+            </p>
+            {showBanner && (
+              <span className={`plan-card-just-posted-chip ${highlightFading ? "is-fading" : ""}`}>
+                Just posted
+              </span>
+            )}
+          </div>
           {plan.description && (
             <p className="plan-card-description">{plan.description}</p>
           )}

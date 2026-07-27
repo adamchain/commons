@@ -73,7 +73,9 @@ export function MessagesPage() {
       </div>
 
       {tab === "interests" ? (
-        !forumsReady ? (
+        <>
+        <p className="messages-tab-sub">Citywide conversations by interest — no commitment, just talk.</p>
+        {!forumsReady ? (
           <div className="feed-skeleton" aria-hidden="true">
             <div className="feed-skeleton-card" />
             <div className="feed-skeleton-card" />
@@ -81,7 +83,7 @@ export function MessagesPage() {
         ) : forums.length === 0 ? (
           <div className="empty-state" style={{ marginTop: 24 }}>
             <p style={{ margin: 0 }}>
-              Join an interest to unlock its citywide forum — Coffee, Fitness, and more.
+              Join an interest to unlock its citywide forum — Coffee, Workouts, and more.
             </p>
             <Link to="/settings/interests" className="btn-link" style={{ marginTop: 12, display: "inline-block", color: "var(--accent)" }}>
               Join more interests →
@@ -117,7 +119,8 @@ export function MessagesPage() {
               Join more interests →
             </Link>
           </div>
-        )
+        )}
+        </>
       ) : !ready ? (
         <div className="feed-skeleton" aria-hidden="true">
           <div className="feed-skeleton-card" />
@@ -158,6 +161,10 @@ export function MessagesPage() {
                     <div className="messages-row-preview">
                       {isPoll && <PollPreviewIcon />}
                       <span>{preview}</span>
+                    </div>
+                    <div className="messages-row-meta">
+                      {c.lastMessageAt ? "Started" : "Not started yet"} · {c.participantCount}{" "}
+                      {c.participantCount === 1 ? "person" : "people"}
                     </div>
                   </div>
                   {c.unreadCount > 0 && (

@@ -5,6 +5,7 @@ import { mongoMirror } from "./mongoMirror.js";
 import type {
   AgeRange,
   AvatarStyle,
+  CommunityAccessLevel,
   CommunityCategory,
   CommunityCreationStatus,
   CommunityMemberRole,
@@ -346,7 +347,7 @@ export interface InviteCodeRecord {
  * A community — a named group with a bulletin, events board, member list, and
  * optional group chat. Owned by the organizer's normal user account. Goes live
  * only after COMMONS admin approval (`creationStatus = approved`). V1 fields
- * only; V2 additions (monetization_*, visibility, verified) are additive later.
+ * only; V2 additions (monetization_*, verified) are additive later.
  */
 export interface CommunityRecord {
   id: string;
@@ -362,6 +363,8 @@ export interface CommunityRecord {
   bulletinPermission: CommunityPostingPermission;
   planPostingPermission: CommunityPostingPermission;
   chatEnabled: boolean;
+  /** Who can see inside (bulletin/events/members). Discovery info stays public either way. */
+  visibility: CommunityAccessLevel;
   screeningQuestion?: string | null;
   /** Optional admin note captured on rejection, shown to the creator. */
   rejectionNote?: string | null;
@@ -423,7 +426,8 @@ export interface NotificationRecord {
     | "planDayOf"
     | "interestedNudge"
     | "didThisHappen"
-    | "planSpotReopen";
+    | "planSpotReopen"
+    | "welcome";
   body: string;
   planId?: string;
   conversationId?: string;
@@ -584,7 +588,24 @@ function emptySnapshot(): Snapshot {
 // shared via text or read aloud at a launch event. 32^6 ≈ 1.07B values.
 const INVITE_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTVWXYZ23456789";
 const INVITE_CODE_LENGTH = 6;
-export const INVITE_CODES_PER_USER = 3;
+export const INVITE_CODES_PER_USER = 5;
+
+// Launch forums only for the highest-density interests (2.6) — everything
+// else stays a feed filter until it earns a dedicated forum. "Join more
+// forums" in Settings still surfaces the full ALL_INTERESTS set; picking one
+// outside this subset just filters the feed, it doesn't spin up a forum.
+export const FORUM_INTERESTS: InterestTag[] = [
+  "coffee",
+  "food",
+  "drinks",
+  "events",
+  "night_out",
+  "music",
+  "books",
+  "walks",
+  "workouts",
+  "new_to_philly",
+];
 
 function generateInviteCode(): string {
   let s = "";
@@ -1659,6 +1680,7 @@ export const store = {
       bulletinPermission: input.bulletinPermission ?? "members",
       planPostingPermission: input.planPostingPermission ?? "organizer_only",
       chatEnabled: true,
+      visibility: "everyone",
       screeningQuestion: input.screeningQuestion ?? null,
       rejectionNote: null,
       submittedAt: now,
@@ -1869,10 +1891,10 @@ export const store = {
   findForumByTag(tag: InterestTag): InterestForumRecord | undefined {
     return snapshot.interestForums.find((f) => f.interestTag === tag);
   },
-  /** Idempotent bootstrap — one forum row per InterestTag, created on demand. */
+  /** Idempotent bootstrap — one forum row per launched interest, created on demand. */
   ensureForumsForInterests(): void {
     let changed = false;
-    for (const tag of ALL_INTERESTS) {
+    for (const tag of FORUM_INTERESTS) {
       if (this.findForumByTag(tag)) continue;
       const row: InterestForumRecord = {
         id: randomUUID(),
@@ -1937,6 +1959,7 @@ export const store = {
   syncForumMembershipsFromInterests(userId: string, interests: InterestTag[]): void {
     this.ensureForumsForInterests();
     for (const tag of interests) {
+      if (!FORUM_INTERESTS.includes(tag)) continue;
       this.joinForum(userId, tag);
     }
   },
@@ -1970,8 +1993,16 @@ export const store = {
       (p) => p.interestTag === tag && p.approvalStatus === "approved",
     );
     if (sort === "popular") {
+      // Recency-weighted like_count: likes decay with age so a fresh post
+      // with a few likes can outrank a stale high-like post.
+      const now = Date.now();
+      const score = (p: ForumPostRecord) => {
+        const ageHours = Math.max(0, (now - Date.parse(p.createdAt)) / 3_600_000);
+        return p.likeCount / Math.pow(ageHours + 2, 1.5);
+      };
       return posts.sort((a, b) => {
-        if (b.likeCount !== a.likeCount) return b.likeCount - a.likeCount;
+        const diff = score(b) - score(a);
+        if (diff !== 0) return diff;
         return b.createdAt.localeCompare(a.createdAt);
       });
     }

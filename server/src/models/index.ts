@@ -279,6 +279,7 @@ const CommunitySchema = new Schema<CommunityRecord>(
     bulletinPermission: { type: String, enum: ["organizer_only", "members"], default: "members" },
     planPostingPermission: { type: String, enum: ["organizer_only", "members"], default: "organizer_only" },
     chatEnabled: { type: Boolean, default: true },
+    visibility: { type: String, enum: ["everyone", "members_only"], default: "everyone" },
     screeningQuestion: { type: String, default: null },
     rejectionNote: { type: String, default: null },
     submittedAt: { type: String, required: true },

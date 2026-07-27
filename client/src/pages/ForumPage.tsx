@@ -142,7 +142,7 @@ export function ForumPage() {
             Popular
           </button>
         </div>
-        <button type="button" className="btn btn-primary forum-make-plan-btn" onClick={makeThisAPlan}>
+        <button type="button" className="btn forum-make-plan-btn" onClick={makeThisAPlan}>
           Make this a plan
         </button>
       </div>

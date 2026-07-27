@@ -58,7 +58,17 @@ export function NetworkPage() {
       )}
 
       {network.length === 0 ? (
-        <p className="form-help">Go to plans, meet people, add them after.</p>
+        <div className="feed-empty" role="status">
+          <div className="feed-empty-glyph" aria-hidden="true">👋</div>
+          <h2 className="feed-empty-headline">Your network starts with one invite.</h2>
+          <p className="feed-empty-body">
+            Meet people at plans and add them after — or invite a friend to skip straight to it.
+          </p>
+          <div className="feed-empty-actions">
+            <Link to="/invite" className="btn-primary">Invite a friend</Link>
+            <Link to="/" className="btn-secondary">Browse plans</Link>
+          </div>
+        </div>
       ) : filtered.length === 0 ? (
         <p className="form-help">No one in your network matches &ldquo;{query.trim()}&rdquo;.</p>
       ) : (

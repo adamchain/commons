@@ -58,7 +58,7 @@ export function EditPlanPage() {
   if (!plan) {
     return (
       <main className="app-shell app-shell--mid">
-        <header className="app-header app-header--minimal">
+        <header className="app-header app-header--minimal app-header--sticky">
           <Link to={`/plans/${id}`} className="detail-back">← Back</Link>
         </header>
         {error ? <p className="error-text">{error}</p> : <p>Loading…</p>}
@@ -284,7 +284,7 @@ function EditForm({
 
   return (
     <main className="app-shell app-shell--mid">
-      <header className="app-header app-header--minimal">
+      <header className="app-header app-header--minimal app-header--sticky">
         <Link to={`/plans/${plan.id}`} className="detail-back">← Back to plan</Link>
       </header>
       <h1 className="brand" style={{ marginBottom: 8 }}>Edit plan</h1>
@@ -294,7 +294,7 @@ function EditForm({
 
       <form onSubmit={(e) => void save(e)} className="form-card">
         <section className="form-section">
-          <label className="form-question">Interests</label>
+          <label className="form-question">Category</label>
           <div className="vibe-grid">
             {VIBE_OPTIONS.map((opt) => {
               const selected = form.vibes.includes(opt.id);
@@ -451,7 +451,7 @@ function EditForm({
             disabled={linkBusy}
           />
           {linkBusy && <p className="form-help">Loading preview…</p>}
-          {linkErr && <p className="form-help" style={{ color: "var(--color-danger, #c0392b)" }}>{linkErr}</p>}
+          {linkErr && <p className="form-help" style={{ color: "var(--accent)" }}>{linkErr}</p>}
           {form.flyerLinkPreview && (
             <div className="link-preview" style={{ marginTop: 8 }}>
               {form.flyerLinkPreview.image && (

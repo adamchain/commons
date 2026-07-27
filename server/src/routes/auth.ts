@@ -168,6 +168,7 @@ authRouter.post("/verify-code", async (req, res) => {
   }
 
   let user = await findUserByPhone(phone);
+  const isNewUser = !user;
   if (!user) {
     try {
       user = await createUser(phone);
@@ -190,6 +191,18 @@ authRouter.post("/verify-code", async (req, res) => {
   if (!user) {
     res.status(500).json({ error: "Could not finish sign in. Please try again." });
     return;
+  }
+  // F.9 — every new account lands with at least one notification instead of
+  // an empty bell. Best-effort: never block sign-in on this.
+  if (isNewUser) {
+    void emit({
+      userId: user.id,
+      kind: "welcome",
+      body: "Welcome to COMMONS — pick a few interests and see what's happening near you.",
+      dedupKey: `welcome:${user.id}`,
+    }).catch((err) => {
+      console.error("[auth] welcome notification failed", err);
+    });
   }
   const token = setSessionCookie(res, user.id);
   res.json({ ...meFromUser(user), token });
@@ -338,6 +351,29 @@ authRouter.post("/redeem-code", requireAuth, async (req, res) => {
     return;
   }
   store.redeemInviteCode(code, userId);
+
+  // 2.9 — both people get a nudge to add each other to their networks.
+  const owner = store.findUserById(row.ownerUserId);
+  const redeemer = store.findUserById(userId);
+  const ownerName = owner?.firstName?.trim() || "Someone";
+  const redeemerName = redeemer?.firstName?.trim() || "Someone";
+  await Promise.all([
+    emit({
+      userId: row.ownerUserId,
+      kind: "networkRequest",
+      body: `${redeemerName} joined COMMONS with your invite — add them to your network?`,
+      dedupKey: `invite-network:${row.code}:${row.ownerUserId}`,
+      profileUserId: userId,
+    }),
+    emit({
+      userId,
+      kind: "networkRequest",
+      body: `You joined via ${ownerName}'s invite — add them to your network?`,
+      dedupKey: `invite-network:${row.code}:${userId}`,
+      profileUserId: row.ownerUserId,
+    }),
+  ]);
+
   res.json({ ok: true });
 });
 

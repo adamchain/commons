@@ -1029,14 +1029,23 @@ plansRouter.put("/:id/participation", requireAuth, async (req, res) => {
     to: state,
   });
   // Notify host on first promotion to "going" — fires once per (plan, joiner)
-  // via dedupKey.
+  // via dedupKey. The very first joiner on a plan gets warmer, specific copy
+  // ("you're going together") since it's the moment the plan stops being
+  // solo; later joiners get a lighter-weight, generic line.
   if (state === "going" && existing?.state !== "going" && plan.creatorId !== userId) {
+    const goingBeforeThisJoin = store
+      .listParticipationsForPlan(planId)
+      .filter((p) => p.state === "going" && p.userId !== userId).length;
     const joiner = await findUserById(userId);
     const joinerName = joiner?.firstName || "Someone";
+    const body =
+      goingBeforeThisJoin === 0
+        ? `${joinerName} claimed a spot on "${plan.title}" — you're going together ✨`
+        : `${joinerName} is in for "${plan.title}"`;
     await emit({
       userId: plan.creatorId,
       kind: "someoneJoinedYourPlan",
-      body: `${joinerName} is in for "${plan.title}"`,
+      body,
       planId: plan.id,
       dedupKey: `someoneJoinedYourPlan:${plan.id}:${userId}`,
     });

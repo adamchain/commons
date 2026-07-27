@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { LegalContent } from "../components/LegalContent";
+import { LEGAL_DOCS } from "../content/legal";
 import { useAuth } from "../context/AuthContext";
 import {
   INTEREST_LABELS,
@@ -18,6 +20,7 @@ export function SettingsPage() {
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
   const [inviteCount, setInviteCount] = useState<number | null>(null);
+  const [legalSheet, setLegalSheet] = useState<"terms" | "privacy" | null>(null);
 
   useEffect(() => {
     void api<{ codes: InviteCodeDTO[] }>("/api/auth/invite-codes")
@@ -107,16 +110,16 @@ export function SettingsPage() {
 
       <SettingsGroup label="Legal">
         <SettingsRow
-          to="/legal/terms"
           icon={<InfoIcon />}
           title="Terms of Service"
           sub="The rules of the community"
+          onClick={() => setLegalSheet("terms")}
         />
         <SettingsRow
-          to="/legal/privacy"
           icon={<LockIcon />}
           title="Privacy Policy"
           sub="How we handle your data"
+          onClick={() => setLegalSheet("privacy")}
         />
       </SettingsGroup>
 
@@ -137,7 +140,31 @@ export function SettingsPage() {
       </button>
 
       <DeleteAccountRow onSignedOut={() => navigate("/onboarding", { replace: true })} />
+
+      {legalSheet && <LegalSheet slug={legalSheet} onClose={() => setLegalSheet(null)} />}
     </main>
+  );
+}
+
+/**
+ * 1.24 — Terms of Service / Privacy Policy open as an in-place sheet rather
+ * than a full navigation away from Settings. `/legal/:slug` still exists as a
+ * standalone route for deep links and the marketing site.
+ */
+function LegalSheet({ slug, onClose }: { slug: "terms" | "privacy"; onClose: () => void }) {
+  const doc = LEGAL_DOCS[slug];
+  return (
+    <div className="filter-sheet-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="filter-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="filter-sheet-header">
+          <h3 className="filter-sheet-title">{doc.title}</h3>
+          <button type="button" className="btn-link" onClick={onClose}>
+            Close
+          </button>
+        </div>
+        <LegalContent doc={doc} />
+      </div>
+    </div>
   );
 }
 
@@ -152,6 +179,7 @@ function SettingsGroup({ label, children }: { label: string; children: ReactNode
 
 function SettingsRow({
   to,
+  onClick,
   icon,
   iconAccent = false,
   title,
@@ -161,6 +189,7 @@ function SettingsRow({
   comingSoon = false,
 }: {
   to?: string;
+  onClick?: () => void;
   icon: ReactNode;
   iconAccent?: boolean;
   title: string;
@@ -201,7 +230,7 @@ function SettingsRow({
     <button
       type="button"
       className="settings-row"
-      onClick={comingSoon ? () => alert("Coming soon.") : undefined}
+      onClick={comingSoon ? () => alert("Coming soon.") : onClick}
     >
       {inner}
     </button>

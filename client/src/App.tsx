@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useAuth } from "./context/AuthContext";
 import { BottomNav } from "./components/BottomNav";
+import { CoachMarks } from "./components/CoachMarks";
 import { TopBar } from "./components/TopBar";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { listenForDeepLinks } from "./lib/deepLinks";
@@ -171,6 +172,7 @@ export default function App() {
         <Route path="/profile/:userId" element={<Protected allowIncomplete><ProfilePage /></Protected>} />
       </Routes>
       <BottomNav />
+      <CoachMarks />
     </>
   );
 }

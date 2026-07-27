@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import type { CSSProperties, ReactNode } from "react";
 import { api } from "../api/http";
-import { formatPhoneInput } from "../lib/format";
+import { formatPhoneInput, isValidPhoneInput } from "../lib/format";
 import { APP_STORE_URL } from "../lib/appStore";
-import { setAuthToken, clearAuthToken } from "../api/authToken";
+import { setAuthToken } from "../api/authToken";
 import { Avatar } from "../components/Avatar";
 import { AvatarCropModal } from "../components/AvatarCropModal";
 import { useAuth } from "../context/AuthContext";
@@ -27,7 +27,20 @@ import {
   type InterestTag,
   type MeDTO,
   type NeighborhoodDTO,
+  type PlanDTO,
 } from "../types/shared";
+
+// Warm one-time interstitial shown right after onboarding completes (F.1). The
+// flag is stored locally so it never re-appears for this device even if the
+// onboarding flow is somehow re-entered later.
+const WELCOME_SEEN_KEY = "commons_welcome_seen";
+function hasSeenWelcome(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(WELCOME_SEEN_KEY) === "1";
+}
+function markWelcomeSeen(): void {
+  if (typeof window !== "undefined") localStorage.setItem(WELCOME_SEEN_KEY, "1");
+}
 
 // TEMP launch gate: after verifying their phone, every (non-admin) member must
 // enter this exclusive code to finalize account setup. Stored client-side once
@@ -52,6 +65,7 @@ type Step =
   | "profile"
   | "age"
   | "legal"
+  | "welcome"
   | "download";
 
 /**
@@ -113,7 +127,8 @@ export function OnboardingPage() {
   // event they came from, or home). Skip on the "download" step — that's the
   // deliberate post-completion app nudge, which navigates on its own.
   useEffect(() => {
-    if (user?.onboardingComplete && step !== "download") navigate(redirectTo, { replace: true });
+    if (user?.onboardingComplete && step !== "download" && step !== "welcome")
+      navigate(redirectTo, { replace: true });
   }, [user, step, redirectTo, navigate]);
 
   useEffect(() => {
@@ -238,8 +253,15 @@ export function OnboardingPage() {
   }
 
   if (step === "phone") {
+    const phoneValid = isValidPhoneInput(phoneNumber);
+    const phoneTouched = phoneNumber.replace(/\D/g, "").length >= 10;
     return (
-      <OnboardingShell landing title="" subtitle="A place for plans meant to be shared.">
+      <OnboardingShell
+        landing
+        title=""
+        subtitle="A place for plans meant to be shared."
+        onBack={!isNative() ? () => navigate("/welcome") : undefined}
+      >
         <input
           className="onboarding-input"
           type="tel"
@@ -247,10 +269,20 @@ export function OnboardingPage() {
           autoComplete="tel"
           placeholder="(555) 555-0100"
           value={phoneNumber}
-          onChange={(e) => setPhoneNumber(formatPhoneInput(e.target.value))}
+          onChange={(e) => {
+            setPhoneNumber(formatPhoneInput(e.target.value));
+            setError(null);
+          }}
         />
+        {phoneTouched && !phoneValid && (
+          <div className="onboarding-error">Enter a valid phone number.</div>
+        )}
         {error && <div className="onboarding-error">{error}</div>}
-        <button className="btn-primary btn-block" disabled={busy || !phoneNumber} onClick={requestCode}>
+        <button
+          className="btn-primary btn-block"
+          disabled={busy || !phoneValid}
+          onClick={requestCode}
+        >
           {busy ? "Sending…" : "Get started"}
         </button>
         <p className="onboarding-fineprint">
@@ -301,7 +333,6 @@ export function OnboardingPage() {
       <OnboardingShell
         title="One last step."
         subtitle="Commons is invite-only for now. Enter your access code, or an invite code from a member, to finish setting up your account."
-        showExit
       >
         <input
           className="onboarding-input"
@@ -377,6 +408,10 @@ export function OnboardingPage() {
           setStep("interests");
         }}
         onSkip={() => setStep("interests")}
+        // Location is the first step after the access-code gate, so "back" has
+        // nowhere else sensible to land — re-showing the gate (already passed,
+        // just re-confirms) beats no back button at all.
+        onBack={() => setStep("gate")}
       />
     );
   }
@@ -442,15 +477,31 @@ export function OnboardingPage() {
               onboardingComplete: true,
             }),
           });
-          // The app is iOS-only, so web finishers get a "get the app" nudge
-          // before continuing (to the event they came from, or the feed). Set
-          // the step BEFORE refreshUser resolves so the completion guard above
-          // sees "download" and doesn't redirect out from under it.
+          // Set the step BEFORE refreshUser resolves so the completion guard
+          // above sees "welcome" (or "download") and doesn't redirect out from
+          // under it.
+          if (!hasSeenWelcome()) {
+            setStep("welcome");
+          } else if (!isNative()) {
+            setStep("download");
+          }
+          await refreshUser();
+          if (hasSeenWelcome() && isNative()) {
+            navigate(redirectTo, { replace: true });
+          }
+        }}
+      />
+    );
+  }
+  if (step === "welcome") {
+    return (
+      <WelcomeStep
+        user={user}
+        onContinue={() => {
+          markWelcomeSeen();
           if (!isNative()) {
             setStep("download");
-            await refreshUser();
           } else {
-            await refreshUser();
             navigate(redirectTo, { replace: true });
           }
         }}
@@ -461,6 +512,49 @@ export function OnboardingPage() {
     return <DownloadAppStep redirectTo={redirectTo} onContinue={() => navigate(redirectTo, { replace: true })} />;
   }
   return null;
+}
+
+/**
+ * F.1 — one-time warm interstitial shown right after onboarding completes,
+ * before the member ever lands on the feed. Static: a headline, a "here's
+ * what's happening" line naming their neighborhood, and — when available — a
+ * single live stat about nearby plans. Dismisses straight to Home (or the
+ * "get the app" nudge on web).
+ */
+function WelcomeStep({ user, onContinue }: { user: MeDTO; onContinue: () => void }) {
+  const [neighborhoodName, setNeighborhoodName] = useState<string | null>(null);
+  const [stat, setStat] = useState<string | null>(null);
+
+  useEffect(() => {
+    const id = user.neighborhoodIds?.[0] ?? user.neighborhoodId ?? null;
+    if (id) {
+      void api<NeighborhoodDTO[]>("/api/neighborhoods")
+        .then((list) => setNeighborhoodName(list.find((n) => n.id === id)?.name ?? null))
+        .catch(() => undefined);
+    }
+    void api<PlanDTO[]>("/api/plans")
+      .then((plans) => {
+        if (plans.length > 0) setStat(`${plans.length} plan${plans.length === 1 ? "" : "s"} near you`);
+      })
+      .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <OnboardingShell title="" subtitle="">
+      <div className="welcome-hero">
+        <h2 className="welcome-headline">Welcome to COMMONS 💛</h2>
+        <p className="welcome-body">
+          You're in — here's what's happening{neighborhoodName ? ` in ${neighborhoodName}` : ""} this
+          week.
+        </p>
+        {stat && <span className="welcome-stat-chip">{stat}</span>}
+      </div>
+      <button type="button" className="btn-primary btn-block" onClick={onContinue} style={{ marginTop: 20 }}>
+        Let's go →
+      </button>
+    </OnboardingShell>
+  );
 }
 
 /**
@@ -592,7 +686,6 @@ function OnboardingShell({
   children,
   landing = false,
   onBack,
-  showExit = false,
 }: {
   title: string;
   subtitle: string;
@@ -601,30 +694,7 @@ function OnboardingShell({
   landing?: boolean;
   /** When provided, renders a back arrow to return to the previous step. */
   onBack?: () => void;
-  /** Renders an "Exit" link that signs out and returns to the front door. Use on
-   *  post-verification setup steps so a user can bail out of onboarding. */
-  showExit?: boolean;
 }) {
-  const { setUser } = useAuth();
-  const navigate = useNavigate();
-
-  // Onboarding can't be left "half done" — the route guard bounces incomplete
-  // users straight back here — so the honest exit is a sign-out that returns to
-  // the marketing landing (web) or the start of onboarding (native).
-  async function handleExit() {
-    const ok = window.confirm("Exit setup? You'll be signed out and can finish anytime.");
-    if (!ok) return;
-    sessionStorage.removeItem("commons_pending_admin_choice");
-    try {
-      await api("/api/auth/logout", { method: "POST" });
-    } catch {
-      /* best-effort — sign out locally regardless */
-    }
-    await clearAuthToken();
-    setUser(null);
-    navigate(isNative() ? "/onboarding" : "/welcome", { replace: true });
-  }
-
   return (
     <div className={`onboarding-shell ${landing ? "onboarding-shell--landing" : ""}`}>
       {landing && (
@@ -649,22 +719,12 @@ function OnboardingShell({
       )}
       <div
         className={`onboarding-card ${landing ? "onboarding-card--landing" : ""} ${
-          !landing && (onBack || showExit) ? "onboarding-card--has-nav" : ""
+          onBack ? "onboarding-card--has-nav" : ""
         }`}
       >
         {onBack && (
           <button type="button" className="onboarding-back" onClick={onBack} aria-label="Back">
             ← Back
-          </button>
-        )}
-        {showExit && (
-          <button
-            type="button"
-            className="onboarding-exit"
-            onClick={() => void handleExit()}
-            aria-label="Exit setup"
-          >
-            Exit
           </button>
         )}
         {landing ? (
@@ -685,11 +745,13 @@ function LocationStep({
   onCoords,
   onSave,
   onSkip,
+  onBack,
 }: {
   coords: { lat: number; lng: number } | null;
   onCoords: (c: { lat: number; lng: number } | null) => void;
   onSave: (neighborhoodIds: string[]) => Promise<void>;
   onSkip: () => void;
+  onBack?: () => void;
 }) {
   const [neighborhoods, setNeighborhoods] = useState<NeighborhoodDTO[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -729,7 +791,7 @@ function LocationStep({
 
   if (permissionState === "idle") {
     return (
-      <OnboardingShell title="Share your location" subtitle="So we can show you what's happening nearby." showExit>
+      <OnboardingShell title="Share your location" subtitle="So we can show you what's happening nearby." onBack={onBack}>
         <button className="btn-primary btn-block" onClick={shareLocation}>
           Allow location access
         </button>
@@ -740,14 +802,14 @@ function LocationStep({
     );
   }
   if (permissionState === "asking") {
-    return <OnboardingShell title="Getting your location…" subtitle="" />;
+    return <OnboardingShell title="Getting your location…" subtitle="" onBack={onBack} />;
   }
 
   return (
     <OnboardingShell
       title="Where do you spend time?"
       subtitle={coords ? "Pick your neighborhoods — we’ll show you what’s happening nearby." : "Pick every area that fits — we’ll personalize your feed."}
-      showExit
+      onBack={onBack}
     >
       <input
         className="onboarding-input"
@@ -862,7 +924,6 @@ function LegalConsentStep({
       title="Before you join."
       subtitle="Our community guidelines, Terms, and Privacy Policy — one quick read."
       onBack={onBack}
-      showExit
     >
       <ul className="guidelines-list">
         <li>
@@ -936,8 +997,7 @@ function LegalConsentStep({
       )}
 
       <p className="onboarding-women-note">
-        COMMONS is a community platform built for women. By joining, you are confirming that you
-        identify as a woman.
+        COMMONS is a community platform built for women.
       </p>
 
       <label className="guidelines-agree">
@@ -985,7 +1045,7 @@ function InterestsStep({ me, onSave, onSkip, onBack }: { me: MeDTO; onSave: (int
   }
 
   return (
-    <OnboardingShell title="What are you into?" subtitle="Pick what you’re into. Your feed does the rest." onBack={onBack} showExit>
+    <OnboardingShell title="What are you into?" subtitle="Pick what you’re into. Your feed does the rest." onBack={onBack}>
       <div className="interest-grid">
         {ALL_INTERESTS.map((t) => {
           const isPicked = picked.includes(t);
@@ -1074,7 +1134,7 @@ function ProfileStep({
   const canContinue = Boolean(firstName.trim() && lastName.trim() && photo);
 
   return (
-    <OnboardingShell title="Put a face to your name." subtitle="Add a photo and your name to continue." onBack={onBack} showExit>
+    <OnboardingShell title="Put a face to your name." subtitle="Add a photo and your name to continue." onBack={onBack}>
       <div className="profile-avatar-preview">
         <button
           type="button"
@@ -1178,16 +1238,20 @@ function AgeStep({
       title="Quick age check."
       subtitle="COMMONS is for adults. Pick your age range so we can personalize your feed."
       onBack={onBack}
-      showExit
     >
-      <label className="guidelines-agree">
-        <input
-          type="checkbox"
-          checked={confirmed}
-          onChange={(e) => setConfirmed(e.target.checked)}
-        />
+      <button
+        type="button"
+        className={`age-confirm-chip ${confirmed ? "is-active" : ""}`}
+        onClick={() => setConfirmed((v) => !v)}
+        aria-pressed={confirmed}
+      >
+        {confirmed && (
+          <span className="age-confirm-chip-check" aria-hidden="true">
+            ✓
+          </span>
+        )}
         <span>I confirm I am 18 years or older.</span>
-      </label>
+      </button>
 
       <div className="filter-sheet-chips" style={{ marginTop: 16 }}>
         {ALL_AGE_RANGES.map((r) => (

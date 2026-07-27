@@ -8,6 +8,7 @@ import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
 import { useCardImages } from "../lib/cardImages";
+import { NumberPicker } from "../components/NumberPicker";
 import {
   VIBE_OPTIONS,
   type InterestTag,
@@ -47,6 +48,40 @@ const weekdayOf = (iso: string) => {
   return new Date(y, m - 1, d).getDay();
 };
 
+// The upcoming Saturday (or today, if today already is one) — used as the
+// anchor date for "That week" ideas so the plan still sorts/shows sensibly
+// on the feed without needing a dedicated "loose week" concept server-side.
+const endOfThisWeek = (): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + (6 - d.getDay()));
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+// F.11 — loose date buckets for "Just an idea" (specific day, sometime this
+// week, or fully open-ended).
+type IdeaDateMode = "specific" | "week" | "anytime";
+
+// F.10 — placeholder copy rotates through these so the empty field doesn't
+// feel like a blank homework assignment.
+const IDEA_PLACEHOLDERS = [
+  "Want to try a yoga class?",
+  "Free for a drink on Thursday?",
+  "Want to cross something off your Philly bucket list?",
+  "Anyone up for a walk this weekend?",
+  "Looking for a coffee shop to work from — join me?",
+  "Free Saturday, someone pick something",
+  "New to the city — show me your favorite spot",
+];
+
+// Tappable starters — short chip label mapped to the fuller phrase it drops
+// into the field.
+const IDEA_STARTER_CHIPS: { label: string; text: string }[] = [
+  { label: "Yoga class", text: "Want to try a yoga class?" },
+  { label: "Drinks Thursday", text: "Free for a drink on Thursday?" },
+  { label: "Bucket list", text: "Want to cross something off your Philly bucket list?" },
+  { label: "Weekend walk", text: "Anyone up for a walk this weekend?" },
+];
+
 export function CreatePlanPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -63,6 +98,10 @@ export function CreatePlanPage() {
   // crew + group chat forward via fromPlanId (handled server-side on create).
   const prefillTitle = searchParams.get("title") ?? "";
   const fromPlanId = searchParams.get("fromPlanId");
+  // 0.9 — arriving here to recreate a past plan (either "Host another like
+  // this" or "Do it again") should send Back to that plan, not into a blank
+  // New Plan flow.
+  const backToSourceId = hostAgainFrom ?? fromPlanId ?? null;
   const prefillTagParam = searchParams.get("tag");
   const inviteUserId = searchParams.get("inviteUser");
   const inviteUserName = searchParams.get("inviteName");
@@ -184,6 +223,15 @@ export function CreatePlanPage() {
   const coverPool = useCardImages();
   const [showCoverLib, setShowCoverLib] = useState(false);
 
+  // F.6 — inline "what's missing" guidance. Errors only render once the host
+  // has actually tried to post, so the form doesn't nag while they're still
+  // filling it out.
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const locationCardRef = useRef<HTMLDivElement>(null);
+  const dateCardRef = useRef<HTMLDivElement>(null);
+  const capacityRowRef = useRef<HTMLElement>(null);
+
   useEffect(() => {
     // Always load the user's network once — needed for both the
     // "Inviting [name]" seeded flow and the hand-pick picker inside the
@@ -271,8 +319,11 @@ export function CreatePlanPage() {
   // Req 3.1 — block past dates outright, and same-day times need at least
   // MIN_LEAD_MINUTES of runway. Derived (not state) so it re-evaluates live
   // as the host edits the form; also re-checked on submit as the source of truth.
-  const dateError =
-    !form.isFlexibleDate && form.date && form.date < today()
+  // F.6 — a wholly missing date folds into this same inline message rather
+  // than only surfacing in a bottom banner.
+  const dateError = !form.isFlexibleDate && !form.date
+    ? "Add a day or mark it flexible."
+    : !form.isFlexibleDate && form.date && form.date < today()
       ? "Pick today or a future date."
       : null;
   const timeError =
@@ -281,32 +332,39 @@ export function CreatePlanPage() {
         ? `Pick a time at least ${MIN_LEAD_MINUTES} minutes from now.`
         : null
       : null;
+  const locationError =
+    !form.neighborhoodId && !form.isFlexibleLocation
+      ? "Add a location or mark it flexible."
+      : null;
+  const capacityNum = form.capacityOn ? Number(form.capacity) : null;
+  const capacityError =
+    capacityNum !== null && (!Number.isFinite(capacityNum) || capacityNum < 1)
+      ? "Enter a number of spots, or turn off the limit."
+      : null;
+  const titleError = !form.title.trim() ? "Give your plan a title." : null;
 
+  // F.6 — flag exactly what's missing inline, next to the field, and scroll
+  // it into view, instead of leaving the host to guess from a generic bottom
+  // banner (or a Post button that's mysteriously disabled).
   const validate = (): boolean => {
     setError(null);
-    if (!form.title.trim()) {
-      setError("Give your plan a title.");
+    setAttemptedSubmit(true);
+    if (titleError) {
+      titleInputRef.current?.focus();
+      titleInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       return false;
     }
-    if (!form.neighborhoodId && !form.isFlexibleLocation) {
-      setError("Pick a neighborhood or toggle flexible.");
+    if (locationError) {
+      locationCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       return false;
     }
-    if (!form.isFlexibleDate && !form.date) {
-      setError("Pick a day or toggle date flexible.");
+    if (dateError || timeError) {
+      dateCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       return false;
     }
-    if (dateError) {
-      setError(dateError);
-      return false;
-    }
-    if (timeError) {
-      setError(timeError);
-      return false;
-    }
-    const capacityNum = form.capacityOn ? Number(form.capacity) : null;
-    if (capacityNum !== null && (!Number.isFinite(capacityNum) || capacityNum < 1)) {
-      setError("Spots must be a positive number, or leave open.");
+    if (capacityError) {
+      setShowMore(true);
+      setTimeout(() => capacityRowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
       return false;
     }
     return true;
@@ -317,7 +375,6 @@ export function CreatePlanPage() {
   // error banner's Retry button without re-entering anything.
   const postPlan = async () => {
     setError(null);
-    const capacityNum = form.capacityOn ? Number(form.capacity) : null;
     setSubmitting(true);
     try {
       const created = await api<{ id: string }>("/api/plans", {
@@ -373,7 +430,9 @@ export function CreatePlanPage() {
           /* best-effort — user can invite again from the plan */
         }
       }
-      navigate("/", { state: { justPostedId: created.id, openInviteForPlanId: created.id } });
+      // F.3 — land on the feed with a "you're live" success sheet (Invite
+      // someone / Done) rather than dropping straight into the invite sheet.
+      navigate("/", { state: { justPostedId: created.id, showPostSuccess: true } });
     } catch (err) {
       setError(
         err instanceof Error
@@ -470,7 +529,7 @@ export function CreatePlanPage() {
     const firstName = user?.firstName || "there";
     return (
       <main className="app-shell app-shell--mid">
-        <header className="app-header app-header--minimal">
+        <header className="app-header app-header--minimal app-header--sticky">
           <Link to="/" className="detail-back">
             ← Back
           </Link>
@@ -546,7 +605,13 @@ export function CreatePlanPage() {
           retry={retry}
           submitting={submitting}
           error={error}
-          onBack={() => setPath("choose")}
+          attemptedSubmit={attemptedSubmit}
+          dateError={dateError}
+          toggleVibe={toggleVibe}
+          onBack={() => {
+            if (backToSourceId) navigate(`/plans/${backToSourceId}`);
+            else setPath("choose");
+          }}
           onOpenFlyer={() => void openFlyerPicker()}
           onShowCoverLib={() => setShowCoverLib(true)}
           onClearFlyer={() => setForm((f) => ({ ...f, flyerDataUrl: null }))}
@@ -578,8 +643,17 @@ export function CreatePlanPage() {
 
   return (
     <main className="app-shell app-shell--mid create-plan">
-      <header className="app-header create-header">
-        <button type="button" className="detail-back" onClick={() => setPath("choose")}>
+      <header className="app-header create-header app-header--sticky">
+        <button
+          type="button"
+          className="detail-back"
+          onClick={() => {
+            // 0.9 — recreating a past plan sends Back to that plan instead of
+            // the blank path picker.
+            if (backToSourceId) navigate(`/plans/${backToSourceId}`);
+            else setPath("choose");
+          }}
+        >
           ← Back
         </button>
         <span className="create-header-title">New plan</span>
@@ -636,11 +710,11 @@ export function CreatePlanPage() {
             <div className="cover-picker-buttons">
               <button type="button" className="cover-btn" onClick={() => setShowCoverLib(true)}>
                 <LibraryIcon />
-                Choose from library
+                Choose from our library
               </button>
               <button type="button" className="cover-btn" onClick={() => void openFlyerPicker()}>
                 <UploadIcon />
-                Upload
+                Upload your own
               </button>
             </div>
           </div>
@@ -660,16 +734,19 @@ export function CreatePlanPage() {
         {/* Plan name */}
         <input
           id="title"
+          ref={titleInputRef}
           className="create-title-input"
           placeholder="Plan name"
           value={form.title}
+          aria-invalid={Boolean(attemptedSubmit && titleError)}
           onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
         />
+        {attemptedSubmit && titleError && <p className="luma-inline-error">{titleError}</p>}
 
         {/* When — Date + Time as Luma-style rows, each with its own Flexible
             pill. Borderless rows on the card, hairline-divided. Req 3.1 —
             past dates are blocked and same-day times need runway. */}
-        <div className="luma-card">
+        <div className="luma-card" ref={dateCardRef}>
           <div className="luma-row">
             <span className="luma-label">Date</span>
             <div className="luma-value">
@@ -725,7 +802,7 @@ export function CreatePlanPage() {
             Neighborhood is kept from the user's default when a place is picked;
             picking a place and toggling Flexible are mutually exclusive —
             each one clears the other (req: location fixes). */}
-        <div className="luma-card">
+        <div className="luma-card" ref={locationCardRef}>
           <div className="location-row">
             <div className="location-row-main">
               {!form.isFlexibleLocation ? (
@@ -791,6 +868,9 @@ export function CreatePlanPage() {
             />
           </div>
         </div>
+        {attemptedSubmit && locationError && (
+          <p className="luma-inline-error">{locationError}</p>
+        )}
 
         {/* Description */}
         <textarea
@@ -801,8 +881,8 @@ export function CreatePlanPage() {
           onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
         />
 
-        {/* Interests — wrapping pills. */}
-        <p className="form-eyebrow">Interests</p>
+        {/* Category — wrapping pills. */}
+        <p className="form-eyebrow">Category</p>
         <div className="vibe-grid">
           {VIBE_OPTIONS.map((opt) => {
             const selected = form.vibes.includes(opt.id);
@@ -871,31 +951,32 @@ export function CreatePlanPage() {
         {showMore && (
           <div className="create-more">
             {/* Spots — toggle for open vs capped */}
-            <section className="form-section">
+            <section className="form-section" ref={capacityRowRef}>
               <div className="form-row-flex">
                 <div className="form-row-flex-main">
-                  <label className="form-question">Spots available</label>
+                  <label className="form-question">Limited spots?</label>
+                  <p className="form-help" style={{ marginTop: 2, marginBottom: 4 }}>Optional</p>
                   {!form.capacityOn ? (
                     <p className="form-help" style={{ marginTop: 4 }}>
                       Open — no cap on who can join
                     </p>
                   ) : (
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      placeholder="e.g. 6"
-                      value={form.capacity}
-                      onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))}
+                    <NumberPicker
+                      value={Number(form.capacity) || 0}
+                      onChange={(n) => setForm((f) => ({ ...f, capacity: String(n) }))}
+                      ariaLabel="Number of spots"
                     />
                   )}
                 </div>
                 <FlexToggle
                   active={form.capacityOn}
                   onClick={() => setForm((f) => ({ ...f, capacityOn: !f.capacityOn }))}
-                  label="Set cap"
+                  label="Set limit"
                 />
               </div>
+              {attemptedSubmit && capacityError && (
+                <p className="luma-inline-error">{capacityError}</p>
+              )}
 
               {form.capacityOn && (
                 <>
@@ -981,7 +1062,7 @@ export function CreatePlanPage() {
             disabled={linkBusy}
           />
           {linkBusy && <p className="form-help">Loading preview…</p>}
-          {linkError && <p className="form-help" style={{ color: "var(--color-danger, #c0392b)" }}>{linkError}</p>}
+          {linkError && <p className="form-help" style={{ color: "var(--accent)" }}>{linkError}</p>}
           {form.flyerLinkPreview && (
             <div className="link-preview" style={{ marginTop: 8 }}>
               {form.flyerLinkPreview.image && (
@@ -1201,10 +1282,11 @@ type FormShape = {
 };
 
 /**
- * Just an Idea form — single open text field, everything else collapsed.
- * Title doubles as the "what's on your mind" body since the server requires
- * a title; on submit we set every flexibility flag so the resulting plan
- * lives as a looking_for entry on the feed.
+ * Just an Idea form — a loose, casual post. Location, a rough date bucket,
+ * and a cover photo all live in the main flow now (F.12); spots and the
+ * Communities row are dropped entirely since ideas aren't meant to be that
+ * formal. "Add details" is left for lower-priority extras (more color,
+ * category tags).
  */
 function IdeaForm({
   form,
@@ -1213,6 +1295,9 @@ function IdeaForm({
   retry,
   submitting,
   error,
+  attemptedSubmit,
+  dateError,
+  toggleVibe,
   onBack,
   onOpenFlyer,
   onShowCoverLib,
@@ -1224,15 +1309,92 @@ function IdeaForm({
   retry: () => void;
   submitting: boolean;
   error: string | null;
+  attemptedSubmit: boolean;
+  dateError: string | null;
+  toggleVibe: (id: VibeIcon) => void;
   onBack: () => void;
   onOpenFlyer: () => void;
   onShowCoverLib: () => void;
   onClearFlyer: () => void;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [dateMode, setDateMode] = useState<IdeaDateMode>(form.isFlexibleDate ? "anytime" : "specific");
+  const [placeholderIdx, setPlaceholderIdx] = useState(0);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const detailsRef = useRef<HTMLDivElement>(null);
+
+  // F.10 — rotate the placeholder copy so the empty field reads as an
+  // invitation to riff, not a blank homework assignment.
+  useEffect(() => {
+    const t = setInterval(() => {
+      setPlaceholderIdx((i) => (i + 1) % IDEA_PLACEHOLDERS.length);
+    }, 3200);
+    return () => clearInterval(t);
+  }, []);
+
+  // F.6 — focus the field that's actually missing instead of leaving a
+  // disabled Post button with no explanation.
+  useEffect(() => {
+    if (attemptedSubmit && !form.title.trim()) {
+      textareaRef.current?.focus();
+      textareaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    // Only re-run when a submit attempt actually happens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attemptedSubmit]);
+
+  // 0.6 — when "Add details" opens, bring it above the keyboard instead of
+  // letting the accessory bar bury its fields.
+  useEffect(() => {
+    if (!detailsOpen) return;
+    const t = setTimeout(() => {
+      detailsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 150);
+    return () => clearTimeout(t);
+  }, [detailsOpen]);
+
+  // Reserve room at the bottom of the form for however much the on-screen
+  // keyboard is currently covering, via the visualViewport API where it's
+  // available (iOS/Android web views).
+  const [keyboardInset, setKeyboardInset] = useState(0);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      setKeyboardInset(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
+    };
+    onResize();
+    vv.addEventListener("resize", onResize);
+    vv.addEventListener("scroll", onResize);
+    return () => {
+      vv.removeEventListener("resize", onResize);
+      vv.removeEventListener("scroll", onResize);
+    };
+  }, []);
+
+  // F.11 — three loose date buckets. "This week" anchors to the coming
+  // Saturday so the plan still sorts sensibly without over-committing to a
+  // single day; "Anytime" stays fully open-ended.
+  const selectDateMode = (mode: IdeaDateMode) => {
+    setDateMode(mode);
+    if (mode === "specific") {
+      setForm((f) => ({
+        ...f,
+        isFlexibleDate: false,
+        date: f.date && f.date >= today() ? f.date : today(),
+      }));
+    } else if (mode === "week") {
+      setForm((f) => ({ ...f, isFlexibleDate: false, date: endOfThisWeek() }));
+    } else {
+      setForm((f) => ({ ...f, isFlexibleDate: true, date: today() }));
+    }
+  };
+
+  const titleMissing = attemptedSubmit && !form.title.trim();
+
   return (
     <main className="app-shell app-shell--mid">
-      <header className="app-header app-header--minimal">
+      <header className="app-header app-header--minimal app-header--sticky">
         <button type="button" className="detail-back" onClick={onBack}>
           ← Back
         </button>
@@ -1242,18 +1404,186 @@ function IdeaForm({
         Just a thought. See who&apos;s down.
       </p>
 
-      <form onSubmit={submit} className="form-card">
+      <form
+        onSubmit={submit}
+        className="form-card"
+        style={detailsOpen && keyboardInset > 0 ? { paddingBottom: keyboardInset } : undefined}
+      >
+        {/* F.10 — tappable starters pre-fill the field with a fuller phrase. */}
+        <div className="idea-starter-chips" role="group" aria-label="Idea starters">
+          {IDEA_STARTER_CHIPS.map((chip) => (
+            <button
+              key={chip.label}
+              type="button"
+              className={`idea-starter-chip ${form.title === chip.text ? "is-active" : ""}`}
+              onClick={() => setForm((f) => ({ ...f, title: chip.text }))}
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+
         <section className="form-section">
           <textarea
+            ref={textareaRef}
             className="idea-textarea"
-            placeholder="What's on your mind?"
+            placeholder={IDEA_PLACEHOLDERS[placeholderIdx]}
             value={form.title}
+            aria-invalid={titleMissing}
             onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
             rows={3}
             autoFocus
           />
+          {titleMissing && <p className="luma-inline-error">Add a few words about the idea.</p>}
         </section>
 
+        {/* F.11 — loose date options: a specific day, sometime this week, or
+            wide open. */}
+        <p className="form-eyebrow">When?</p>
+        <div className="seg-toggle idea-date-toggle" role="group" aria-label="When">
+          <button
+            type="button"
+            className={`seg-toggle-btn ${dateMode === "specific" ? "is-active" : ""}`}
+            onClick={() => selectDateMode("specific")}
+            aria-pressed={dateMode === "specific"}
+          >
+            A day
+          </button>
+          <button
+            type="button"
+            className={`seg-toggle-btn ${dateMode === "week" ? "is-active" : ""}`}
+            onClick={() => selectDateMode("week")}
+            aria-pressed={dateMode === "week"}
+          >
+            This week
+          </button>
+          <button
+            type="button"
+            className={`seg-toggle-btn ${dateMode === "anytime" ? "is-active" : ""}`}
+            onClick={() => selectDateMode("anytime")}
+            aria-pressed={dateMode === "anytime"}
+          >
+            Anytime
+          </button>
+        </div>
+        {dateMode === "specific" && (
+          <div className="idea-date-input-row">
+            <input
+              type="date"
+              className="luma-input idea-date-input"
+              min={today()}
+              value={form.date}
+              aria-invalid={Boolean(dateError)}
+              onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+            />
+            {dateError && <p className="luma-inline-error">{dateError}</p>}
+          </div>
+        )}
+
+        {/* F.12 / 0.1 — optional location, same venue picker as the full
+            form. Left flexible unless the host picks a spot. */}
+        <p className="form-eyebrow">Where?</p>
+        <div className="luma-card">
+          <div className="location-row">
+            <div className="location-row-main">
+              {!form.isFlexibleLocation ? (
+                <PlacePicker
+                  value={form.locationName}
+                  address={form.locationAddress}
+                  placeholder="Search a spot, or leave it flexible"
+                  onChange={(name) =>
+                    setForm((f) => ({
+                      ...f,
+                      locationName: name,
+                      locationAddress: "",
+                      locationLat: undefined,
+                      locationLng: undefined,
+                      locationPlaceId: undefined,
+                    }))
+                  }
+                  onSelect={(p) =>
+                    setForm((f) => ({
+                      ...f,
+                      locationName: p.name,
+                      locationAddress: p.address,
+                      locationLat: p.lat,
+                      locationLng: p.lng,
+                      locationPlaceId: p.placeId,
+                      isFlexibleLocation: false,
+                    }))
+                  }
+                  onClear={() =>
+                    setForm((f) => ({
+                      ...f,
+                      locationName: "",
+                      locationAddress: "",
+                      locationLat: undefined,
+                      locationLng: undefined,
+                      locationPlaceId: undefined,
+                    }))
+                  }
+                />
+              ) : (
+                <span className="luma-flex-text location-row-flex-text">Flexible location</span>
+              )}
+            </div>
+            <FlexToggle
+              active={form.isFlexibleLocation}
+              onClick={() =>
+                setForm((f) => {
+                  const next = !f.isFlexibleLocation;
+                  return next
+                    ? {
+                        ...f,
+                        isFlexibleLocation: true,
+                        locationName: "",
+                        locationAddress: "",
+                        locationLat: undefined,
+                        locationLng: undefined,
+                        locationPlaceId: undefined,
+                      }
+                    : { ...f, isFlexibleLocation: false };
+                })
+              }
+              label="Flexible"
+            />
+          </div>
+        </div>
+
+        {/* F.12 — cover photo moved out of "Add details" into the main flow.
+            No redundant "Cover image" label above it (1.17) — the picker's
+            own copy already says as much. */}
+        {form.flyerDataUrl ? (
+          <div className="cover-picker cover-picker--filled">
+            <img src={form.flyerDataUrl} alt="" className="cover-picker-img" />
+            <div className="cover-picker-overlay">
+              <button type="button" className="cover-chip" onClick={onShowCoverLib}>
+                Change
+              </button>
+              <button type="button" className="cover-chip" onClick={onClearFlyer}>
+                Remove
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="cover-picker">
+            <span className="cover-picker-title">Add a cover image</span>
+            <span className="cover-picker-sub">Make your idea stand out</span>
+            <div className="cover-picker-buttons">
+              <button type="button" className="cover-btn" onClick={onShowCoverLib}>
+                <LibraryIcon />
+                Choose from our library
+              </button>
+              <button type="button" className="cover-btn" onClick={onOpenFlyer}>
+                <UploadIcon />
+                Upload your own
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 1.17 — tighter gap under the label, and the toggle no longer
+            stretches the full width of the card. */}
         <p className="form-eyebrow idea-visibility-label">Who can see this?</p>
         <div className="seg-toggle idea-visibility-toggle" role="group" aria-label="Visibility">
           <button
@@ -1284,62 +1614,33 @@ function IdeaForm({
           <span className={`idea-disclosure-chevron ${detailsOpen ? "is-open" : ""}`}>›</span>
         </button>
         {detailsOpen && (
-          <div className="idea-details">
-            <div className="form-row-flex">
-              <div className="form-row-flex-main">
-                <label className="form-question">Spots available</label>
-                {!form.capacityOn ? (
-                  <p className="form-help" style={{ marginTop: 4 }}>Open — no cap</p>
-                ) : (
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    placeholder="e.g. 6"
-                    className="idea-detail-input"
-                    value={form.capacity}
-                    onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))}
-                  />
-                )}
-              </div>
-              <FlexToggle
-                active={form.capacityOn}
-                onClick={() => setForm((f) => ({ ...f, capacityOn: !f.capacityOn }))}
-                label="Set cap"
-              />
-            </div>
+          <div className="idea-details" ref={detailsRef}>
+            <label className="form-question">Add more detail</label>
+            <textarea
+              className="idea-detail-input"
+              placeholder="Any more color? Who it's for, timing, what to bring…"
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              rows={3}
+            />
 
-            <label className="form-question" style={{ marginTop: 14 }}>Cover image</label>
-            {/* Same cover component as the full "New plan" form — Choose from
-                library / Upload, pinstripe placeholder when empty. */}
-            {form.flyerDataUrl ? (
-              <div className="cover-picker cover-picker--filled">
-                <img src={form.flyerDataUrl} alt="" className="cover-picker-img" />
-                <div className="cover-picker-overlay">
-                  <button type="button" className="cover-chip" onClick={onShowCoverLib}>
-                    Change
+            <label className="form-question" style={{ marginTop: 14 }}>Category</label>
+            <div className="vibe-grid">
+              {VIBE_OPTIONS.map((opt) => {
+                const selected = form.vibes.includes(opt.id);
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className={`vibe-tile ${selected ? "is-selected" : ""}`}
+                    onClick={() => toggleVibe(opt.id)}
+                    aria-pressed={selected}
+                  >
+                    <span className="vibe-tile-label">{opt.label}</span>
                   </button>
-                  <button type="button" className="cover-chip" onClick={onClearFlyer}>
-                    Remove
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="cover-picker">
-                <span className="cover-picker-title">Add a cover image</span>
-                <span className="cover-picker-sub">Make your idea stand out</span>
-                <div className="cover-picker-buttons">
-                  <button type="button" className="cover-btn" onClick={onShowCoverLib}>
-                    <LibraryIcon />
-                    Choose from library
-                  </button>
-                  <button type="button" className="cover-btn" onClick={onOpenFlyer}>
-                    <UploadIcon />
-                    Upload
-                  </button>
-                </div>
-              </div>
-            )}
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -1352,18 +1653,9 @@ function IdeaForm({
           </div>
         )}
 
-        <button type="submit" className="btn btn-primary btn-block" disabled={submitting || !form.title.trim()}>
+        <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
           {submitting ? "Posting…" : "Put it out there"}
         </button>
-
-        <p className="create-communities-footer">
-          <strong>Communities</strong>{" "}
-          <Link to="/communities" className="visibility-option-pill">
-            Explore →
-          </Link>
-          <br />
-          Run clubs, book clubs, recurring crews.
-        </p>
       </form>
     </main>
   );
@@ -1389,9 +1681,19 @@ function NetworkHandPick({
   }
   if (network.length === 0) {
     return (
-      <p className="form-help" style={{ marginTop: 8 }}>
-        No one in your network yet — your plan will still post to your network as it grows.
-      </p>
+      <div className="network-empty-prompt" style={{ marginTop: 8 }}>
+        <p className="form-help" style={{ marginTop: 0, marginBottom: 10 }}>
+          You haven&apos;t added anyone yet — invite someone or add people you&apos;ve met.
+        </p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Link to="/invite" className="btn-pill-accent" style={{ textDecoration: "none" }}>
+            Invite friends
+          </Link>
+          <Link to="/search" className="btn-pill-ghost" style={{ textDecoration: "none" }}>
+            Find people
+          </Link>
+        </div>
+      </div>
     );
   }
   return (

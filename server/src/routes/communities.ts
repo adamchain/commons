@@ -65,6 +65,7 @@ async function toCommunityDTO(
     bulletinPermission: community.bulletinPermission,
     planPostingPermission: community.planPostingPermission,
     chatEnabled: community.chatEnabled,
+    visibility: community.visibility ?? "everyone",
     screeningQuestion: isOrganizer ? community.screeningQuestion ?? null : null,
     hasScreening: !!community.screeningQuestion,
     createdAt: community.createdAt,
@@ -74,6 +75,7 @@ async function toCommunityDTO(
     isOrganizer,
     canPostBulletin,
     canPostPlan,
+    pendingRequestCount: isOrganizer ? store.listPendingCommunityMembers(community.id).length : 0,
   };
 }
 
@@ -87,6 +89,8 @@ function toCommunityCard(community: CommunityRecord, viewerId: string): Communit
     memberCount: community.memberCount,
     isFounding: community.isFounding,
     myRole: membership?.status === "active" ? membership.role : null,
+    myMembershipStatus: membership?.status ?? null,
+    hasScreening: !!community.screeningQuestion,
   };
 }
 
@@ -122,6 +126,14 @@ function memberDTO(
     screeningAnswer: includeAnswer ? m.screeningAnswer ?? null : null,
     joinedAt: m.joinedAt,
   };
+}
+
+/** "Members only" communities hide their bulletin/events/members from non-members —
+ *  discovery info (name, cover, description, member count) always stays public. */
+function canSeeInside(community: CommunityRecord, viewerId: string, isOrganizer: boolean): boolean {
+  if (community.visibility !== "members_only") return true;
+  if (isOrganizer) return true;
+  return store.findCommunityMembership(community.id, viewerId)?.status === "active";
 }
 
 function parsePermission(
@@ -274,6 +286,9 @@ communitiesRouter.patch("/:id", requireAuth, async (req, res) => {
   if ("chatEnabled" in (req.body ?? {})) {
     patch.chatEnabled = Boolean(req.body.chatEnabled);
   }
+  if (req.body?.visibility === "everyone" || req.body?.visibility === "members_only") {
+    patch.visibility = req.body.visibility;
+  }
   const updated = store.updateCommunity(community.id, patch) ?? community;
   res.json(await toCommunityDTO(updated, viewerId, { viewerIsAdmin }));
 });
@@ -361,6 +376,10 @@ communitiesRouter.get("/:id/members", requireAuth, async (req, res) => {
   }
   const viewerIsAdmin = await isCommonsAdmin(viewerId);
   const isOrganizer = community.organizerId === viewerId || viewerIsAdmin;
+  if (!canSeeInside(community, viewerId, isOrganizer)) {
+    res.status(403).json({ error: "Join the community to see its members" });
+    return;
+  }
 
   const active = store.listActiveCommunityMembers(community.id);
   // Organizer first, then by join time.
@@ -475,6 +494,10 @@ communitiesRouter.get("/:id/posts", requireAuth, async (req, res) => {
   }
   const viewerIsOrganizer =
     community.organizerId === viewerId || (await isCommonsAdmin(viewerId));
+  if (!canSeeInside(community, viewerId, viewerIsOrganizer)) {
+    res.status(403).json({ error: "Join the community to see the bulletin" });
+    return;
+  }
   const posts = store.listCommunityPosts(community.id);
   const users = await findUsersByIds(posts.map((p) => p.authorId));
   res.json({
@@ -577,6 +600,10 @@ communitiesRouter.get("/:id/events", requireAuth, async (req, res) => {
   const membership = store.findCommunityMembership(community.id, viewerId);
   const isMember = membership?.status === "active";
   const isOrganizer = community.organizerId === viewerId || (await isCommonsAdmin(viewerId));
+  if (!canSeeInside(community, viewerId, isOrganizer)) {
+    res.status(403).json({ error: "Join the community to see its events" });
+    return;
+  }
   const plans = store
     .listPlans()
     .filter((p) => p.communityId === community.id && !p.cancelledAt)

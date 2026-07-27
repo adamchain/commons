@@ -1,97 +1,7 @@
-/* ---------- Theme tokens — Final Dev Feedback palette ----------
+/* ---------- Theme tokens — see styles/tokens.css ----------
    Red #C13B3B only. App bg #EDE8E0. Cards/inputs #FDFAF7. Tan for pills only.
    No pale-pink fills. Commons is light-only. */
-
-:root {
-  /* --- Primitives --- */
-  --paper-50:  #faf5ec;
-  --paper-100: #ede8e0;
-  --paper-200: #ede5d8; /* tan — interest tags, icon containers, pills */
-  --paper-300: #d9c9aa;
-
-  --ink-900: #1a1a2e;
-  --ink-800: #1c1c4a;
-  --ink-700: #2a2a5e;
-  --ink-600: #4a4a72;
-  --ink-500: #7a7a8a; /* muted */
-  --ink-400: #a8a8b4; /* faint */
-
-  --signal-100: #f5eaea; /* legacy alias — do not use for fills */
-  --signal-300: #e89a9b;
-  --signal-500: #c13b3b;
-  --signal-600: #a62525;
-  --signal-700: #8c1e1e;
-  --looking-orange: #c13b3b; /* ideas use red left edge only */
-
-  --tan: #ede5d8;
-  --tan-mid: #e0d5c8;
-  --faint: #a8a8b4;
-
-  --hairline: #e8e0d4;
-  --hairline-strong: #d4c9b8;
-
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-
-  /* Spacing scale (4px base) */
-  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px;
-  --s-6: 32px; --s-7: 48px; --s-8: 64px; --s-9: 96px;
-
-  /* Radius scale — cards sit on --r-lg (20px) per brand spec. */
-  --r-sm: 8px; --r-md: 14px; --r-lg: 20px; --r-xl: 32px; --r-pill: 999px;
-
-  --font-display: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-ui: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-serif: var(--font-ui);
-  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-
-  /* --- Semantic mapping --- */
-  --accent-rgb: 193, 59, 59;
-  --bg: #ede8e0;
-  --bg-gradient: var(--bg);
-  --surface: #fdfaf7;
-  --surface-2: var(--tan); /* pills / icon chips only — never inputs */
-  --surface-hover: var(--tan-mid);
-  --border: var(--hairline);
-  --border-strong: var(--hairline-strong);
-  --text: var(--ink-900);
-  --text-muted: var(--ink-500);
-  --text-subtle: var(--ink-400);
-  --accent: var(--signal-500);
-  --accent-hover: var(--signal-600);
-  --accent-soft: transparent; /* no pink washes — selected = red outline on white */
-  --accent-on: #ffffff;
-  --success: #2f8f55;
-  --success-bg: #e8f5ee;
-  --success-border: #b5dcc6;
-  --warning: #c97a1a;
-  --danger: var(--signal-500);
-  /* Card layers: solid fill + hairline border + warm drop shadow + inner light line */
-  --shadow-card: 0 2px 8px rgba(180, 160, 140, 0.22), 0 1px 2px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.85);
-  --shadow-sm: 0 1px 0 rgba(180, 160, 140, 0.15), 0 2px 8px rgba(0, 0, 0, 0.05);
-  --shadow-elevate: var(--shadow-sm);
-  --shadow-fab: 0 4px 16px rgba(193, 59, 59, 0.42), 0 2px 6px rgba(0, 0, 0, 0.12);
-  --shadow-nav: 0 -1px 0 var(--hairline);
-  --radius: var(--r-md);
-  --radius-lg: var(--r-lg);
-  --radius-pill: var(--r-pill);
-  --max-shell: 540px;
-  --max-shell-mid: 720px;
-  --max-shell-wide: 1180px;
-
-  font-family: var(--font-ui);
-  color: var(--text);
-  background: var(--bg);
-  color-scheme: light;
-  /* Cap Dynamic Type so iOS accessibility text sizes don't blow layouts */
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-
-  /* layout + community tints */
-  --nav-height: 72px;
-  --community-pink: #6b2f42;
-  --community-pink-soft: rgba(214, 52, 64, 0.10);
-  --community-pink-border: rgba(214, 52, 64, 0.22);
-}
+@import "./styles/tokens.css";
 
 /* Light = paper (explicit, mirrors the default). */
 [data-theme="light"] {
@@ -279,13 +189,13 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-muted);
   font-size: 13px;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   margin-top: 6px;
 }
 
 .section-title {
   font-size: 13px;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   letter-spacing: 0.1em;
   color: var(--text-muted);
   margin: 28px 0 14px;
@@ -476,7 +386,7 @@ h1, h2, h3, h4, h5, h6 {
   gap: 4px;
   font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   letter-spacing: 0.08em;
   padding: 5px 10px;
   border-radius: 999px;
@@ -777,7 +687,7 @@ h1, h2, h3, h4, h5, h6 {
 .participant-role {
   color: var(--text-muted);
   font-size: 12px;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   letter-spacing: 0.08em;
   margin-top: 2px;
 }
@@ -854,7 +764,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.1em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   color: var(--text-muted);
   margin-top: -3px;
 }
@@ -865,7 +775,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .who-block-heading {
   font-size: 12px;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   letter-spacing: 0.1em;
   color: var(--text-muted);
   font-weight: 700;
@@ -987,11 +897,25 @@ h1, h2, h3, h4, h5, h6 {
   pointer-events: none;
 }
 
+/* 1.16 — once the hero scrolls away the fixed back button would otherwise
+   float directly on top of body text; this scrim fades body content under
+   the safe area so nothing collides with the back button (or the OS clock). */
+.plan-detail-safe-scrim {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 21;
+  height: calc(50px + env(safe-area-inset-top, 0px));
+  background: linear-gradient(to bottom, var(--bg) 45%, rgba(240, 233, 223, 0));
+  pointer-events: none;
+}
+
 .plan-detail-back {
-  position: absolute;
+  position: fixed;
   top: calc(14px + env(safe-area-inset-top, 0px));
   left: 16px;
-  z-index: 2;
+  z-index: 22;
   width: 34px;
   height: 34px;
   border-radius: 17px;
@@ -1019,7 +943,7 @@ h1, h2, h3, h4, h5, h6 {
   color: rgba(255, 255, 255, 0.65);
   font-weight: 600;
   letter-spacing: 0.6px;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   margin-bottom: 5px;
 }
 
@@ -1571,7 +1495,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   padding: 3px 8px;
   border-radius: 999px;
   background: var(--surface-2);
@@ -1593,7 +1517,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .form-section-title {
   font-size: 11px;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   letter-spacing: 0.12em;
   color: var(--text-muted);
   font-weight: 700;
@@ -1840,7 +1764,7 @@ h1, h2, h3, h4, h5, h6 {
 .form-optional-label {
   font-size: 11px;
   letter-spacing: 0.1em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   font-weight: 700;
   color: var(--text-subtle, var(--text-muted));
   margin: 4px 0 6px;
@@ -2117,7 +2041,7 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--accent);
   font-weight: 700;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   margin-left: 8px;
 }
 
@@ -2173,7 +2097,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 12px;
   color: var(--text-muted);
   letter-spacing: 0.18em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
 }
 
 .loader-bar {
@@ -2285,24 +2209,32 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text);
 }
 
-/* Exit-onboarding link — mirrors the back pill but anchored top-right. Signs the
-   user out and returns them to the front door. */
-.onboarding-exit {
-  position: absolute;
-  top: calc(16px + env(safe-area-inset-top, 0px));
-  right: 16px;
-  z-index: 3;
-  padding: 8px 12px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-muted);
-  background: var(--surface);
-  border: 1px solid var(--border);
+/* Age confirmation — chip toggle, same shape/behavior as the Flexible pill. */
+.age-confirm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
   border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 13.5px;
+  font-weight: 600;
   cursor: pointer;
+  text-align: left;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
-.onboarding-exit:hover {
-  color: var(--text);
+.age-confirm-chip:hover {
+  background: var(--surface-2);
+}
+.age-confirm-chip.is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.age-confirm-chip-check {
+  flex-shrink: 0;
 }
 
 /* Guidelines agree checkbox + legal links. */
@@ -2319,12 +2251,31 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 400;
   cursor: pointer;
 }
+/* Legal consent checkbox — red check + red outline on a white fill (never a
+   solid accent block), matching the app's outline-only selected-state style. */
 .guidelines-agree input {
+  appearance: none;
+  -webkit-appearance: none;
   width: 20px;
   height: 20px;
   flex-shrink: 0;
   margin-top: 1px;
-  accent-color: var(--accent);
+  border: 1.5px solid var(--accent);
+  border-radius: 5px;
+  background: var(--surface);
+  position: relative;
+  cursor: pointer;
+}
+.guidelines-agree input:checked::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 5px;
+  height: 10px;
+  border: solid var(--accent);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
 }
 .guidelines-agree a {
   color: var(--accent);
@@ -2418,7 +2369,7 @@ h1, h2, h3, h4, h5, h6 {
 .onboarding-card--landing .onboarding-subtitle {
   font-size: 13px;
   letter-spacing: 0.18em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   color: rgba(255, 255, 255, 0.9);
   margin: 0;
 }
@@ -2478,10 +2429,10 @@ h1, h2, h3, h4, h5, h6 {
 }
 .onboarding-title {
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 26px;
   margin: 0;
   text-align: center;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.2;
 }
@@ -2515,7 +2466,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 22px;
 }
 .onboarding-error {
-  color: #c0392b;
+  color: var(--accent);
   font-size: 14px;
 }
 .btn-block { width: 100%; }
@@ -2552,7 +2503,7 @@ h1, h2, h3, h4, h5, h6 {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  text-decoration: underline;
+  text-decoration: none;
   font-size: 14px;
 }
 
@@ -2736,7 +2687,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 2px;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   margin-bottom: 10px;
 }
 .path-picker-eyebrow--accent {
@@ -2816,7 +2767,7 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text);
 }
 .interest-tile.is-picked {
-  background: var(--paper-100, var(--bg));
+  background: var(--surface);
   color: var(--text);
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
@@ -2940,12 +2891,22 @@ h1, h2, h3, h4, h5, h6 {
   margin-bottom: 0;
   width: 100%;
 }
+.plan-card-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
 .plan-card-meta-line--single {
   display: block;
   font-size: 12px;
   color: var(--text);
   opacity: 0.7;
-  margin: 0 0 12px;
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .plan-card-posted-by {
   font-size: 12px;
@@ -3260,6 +3221,9 @@ h1, h2, h3, h4, h5, h6 {
 .share-channel-icon--x { background: #000; }
 .share-channel-icon--whatsapp { background: #25d366; }
 .share-channel-icon--sms { background: #34c759; }
+.share-channel-icon--instagram {
+  background: radial-gradient(circle at 30% 110%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%);
+}
 .share-channel-icon--copy { background: var(--surface-2); }
 .share-channel-label { font-size: 11.5px; color: var(--text-muted); }
 
@@ -3307,7 +3271,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   color: var(--accent);
   background: var(--accent-soft);
   padding: 4px 10px;
@@ -3337,9 +3301,9 @@ h1, h2, h3, h4, h5, h6 {
 .public-event-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .public-event-tag {
   font-size: 12px;
-  color: var(--text-muted);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  color: var(--text);
+  background: var(--tan);
+  border: none;
   padding: 4px 10px;
   border-radius: 999px;
 }
@@ -3450,7 +3414,7 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
   color: var(--faint);
   letter-spacing: 1.6px;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   margin: 0 0 9px;
 }
 .profile-network-card {
@@ -3506,7 +3470,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.12em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   color: var(--text-muted);
 }
 .profile-network-card-count {
@@ -3771,11 +3735,11 @@ h1, h2, h3, h4, h5, h6 {
 .profile-interest-chip {
   padding: 6px 12px;
   border-radius: 999px;
-  background: var(--bg);
+  background: var(--tan);
   color: var(--text);
   font-size: 13px;
   font-weight: 500;
-  border: 1.5px solid var(--border);
+  border: none;
 }
 
 .profile-edit-panel {
@@ -4165,7 +4129,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .chat-roster { padding: 8px 0; }
-.chat-roster-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.chat-roster-label { font-size: 12px; color: var(--text-muted); text-transform: none; /* no caps — final pass */ letter-spacing: 0.05em; }
 .chat-roster-list { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
 .chat-roster-chip {
   display: flex;
@@ -4200,7 +4164,7 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-subtle);
   font-size: 11px;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   font-weight: 700;
 }
 .chat-day-divider::before,
@@ -4384,7 +4348,46 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-muted);
 }
 .friend-remove-btn:hover {
-  color: var(--color-danger, #c0392b);
+  color: var(--accent);
+}
+
+/* F.2 — dismissible, first-Home-load forum suggestion above the feed. */
+.feed-forum-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--tan);
+  border-radius: var(--radius-lg, 14px);
+  padding: 12px 12px 12px 14px;
+  margin-bottom: 16px;
+}
+.feed-forum-suggestion-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.feed-forum-suggestion-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.35;
+}
+.feed-forum-suggestion-dismiss {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
 }
 
 /* Pull-to-refresh — iPhone-native feel: finger-tracked transform + fixed spinner. */
@@ -4418,12 +4421,27 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* My Plans page */
+.my-plans-explore-cta {
+  background: var(--tan);
+  border-radius: var(--radius-lg, 14px);
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+.my-plans-explore-cta p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+.my-plans-explore-cta a {
+  color: var(--accent);
+  font-weight: 600;
+}
 .my-plans-section { margin-bottom: 24px; }
 .my-plans-section-title {
   font-size: 14px;
   font-weight: 800;
   letter-spacing: 0.02em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   color: var(--text-muted);
   margin: 0 0 10px;
 }
@@ -4441,14 +4459,15 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  margin-bottom: 14px;
 }
 .profile-block-see-all { font-size: 13px; }
 
-/* List / Calendar view toggle inside the Your Plans block. */
+/* List / Calendar / Saved view toggle inside the Your Plans block. */
 .profile-plans-toggle {
   display: inline-flex;
-  gap: 2px;
-  padding: 2px;
+  gap: 4px;
+  padding: 3px;
   max-width: 100%;
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -4458,7 +4477,7 @@ h1, h2, h3, h4, h5, h6 {
 .profile-plans-toggle button {
   flex: 1 1 0;
   min-width: 0;
-  padding: 5px 12px;
+  padding: 6px 14px;
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -4488,8 +4507,8 @@ h1, h2, h3, h4, h5, h6 {
   max-width: 320px;
   text-align: center;
   padding: 28px 20px;
-  background: var(--accent);
-  border: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   display: flex;
@@ -4498,20 +4517,24 @@ h1, h2, h3, h4, h5, h6 {
   gap: 8px;
 }
 .chat-empty-glyph {
-  font-size: 40px;
-  line-height: 1;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
 }
 .chat-empty-headline {
   font-family: var(--font-display);
   font-size: 18px;
   font-weight: 700;
-  color: var(--paper-50, #fff);
+  color: var(--accent);
 }
 .chat-empty-body {
   margin: 0;
   font-size: 13.5px;
   line-height: 1.5;
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--text-muted);
 }
 
 .chat-composer {
@@ -4583,7 +4606,7 @@ h1, h2, h3, h4, h5, h6 {
   margin: 0;
   font-size: 13px;
   letter-spacing: 0.16em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   color: var(--text-muted);
 }
 .welcome-headline {
@@ -4602,6 +4625,17 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-muted);
   font-size: 15px;
   line-height: 1.5;
+}
+.welcome-stat-chip {
+  align-self: center;
+  margin-top: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 /* Community guidelines acknowledgment */
@@ -4790,7 +4824,7 @@ h1, h2, h3, h4, h5, h6 {
   flex: 0 0 auto;
   font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   letter-spacing: 0.08em;
   color: var(--text-muted);
   padding-right: 4px;
@@ -4827,7 +4861,7 @@ h1, h2, h3, h4, h5, h6 {
 .week-glance-dow {
   display: block;
   font-size: 10px;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   letter-spacing: 0.06em;
 }
 
@@ -5040,7 +5074,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -5094,9 +5128,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .plan-card-kind-pill.is-cancelled {
-  background: var(--danger-bg, #fcecec);
-  color: var(--danger, #a13030);
-  border: 1px solid var(--danger-border, #f1c1c1);
+  background: var(--surface);
+  color: var(--danger);
+  border: 1.5px solid var(--danger);
 }
 .plan-card-kind-pill.is-cancelled::before {
   content: "×";
@@ -5179,23 +5213,23 @@ h1, h2, h3, h4, h5, h6 {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.16);
 }
-.plan-card-just-posted-banner {
-  position: relative;
-  z-index: 3;
-  background: var(--accent);
-  color: #fff;
-  text-align: center;
-  font-size: 12px;
+.plan-card-just-posted-chip {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
-  padding: 8px 12px;
-  border-radius: 0;
+  padding: 2px 9px;
+  border-radius: 999px;
+  transition: opacity 600ms ease;
 }
-/* Banner occupies the top — push floating controls below it */
-.plan-card--just-posted .plan-card-save-btn,
-.plan-card--just-posted .plan-card-hide-btn {
-  top: 44px;
+.plan-card-just-posted-chip.is-fading {
+  opacity: 0;
 }
 @keyframes just-posted-pulse {
   0%, 100% { transform: translateY(0); }
@@ -5245,7 +5279,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   color: var(--accent);
 }
 
@@ -5616,6 +5650,56 @@ h1, h2, h3, h4, h5, h6 {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+/* 1.21 — scrollable number picker (spots cap), replacing the plain
+   <input type="number"> stepper. */
+.number-picker-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  margin-top: 8px;
+  padding: 2px 2px 6px;
+}
+.number-picker-scroll::-webkit-scrollbar {
+  display: none;
+}
+.number-picker-chip {
+  flex: 0 0 auto;
+  scroll-snap-align: center;
+  min-width: 44px;
+  padding: 10px 0;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 15px;
+  text-align: center;
+  cursor: pointer;
+}
+.number-picker-chip.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.number-picker-chip--other {
+  min-width: 60px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.number-picker-custom {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+.number-picker-custom input {
+  width: 90px;
 }
 
 .coordination-banner {
@@ -6178,6 +6262,36 @@ h1, h2, h3, h4, h5, h6 {
   min-height: 32px;
 }
 
+/* 1.15 — persistent back button on Create/Edit plan flows: stays put while
+   the form scrolls underneath instead of disappearing with the header. */
+.app-header--sticky {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 20;
+  margin-left: -15px;
+  margin-right: -15px;
+  padding-left: 15px;
+  padding-right: 15px;
+  padding-top: 10px;
+  background: linear-gradient(to bottom, var(--bg) 72%, rgba(240, 233, 223, 0));
+}
+@media (min-width: 720px) {
+  .app-header--sticky {
+    margin-left: -32px;
+    margin-right: -32px;
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+}
+@media (min-width: 1024px) {
+  .app-header--sticky {
+    margin-left: -48px;
+    margin-right: -48px;
+    padding-left: 48px;
+    padding-right: 48px;
+  }
+}
+
 /* ============== Global Top Bar ============== */
 
 .top-bar {
@@ -6404,13 +6518,42 @@ h1, h2, h3, h4, h5, h6 {
   margin: 0;
 }
 
+/* F.3 — post-posting success sheet. */
+.post-success-sheet {
+  text-align: center;
+  padding-top: 28px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+}
+.post-success-icon {
+  font-size: 40px;
+  line-height: 1;
+  margin-bottom: 10px;
+}
+.post-success-title {
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0 0 6px;
+}
+.post-success-sub {
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.4;
+  margin: 0 0 22px;
+}
+.post-success-done {
+  display: block;
+  width: 100%;
+  text-align: center;
+  margin-top: 10px;
+}
+
 .filter-sheet-group {
   margin-top: 14px;
 }
 
 .filter-sheet-group-label {
   font-size: 12px;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   letter-spacing: 0.08em;
   color: var(--text-muted);
   font-weight: 700;
@@ -6572,7 +6715,7 @@ h1, h2, h3, h4, h5, h6 {
 .week-strip-dow {
   font-size: 9px;
   letter-spacing: 0.8px;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   font-weight: 400;
   color: var(--faint);
   line-height: 1;
@@ -6605,7 +6748,7 @@ h1, h2, h3, h4, h5, h6 {
   top: 5px;
   font-size: 9px;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   font-weight: 800;
   color: var(--accent);
   line-height: 1;
@@ -6811,7 +6954,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .profile-week-dow {
   font-size: 10px;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   letter-spacing: 0.06em;
   color: var(--text-muted);
   font-weight: 700;
@@ -6828,7 +6971,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .profile-month-caption {
   font-size: 13px;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   letter-spacing: 0.08em;
   color: var(--text-muted);
   margin: 12px 0 8px;
@@ -6930,7 +7073,7 @@ h1, h2, h3, h4, h5, h6 {
 .notif-toolbar-count {
   font-size: 11px;
   font-weight: 800;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   letter-spacing: 0.1em;
   color: var(--text-muted);
 }
@@ -7040,15 +7183,15 @@ h1, h2, h3, h4, h5, h6 {
   margin-top: 12px;
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid var(--danger-border, #f1c1c1);
-  background: var(--danger-bg, #fcecec);
-  color: var(--danger, #a13030);
+  border: 1.5px solid var(--danger);
+  background: var(--surface);
+  color: var(--danger);
   font-size: 13px;
   font-weight: 600;
 }
 
 .plan-cancel-link {
-  color: var(--danger, #a13030);
+  color: var(--danger);
   font-size: 13px;
 }
 
@@ -7139,7 +7282,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   color: var(--accent);
 }
 
@@ -7742,7 +7885,7 @@ h1, h2, h3, h4, h5, h6 {
 .invite-section-heading {
   font-size: 11px;
   font-weight: 800;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   letter-spacing: 0.12em;
   color: var(--text-muted);
   margin: 0 0 10px;
@@ -7763,6 +7906,10 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text);
 }
 .btn-pill-ghost:hover { background: var(--surface-2); }
+.btn-pill-ghost.is-copied {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 .btn-pill-accent {
   background: var(--accent);
   color: var(--accent-on);
@@ -7791,7 +7938,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .onboarding-input-invite {
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   letter-spacing: 0.08em;
   font-family: var(--font-mono, ui-monospace, "SFMono-Regular", Menlo, monospace);
 }
@@ -8651,7 +8798,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.18em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   color: var(--text-subtle);
   margin-bottom: 3px;
 }
@@ -8699,7 +8846,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 22px;
   font-weight: 800;
   letter-spacing: 0.10em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   color: var(--accent);
   margin-bottom: 12px;
 }
@@ -8857,11 +9004,41 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
   letter-spacing: -0.01em;
   color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .xpl-comm-sub {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.66);
   margin-top: 1px;
+}
+.xpl-comm-info { flex: 1; min-width: 0; }
+/* Join CTA on the Explore rail — auto-join or (for screened communities) a
+   request hint; tapping either still lands on the community page. */
+.xpl-comm-join {
+  flex-shrink: 0;
+  margin-left: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--signal-500);
+  color: #fff;
+  border: 1px solid var(--signal-500);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.xpl-comm-join:hover { filter: brightness(1.08); }
+.xpl-comm-join--outline {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.32);
+}
+.xpl-comm-join--pending {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  border-color: rgba(255, 255, 255, 0.28);
+  cursor: default;
 }
 .xpl-comm-chevron {
   position: absolute;
@@ -8897,7 +9074,7 @@ a.xpl-comm-card {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   color: #fff;
   background: rgba(255, 255, 255, 0.22);
   vertical-align: middle;
@@ -9218,7 +9395,7 @@ a.xpl-comm-card {
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.12em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   color: var(--accent);
 }
 .lp-headline {
@@ -9463,7 +9640,7 @@ a.xpl-comm-card {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   color: var(--accent);
   margin-bottom: 14px;
 }
@@ -9554,7 +9731,7 @@ a.xpl-comm-card {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: none; /* no caps — final pass */
   color: var(--text-subtle);
   margin-bottom: 2px;
 }
@@ -10098,7 +10275,9 @@ a.xpl-comm-card {
   gap: 6px;
 }
 .messages-row-meta {
-  display: none;
+  font-size: 12px;
+  color: var(--faint);
+  margin-top: 1px;
 }
 .messages-row-time {
   font-size: 12px;
@@ -10146,20 +10325,19 @@ a.xpl-comm-card {
 .settings-interest-pill {
   padding: 9px 14px;
   border-radius: var(--r-pill);
-  border: 1px solid var(--border);
-  background: var(--surface);
+  border: none;
+  background: var(--tan);
   color: var(--text);
   font-size: 13px;
   font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
-  transition: border-color 120ms ease, color 120ms ease;
+  transition: background 120ms ease, color 120ms ease, box-shadow 120ms ease;
 }
 .settings-interest-pill.is-active {
-  border-color: var(--accent);
   color: var(--accent);
-  background: var(--surface);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--tan);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
 }
 
 .network-search-wrap {
@@ -10213,11 +10391,66 @@ a.xpl-comm-card {
 
 .idea-visibility-label {
   margin-top: 16px;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
+/* 1.17 — hug its contents instead of stretching the full card width. The
+   card is a CSS grid, so a plain width reset isn't enough — grid items
+   stretch to fill their column by default; justify-self opts this one out. */
 .idea-visibility-toggle {
-  width: 100%;
+  justify-self: start;
+  width: auto;
   margin-bottom: 12px;
+}
+
+/* F.10 — tappable starter chips above the idea field. */
+.idea-starter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.idea-starter-chip {
+  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.idea-starter-chip:hover {
+  border-color: var(--border-strong);
+}
+.idea-starter-chip.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* F.11 — "When" segmented control spans the full width, split evenly. */
+.idea-date-toggle {
+  display: flex;
+  width: 100%;
+  margin-bottom: 10px;
+}
+.idea-date-toggle .seg-toggle-btn {
+  flex: 1;
+  text-align: center;
+}
+.idea-date-input-row {
+  margin-bottom: 12px;
+}
+.idea-date-input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  font-size: 15px;
+  text-align: left;
+  color: var(--text);
 }
 .idea-details {
   margin-top: 8px;
@@ -10365,6 +10598,21 @@ a.xpl-comm-card {
 
 .forum-make-plan-btn {
   white-space: nowrap;
+  background: var(--surface);
+  color: var(--text);
+  border: 1.5px solid var(--border);
+  padding: 8px 16px;
+  font-size: 13px;
+  border-radius: 999px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.forum-make-plan-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--surface);
+  transform: none;
 }
 
 .forum-composer-card {
@@ -10519,17 +10767,22 @@ a.xpl-comm-card {
 
 .forum-reply-list {
   margin-bottom: 20px;
+  padding-left: 16px;
+  border-left: 2px solid var(--border);
 }
 
 .forum-reply-row {
   display: flex;
-  gap: 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
+  gap: 8px;
+  padding: 10px 12px;
+  margin-top: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
 }
 
-.forum-reply-row:last-child {
-  border-bottom: none;
+.forum-reply-row:first-of-type {
+  margin-top: 10px;
 }
 
 .forum-reply-body {
@@ -10586,31 +10839,48 @@ a.xpl-comm-card {
   outline: none;
 }
 
+.forum-reply-send-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  color: var(--accent);
+}
+
+.forum-reply-send-btn:disabled {
+  color: var(--text-subtle);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Messages Plans / Interests tab switcher */
 .messages-tabs {
   display: flex;
-  gap: 6px;
+  gap: 20px;
   margin: 0 0 16px;
-  padding: 4px;
-  background: var(--tan-mid);
-  border-radius: 999px;
-  width: fit-content;
-  max-width: 100%;
+  border-bottom: 1px solid var(--border);
+  width: 100%;
 }
 .messages-tab {
-  padding: 8px 18px;
+  padding: 4px 2px 10px;
   font-size: 14px;
   font-weight: 600;
   color: var(--text-muted);
-  border-radius: 999px;
   background: transparent;
   border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
   cursor: pointer;
+  margin-bottom: -1px;
 }
 .messages-tab.is-active {
-  background: var(--surface);
   color: var(--text);
-  box-shadow: var(--shadow-sm);
+  border-bottom-color: var(--accent);
 }
 
 .plan-card-save-btn--body {
@@ -10646,4 +10916,157 @@ a.xpl-comm-card {
   font-size: 13px;
   color: var(--text-muted);
   margin: 0 0 12px;
+}
+
+/* ---------- Shared UI primitives (Button / Input / Chip / Card / Tab) ---------- */
+.ui-field { display: flex; flex-direction: column; gap: 6px; }
+.ui-field-label {
+  font-size: var(--text-meta);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+  margin: 0;
+}
+.ui-input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: var(--text-body);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  box-sizing: border-box;
+}
+.ui-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  outline: none;
+}
+.ui-textarea { min-height: 96px; resize: vertical; }
+
+.ui-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--r-pill);
+  font-size: 14px;
+  font-weight: 600;
+  border: 1.5px solid transparent;
+  background: var(--tan);
+  color: var(--text);
+  cursor: pointer;
+}
+.ui-chip--outline {
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+.ui-chip--red-outline {
+  background: var(--surface);
+  border-color: var(--border);
+}
+.ui-chip--red-outline.is-active,
+.ui-chip.is-active.ui-chip--red-outline {
+  border-color: var(--accent);
+  background: var(--surface);
+  color: var(--accent);
+}
+.ui-chip--tan.is-active {
+  border-color: var(--accent);
+  background: var(--surface);
+  color: var(--accent);
+}
+
+.ui-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+}
+.ui-card--padded { padding: var(--space-16); }
+
+.ui-tab-list {
+  display: flex;
+  gap: var(--space-16);
+  border-bottom: 1px solid var(--border);
+}
+.ui-tab {
+  padding: 10px 2px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.ui-tab.is-active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ---------- F.13 First-run coach marks ---------- */
+.coach-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+}
+.coach-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(26, 26, 46, 0.45);
+  border: none;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.coach-card {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(var(--nav-height) + 16px + env(safe-area-inset-bottom, 0px));
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+  pointer-events: auto;
+  animation: coach-in 220ms var(--ease-out);
+}
+.coach-card-arrow {
+  position: absolute;
+  bottom: -8px;
+  left: var(--coach-left, 50%);
+  width: 16px;
+  height: 16px;
+  background: var(--surface);
+  transform: translateX(-50%) rotate(45deg);
+  border-radius: 2px;
+  box-shadow: 2px 2px 4px rgba(180, 160, 140, 0.2);
+}
+.coach-step {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--faint);
+  font-weight: 600;
+}
+.coach-title {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+.coach-body {
+  margin: 0 0 16px;
+  font-size: 15px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.coach-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+@keyframes coach-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }

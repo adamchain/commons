@@ -6,6 +6,7 @@ import { PlanCard } from "../components/PlanCard";
 import {
   ALL_COMMUNITY_CATEGORIES,
   COMMUNITY_CATEGORY_LABELS,
+  type CommunityAccessLevel,
   type CommunityCategory,
   type CommunityDTO,
   type CommunityMemberDTO,
@@ -18,10 +19,19 @@ import "./Communities.css";
 
 type Tab = "bulletin" | "events" | "members" | "settings";
 
+function MessageCircleIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+    </svg>
+  );
+}
+
 export function CommunityDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const [community, setCommunity] = useState<CommunityDTO | null>(null);
+  const [previewMembers, setPreviewMembers] = useState<CommunityMemberDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [tab, setTab] = useState<Tab>("bulletin");
@@ -30,6 +40,12 @@ export function CommunityDetailPage() {
     try {
       const c = await api<CommunityDTO>(`/api/communities/${id}`);
       setCommunity(c);
+      try {
+        const m = await api<{ members: CommunityMemberDTO[] }>(`/api/communities/${id}/members`);
+        setPreviewMembers(m.members.slice(0, 3));
+      } catch {
+        setPreviewMembers([]);
+      }
     } catch {
       setNotFound(true);
     } finally {
@@ -59,6 +75,9 @@ export function CommunityDetailPage() {
 
   const catLabel = COMMUNITY_CATEGORY_LABELS[community.category];
   const isActiveMember = community.myMembership?.status === "active";
+  // "Members only" communities keep discovery info (name/cover/description/count)
+  // public, but lock the bulletin/events/members tabs to active members + the organizer.
+  const canSeeInside = community.visibility !== "members_only" || isActiveMember || community.isOrganizer;
 
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy">
@@ -73,29 +92,50 @@ export function CommunityDetailPage() {
         </div>
       )}
 
-      {/* Header */}
+      {/* Header — category + name overlay the cover photo; a single compressed
+          row below carries member avatars, the meta line, and the Join pill. */}
       <header className="cmy-header">
         <div
           className="cmy-cover"
           style={community.coverImage ? { backgroundImage: `url(${community.coverImage})` } : undefined}
           data-cat={community.category}
         >
-          <span className="cmy-cover-tag">{catLabel.toUpperCase()}</span>
+          <div className="cmy-cover-overlay">
+            <span className="cmy-cover-tag">{catLabel}</span>
+            <div className="cmy-cover-title-row">
+              <h1 className="cmy-name">{community.name}</h1>
+              {community.isFounding && <span className="cmy-founding">★ Founding</span>}
+            </div>
+          </div>
         </div>
         <div className="cmy-header-body">
-          <div className="cmy-title-row">
-            <h1 className="cmy-name">{community.name}</h1>
-            {community.isFounding && <span className="cmy-founding">★ Founding Community</span>}
+          <div className="cmy-header-row">
+            <div className="cmy-header-info">
+              {previewMembers.length > 0 && (
+                <span className="cmy-header-avatars">
+                  {previewMembers.map((m) => (
+                    <Avatar
+                      key={m.user.id}
+                      seed={m.user.avatarSeed}
+                      style={m.user.avatarStyle}
+                      photoDataUrl={m.user.avatarPhotoDataUrl}
+                      params={m.user.avatarParams}
+                      size="xs"
+                    />
+                  ))}
+                </span>
+              )}
+              <span className="cmy-header-meta">
+                {community.memberCount} {community.memberCount === 1 ? "member" : "members"} · Organized by {community.organizer.firstName}
+              </span>
+            </div>
+            <JoinControl community={community} onChange={setCommunity} reload={load} />
           </div>
-          <div className="cmy-meta">
-            <span>{community.memberCount} {community.memberCount === 1 ? "member" : "members"}</span>
-            <span className="cmy-dot">·</span>
-            <span>Organized by {community.organizer.firstName}</span>
-          </div>
-          <JoinControl community={community} onChange={setCommunity} reload={load} />
           {community.description && <p className="cmy-desc">{community.description}</p>}
           {community.chatEnabled && (isActiveMember || community.isOrganizer) && (
-            <Link to={`/communities/${community.id}/chat`} className="cmy-chat-link">💬 Open group chat</Link>
+            <Link to={`/communities/${community.id}/chat`} className="cmy-chat-link">
+              <MessageCircleIcon /> Open group chat
+            </Link>
           )}
         </div>
       </header>
@@ -104,13 +144,19 @@ export function CommunityDetailPage() {
       <nav className="cmy-tabs" role="tablist">
         <TabButton id="bulletin" tab={tab} setTab={setTab}>Bulletin</TabButton>
         <TabButton id="events" tab={tab} setTab={setTab}>Events</TabButton>
-        <TabButton id="members" tab={tab} setTab={setTab}>Members</TabButton>
+        <TabButton id="members" tab={tab} setTab={setTab} badge={community.pendingRequestCount || undefined}>Members</TabButton>
         {community.isOrganizer && <TabButton id="settings" tab={tab} setTab={setTab}>Settings</TabButton>}
       </nav>
 
-      {tab === "bulletin" && <BulletinTab community={community} />}
-      {tab === "events" && <EventsTab community={community} onPostPlan={() => navigate(`/plans/new?communityId=${community.id}`)} />}
-      {tab === "members" && <MembersTab community={community} onCountChange={load} />}
+      {tab === "bulletin" && (canSeeInside ? <BulletinTab community={community} /> : <LockedPanel />)}
+      {tab === "events" && (
+        canSeeInside ? (
+          <EventsTab community={community} onPostPlan={() => navigate(`/plans/new?communityId=${community.id}`)} />
+        ) : (
+          <LockedPanel />
+        )
+      )}
+      {tab === "members" && (canSeeInside ? <MembersTab community={community} onCountChange={load} /> : <LockedPanel />)}
       {tab === "settings" && community.isOrganizer && (
         <SettingsTab community={community} onSaved={setCommunity} />
       )}
@@ -122,11 +168,13 @@ function TabButton({
   id,
   tab,
   setTab,
+  badge,
   children,
 }: {
   id: Tab;
   tab: Tab;
   setTab: (t: Tab) => void;
+  badge?: number;
   children: React.ReactNode;
 }) {
   return (
@@ -138,7 +186,19 @@ function TabButton({
       onClick={() => setTab(id)}
     >
       {children}
+      {!!badge && <span className="cmy-tab-badge">{badge}</span>}
     </button>
+  );
+}
+
+function LockedPanel() {
+  return (
+    <section className="cmy-tabpanel">
+      <div className="cmy-locked">
+        <span className="cmy-locked-icon" aria-hidden="true">🔒</span>
+        <p className="cmy-locked-text">Join to see what’s happening inside.</p>
+      </div>
+    </section>
   );
 }
 
@@ -155,6 +215,7 @@ function JoinControl({
   const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [justRequested, setJustRequested] = useState(false);
 
   async function doJoin(screeningAnswer?: string) {
     setBusy(true);
@@ -167,6 +228,7 @@ function JoinControl({
       onChange(updated);
       setAsking(false);
       setAnswer("");
+      if (updated.myMembership?.status === "pending") setJustRequested(true);
     } catch (e) {
       setErr(cleanError(e));
     } finally {
@@ -203,7 +265,14 @@ function JoinControl({
     );
   }
   if (status === "pending") {
-    return <span className="cmy-pending-pill">Requested — pending</span>;
+    return (
+      <div className="cmy-join-row cmy-join-col">
+        <button type="button" className="cmy-btn cmy-btn--ghost" disabled>Pending</button>
+        {justRequested && (
+          <p className="cmy-pending-note">Request sent — organizers usually respond within a day.</p>
+        )}
+      </div>
+    );
   }
 
   // Visitor
@@ -298,16 +367,12 @@ function BulletinTab({ community }: { community: CommunityDTO }) {
       <ul className="cmy-post-list">
         {posts.map((p) => (
           <li key={p.id} className={`cmy-post ${p.pinned ? "cmy-post--pinned" : ""}`}>
-            {p.pinned && <div className="cmy-pinned-label">📌 Pinned</div>}
             <div className="cmy-post-head">
               <Avatar seed={p.author.avatarSeed} style={p.author.avatarStyle} photoDataUrl={p.author.avatarPhotoDataUrl} params={p.author.avatarParams} size="sm" />
-              <div className="cmy-post-author">
-                <span className="cmy-post-name">
-                  {p.author.firstName}
-                  {p.authorIsOrganizer && <span className="cmy-org-badge">Organizer</span>}
-                </span>
-                <span className="cmy-post-time">{formatRelative(p.createdAt)}</span>
-              </div>
+              <span className="cmy-post-name">{p.author.firstName}</span>
+              {p.authorIsOrganizer && <span className="cmy-org-badge">Organizer</span>}
+              {p.pinned && <span className="cmy-pinned-label">📌 Pinned</span>}
+              <span className="cmy-post-time">{formatRelative(p.createdAt)}</span>
               <div className="cmy-post-actions">
                 {community.isOrganizer && (
                   <button type="button" className="cmy-icon-btn" onClick={() => togglePin(p)} title={p.pinned ? "Unpin" : "Pin"}>
@@ -327,14 +392,17 @@ function BulletinTab({ community }: { community: CommunityDTO }) {
 
       {community.canPostBulletin && (
         <div className="cmy-composer">
-          <textarea
-            className="cmy-textarea"
-            rows={3}
+          <input
+            type="text"
+            className="cmy-composer-input"
             placeholder="Post something to the group…"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submit();
+            }}
           />
-          <button type="button" className="cmy-btn cmy-btn--primary" disabled={busy || !draft.trim()} onClick={submit}>
+          <button type="button" className="cmy-btn cmy-btn--primary cmy-btn--sm" disabled={busy || !draft.trim()} onClick={submit}>
             Post
           </button>
         </div>
@@ -455,6 +523,7 @@ function SettingsTab({ community, onSaved }: { community: CommunityDTO; onSaved:
   const [bulletinPermission, setBulletinPermission] = useState<CommunityPostingPermission>(community.bulletinPermission);
   const [planPostingPermission, setPlanPostingPermission] = useState<CommunityPostingPermission>(community.planPostingPermission);
   const [chatEnabled, setChatEnabled] = useState(community.chatEnabled);
+  const [visibility, setVisibility] = useState<CommunityAccessLevel>(community.visibility);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -474,6 +543,7 @@ function SettingsTab({ community, onSaved }: { community: CommunityDTO; onSaved:
           bulletinPermission,
           planPostingPermission,
           chatEnabled,
+          visibility,
         }),
       });
       onSaved(updated);
@@ -505,7 +575,13 @@ function SettingsTab({ community, onSaved }: { community: CommunityDTO; onSaved:
       </label>
       <label className="cmy-field">
         <span>Screening question <em className="cmy-hint">(leave blank to let anyone join instantly)</em></span>
-        <input className="cmy-input" value={screening} placeholder="e.g. What's your typical pace?" onChange={(e) => setScreening(e.target.value)} />
+        <textarea
+          className="cmy-textarea"
+          rows={3}
+          value={screening}
+          placeholder="e.g. What's your typical pace?"
+          onChange={(e) => setScreening(e.target.value)}
+        />
       </label>
 
       <div className="cmy-field">
@@ -524,10 +600,25 @@ function SettingsTab({ community, onSaved }: { community: CommunityDTO; onSaved:
           options={[["organizer_only", "Organizer only"], ["members", "All members"]]}
         />
       </div>
-      <label className="cmy-toggle-row">
+      <div className="cmy-field">
+        <span>Who can see inside <em className="cmy-hint">(name, cover, and description always stay public)</em></span>
+        <Segmented
+          value={visibility}
+          onChange={setVisibility}
+          options={[["everyone", "Everyone"], ["members_only", "Members only"]]}
+        />
+      </div>
+      <div className="cmy-toggle-row">
         <span>Group chat</span>
-        <input type="checkbox" checked={chatEnabled} onChange={(e) => setChatEnabled(e.target.checked)} />
-      </label>
+        <button
+          type="button"
+          className={`cmy-chip-toggle ${chatEnabled ? "is-active" : ""}`}
+          aria-pressed={chatEnabled}
+          onClick={() => setChatEnabled((v) => !v)}
+        >
+          {chatEnabled ? "On" : "Off"}
+        </button>
+      </div>
 
       {err && <p className="cmy-err">{err}</p>}
       {msg && <p className="cmy-saved">{msg}</p>}
@@ -538,14 +629,14 @@ function SettingsTab({ community, onSaved }: { community: CommunityDTO; onSaved:
   );
 }
 
-function Segmented({
+function Segmented<T extends string>({
   value,
   onChange,
   options,
 }: {
-  value: CommunityPostingPermission;
-  onChange: (v: CommunityPostingPermission) => void;
-  options: Array<[CommunityPostingPermission, string]>;
+  value: T;
+  onChange: (v: T) => void;
+  options: Array<[T, string]>;
 }) {
   return (
     <div className="cmy-segmented">

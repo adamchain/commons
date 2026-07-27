@@ -381,7 +381,9 @@ export function ChatPage() {
         <div ref={scrollRef} className="chat-messages">
           {grouped.length === 0 ? (
             <div className="chat-empty-card">
-              <div className="chat-empty-glyph" aria-hidden>💬</div>
+              <div className="chat-empty-glyph" aria-hidden>
+                <MessageCircleIcon />
+              </div>
               <div className="chat-empty-headline">It's quiet in here</div>
               <p className="chat-empty-body">
                 Be the first to say hi — a quick hello or a logistics note goes a long way.
@@ -685,6 +687,14 @@ function groupMessages(msgs: MessageDTO[]): GroupedEntry[] {
     lastUserAt = date.getTime();
   }
   return out;
+}
+
+function MessageCircleIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+    </svg>
+  );
 }
 
 function dayLabel(d: Date): string {

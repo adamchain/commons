@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState, type MouseEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { COMMUNITY_CATEGORY_LABELS, type CommunityCardDTO } from "../types/shared";
 
@@ -19,6 +19,7 @@ const CATEGORIES: Array<{ label: string; photo: string }> = [
 ];
 
 export function ExplorePage() {
+  const navigate = useNavigate();
   const [communities, setCommunities] = useState<CommunityCardDTO[]>([]);
   const [loadedComm, setLoadedComm] = useState(false);
 
@@ -113,7 +114,7 @@ export function ExplorePage() {
                   <div className="xpl-comm-overlay" aria-hidden="true" />
                   <div className="xpl-comm-body">
                     <span className="xpl-comm-num">{String(i + 1).padStart(2, "0")}</span>
-                    <div>
+                    <div className="xpl-comm-info">
                       <div className="xpl-comm-name">
                         {c.name}
                         {c.isFounding ? <span className="xpl-comm-founding">Founding</span> : null}
@@ -123,6 +124,13 @@ export function ExplorePage() {
                         {c.memberCount === 1 ? "member" : "members"}
                       </div>
                     </div>
+                    <CommunityJoinCta
+                      community={c}
+                      onJoined={(updated) =>
+                        setCommunities((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+                      }
+                      onRequest={() => navigate(`/communities/${c.id}`)}
+                    />
                   </div>
                   <ChevronIcon />
                 </Link>
@@ -139,6 +147,55 @@ export function ExplorePage() {
         ) : null}
       </section>
     </main>
+  );
+}
+
+/** Compact join CTA on an Explore rail card — auto-joins instantly-joinable
+ *  communities inline; screened ones route through to the full request flow. */
+function CommunityJoinCta({
+  community,
+  onJoined,
+  onRequest,
+}: {
+  community: CommunityCardDTO;
+  onJoined: (updated: CommunityCardDTO) => void;
+  onRequest: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const status = community.myMembershipStatus;
+
+  if (status === "active") return null;
+  if (status === "pending") {
+    return (
+      <span className="xpl-comm-join xpl-comm-join--pending" onClick={(e) => e.preventDefault()}>
+        Pending
+      </span>
+    );
+  }
+
+  async function handleClick(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (community.hasScreening) {
+      onRequest();
+      return;
+    }
+    if (busy) return;
+    setBusy(true);
+    try {
+      await api(`/api/communities/${community.id}/join`, { method: "POST", body: JSON.stringify({}) });
+      onJoined({ ...community, myMembershipStatus: "active", memberCount: community.memberCount + 1 });
+    } catch {
+      /* rail CTA fails quietly — the full community page has the real error state */
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button type="button" className="xpl-comm-join" disabled={busy} onClick={handleClick}>
+      {community.hasScreening ? "Request" : "Join"}
+    </button>
   );
 }
 

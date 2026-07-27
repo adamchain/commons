@@ -85,7 +85,14 @@ export function CreateCommunityPage() {
         </label>
         <label className="cmy-field">
           <span>Screening question <em className="cmy-hint">(optional — leave blank for instant join)</em></span>
-          <input className="cmy-input" value={screening} placeholder="e.g. What's your typical pace?" maxLength={280} onChange={(e) => setScreening(e.target.value)} />
+          <textarea
+            className="cmy-textarea"
+            rows={3}
+            value={screening}
+            placeholder="e.g. What's your typical pace?"
+            maxLength={280}
+            onChange={(e) => setScreening(e.target.value)}
+          />
         </label>
 
         {err && <p className="cmy-err">{err}</p>}

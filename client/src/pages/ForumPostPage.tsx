@@ -152,7 +152,7 @@ export function ForumPostPage() {
           >
             <HeartIcon filled={post.likedByMe} /> {post.likeCount}
           </button>
-          <button type="button" className="btn btn-secondary forum-make-plan-btn" onClick={makeThisAPlan}>
+          <button type="button" className="btn forum-make-plan-btn" onClick={makeThisAPlan}>
             Make this a plan
           </button>
         </div>
@@ -202,12 +202,26 @@ export function ForumPostPage() {
           value={reply}
           onChange={(e) => setReply(e.target.value)}
         />
-        <button type="submit" className="btn btn-primary" disabled={sending || !reply.trim()}>
-          {sending ? "…" : "Reply"}
+        <button
+          type="submit"
+          className="forum-reply-send-btn"
+          disabled={sending || !reply.trim()}
+          aria-label="Send reply"
+        >
+          <SendIcon />
         </button>
       </form>
       {error && <p className="error-text">{error}</p>}
     </main>
+  );
+}
+
+function SendIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M22 2 11 13" />
+      <path d="M22 2 15 22l-4-9-9-4 20-7z" />
+    </svg>
   );
 }
 
