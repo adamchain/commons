@@ -1,36 +1,63 @@
 // Thin wrapper over Google Cloud Storage for admin image uploads.
 //
 // Config (all via env):
-//   GCS_BUCKET            — bucket name (required to enable GCS uploads)
-//   GCS_PROJECT_ID        — optional; otherwise inferred from credentials
-//   GCS_KEY_FILE          — optional path to a service-account JSON. If unset,
-//                           the client uses Application Default Credentials
-//                           (GOOGLE_APPLICATION_CREDENTIALS, or Workload
-//                           Identity on Cloud Run / GKE).
+//   GCS_BUCKET / GCS_BUCKET_NAME — bucket name (required to enable GCS uploads)
+//   GCS_PROJECT_ID               — optional; otherwise inferred from credentials
+//   Credentials (pick one):
+//     GCS_CLIENT_EMAIL + GCS_PRIVATE_KEY — Railway-friendly (paste key with \n)
+//     GCS_KEY_FILE                       — path to a service-account JSON
+//     else Application Default Credentials (GOOGLE_APPLICATION_CREDENTIALS /
+//       Workload Identity on Cloud Run / GKE)
 //   GCS_PUBLIC_BASE_URL   — optional CDN / custom-domain base. Defaults to
 //                           https://storage.googleapis.com/<bucket>.
 //   GCS_DEFAULTS_PREFIX   — optional folder holding the standard placeholder
 //                           library images. Defaults to `defaults/`. "Load
 //                           default images" lists this folder and seeds it.
 //
-// When GCS_BUCKET is unset, `isGcsConfigured()` returns false and callers fall
-// back to storing the image inline (data URL) — so local dev works with no GCS.
+// When the bucket env is unset, `isGcsConfigured()` returns false and callers
+// fall back to storing the image inline (data URL) — so local dev works with
+// no GCS.
 
 import { randomUUID } from "node:crypto";
 import { Storage } from "@google-cloud/storage";
 
 let storage: Storage | null = null;
 
+/** Bucket name — accepts either Commons (`GCS_BUCKET`) or SuiteNote-style (`GCS_BUCKET_NAME`). */
+export function gcsBucketName(): string | undefined {
+  return process.env.GCS_BUCKET?.trim() || process.env.GCS_BUCKET_NAME?.trim() || undefined;
+}
+
 export function isGcsConfigured(): boolean {
-  return Boolean(process.env.GCS_BUCKET?.trim());
+  return Boolean(gcsBucketName());
+}
+
+/** Normalize private keys pasted into env vars (`\\n` → real newlines). */
+function normalizePrivateKey(raw: string): string {
+  return raw.replace(/\\n/g, "\n").trim();
 }
 
 function client(): Storage {
   if (!storage) {
-    storage = new Storage({
-      projectId: process.env.GCS_PROJECT_ID?.trim() || undefined,
-      keyFilename: process.env.GCS_KEY_FILE?.trim() || undefined,
-    });
+    const projectId = process.env.GCS_PROJECT_ID?.trim() || undefined;
+    const keyFilename = process.env.GCS_KEY_FILE?.trim() || undefined;
+    const clientEmail = process.env.GCS_CLIENT_EMAIL?.trim();
+    const privateKeyRaw = process.env.GCS_PRIVATE_KEY?.trim();
+
+    if (clientEmail && privateKeyRaw) {
+      storage = new Storage({
+        projectId,
+        credentials: {
+          client_email: clientEmail,
+          private_key: normalizePrivateKey(privateKeyRaw),
+        },
+      });
+    } else {
+      storage = new Storage({
+        projectId,
+        keyFilename: keyFilename || undefined,
+      });
+    }
   }
   return storage;
 }
@@ -65,7 +92,7 @@ export function parseDataUrl(dataUrl: string): { buffer: Buffer; contentType: st
  * `isGcsConfigured()` first.
  */
 export async function uploadCardImage(buffer: Buffer, contentType: string): Promise<string> {
-  const bucketName = process.env.GCS_BUCKET?.trim();
+  const bucketName = gcsBucketName();
   if (!bucketName) throw new Error("GCS_BUCKET is not configured");
 
   const ext = EXT_BY_MIME[contentType] ?? "jpg";
@@ -104,7 +131,7 @@ function labelFromObjectName(objectName: string): string {
  * storage/permission error so callers can surface it.
  */
 export async function listDefaultImages(): Promise<{ url: string; label: string }[]> {
-  const bucketName = process.env.GCS_BUCKET?.trim();
+  const bucketName = gcsBucketName();
   if (!bucketName) return [];
 
   const rawPrefix = process.env.GCS_DEFAULTS_PREFIX?.trim() || "defaults/";
