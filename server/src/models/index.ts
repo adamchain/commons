@@ -277,8 +277,10 @@ const CommunitySchema = new Schema<CommunityRecord>(
     creationStatus: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
     isFounding: { type: Boolean, default: false },
     bulletinPermission: { type: String, enum: ["organizer_only", "members"], default: "members" },
-    planPostingPermission: { type: String, enum: ["organizer_only", "members"], default: "organizer_only" },
+    planPostingPermission: { type: String, enum: ["organizer_only", "members"], default: "members" },
     chatEnabled: { type: Boolean, default: true },
+    bulletinEnabled: { type: Boolean, default: true },
+    bulletinRequiresApproval: { type: Boolean, default: false },
     visibility: { type: String, enum: ["everyone", "members_only"], default: "everyone" },
     screeningQuestion: { type: String, default: null },
     rejectionNote: { type: String, default: null },
@@ -321,6 +323,11 @@ const CommunityPostSchema = new Schema<CommunityPostRecord>(
     content: { type: String, default: "" },
     image: { type: String, default: null },
     pinned: { type: Boolean, default: false },
+    approvalStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "approved",
+    },
     createdAt: { type: String, required: true },
     deletedAt: { type: String, default: null },
   },
@@ -328,6 +335,7 @@ const CommunityPostSchema = new Schema<CommunityPostRecord>(
 );
 CommunityPostSchema.index({ id: 1 }, { unique: true });
 CommunityPostSchema.index({ communityId: 1, createdAt: -1 });
+CommunityPostSchema.index({ communityId: 1, approvalStatus: 1 });
 export const CommunityPostModel = compile<CommunityPostRecord>("CommunityPost", CommunityPostSchema);
 
 // Interest Forums — one row per InterestTag (citywide topic boards).

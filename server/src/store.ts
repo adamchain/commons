@@ -363,6 +363,10 @@ export interface CommunityRecord {
   bulletinPermission: CommunityPostingPermission;
   planPostingPermission: CommunityPostingPermission;
   chatEnabled: boolean;
+  /** When false, the bulletin tab/posts are hidden — organizer toggle. */
+  bulletinEnabled: boolean;
+  /** When true, member posts wait for organizer approval before going live. */
+  bulletinRequiresApproval: boolean;
   /** Who can see inside (bulletin/events/members). Discovery info stays public either way. */
   visibility: CommunityAccessLevel;
   screeningQuestion?: string | null;
@@ -397,6 +401,11 @@ export interface CommunityPostRecord {
   content: string;
   image?: string | null;
   pinned: boolean;
+  /**
+   * Approval gate when the community has bulletinRequiresApproval on.
+   * Missing/undefined on legacy rows is treated as approved.
+   */
+  approvalStatus?: "pending" | "approved" | "rejected";
   createdAt: string;
   /** Soft delete — non-null means hidden. */
   deletedAt?: string | null;
@@ -1678,8 +1687,10 @@ export const store = {
       creationStatus: input.creationStatus ?? "pending",
       isFounding: input.isFounding ?? false,
       bulletinPermission: input.bulletinPermission ?? "members",
-      planPostingPermission: input.planPostingPermission ?? "organizer_only",
+      planPostingPermission: input.planPostingPermission ?? "members",
       chatEnabled: true,
+      bulletinEnabled: true,
+      bulletinRequiresApproval: false,
       visibility: "everyone",
       screeningQuestion: input.screeningQuestion ?? null,
       rejectionNote: null,
@@ -1803,12 +1814,27 @@ export const store = {
   // ---- Community bulletin posts ----
   listCommunityPosts(communityId: string): CommunityPostRecord[] {
     return snapshot.communityPosts
-      .filter((p) => p.communityId === communityId && !p.deletedAt)
+      .filter(
+        (p) =>
+          p.communityId === communityId &&
+          !p.deletedAt &&
+          (p.approvalStatus ?? "approved") === "approved",
+      )
       .sort((a, b) => {
         // Pinned first, then reverse-chron.
         if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
         return b.createdAt.localeCompare(a.createdAt);
       });
+  },
+  listPendingCommunityPosts(communityId: string): CommunityPostRecord[] {
+    return snapshot.communityPosts
+      .filter(
+        (p) =>
+          p.communityId === communityId &&
+          !p.deletedAt &&
+          p.approvalStatus === "pending",
+      )
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
   findCommunityPostById(id: string): CommunityPostRecord | undefined {
     return snapshot.communityPosts.find((p) => p.id === id && !p.deletedAt);
@@ -1818,6 +1844,7 @@ export const store = {
     authorId: string;
     content: string;
     image?: string | null;
+    approvalStatus?: "pending" | "approved";
   }): CommunityPostRecord {
     const row: CommunityPostRecord = {
       id: randomUUID(),
@@ -1826,10 +1853,27 @@ export const store = {
       content: input.content,
       image: input.image ?? null,
       pinned: false,
+      approvalStatus: input.approvalStatus ?? "approved",
       createdAt: new Date().toISOString(),
       deletedAt: null,
     };
     snapshot.communityPosts.push(row);
+    persist();
+    mongoMirror.upsertCommunityPost(row);
+    return row;
+  },
+  setCommunityPostApprovalStatus(
+    id: string,
+    status: "approved" | "rejected",
+  ): CommunityPostRecord | undefined {
+    const row = snapshot.communityPosts.find((p) => p.id === id && !p.deletedAt);
+    if (!row) return undefined;
+    if (status === "rejected") {
+      row.approvalStatus = "rejected";
+      row.deletedAt = new Date().toISOString();
+    } else {
+      row.approvalStatus = "approved";
+    }
     persist();
     mongoMirror.upsertCommunityPost(row);
     return row;

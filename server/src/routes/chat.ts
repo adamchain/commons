@@ -170,7 +170,7 @@ chatRouter.get("/conversations/:id/messages", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Not a participant" });
     return;
   }
-  const hostId = store.findPlanById(conv.planId)?.creatorId ?? "";
+  const hostId = conversationHostId(conv);
   const raw = store.listMessagesForConversation(convId);
   const messages = await Promise.all(raw.map((m) => toMessageDto(m, userId, hostId)));
   res.json(messages);
@@ -266,7 +266,7 @@ chatRouter.post("/conversations/:id/polls", requireAuth, async (req, res) => {
       });
     }
   }
-  const hostId = store.findPlanById(conv.planId)?.creatorId ?? "";
+  const hostId = conversationHostId(conv);
   res.status(201).json(await toMessageDto(message, userId, hostId));
 });
 
@@ -290,12 +290,12 @@ chatRouter.post("/conversations/:id/messages/:msgId/vote", requireAuth, async (r
     res.status(404).json({ error: "Poll not found" });
     return;
   }
-  const hostId = store.findPlanById(conv.planId)?.creatorId ?? "";
+  const hostId = conversationHostId(conv);
   res.json(await toMessageDto(updated, userId, hostId));
 });
 
 // POST /api/conversations/:id/messages/:msgId/close-poll
-// Only the poll's author or the plan host can freeze results.
+// Only the poll's author or the plan host / community organizer can freeze results.
 chatRouter.post("/conversations/:id/messages/:msgId/close-poll", requireAuth, async (req, res) => {
   const convId = String(req.params.id);
   const msgId = String(req.params.msgId);
@@ -314,7 +314,7 @@ chatRouter.post("/conversations/:id/messages/:msgId/close-poll", requireAuth, as
     res.status(404).json({ error: "Poll not found" });
     return;
   }
-  const hostId = store.findPlanById(conv.planId)?.creatorId ?? "";
+  const hostId = conversationHostId(conv);
   if (userId !== existing.senderId && userId !== hostId) {
     res.status(403).json({ error: "Only the poll's author or the host can close it" });
     return;
@@ -328,7 +328,7 @@ chatRouter.post("/conversations/:id/messages/:msgId/close-poll", requireAuth, as
 });
 
 // POST /api/conversations/:id/messages/:msgId/reopen-poll
-// Mirror of close-poll: only the poll's author or the plan host can re-open it.
+// Mirror of close-poll: only the poll's author or the plan host / community organizer can re-open it.
 chatRouter.post("/conversations/:id/messages/:msgId/reopen-poll", requireAuth, async (req, res) => {
   const convId = String(req.params.id);
   const msgId = String(req.params.msgId);
@@ -347,7 +347,7 @@ chatRouter.post("/conversations/:id/messages/:msgId/reopen-poll", requireAuth, a
     res.status(404).json({ error: "Poll not found" });
     return;
   }
-  const hostId = store.findPlanById(conv.planId)?.creatorId ?? "";
+  const hostId = conversationHostId(conv);
   if (userId !== existing.senderId && userId !== hostId) {
     res.status(403).json({ error: "Only the poll's author or the host can re-open it" });
     return;
@@ -425,15 +425,22 @@ function truncate(s: string, n: number): string {
   return s.length <= n ? s : s.slice(0, n - 1) + "…";
 }
 
+function conversationHostId(
+  conv: NonNullable<ReturnType<typeof store.findConversationById>>,
+): string {
+  if (conv.communityId) {
+    return store.findCommunityById(conv.communityId)?.organizerId ?? "";
+  }
+  return store.findPlanById(conv.planId)?.creatorId ?? "";
+}
+
 async function toConversationDto(
   conv: NonNullable<ReturnType<typeof store.findConversationById>>,
   _viewerId: string,
 ): Promise<ConversationDTO> {
   const messages = store.listMessagesForConversation(conv.id);
   const users = await findUsersByIds(conv.participantIds);
-  const hostId = conv.communityId
-    ? store.findCommunityById(conv.communityId)?.organizerId ?? ""
-    : store.findPlanById(conv.planId)?.creatorId ?? "";
+  const hostId = conversationHostId(conv);
   return {
     id: conv.id,
     planId: conv.planId,

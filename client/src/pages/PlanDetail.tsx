@@ -10,6 +10,7 @@ import { ParticipationButtons } from "../components/ParticipationButtons";
 import { ShareSheet } from "../components/ShareSheet";
 import { useAuth } from "../context/AuthContext";
 import { planHasEnded } from "../lib/planTime";
+import { useCardImages, pickCoverImage } from "../lib/cardImages";
 import { formatPlaceAddress, formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
 import { type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
 
@@ -40,6 +41,7 @@ export function PlanDetailPage() {
   const [showAllGoing, setShowAllGoing] = useState(false);
   const [showAllInterested, setShowAllInterested] = useState(false);
   const lockFormRef = useRef<HTMLDivElement | null>(null);
+  const coverPool = useCardImages();
 
   const load = async () => {
     const data = await api<PlanDTO>(`/api/plans/${id}`);
@@ -188,9 +190,9 @@ export function PlanDetailPage() {
     }
   }
 
-  // No stock cover photos — a real flyer/photo or nothing (the hero falls
-  // back to the tan surface color, matching the feed card treatment).
-  const coverSrc = plan.flyerDataUrl ?? null;
+  // Uploaded flyer/photo, or a stable stock cover from the admin library —
+  // same treatment as the feed card so the hero matches its thumbnail.
+  const coverSrc = plan.flyerDataUrl ?? pickCoverImage(coverPool, plan.id);
   const prettyAddress = formatPlaceAddress(plan.location.address);
   const showAddressLine = prettyAddress && prettyAddress !== plan.location.name;
   const mapsQuery = encodeURIComponent(

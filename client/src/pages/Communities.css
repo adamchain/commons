@@ -343,6 +343,13 @@
   gap: 6px;
 }
 .cmy-post--pinned { border: 1px solid var(--community-pink-border); }
+.cmy-post--pending { border: 1px dashed var(--hairline, rgba(0, 0, 0, 0.15)); background: var(--paper-50, #fafafa); }
+.cmy-pending-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-subtle);
+  white-space: nowrap;
+}
 .cmy-pinned-label {
   display: inline-flex;
   align-items: center;

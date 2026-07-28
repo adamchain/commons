@@ -40,6 +40,7 @@ export function CommunityDetailPage() {
     try {
       const c = await api<CommunityDTO>(`/api/communities/${id}`);
       setCommunity(c);
+      setTab((prev) => (prev === "bulletin" && !c.bulletinEnabled ? "events" : prev));
       try {
         const m = await api<{ members: CommunityMemberDTO[] }>(`/api/communities/${id}/members`);
         setPreviewMembers(m.members.slice(0, 3));
@@ -56,6 +57,13 @@ export function CommunityDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // If the organizer turns the bulletin off while you're on that tab, land on Events.
+  useEffect(() => {
+    if (community && !community.bulletinEnabled && tab === "bulletin") {
+      setTab("events");
+    }
+  }, [community, tab]);
 
   if (loading) {
     return (
@@ -142,13 +150,17 @@ export function CommunityDetailPage() {
 
       {/* Tabs */}
       <nav className="cmy-tabs" role="tablist">
-        <TabButton id="bulletin" tab={tab} setTab={setTab}>Bulletin</TabButton>
+        {community.bulletinEnabled && (
+          <TabButton id="bulletin" tab={tab} setTab={setTab} badge={community.pendingBulletinCount || undefined}>
+            Bulletin
+          </TabButton>
+        )}
         <TabButton id="events" tab={tab} setTab={setTab}>Events</TabButton>
         <TabButton id="members" tab={tab} setTab={setTab} badge={community.pendingRequestCount || undefined}>Members</TabButton>
         {community.isOrganizer && <TabButton id="settings" tab={tab} setTab={setTab}>Settings</TabButton>}
       </nav>
 
-      {tab === "bulletin" && (canSeeInside ? <BulletinTab community={community} /> : <LockedPanel />)}
+      {tab === "bulletin" && community.bulletinEnabled && (canSeeInside ? <BulletinTab community={community} onPendingChange={load} /> : <LockedPanel />)}
       {tab === "events" && (
         canSeeInside ? (
           <EventsTab community={community} onPostPlan={() => navigate(`/plans/new?communityId=${community.id}`)} />
@@ -320,14 +332,18 @@ function JoinControl({
   );
 }
 
-function BulletinTab({ community }: { community: CommunityDTO }) {
+function BulletinTab({ community, onPendingChange }: { community: CommunityDTO; onPendingChange?: () => void }) {
   const [posts, setPosts] = useState<CommunityPostDTO[]>([]);
+  const [pending, setPending] = useState<CommunityPostDTO[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const r = await api<{ posts: CommunityPostDTO[] }>(`/api/communities/${community.id}/posts`);
+    const r = await api<{ posts: CommunityPostDTO[]; pending?: CommunityPostDTO[] }>(
+      `/api/communities/${community.id}/posts`,
+    );
     setPosts(r.posts);
+    setPending(r.pending ?? []);
   }, [community.id]);
 
   useEffect(() => {
@@ -344,6 +360,7 @@ function BulletinTab({ community }: { community: CommunityDTO }) {
       });
       setDraft("");
       await load();
+      onPendingChange?.();
     } finally {
       setBusy(false);
     }
@@ -352,6 +369,7 @@ function BulletinTab({ community }: { community: CommunityDTO }) {
   async function del(postId: string) {
     await api(`/api/communities/${community.id}/posts/${postId}`, { method: "DELETE" });
     await load();
+    onPendingChange?.();
   }
   async function togglePin(post: CommunityPostDTO) {
     await api(`/api/communities/${community.id}/posts/${post.id}/pin`, {
@@ -360,12 +378,82 @@ function BulletinTab({ community }: { community: CommunityDTO }) {
     });
     await load();
   }
+  async function approve(postId: string) {
+    await api(`/api/communities/${community.id}/posts/${postId}/approve`, { method: "POST" });
+    await load();
+    onPendingChange?.();
+  }
+  async function decline(postId: string) {
+    await api(`/api/communities/${community.id}/posts/${postId}/decline`, { method: "POST" });
+    await load();
+    onPendingChange?.();
+  }
+
+  const livePosts = posts.filter((p) => p.approvalStatus === "approved");
+  const myPending = posts.filter((p) => p.approvalStatus === "pending");
+  const composerHint = community.bulletinRequiresApproval && !community.isOrganizer
+    ? "Submit a post for approval…"
+    : "Post something to the group…";
 
   return (
     <section className="cmy-tabpanel">
-      {posts.length === 0 && <p className="cmy-muted">No posts yet. Start the conversation.</p>}
+      {community.isOrganizer && pending.length > 0 && (
+        <div className="cmy-requests">
+          <h3 className="cmy-subhead">Awaiting approval</h3>
+          <ul className="cmy-post-list">
+            {pending.map((p) => (
+              <li key={p.id} className="cmy-post cmy-post--pending">
+                <div className="cmy-post-head">
+                  <Avatar seed={p.author.avatarSeed} style={p.author.avatarStyle} photoDataUrl={p.author.avatarPhotoDataUrl} params={p.author.avatarParams} size="sm" />
+                  <span className="cmy-post-name">{p.author.firstName}</span>
+                  <span className="cmy-post-time">{formatRelative(p.createdAt)}</span>
+                </div>
+                {p.content && <p className="cmy-post-body">{p.content}</p>}
+                {p.image && <img className="cmy-post-image" src={p.image} alt="" loading="lazy" />}
+                <div className="cmy-join-row">
+                  <button type="button" className="cmy-btn cmy-btn--primary cmy-btn--sm" onClick={() => approve(p.id)}>
+                    Approve
+                  </button>
+                  <button type="button" className="cmy-btn cmy-btn--ghost cmy-btn--sm" onClick={() => decline(p.id)}>
+                    Decline
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {!community.isOrganizer && myPending.length > 0 && (
+        <div className="cmy-requests">
+          <h3 className="cmy-subhead">Your posts awaiting approval</h3>
+          <ul className="cmy-post-list">
+            {myPending.map((p) => (
+              <li key={p.id} className="cmy-post cmy-post--pending">
+                <div className="cmy-post-head">
+                  <Avatar seed={p.author.avatarSeed} style={p.author.avatarStyle} photoDataUrl={p.author.avatarPhotoDataUrl} params={p.author.avatarParams} size="sm" />
+                  <span className="cmy-post-name">{p.author.firstName}</span>
+                  <span className="cmy-pending-badge">Pending</span>
+                  <span className="cmy-post-time">{formatRelative(p.createdAt)}</span>
+                  {p.canDelete && (
+                    <div className="cmy-post-actions">
+                      <button type="button" className="cmy-icon-btn" onClick={() => del(p.id)} title="Delete">×</button>
+                    </div>
+                  )}
+                </div>
+                {p.content && <p className="cmy-post-body">{p.content}</p>}
+                {p.image && <img className="cmy-post-image" src={p.image} alt="" loading="lazy" />}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {livePosts.length === 0 && pending.length === 0 && myPending.length === 0 && (
+        <p className="cmy-muted">No posts yet. Start the conversation.</p>
+      )}
       <ul className="cmy-post-list">
-        {posts.map((p) => (
+        {livePosts.map((p) => (
           <li key={p.id} className={`cmy-post ${p.pinned ? "cmy-post--pinned" : ""}`}>
             <div className="cmy-post-head">
               <Avatar seed={p.author.avatarSeed} style={p.author.avatarStyle} photoDataUrl={p.author.avatarPhotoDataUrl} params={p.author.avatarParams} size="sm" />
@@ -395,7 +483,7 @@ function BulletinTab({ community }: { community: CommunityDTO }) {
           <input
             type="text"
             className="cmy-composer-input"
-            placeholder="Post something to the group…"
+            placeholder={composerHint}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -403,7 +491,7 @@ function BulletinTab({ community }: { community: CommunityDTO }) {
             }}
           />
           <button type="button" className="cmy-btn cmy-btn--primary cmy-btn--sm" disabled={busy || !draft.trim()} onClick={submit}>
-            Post
+            {community.bulletinRequiresApproval && !community.isOrganizer ? "Submit" : "Post"}
           </button>
         </div>
       )}
@@ -523,6 +611,8 @@ function SettingsTab({ community, onSaved }: { community: CommunityDTO; onSaved:
   const [bulletinPermission, setBulletinPermission] = useState<CommunityPostingPermission>(community.bulletinPermission);
   const [planPostingPermission, setPlanPostingPermission] = useState<CommunityPostingPermission>(community.planPostingPermission);
   const [chatEnabled, setChatEnabled] = useState(community.chatEnabled);
+  const [bulletinEnabled, setBulletinEnabled] = useState(community.bulletinEnabled);
+  const [bulletinRequiresApproval, setBulletinRequiresApproval] = useState(community.bulletinRequiresApproval);
   const [visibility, setVisibility] = useState<CommunityAccessLevel>(community.visibility);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -543,6 +633,8 @@ function SettingsTab({ community, onSaved }: { community: CommunityDTO; onSaved:
           bulletinPermission,
           planPostingPermission,
           chatEnabled,
+          bulletinEnabled,
+          bulletinRequiresApproval,
           visibility,
         }),
       });
@@ -584,20 +676,48 @@ function SettingsTab({ community, onSaved }: { community: CommunityDTO; onSaved:
         />
       </label>
 
-      <div className="cmy-field">
-        <span>Who can post to the bulletin?</span>
-        <Segmented
-          value={bulletinPermission}
-          onChange={setBulletinPermission}
-          options={[["members", "All members"], ["organizer_only", "Organizer only"]]}
-        />
+      <div className="cmy-toggle-row">
+        <span>Bulletin</span>
+        <button
+          type="button"
+          className={`cmy-chip-toggle ${bulletinEnabled ? "is-active" : ""}`}
+          aria-pressed={bulletinEnabled}
+          onClick={() => setBulletinEnabled((v) => !v)}
+        >
+          {bulletinEnabled ? "On" : "Off"}
+        </button>
       </div>
+      {bulletinEnabled && (
+        <>
+          <div className="cmy-field">
+            <span>Who can post to the bulletin?</span>
+            <Segmented
+              value={bulletinPermission}
+              onChange={setBulletinPermission}
+              options={[["members", "All members"], ["organizer_only", "Organizer only"]]}
+            />
+          </div>
+          {bulletinPermission === "members" && (
+            <div className="cmy-toggle-row">
+              <span>Require approval for member posts</span>
+              <button
+                type="button"
+                className={`cmy-chip-toggle ${bulletinRequiresApproval ? "is-active" : ""}`}
+                aria-pressed={bulletinRequiresApproval}
+                onClick={() => setBulletinRequiresApproval((v) => !v)}
+              >
+                {bulletinRequiresApproval ? "On" : "Off"}
+              </button>
+            </div>
+          )}
+        </>
+      )}
       <div className="cmy-field">
         <span>Who can post plans?</span>
         <Segmented
           value={planPostingPermission}
           onChange={setPlanPostingPermission}
-          options={[["organizer_only", "Organizer only"], ["members", "All members"]]}
+          options={[["members", "All members"], ["organizer_only", "Organizer only"]]}
         />
       </div>
       <div className="cmy-field">

@@ -47,7 +47,8 @@ async function toCommunityDTO(
   const isOrganizer = community.organizerId === viewerId || viewerIsAdmin;
   const isActiveMember = membership?.status === "active";
   const canPostBulletin =
-    isOrganizer || (community.bulletinPermission === "members" && isActiveMember);
+    (community.bulletinEnabled ?? true) &&
+    (isOrganizer || (community.bulletinPermission === "members" && isActiveMember));
   const canPostPlan =
     isOrganizer || (community.planPostingPermission === "members" && isActiveMember);
   return {
@@ -65,6 +66,8 @@ async function toCommunityDTO(
     bulletinPermission: community.bulletinPermission,
     planPostingPermission: community.planPostingPermission,
     chatEnabled: community.chatEnabled,
+    bulletinEnabled: community.bulletinEnabled ?? true,
+    bulletinRequiresApproval: community.bulletinRequiresApproval ?? false,
     visibility: community.visibility ?? "everyone",
     screeningQuestion: isOrganizer ? community.screeningQuestion ?? null : null,
     hasScreening: !!community.screeningQuestion,
@@ -76,6 +79,7 @@ async function toCommunityDTO(
     canPostBulletin,
     canPostPlan,
     pendingRequestCount: isOrganizer ? store.listPendingCommunityMembers(community.id).length : 0,
+    pendingBulletinCount: isOrganizer ? store.listPendingCommunityPosts(community.id).length : 0,
   };
 }
 
@@ -101,6 +105,7 @@ function postDTO(
   viewerId: string,
   viewerIsOrganizer: boolean,
 ): CommunityPostDTO {
+  const status = post.approvalStatus ?? "approved";
   return {
     id: post.id,
     author: publicFor(post.authorId, users),
@@ -108,6 +113,7 @@ function postDTO(
     content: post.content,
     image: post.image ?? null,
     pinned: post.pinned,
+    approvalStatus: status === "pending" ? "pending" : "approved",
     createdAt: post.createdAt,
     canDelete: viewerIsOrganizer || post.authorId === viewerId,
   };
@@ -285,6 +291,12 @@ communitiesRouter.patch("/:id", requireAuth, async (req, res) => {
   }
   if ("chatEnabled" in (req.body ?? {})) {
     patch.chatEnabled = Boolean(req.body.chatEnabled);
+  }
+  if ("bulletinEnabled" in (req.body ?? {})) {
+    patch.bulletinEnabled = Boolean(req.body.bulletinEnabled);
+  }
+  if ("bulletinRequiresApproval" in (req.body ?? {})) {
+    patch.bulletinRequiresApproval = Boolean(req.body.bulletinRequiresApproval);
   }
   if (req.body?.visibility === "everyone" || req.body?.visibility === "members_only") {
     patch.visibility = req.body.visibility;
@@ -492,6 +504,10 @@ communitiesRouter.get("/:id/posts", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Community not found" });
     return;
   }
+  if (!(community.bulletinEnabled ?? true)) {
+    res.status(403).json({ error: "Bulletin is turned off for this community" });
+    return;
+  }
   const viewerIsOrganizer =
     community.organizerId === viewerId || (await isCommonsAdmin(viewerId));
   if (!canSeeInside(community, viewerId, viewerIsOrganizer)) {
@@ -499,9 +515,20 @@ communitiesRouter.get("/:id/posts", requireAuth, async (req, res) => {
     return;
   }
   const posts = store.listCommunityPosts(community.id);
-  const users = await findUsersByIds(posts.map((p) => p.authorId));
+  // Authors can see their own pending posts on the feed; organizers get the
+  // full pending queue in a separate array for the approval UI.
+  const myPending = viewerIsOrganizer
+    ? []
+    : store.listPendingCommunityPosts(community.id).filter((p) => p.authorId === viewerId);
+  const pending = viewerIsOrganizer ? store.listPendingCommunityPosts(community.id) : [];
+  const allForUsers = [...posts, ...myPending, ...pending];
+  const users = await findUsersByIds(allForUsers.map((p) => p.authorId));
   res.json({
-    posts: posts.map((p) => postDTO(p, users, community.organizerId, viewerId, viewerIsOrganizer)),
+    posts: [
+      ...myPending.map((p) => postDTO(p, users, community.organizerId, viewerId, viewerIsOrganizer)),
+      ...posts.map((p) => postDTO(p, users, community.organizerId, viewerId, viewerIsOrganizer)),
+    ],
+    pending: pending.map((p) => postDTO(p, users, community.organizerId, viewerId, viewerIsOrganizer)),
   });
 });
 
@@ -511,6 +538,10 @@ communitiesRouter.post("/:id/posts", requireAuth, async (req, res) => {
   const community = store.findCommunityById(String(req.params.id));
   if (!community || community.creationStatus !== "approved") {
     res.status(404).json({ error: "Community not found" });
+    return;
+  }
+  if (!(community.bulletinEnabled ?? true)) {
+    res.status(403).json({ error: "Bulletin is turned off for this community" });
     return;
   }
   const viewerIsOrganizer =
@@ -531,17 +562,69 @@ communitiesRouter.post("/:id/posts", requireAuth, async (req, res) => {
     res.status(400).json({ error: "Write something to post" });
     return;
   }
+  // Organizer posts are always live. Member posts wait when approval is required.
+  const needsApproval =
+    !viewerIsOrganizer && (community.bulletinRequiresApproval ?? false);
   const post = store.createCommunityPost({
     communityId: community.id,
     authorId: viewerId,
     content,
     image,
+    approvalStatus: needsApproval ? "pending" : "approved",
   });
   const users = await findUsersByIds([post.authorId]);
-  store.log("community_post_created", { communityId: community.id, postId: post.id });
+  store.log("community_post_created", {
+    communityId: community.id,
+    postId: post.id,
+    approvalStatus: post.approvalStatus,
+  });
   res
     .status(201)
     .json(postDTO(post, users, community.organizerId, viewerId, viewerIsOrganizer));
+});
+
+// POST /api/communities/:id/posts/:postId/approve — organizer approves a pending post.
+communitiesRouter.post("/:id/posts/:postId/approve", requireAuth, async (req, res) => {
+  const viewerId = String(req.userId);
+  const community = store.findCommunityById(String(req.params.id));
+  if (!community) {
+    res.status(404).json({ error: "Community not found" });
+    return;
+  }
+  if (community.organizerId !== viewerId && !(await isCommonsAdmin(viewerId))) {
+    res.status(403).json({ error: "Only the organizer can approve posts" });
+    return;
+  }
+  const post = store.findCommunityPostById(String(req.params.postId));
+  if (!post || post.communityId !== community.id || post.approvalStatus !== "pending") {
+    res.status(404).json({ error: "Pending post not found" });
+    return;
+  }
+  store.setCommunityPostApprovalStatus(post.id, "approved");
+  store.log("community_post_approved", { communityId: community.id, postId: post.id });
+  res.json({ ok: true });
+});
+
+// POST /api/communities/:id/posts/:postId/decline — organizer declines a pending post.
+communitiesRouter.post("/:id/posts/:postId/decline", requireAuth, async (req, res) => {
+  const viewerId = String(req.userId);
+  const community = store.findCommunityById(String(req.params.id));
+  if (!community) {
+    res.status(404).json({ error: "Community not found" });
+    return;
+  }
+  if (community.organizerId !== viewerId && !(await isCommonsAdmin(viewerId))) {
+    res.status(403).json({ error: "Only the organizer can decline posts" });
+    return;
+  }
+  const post = store.findCommunityPostById(String(req.params.postId));
+  if (!post || post.communityId !== community.id || post.approvalStatus !== "pending") {
+    res.status(404).json({ error: "Pending post not found" });
+    return;
+  }
+  store.setCommunityPostApprovalStatus(post.id, "rejected");
+  store.log("community_post_declined", { communityId: community.id, postId: post.id });
+  res.json({ ok: true });
 });
 
 // POST /api/communities/:id/posts/:postId/pin — organizer pin/unpin. { pinned }
@@ -552,6 +635,10 @@ communitiesRouter.post("/:id/posts/:postId/pin", requireAuth, async (req, res) =
     res.status(404).json({ error: "Community not found" });
     return;
   }
+  if (!(community.bulletinEnabled ?? true)) {
+    res.status(403).json({ error: "Bulletin is turned off for this community" });
+    return;
+  }
   if (community.organizerId !== viewerId && !(await isCommonsAdmin(viewerId))) {
     res.status(403).json({ error: "Only the organizer can pin posts" });
     return;
@@ -559,6 +646,10 @@ communitiesRouter.post("/:id/posts/:postId/pin", requireAuth, async (req, res) =
   const post = store.findCommunityPostById(String(req.params.postId));
   if (!post || post.communityId !== community.id) {
     res.status(404).json({ error: "Post not found" });
+    return;
+  }
+  if ((post.approvalStatus ?? "approved") !== "approved") {
+    res.status(400).json({ error: "Only approved posts can be pinned" });
     return;
   }
   store.setCommunityPostPinned(post.id, Boolean(req.body?.pinned));
@@ -639,6 +730,7 @@ communitiesRouter.get("/:id/conversation", requireAuth, async (req, res) => {
   const conv = store.ensureCommunityConversation(community.id, activeIds);
   const users = await findUsersByIds(conv.participantIds);
   const messages = store.listMessagesForConversation(conv.id);
+  const hostId = community.organizerId;
   res.json({
     id: conv.id,
     communityId: community.id,
@@ -647,5 +739,8 @@ communitiesRouter.get("/:id/conversation", requireAuth, async (req, res) => {
     participants: conv.participantIds.map((id) => publicFor(id, users)),
     lastMessageAt: conv.lastMessageAt,
     unreadCount: messages.filter((m) => !m.readBy.includes(viewerId)).length,
+    muted: store.isConversationMuted(viewerId, conv.id),
+    isHost: hostId === viewerId || (await isCommonsAdmin(viewerId)),
+    hostId,
   });
 });

@@ -8,10 +8,12 @@ import type { MeDTO, PlanDTO } from "../types/shared";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
 import { planHasEnded } from "../lib/planTime";
 import { useNeighborhoods } from "../lib/useNeighborhoods";
+import { useCardImages, pickCoverImage } from "../lib/cardImages";
 
 /**
  * Compact event card. Looking-for (2+ flexible fields) gets a red left edge;
- * confirmed plans are plain white. No stock cover images — photo only if uploaded.
+ * confirmed plans are plain white. Shows the uploaded flyer, or a stable stock
+ * cover from the admin library so cards are never blank.
  */
 export function PlanCard({
   plan,
@@ -28,7 +30,8 @@ export function PlanCard({
   const flexCount = (plan.isFlexibleTime ? 1 : 0) + (plan.isFlexibleLocation ? 1 : 0);
   // Only 2+ flexible fields = Looking For card. One flexible field = confirmed.
   const isLooking = plan.planKind === "looking_for" && flexCount > 1 && !plan.lockedAt;
-  const coverImage = plan.flyerDataUrl ?? null;
+  const coverPool = useCardImages();
+  const coverImage = plan.flyerDataUrl ?? pickCoverImage(coverPool, plan.id);
   const hoods = useNeighborhoods();
   const hoodName = hoods[plan.neighborhoodId]?.name ?? null;
   const isCancelled = Boolean(plan.cancelledAt);

@@ -499,6 +499,10 @@ export interface CommunityDTO {
   bulletinPermission: CommunityPostingPermission;
   planPostingPermission: CommunityPostingPermission;
   chatEnabled: boolean;
+  /** When false, the bulletin is turned off for this community. */
+  bulletinEnabled: boolean;
+  /** When true, member posts wait for organizer approval before going live. */
+  bulletinRequiresApproval: boolean;
   /** Who can see inside (bulletin/events/members) — discovery info is always public. */
   visibility: CommunityAccessLevel;
   /** Only exposed to the organizer/admin (others get null). */
@@ -516,6 +520,8 @@ export interface CommunityDTO {
   canPostPlan: boolean;
   /** Count of pending join requests — only populated for the organizer/admin (0 otherwise). */
   pendingRequestCount: number;
+  /** Count of bulletin posts awaiting approval — organizer/admin only (0 otherwise). */
+  pendingBulletinCount: number;
 }
 
 export interface CommunityMemberDTO {
@@ -534,6 +540,8 @@ export interface CommunityPostDTO {
   content: string;
   image: string | null;
   pinned: boolean;
+  /** pending = awaiting organizer approval; approved = live on the bulletin. */
+  approvalStatus: "pending" | "approved";
   createdAt: string;
   /** Viewer may delete this post (own post, or organizer/admin on any). */
   canDelete: boolean;
