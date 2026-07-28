@@ -8808,24 +8808,32 @@ h1, h2, h3, h4, h5, h6 {
   overflow-y: auto;
   min-height: 0;
   flex: 1;
+  align-content: start;
+  align-items: start;
 }
 .cover-lib-tile {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  height: auto;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   overflow: hidden;
   padding: 0;
+  margin: 0;
   cursor: pointer;
   background: var(--surface);
-  min-height: 0;
-  aspect-ratio: 16 / 10;
+  /* Keep the button from stretching/collapsing in the grid and letting imgs paint over neighbors. */
+  align-self: start;
 }
 .cover-lib-tile.is-pending {
   background: var(--surface-2, #eee);
 }
 .cover-lib-skel {
+  position: absolute;
+  inset: 0;
   display: block;
-  width: 100%;
-  height: 100%;
   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
   background-size: 200% 100%;
   animation: cover-skel 1.1s ease-in-out infinite;
@@ -8835,6 +8843,8 @@ h1, h2, h3, h4, h5, h6 {
   100% { background-position: -100% 0; }
 }
 .cover-lib-tile img {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
