@@ -62,7 +62,13 @@ function client(): Storage {
   return storage;
 }
 
-function publicUrl(bucket: string, objectPath: string): string {
+function publicUrl(bucket: string, objectPath: string, downloadToken?: string): string {
+  // Firebase Storage download-token URLs work on buckets with uniform access
+  // (plain storage.googleapis.com URLs 403 without public IAM).
+  if (downloadToken) {
+    const encoded = encodeURIComponent(objectPath);
+    return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encoded}?alt=media&token=${downloadToken}`;
+  }
   const base = process.env.GCS_PUBLIC_BASE_URL?.trim().replace(/\/$/, "");
   if (base) return `${base}/${objectPath}`;
   return `https://storage.googleapis.com/${bucket}/${objectPath}`;
@@ -98,11 +104,15 @@ export async function uploadCardImage(buffer: Buffer, contentType: string): Prom
   const ext = EXT_BY_MIME[contentType] ?? "jpg";
   const objectPath = `card-images/${randomUUID()}.${ext}`;
   const file = client().bucket(bucketName).file(objectPath);
+  const downloadToken = randomUUID();
 
   await file.save(buffer, {
     contentType,
     resumable: false,
-    metadata: { cacheControl: "public, max-age=31536000, immutable" },
+    metadata: {
+      cacheControl: "public, max-age=31536000, immutable",
+      metadata: { firebaseStorageDownloadTokens: downloadToken },
+    },
   });
 
   // Best-effort public ACL. No-op (and ignored) on uniform bucket-level access
@@ -110,10 +120,10 @@ export async function uploadCardImage(buffer: Buffer, contentType: string): Prom
   try {
     await file.makePublic();
   } catch {
-    /* uniform bucket-level access — bucket IAM controls visibility */
+    /* uniform bucket-level access — Firebase download token URL still works */
   }
 
-  return publicUrl(bucketName, objectPath);
+  return publicUrl(bucketName, objectPath, downloadToken);
 }
 
 /** Turn `defaults/summer-bbq.jpg` into a friendly label like "Summer Bbq". */
@@ -124,6 +134,17 @@ function labelFromObjectName(objectName: string): string {
   return stem.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/** `defaults/Night-Out/foo.jpg` → "Night Out". */
+function categoryFromObjectName(objectName: string, prefix: string): string {
+  const rest = objectName.startsWith(prefix) ? objectName.slice(prefix.length) : objectName;
+  const folder = rest.split("/")[0] ?? "";
+  if (!folder || folder === rest) return "Other";
+  return folder.replace(/[-_]+/g, " ").trim();
+}
+
+export type CoverCatalogItem = { url: string; label: string; category: string };
+export type CoverCatalogCategory = { id: string; label: string; images: CoverCatalogItem[] };
+
 /**
  * List the standard placeholder images stored under `GCS_DEFAULTS_PREFIX`
  * (default `defaults/`) in the bucket, as `{ url, label }` pairs sorted by name.
@@ -131,6 +152,15 @@ function labelFromObjectName(objectName: string): string {
  * storage/permission error so callers can surface it.
  */
 export async function listDefaultImages(): Promise<{ url: string; label: string }[]> {
+  const catalog = await listDefaultCatalog();
+  return catalog.flatMap((c) => c.images.map(({ url, label }) => ({ url, label })));
+}
+
+/**
+ * Categorized cover catalog for the create-plan picker — one group per folder
+ * under `defaults/` (Coffee, Food, Events, …).
+ */
+export async function listDefaultCatalog(): Promise<CoverCatalogCategory[]> {
   const bucketName = gcsBucketName();
   if (!bucketName) return [];
 
@@ -138,10 +168,40 @@ export async function listDefaultImages(): Promise<{ url: string; label: string 
   const prefix = rawPrefix.endsWith("/") ? rawPrefix : `${rawPrefix}/`;
 
   const [files] = await client().bucket(bucketName).getFiles({ prefix });
-  return files
-    .map((f) => f.name)
-    // Keep only real image objects — skips the folder placeholder & stray files.
-    .filter((name) => name !== prefix && /\.(png|jpe?g|gif|webp|avif)$/i.test(name))
-    .sort((a, b) => a.localeCompare(b))
-    .map((name) => ({ url: publicUrl(bucketName, name), label: labelFromObjectName(name) }));
+  const byCat = new Map<string, CoverCatalogItem[]>();
+
+  for (const file of files) {
+    const name = file.name;
+    if (name === prefix || !/\.(png|jpe?g|gif|webp|avif)$/i.test(name)) continue;
+    const custom = (file.metadata?.metadata ?? {}) as Record<string, string | undefined>;
+    let token = custom.firebaseStorageDownloadTokens?.split(",")[0]?.trim();
+    if (!token) {
+      // Backfill a download token so the URL is readable on Firebase buckets.
+      token = randomUUID();
+      try {
+        await file.setMetadata({
+          metadata: { ...custom, firebaseStorageDownloadTokens: token },
+        });
+      } catch {
+        token = undefined;
+      }
+    }
+    const category = categoryFromObjectName(name, prefix);
+    const item: CoverCatalogItem = {
+      url: publicUrl(bucketName, name, token),
+      label: labelFromObjectName(name),
+      category,
+    };
+    const list = byCat.get(category) ?? [];
+    list.push(item);
+    byCat.set(category, list);
+  }
+
+  return [...byCat.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([label, images]) => ({
+      id: label.toLowerCase().replace(/\s+/g, "-"),
+      label,
+      images: images.sort((a, b) => a.label.localeCompare(b.label)),
+    }));
 }

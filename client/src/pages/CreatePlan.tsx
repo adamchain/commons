@@ -7,7 +7,6 @@ import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
-import { useCardImages } from "../lib/cardImages";
 import { NumberPicker } from "../components/NumberPicker";
 import {
   VIBE_OPTIONS,
@@ -220,7 +219,6 @@ export function CreatePlanPage() {
   });
   const navigate = useNavigate();
   const flyerRef = useRef<HTMLInputElement>(null);
-  const coverPool = useCardImages();
   const [showCoverLib, setShowCoverLib] = useState(false);
 
   // F.6 — inline "what's missing" guidance. Errors only render once the host
@@ -629,7 +627,6 @@ export function CreatePlanPage() {
         />
         {showCoverLib && (
           <CoverLibraryModal
-            coverPool={coverPool}
             onPick={(url) => {
               setForm((f) => ({ ...f, flyerDataUrl: url }));
               setShowCoverLib(false);
@@ -1202,7 +1199,6 @@ export function CreatePlanPage() {
 
       {showCoverLib && (
         <CoverLibraryModal
-          coverPool={coverPool}
           onPick={(url) => {
             setForm((f) => ({ ...f, flyerDataUrl: url }));
             setShowCoverLib(false);
@@ -1214,15 +1210,50 @@ export function CreatePlanPage() {
   );
 }
 
+type CoverCatalogCategory = {
+  id: string;
+  label: string;
+  images: { url: string; label: string; category: string }[];
+};
+
 function CoverLibraryModal({
-  coverPool,
   onPick,
   onClose,
 }: {
-  coverPool: string[];
   onPick: (url: string) => void;
   onClose: () => void;
 }) {
+  const [categories, setCategories] = useState<CoverCatalogCategory[] | null>(null);
+  const [active, setActive] = useState<string>("all");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const r = await api<{ categories: CoverCatalogCategory[] }>("/api/card-images/catalog");
+        if (!alive) return;
+        setCategories(r.categories);
+        setActive("all");
+      } catch (e) {
+        if (!alive) return;
+        setError(e instanceof Error ? e.message : "Couldn't load covers");
+        setCategories([]);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const chips = categories ?? [];
+  const images =
+    !categories
+      ? []
+      : active === "all"
+        ? categories.flatMap((c) => c.images)
+        : (categories.find((c) => c.id === active)?.images ?? []);
+
   return (
     <div
       className="cover-lib-backdrop"
@@ -1238,13 +1269,54 @@ function CoverLibraryModal({
             ×
           </button>
         </div>
-        <div className="cover-lib-grid">
-          {coverPool.map((url) => (
-            <button key={url} type="button" className="cover-lib-tile" onClick={() => onPick(url)}>
-              <img src={url} alt="" loading="lazy" />
+
+        {chips.length > 1 && (
+          <div className="cover-lib-cats" role="tablist" aria-label="Cover categories">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={active === "all"}
+              className={`cover-lib-cat ${active === "all" ? "is-active" : ""}`}
+              onClick={() => setActive("all")}
+            >
+              All
             </button>
-          ))}
-        </div>
+            {chips.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                role="tab"
+                aria-selected={active === c.id}
+                className={`cover-lib-cat ${active === c.id ? "is-active" : ""}`}
+                onClick={() => setActive(c.id)}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {categories === null ? (
+          <p className="cover-lib-status">Loading covers…</p>
+        ) : error ? (
+          <p className="cover-lib-status">{error}</p>
+        ) : images.length === 0 ? (
+          <p className="cover-lib-status">No covers yet — upload one from your camera roll.</p>
+        ) : (
+          <div className="cover-lib-grid">
+            {images.map((img) => (
+              <button
+                key={img.url}
+                type="button"
+                className="cover-lib-tile"
+                onClick={() => onPick(img.url)}
+                aria-label={img.label || "Cover image"}
+              >
+                <img src={img.url} alt="" loading="lazy" />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
