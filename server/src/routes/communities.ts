@@ -473,6 +473,57 @@ communitiesRouter.post("/:id/members/:userId/decline", requireAuth, async (req, 
   res.json({ ok: true });
 });
 
+// POST /api/communities/:id/members — organizer adds a member directly (no screening).
+communitiesRouter.post("/:id/members", requireAuth, async (req, res) => {
+  const viewerId = String(req.userId);
+  const community = store.findCommunityById(String(req.params.id));
+  if (!community || community.creationStatus !== "approved") {
+    res.status(404).json({ error: "Community not found" });
+    return;
+  }
+  if (community.organizerId !== viewerId && !(await isCommonsAdmin(viewerId))) {
+    res.status(403).json({ error: "Only the organizer can add members" });
+    return;
+  }
+  const targetId = String(req.body?.userId ?? "").trim();
+  if (!targetId) {
+    res.status(400).json({ error: "userId is required" });
+    return;
+  }
+  const target = await findUserById(targetId);
+  if (!target || !target.onboardingComplete) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  if (targetId === community.organizerId) {
+    res.status(400).json({ error: "The organizer is already a member" });
+    return;
+  }
+  const existing = store.findCommunityMembership(community.id, targetId);
+  if (existing?.status === "active") {
+    res.status(400).json({ error: "Already a member" });
+    return;
+  }
+  store.upsertCommunityMembership({
+    communityId: community.id,
+    userId: targetId,
+    role: "member",
+    status: "active",
+  });
+  if (community.chatEnabled && store.findCommunityConversation(community.id)) {
+    store.ensureCommunityConversation(community.id, [targetId]);
+  }
+  await emit({
+    userId: targetId,
+    kind: "communityRequestApproved",
+    body: `You were added to ${community.name}`,
+    communityId: community.id,
+    dedupKey: `communityAdded:${community.id}:${targetId}`,
+  });
+  store.log("community_member_added", { communityId: community.id, userId: targetId });
+  res.status(201).json({ ok: true });
+});
+
 // DELETE /api/communities/:id/members/:userId — organizer removes a member.
 // Removed users may re-request. Organizer can't remove themselves.
 communitiesRouter.delete("/:id/members/:userId", requireAuth, async (req, res) => {

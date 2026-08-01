@@ -20,7 +20,7 @@ html,
 body,
 #root {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--text-body);
   min-height: 100vh;
   /* Dynamic viewport — avoids 1px overflow that would push the fixed bottom-nav
      out of the visible area on mobile Safari (URL bar dynamic height). */
@@ -37,7 +37,7 @@ body,
 }
 
 body {
-  font-size: 15px;
+  font-size: var(--text-body);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -373,7 +373,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .plan-card-title {
   font-family: var(--font-ui);
-  font-size: 22px;
+  font-size: var(--text-card);
   font-weight: 700;
   letter-spacing: -0.01em;
   margin: 0;
@@ -2229,12 +2229,24 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--surface-2);
 }
 .age-confirm-chip.is-active {
-  background: var(--accent-soft);
   border-color: var(--accent);
   color: var(--accent);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 .age-confirm-chip-check {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--accent);
+  border-radius: 4px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 /* Guidelines agree checkbox + legal links. */
@@ -2436,10 +2448,16 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: -0.02em;
   line-height: 1.2;
 }
-/* Reserve room at the top of the card so the absolutely-positioned Back/Exit
-   pills never overlap the wordmark or title. */
+/* Reserve room at the top of the card so the absolutely-positioned Back
+   pill never overlaps the wordmark or title. */
 .onboarding-card--has-nav {
   padding-top: calc(56px + env(safe-area-inset-top, 0px));
+}
+.onboarding-card--compact.onboarding-card--has-nav {
+  padding-top: calc(44px + env(safe-area-inset-top, 0px));
+}
+.onboarding-card--compact .onboarding-body {
+  margin-top: 4px;
 }
 .onboarding-subtitle {
   margin: 0;
@@ -2483,7 +2501,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 .btn-primary:disabled,
 .btn:disabled.btn-primary {
-  background: var(--accent);
+  background: #c13b3b;
   color: #fff;
   opacity: 0.38;
   cursor: not-allowed;
@@ -2637,7 +2655,6 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text);
 }
 .neighborhood-row:last-child { border-bottom: none; }
-.neighborhood-row:hover { background: var(--bg); }
 .neighborhood-name { font-weight: 600; display: inline-flex; align-items: center; gap: 8px; }
 .neighborhood-check {
   color: var(--accent);
@@ -2649,10 +2666,47 @@ h1, h2, h3, h4, h5, h6 {
 .neighborhood-metro { color: var(--text-muted); font-size: 13px; }
 
 /* Create-plan path selector — Make a plan / Just an idea */
+.path-picker-page .app-header--minimal {
+  margin-bottom: 22px;
+}
+.path-picker-page {
+  padding-top: 0;
+}
+.path-picker-header.app-header--sticky {
+  top: 0;
+  margin-left: -15px;
+  margin-right: -15px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 15px 12px;
+  background: var(--bg);
+  background-image: none;
+}
+@media (min-width: 720px) {
+  .path-picker-header.app-header--sticky {
+    margin-left: -32px;
+    margin-right: -32px;
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+}
+.idea-form-page .brand,
+.path-picker-page .path-picker-intent-head {
+  padding-top: 4px;
+}
+.chat-header-menu-leave,
+.forum-leave-btn,
+.profile-block-btn,
+.friend-remove-btn {
+  font-size: 13px;
+  font-weight: 600;
+}
+.chat-header-menu button {
+  font-size: 13px;
+  font-weight: 600;
+}
 .path-picker {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
   margin-top: 8px;
 }
 .path-picker-card {
@@ -2671,6 +2725,8 @@ h1, h2, h3, h4, h5, h6 {
   transition: border-color 120ms ease, transform 120ms ease;
   min-height: auto;
   width: 100%;
+  position: relative;
+  z-index: 0;
 }
 .path-picker-card--idea {
   background: var(--surface);
@@ -2682,6 +2738,7 @@ h1, h2, h3, h4, h5, h6 {
 .path-picker-card.is-selected {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
+  z-index: 1;
 }
 .path-picker-eyebrow {
   font-size: 9px;
@@ -2733,8 +2790,11 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
   color: var(--text);
   letter-spacing: -0.6px;
-  line-height: 1.15;
-  margin: 0 0 6px;
+  line-height: 1.2;
+  margin: 0 0 8px;
+  /* Keep the greeting fully below the back row / status bar. */
+  position: relative;
+  z-index: 0;
 }
 .path-picker-intent-sub {
   font-size: 12px;
@@ -2759,7 +2819,7 @@ h1, h2, h3, h4, h5, h6 {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: var(--bg);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 16px 8px;
@@ -3526,6 +3586,34 @@ h1, h2, h3, h4, h5, h6 {
   display: grid;
   gap: 0;
 }
+.messages-row-wrap {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+}
+.messages-row-wrap:last-child {
+  border-bottom: none;
+}
+.messages-row-wrap .messages-row {
+  flex: 1;
+  min-width: 0;
+  border-bottom: none;
+}
+.messages-row-dismiss {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  width: 40px;
+  flex-shrink: 0;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  align-self: center;
+}
+.messages-row-dismiss:hover {
+  color: var(--accent);
+}
 .messages-row {
   display: grid;
   grid-template-columns: 44px 1fr auto;
@@ -4039,9 +4127,25 @@ h1, h2, h3, h4, h5, h6 {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  padding-top: 0;
   padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   overflow: hidden;
+}
+.app-shell--chat .chat-header-bar--thread.app-header--sticky {
+  top: 0;
+  margin-left: -15px;
+  margin-right: -15px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 15px 10px;
+  background: var(--bg);
+  background-image: none;
+}
+@media (min-width: 720px) {
+  .app-shell--chat .chat-header-bar--thread.app-header--sticky {
+    margin-left: -32px;
+    margin-right: -32px;
+    padding-left: 32px;
+    padding-right: 32px;
+  }
 }
 .chat-shell {
   display: flex;
@@ -4469,21 +4573,21 @@ h1, h2, h3, h4, h5, h6 {
 }
 .profile-block-see-all { font-size: 13px; }
 
-/* List / Calendar / Saved view toggle inside the Your Plans block. */
+/* List / Calendar view toggle inside the Your Plans block. */
 .profile-plans-toggle {
   display: inline-flex;
-  gap: 4px;
+  flex-shrink: 0;
+  gap: 2px;
   padding: 3px;
-  max-width: 100%;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 999px;
   box-sizing: border-box;
 }
 .profile-plans-toggle button {
-  flex: 1 1 0;
-  min-width: 0;
-  padding: 6px 14px;
+  flex: 0 0 auto;
+  min-width: 4.75rem;
+  padding: 6px 16px;
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -4491,11 +4595,17 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-muted);
   border-radius: 999px;
   background: transparent;
+  border: none;
+  line-height: 1.2;
 }
 .profile-plans-toggle button.is-active {
   background: var(--surface);
   color: var(--text);
-  box-shadow: var(--shadow-card);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.profile-plan-chip--going {
+  color: var(--text);
+  border: 1px solid var(--text);
 }
 .profile-list-row--past { display: flex; align-items: center; gap: 8px; }
 .profile-list-row--past .profile-list-row-main {
@@ -4568,10 +4678,11 @@ h1, h2, h3, h4, h5, h6 {
   min-width: 0;
   background: transparent;
   border: none;
-  padding: 10px 0;
+  padding: 10px 4px;
   color: var(--text);
   font-size: 15px;
   width: auto;
+  line-height: 1.35;
 }
 .chat-composer-input:focus {
   outline: none;
@@ -4645,6 +4756,14 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Community guidelines acknowledgment */
+.guidelines-heading {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text);
+}
 .guidelines-list {
   list-style: none;
   margin: 4px 0 0;
@@ -5213,11 +5332,10 @@ h1, h2, h3, h4, h5, h6 {
 
 .plan-card--just-posted {
   position: relative;
-  animation: just-posted-pulse 1.4s ease-out 2;
 }
 .plan-card--just-posted > .plan-card {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.16);
+  border-color: var(--border);
+  box-shadow: none;
 }
 .plan-card-just-posted-chip {
   display: inline-flex;
@@ -5237,6 +5355,35 @@ h1, h2, h3, h4, h5, h6 {
 .plan-card-just-posted-chip.is-fading {
   opacity: 0;
 }
+
+.feed-post-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 120;
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: var(--shadow-elevate);
+  animation: feed-post-toast-in 280ms ease, feed-post-toast-out 400ms ease 3.6s forwards;
+  pointer-events: none;
+}
+@keyframes feed-post-toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes feed-post-toast-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 @keyframes just-posted-pulse {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-2px); }
@@ -5523,11 +5670,6 @@ h1, h2, h3, h4, h5, h6 {
   gap: 12px;
   width: 100%;
   max-width: 260px;
-}
-
-.neighborhood-row.is-selected {
-  background: var(--accent-soft);
-  border-left: 3px solid var(--accent);
 }
 
 .segmented {
@@ -6166,25 +6308,63 @@ h1, h2, h3, h4, h5, h6 {
   width: 100%;
 }
 
+/* Lock-it-In: stack day/time vertically so date input never runs off-screen */
 .lock-time-row {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 10px;
   min-width: 0;
+  width: 100%;
 }
 .lock-time-row .onboarding-input {
-  flex: 1;
+  width: 100%;
   min-width: 0;
+  box-sizing: border-box;
 }
 .lock-time-row .flex-toggle-btn {
   margin-top: 0;
-  flex-shrink: 0;
+  align-self: flex-start;
+}
+.coordination-banner--expanded #lock-date {
+  width: 100%;
+  box-sizing: border-box;
+  max-width: 100%;
 }
 .lock-flex-text {
-  flex: 1;
-  font-size: 15px;
+  font-size: var(--text-body);
   color: var(--text-muted);
   font-style: italic;
+}
+.participation-toast,
+.plan-card-toast {
+  margin: 8px 0 0;
+  font-size: var(--text-meta);
+  font-weight: 600;
+  color: var(--accent);
+}
+.plan-card-toast {
+  position: absolute;
+  left: 14px;
+  bottom: 8px;
+  z-index: 2;
+  background: var(--surface);
+  border: 1.5px solid var(--accent);
+  border-radius: var(--r-pill);
+  padding: 4px 10px;
+}
+.plan-card-going-count--link {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .profile-month-calendar {
@@ -6820,7 +7000,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .plan-card--compact .plan-card-title {
   font-family: var(--font-display);
-  font-size: 19px;
+  font-size: var(--text-card);
   font-weight: 700;
   letter-spacing: -0.01em;
   line-height: 1.15;
@@ -7163,11 +7343,7 @@ h1, h2, h3, h4, h5, h6 {
 .notif-row-title {
   font-weight: 600;
   font-size: 14px;
-  line-height: 1.35;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  line-height: 1.45;
 }
 
 .notif-row-icon {
@@ -8369,45 +8545,85 @@ h1, h2, h3, h4, h5, h6 {
    Sticky 3-part header · cover picker · Luma rows · settings card
    ============================================================ */
 
+/* Shell already applies safe-area-inset-top on .app-shell. Create-plan clears
+   that and puts the inset on the sticky header once, so we don't get a tall
+   empty band under the Dynamic Island or a cramped header row. */
+.app-shell.create-plan {
+  padding-top: 0;
+}
 .create-plan {
-  padding-top: calc(12px + env(safe-area-inset-top, 0px));
   padding-bottom: 40px;
 }
 
-/* Header: ← Back · New plan · Post it — sits above the cover picker, not on top of it. */
+/* Header: ← Back · New plan · Post it — three equal tracks so the title stays
+   centered and the side actions can't collide with it. */
 .create-header {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
-  margin: 0 0 20px;
-  padding: 14px 0 10px;
+  column-gap: 10px;
+  row-gap: 0;
+  margin: 0 0 16px;
+  padding: 0;
   background: transparent;
   border-bottom: none;
 }
 .app-header.create-header {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+  /* Override .app-header flex — grid owns this row. */
+  justify-content: stretch;
+  gap: 10px;
+}
+.app-header.create-header.app-header--sticky {
+  top: 0;
+  z-index: 20;
+  margin-left: -15px;
+  margin-right: -15px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 15px 12px;
+  background: var(--bg);
+  /* Kill the shared sticky gradient so side labels don't read as overlapping. */
+  background-image: none;
+}
+@media (min-width: 720px) {
+  .app-header.create-header.app-header--sticky {
+    margin-left: -32px;
+    margin-right: -32px;
+    padding-left: 32px;
+    padding-right: 32px;
+  }
 }
 .create-header .detail-back {
   justify-self: start;
+  align-self: center;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .create-header-title {
   justify-self: center;
+  text-align: center;
   font-weight: 600;
   font-size: 17px;
+  line-height: 1.2;
   color: var(--text);
+  white-space: nowrap;
 }
 .create-header-post {
   justify-self: end;
+  align-self: center;
   background: none;
   border: none;
-  padding: 6px 4px;
+  padding: 6px 0;
   font-size: 16px;
   font-weight: 600;
+  line-height: 1.2;
   color: var(--accent);
   cursor: pointer;
+  white-space: nowrap;
 }
 .create-header-post:disabled {
   opacity: 0.5;
@@ -8417,7 +8633,13 @@ h1, h2, h3, h4, h5, h6 {
 .create-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
+}
+.create-form > .luma-card,
+.create-form > .create-title-input,
+.create-form > .create-desc-input,
+.create-form > .cover-picker {
+  flex-shrink: 0;
 }
 
 /* Cover picker — striped tan placeholder when empty, image when filled. */
@@ -8716,6 +8938,9 @@ h1, h2, h3, h4, h5, h6 {
   cursor: pointer;
   text-align: left;
 }
+.settings-options-toggle .create-more-chevron {
+  margin-left: auto;
+}
 .settings-options-hint {
   margin-left: auto;
   font-size: 13px;
@@ -8803,31 +9028,44 @@ h1, h2, h3, h4, h5, h6 {
 }
 .cover-lib-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 10px;
+  row-gap: 10px;
   overflow-y: auto;
   min-height: 0;
   flex: 1;
   align-content: start;
   align-items: start;
 }
+/* iOS WKWebView ignores aspect-ratio on <button>, which collapsed tiles and
+   let absolutely-positioned images paint over neighbors. Size via an inner
+   padding-bottom frame instead. */
 .cover-lib-tile {
-  position: relative;
   display: block;
   width: 100%;
-  aspect-ratio: 16 / 10;
   height: auto;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  align-self: start;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.cover-lib-tile-frame {
+  display: block;
+  position: relative;
+  width: 100%;
+  height: 0;
+  padding-bottom: 62.5%; /* 16 / 10 */
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   overflow: hidden;
-  padding: 0;
-  margin: 0;
-  cursor: pointer;
   background: var(--surface);
-  /* Keep the button from stretching/collapsing in the grid and letting imgs paint over neighbors. */
-  align-self: start;
+  box-sizing: border-box;
 }
-.cover-lib-tile.is-pending {
+.cover-lib-tile.is-pending .cover-lib-tile-frame {
   background: var(--surface-2, #eee);
 }
 .cover-lib-skel {
@@ -8850,7 +9088,7 @@ h1, h2, h3, h4, h5, h6 {
   height: 100%;
   object-fit: cover;
 }
-.cover-lib-tile:hover {
+.cover-lib-tile:hover .cover-lib-tile-frame {
   border-color: var(--accent);
 }
 .cover-lib-more {
@@ -9921,6 +10159,142 @@ a.xpl-comm-card {
   color: var(--paper-50);
 }
 
+/* Guidelines agree chip + legal doc modals. */
+.legal-agree-chip {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  margin: 14px 0 12px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 13.5px;
+  line-height: 1.45;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+.legal-agree-chip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.legal-agree-chip.is-active {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.legal-agree-chip-check {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--accent);
+  border-radius: 4px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  margin-top: 1px;
+}
+.legal-consent-intro {
+  margin: 14px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+}
+.legal-consent-openers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.legal-consent-opener {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--accent);
+  background: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.legal-consent-opener.is-read {
+  color: var(--accent);
+}
+.legal-consent-opener-hint {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: none;
+}
+.legal-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.45);
+}
+.legal-modal {
+  width: 100%;
+  max-width: 420px;
+  max-height: min(88dvh, 720px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  background: var(--surface);
+  box-shadow: var(--shadow-elevate);
+}
+.legal-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.legal-modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+.legal-modal-close {
+  background: none;
+  border: none;
+  padding: 6px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.legal-modal-panel {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  text-align: left;
+}
+
 /* --- Onboarding consent gate --- */
 .legal-consent-tabs {
   display: flex;
@@ -10120,10 +10494,11 @@ a.xpl-comm-card {
   color: inherit;
 }
 .month-cal-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--accent);
+  box-shadow: 0 0 0 1px rgba(193, 59, 59, 0.35);
 }
 .month-cal-cell.has-plans {
   border-color: var(--border);
@@ -10174,7 +10549,7 @@ a.xpl-comm-card {
 }
 .chat-header-bar--thread {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: minmax(72px, auto) 1fr minmax(40px, auto);
   align-items: center;
   gap: 8px;
 }
@@ -10352,6 +10727,27 @@ a.xpl-comm-card {
   box-shadow: inset 0 0 0 1.5px var(--accent);
 }
 
+.settings-forum-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.settings-forum-row:last-child { border-bottom: none; }
+.settings-forum-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+  font-weight: 600;
+}
+.settings-forum-label { font-size: 15px; }
+
 .network-search-wrap {
   display: flex;
   align-items: center;
@@ -10375,7 +10771,8 @@ a.xpl-comm-card {
   background: transparent;
   font-size: 14px;
   color: var(--text);
-  padding: 0;
+  padding: 2px 0;
+  line-height: 1.35;
 }
 .network-search-input:focus {
   outline: none;
@@ -10413,8 +10810,63 @@ a.xpl-comm-card {
   width: auto;
   margin-bottom: 12px;
 }
+.idea-visibility-toggle--three {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+.idea-visibility-toggle--three .seg-toggle-btn {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.idea-community-pick {
+  margin: 8px 0 14px;
+}
+.idea-community-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.idea-community-option {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.idea-community-option.is-active {
+  border-color: var(--community-pink-border);
+  background: var(--community-pink-soft);
+  color: var(--community-pink);
+}
+.idea-community-vis {
+  margin-top: 10px;
+}
+.form-eyebrow-optional,
+.form-question-optional {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+.link-preview--form {
+  margin-top: 8px;
+}
+.create-more .link-preview {
+  margin-top: 8px;
+}
 
 /* F.10 — tappable starter chips above the idea field. */
+.idea-inspiration-line {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
 .idea-starter-chips {
   display: flex;
   flex-wrap: wrap;

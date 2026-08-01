@@ -23,12 +23,30 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
   const neighborhood = target.neighborhoodId
     ? store.findNeighborhoodById(target.neighborhoodId)
     : null;
-  // Plans authored
+  // Plans authored (all-time, for stats + past accordion).
   const allPlans = store.listPlansByCreator(targetId);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const upcoming = allPlans.filter((p) => new Date(p.date).getTime() >= today.getTime());
   const past = allPlans.filter((p) => new Date(p.date).getTime() < today.getTime());
+
+  // Upcoming = hosting + actively In or Interested (not saved/bookmarked-only).
+  const upcomingHosted = allPlans.filter(
+    (p) => !p.cancelledAt && new Date(p.date).getTime() >= today.getTime(),
+  );
+  const upcomingJoined = store
+    .listParticipationsForUser(targetId)
+    .filter((p) => p.state === "going" || p.state === "interested")
+    .map((p) => store.findPlanById(p.planId))
+    .filter((p): p is NonNullable<typeof p> => {
+      if (!p || p.cancelledAt) return false;
+      if (p.creatorId === targetId) return false;
+      return new Date(p.date).getTime() >= today.getTime();
+    });
+  const upcomingById = new Map<string, (typeof upcomingHosted)[number]>();
+  for (const p of [...upcomingHosted, ...upcomingJoined]) upcomingById.set(p.id, p);
+  const upcoming = [...upcomingById.values()].sort(
+    (a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time),
+  );
 
   // "Message in current plan" CTA appears only when viewer + target share a current plan as participants.
   const sharedPlanId = findSharedActivePlan(targetId, viewerId);
@@ -67,8 +85,7 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
   const inEitherNetwork = inMyNetwork || targetNetwork.has(viewerId);
   const sharedCompleted = hasSharedCompletedPlan(targetId, viewerId);
   const showFullProfile = isSelf || inEitherNetwork || sharedCompleted;
-  const showSocial = showFullProfile;
-  const socialLinks = showSocial ? target.socialLinks ?? null : null;
+  const socialLinks = target.socialLinks ?? null;
 
   res.json({
     user: userToPublic(target),
@@ -94,6 +111,7 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
       : [],
     sharedPlanId,
     socialLinks,
+    plansGated: !showFullProfile && !isSelf,
     network: {
       inMyNetwork,
       requestSent,

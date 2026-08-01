@@ -5,6 +5,7 @@ import { Avatar } from "../components/Avatar";
 import { PollCard } from "../components/PollCard";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
+import { hrefForBack, type NavFromState } from "../lib/navState";
 import { planHasEnded } from "../lib/planTime";
 import type { ConversationDTO, MessageDTO, PlanDTO, PublicUser } from "../types/shared";
 
@@ -15,9 +16,22 @@ export function ChatPage() {
   const { planId = "" } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const fromMessages = (location.state as { from?: string } | null)?.from === "messages";
-  const backTo = fromMessages ? "/messages" : `/plans/${planId}`;
-  const backLabel = fromMessages ? "← Messages" : "← Plan";
+  const navFrom = (location.state as NavFromState | null) ?? null;
+  const backState: NavFromState = navFrom?.from ? navFrom : { from: "plan", planId };
+  const backHref = hrefForBack(backState);
+  const backLabel =
+    navFrom?.from === "messages"
+      ? "← Messages"
+      : navFrom?.from === "notifications"
+        ? "← Notifications"
+        : navFrom?.from === "profile"
+          ? "← Profile"
+          : navFrom?.from === "plan"
+            ? "← Plan"
+            : "← Plan";
+  const planLinkState: NavFromState = navFrom?.from === "messages"
+    ? { from: "messages" }
+    : { from: "chat", planId };
   const { user } = useAuth();
   const [plan, setPlan] = useState<PlanDTO | null>(null);
   const [conv, setConv] = useState<ConversationDTO | null>(null);
@@ -34,6 +48,7 @@ export function ChatPage() {
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [chatReady, setChatReady] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const atBottomRef = useRef(true);
   const composerMenuRef = useRef<HTMLDivElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
 
@@ -63,11 +78,21 @@ export function ChatPage() {
     return () => clearInterval(interval);
   }, [conv]);
 
-  // Autoscroll on new messages
+  // Autoscroll on new messages — only when the reader is already near the bottom.
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+    };
+    onScroll();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [chatReady]);
+
+  useEffect(() => {
+    if (!atBottomRef.current || !scrollRef.current) return;
+    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages.length]);
 
   useEffect(() => {
@@ -140,25 +165,6 @@ export function ChatPage() {
       setConv((prev) => (prev ? { ...prev, muted: r.muted } : prev));
     } catch {
       /* swallow — they can tap again */
-    }
-  }
-
-  async function blockHost() {
-    if (!conv) return;
-    setHeaderMenuOpen(false);
-    const host = conv.participants.find((p) => p.id === conv.hostId);
-    const name = host?.firstName || "the host";
-    if (
-      !window.confirm(`Block ${name}? You'll leave this chat, and won't see their plans or profile.`)
-    ) {
-      return;
-    }
-    try {
-      await api(`/api/users/${conv.hostId}/block`, { method: "POST" });
-      await api(`/api/conversations/${conv.id}/leave`, { method: "POST" }).catch(() => undefined);
-      navigate("/messages");
-    } catch {
-      /* swallow */
     }
   }
 
@@ -266,8 +272,8 @@ export function ChatPage() {
 
   return (
     <main className="app-shell app-shell--chat">
-      <header className="app-header app-header--minimal chat-header-bar chat-header-bar--thread">
-        <Link to={backTo} className="detail-back">{backLabel}</Link>
+      <header className="app-header app-header--minimal chat-header-bar chat-header-bar--thread app-header--sticky">
+        <Link to={backHref} className="detail-back">{backLabel}</Link>
         <div className="chat-thread-title">{sentenceCaseTitle(plan.title)}</div>
         <div className="chat-header-menu-wrap" ref={headerMenuRef}>
           <button
@@ -284,11 +290,6 @@ export function ChatPage() {
               <button type="button" role="menuitem" onClick={() => void toggleMute()}>
                 {conv.muted ? "Unmute notifications" : "Mute notifications"}
               </button>
-              {!conv.isHost && (
-                <button type="button" role="menuitem" onClick={() => void blockHost()}>
-                  Block host
-                </button>
-              )}
               <button
                 type="button"
                 role="menuitem"
@@ -298,7 +299,7 @@ export function ChatPage() {
                   void leaveChat();
                 }}
               >
-                Leave chat
+                {planConcluded ? "Remove from inbox" : "Leave chat"}
               </button>
             </div>
           )}
@@ -306,7 +307,15 @@ export function ChatPage() {
       </header>
 
       <div className="chat-shell">
-        <Link to={`/plans/${planId}`} className="chat-header-card chat-header-card--compact" aria-label="Open plan details">
+        <Link
+          to={`/plans/${planId}`}
+          state={planLinkState}
+          className="chat-header-card chat-header-card--compact"
+          aria-label="Open plan details"
+        >
+          <span className="chat-header-emoji" aria-hidden="true">
+            {plan.hostEmoji || "💬"}
+          </span>
           <div className="chat-header-text">
             <div className="chat-header-meta">
               {formatPlanDate(plan.date)} · {formatPlanTime(plan.time, plan.isFlexibleTime)} · {participantLabel}
@@ -522,6 +531,10 @@ export function ChatPage() {
             placeholder="Message the group…"
             value={body}
             onChange={(e) => setBody(e.target.value)}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.currentTarget.focus({ preventScroll: true });
+            }}
           />
           <button
             type="submit"

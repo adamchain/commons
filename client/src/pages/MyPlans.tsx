@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
@@ -9,39 +9,29 @@ import type { PlanDTO } from "../types/shared";
 
 /**
  * My Plans — the user's plans on their own page (previously a cramped section
- * on the profile). Groups into Hosting, Going, Interested, Saved, and Past
- * (with "Do it again"). Saved plans the feed didn't return are fetched by id.
+ * on the profile). Groups into Hosting, Going, Interested, and Past
+ * (with "Do it again").
  */
 export function MyPlansPage() {
   const { user } = useAuth();
   const [plans, setPlans] = useState<PlanDTO[] | null>(null);
 
-  const savedIds = useMemo(() => new Set(user?.savedPlanIds ?? []), [user?.savedPlanIds]);
-
   async function load() {
     const feed = await api<PlanDTO[]>("/api/plans").catch(() => [] as PlanDTO[]);
-    // Backfill any saved plans the feed didn't include (out of scope / not RSVP'd).
-    const have = new Set(feed.map((p) => p.id));
-    const missing = [...savedIds].filter((id) => !have.has(id));
-    const extra = await Promise.all(
-      missing.map((id) => api<PlanDTO>(`/api/plans/${id}`).catch(() => null)),
-    );
-    setPlans([...feed, ...extra.filter((p): p is PlanDTO => !!p)]);
+    setPlans(feed);
   }
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, user?.savedPlanIds]);
+  }, [user?.id]);
 
   if (!plans || !user) return <LoadingScreen tagline="Your plans" />;
 
   const upcoming = (p: PlanDTO) => !p.cancelledAt && !planHasEnded(p);
   const hosting = plans.filter((p) => p.creator.id === user.id && upcoming(p));
   const going = plans.filter((p) => p.creator.id !== user.id && p.myState === "going" && upcoming(p));
-  const interested = plans.filter((p) => p.myState === "interested" && upcoming(p));
-  const saved = plans.filter(
-    (p) => savedIds.has(p.id) && p.creator.id !== user.id && p.myState == null && upcoming(p),
+  const interested = plans.filter(
+    (p) => p.creator.id !== user.id && p.myState === "interested" && upcoming(p),
   );
   const past = plans
     .filter((p) => (p.creator.id === user.id || p.myState === "going") && (planHasEnded(p) || p.cancelledAt))
@@ -51,11 +41,10 @@ export function MyPlansPage() {
     hosting.length === 0 &&
     going.length === 0 &&
     interested.length === 0 &&
-    saved.length === 0 &&
     past.length === 0;
   // 2.13 — a couple lonely RSVPs still feel thin; nudge toward Explore/Communities
   // rather than leaving the page looking done.
-  const activeCount = hosting.length + going.length + interested.length + saved.length;
+  const activeCount = hosting.length + going.length + interested.length;
   const isThin = !empty && activeCount > 0 && activeCount < 3;
 
   return (
@@ -65,7 +54,7 @@ export function MyPlansPage() {
       </header>
       <h1 className="brand" style={{ marginBottom: 4 }}>My plans</h1>
       <p className="brand-tagline" style={{ marginBottom: 20 }}>
-        Everything you're hosting, in on, saved, or did before.
+        Everything you're hosting, in on, interested in, or did before.
       </p>
 
       {empty && (
@@ -75,7 +64,7 @@ export function MyPlansPage() {
           <p className="feed-empty-body">Join something from the feed — see what's happening this week.</p>
           <div className="feed-empty-actions">
             <Link to="/" className="btn-primary">See what's happening →</Link>
-            <Link to="/explore" className="btn-secondary">Explore communities</Link>
+            <Link to="/communities" className="btn-secondary">Explore communities</Link>
           </div>
         </div>
       )}
@@ -83,7 +72,9 @@ export function MyPlansPage() {
       {isThin && (
         <div className="my-plans-explore-cta">
           <p>
-            Want more on your plate? <Link to="/explore">Explore communities</Link> to find your people.
+            Want more on your plate? <Link to="/communities">Explore communities</Link>
+            {" · "}
+            <Link to="/">Browse the feed</Link>
           </p>
         </div>
       )}
@@ -91,7 +82,6 @@ export function MyPlansPage() {
       <Section title="Hosting" plans={hosting} onRefresh={load} />
       <Section title="Going" plans={going} onRefresh={load} />
       <Section title="Interested" plans={interested} onRefresh={load} />
-      <Section title="Saved" plans={saved} onRefresh={load} />
 
       {past.length > 0 && (
         <section className="my-plans-section">
@@ -102,6 +92,7 @@ export function MyPlansPage() {
                 <PlanCard plan={plan} onPlanRefresh={load} />
                 <Link
                   to={`/plans/new?fromPlanId=${plan.id}&title=${encodeURIComponent(plan.title)}`}
+                  state={{ hostAgainFrom: plan.id }}
                   className="btn-secondary btn-block my-plans-do-again"
                 >
                   Do it again
@@ -132,7 +123,7 @@ function Section({
       </h2>
       <div className="plan-grid">
         {plans.map((plan) => (
-          <PlanCard key={plan.id} plan={plan} onPlanRefresh={onRefresh} />
+          <PlanCard key={plan.id} plan={plan} onPlanRefresh={onRefresh} navFrom={{ from: "my-plans" }} />
         ))}
       </div>
     </section>

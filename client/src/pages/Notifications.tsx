@@ -4,6 +4,7 @@ import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { useAuth } from "../context/AuthContext";
 import { formatRelative } from "../lib/format";
+import type { NavFromState } from "../lib/navState";
 import type { NotificationDTO, NotificationKind, PlanDTO } from "../types/shared";
 
 /**
@@ -155,8 +156,9 @@ function NotifRow({ item, onDismiss }: { item: NotificationDTO; onDismiss: () =>
     </>
   );
   if (href) {
+    const linkState: NavFromState = { from: "notifications" };
     return (
-      <Link to={href} className="notif-row">
+      <Link to={href} state={linkState} className="notif-row">
         {inner}
       </Link>
     );
@@ -166,6 +168,7 @@ function NotifRow({ item, onDismiss }: { item: NotificationDTO; onDismiss: () =>
 
 function hrefFor(n: NotificationDTO): string | null {
   if (n.kind === "newGroupChatMessage" && n.planId) return `/plans/${n.planId}/chat`;
+  if (n.kind === "welcome") return "/settings/interests";
   // Network request/accept link to the other person's profile, where the
   // Accept / connected state lives.
   if ((n.kind === "networkRequest" || n.kind === "networkAccepted") && n.profileUserId) {

@@ -61,7 +61,17 @@ export function TopBar() {
 
   return (
     <header className="top-bar" aria-label="Top navigation">
-      <Link to="/" className="top-bar-brand" aria-label="Commons home">
+      <Link
+        to="/"
+        className="top-bar-brand"
+        aria-label="Commons home"
+        onClick={(e) => {
+          if (pathname === "/") {
+            e.preventDefault();
+            window.dispatchEvent(new CustomEvent("commons:home-refresh"));
+          }
+        }}
+      >
         <img src={wordmark} alt="COMMONS" className="top-bar-brand-img" />
       </Link>
       <div className="top-bar-actions">

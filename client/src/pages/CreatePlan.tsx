@@ -10,6 +10,7 @@ import { isNative } from "../lib/platform";
 import { NumberPicker } from "../components/NumberPicker";
 import {
   VIBE_OPTIONS,
+  type CommunityCardDTO,
   type InterestTag,
   type JoinType,
   type PlanDTO,
@@ -23,11 +24,15 @@ const today = (): string => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-const MIN_LEAD_MINUTES = 15;
+/** Default plan time = now + 1 hour (rounded to the minute). */
+const defaultPlanTime = (): string => {
+  const d = new Date(Date.now() + 60 * 60 * 1000);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
 
-/** "HH:MM" floor for a same-day time picker — now plus a grace window. */
-const minTimeForToday = (): string => {
-  const d = new Date(Date.now() + MIN_LEAD_MINUTES * 60 * 1000);
+/** "HH:MM" for the current clock — used to block past times on today. */
+const nowTime = (): string => {
+  const d = new Date();
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
 
@@ -68,7 +73,6 @@ const IDEA_PLACEHOLDERS = [
   "Want to cross something off your Philly bucket list?",
   "Anyone up for a walk this weekend?",
   "Looking for a coffee shop to work from — join me?",
-  "Free Saturday, someone pick something",
   "New to the city — show me your favorite spot",
 ];
 
@@ -147,7 +151,7 @@ export function CreatePlanPage() {
     locationPlaceId: undefined as string | undefined,
     neighborhoodId: user?.neighborhoodIds?.[0] ?? user?.neighborhoodId ?? "",
     date: today(),
-    time: "19:00",
+    time: defaultPlanTime(),
     isFlexibleTime: false,
     isFlexibleLocation: false,
     isFlexibleDate: false,
@@ -177,10 +181,41 @@ export function CreatePlanPage() {
   // Skipped automatically when arriving with an invite seed.
   type Path = "choose" | "plan" | "idea";
   const [path, setPath] = useState<Path>(
-    inviteUserId || inviteUserIds.length > 0 || prefillTitle || prefillName || hostAgainFrom || fromForumTag
+    inviteUserId ||
+      inviteUserIds.length > 0 ||
+      prefillTitle ||
+      prefillName ||
+      hostAgainFrom ||
+      fromPlanId ||
+      fromForumTag
       ? "plan"
       : "choose",
   );
+
+  const leaveCreatePlan = () => {
+    if (backToSourceId) {
+      navigate(`/plans/${backToSourceId}`);
+      return;
+    }
+    if (fromForumTag) {
+      navigate(`/forums/${fromForumTag}`);
+      return;
+    }
+    if (window.history.length > 1) navigate(-1);
+    else navigate("/");
+  };
+
+  const backFromForm = () => {
+    if (backToSourceId) {
+      navigate(`/plans/${backToSourceId}`);
+      return;
+    }
+    if (fromForumTag) {
+      navigate(`/forums/${fromForumTag}`);
+      return;
+    }
+    setPath("choose");
+  };
   // Carries the source plan id server-side so "Host another like this" also
   // pulls the previous crew + group chat forward, same as "Do it again".
   const [carryFromId, setCarryFromId] = useState<string | null>(fromPlanId);
@@ -193,14 +228,16 @@ export function CreatePlanPage() {
   // (?communityId=…), the plan is tagged to that community and the host picks
   // whether it's public (feed + community) or community-only.
   const communityId = searchParams.get("communityId");
+  const [pickedCommunityId, setPickedCommunityId] = useState<string | null>(communityId);
+  const effectiveCommunityId = pickedCommunityId ?? communityId;
   const [communityName, setCommunityName] = useState<string | null>(null);
   const [communityVisibility, setCommunityVisibility] = useState<"public" | "community_only">(
     "public",
   );
   useEffect(() => {
-    if (!communityId) return;
+    if (!effectiveCommunityId) return;
     let alive = true;
-    api<{ name: string }>(`/api/communities/${communityId}`)
+    api<{ name: string }>(`/api/communities/${effectiveCommunityId}`)
       .then((c) => {
         if (alive) setCommunityName(c.name);
       })
@@ -210,7 +247,11 @@ export function CreatePlanPage() {
     return () => {
       alive = false;
     };
-  }, [communityId]);
+  }, [effectiveCommunityId]);
+
+  useEffect(() => {
+    if (path === "idea") window.scrollTo(0, 0);
+  }, [path]);
   const [invitedIds, setInvitedIds] = useState<Set<string>>(() => {
     const seed = new Set<string>();
     if (inviteUserId) seed.add(inviteUserId);
@@ -314,9 +355,8 @@ export function CreatePlanPage() {
     ? "looking_for"
     : "standard";
 
-  // Req 3.1 — block past dates outright, and same-day times need at least
-  // MIN_LEAD_MINUTES of runway. Derived (not state) so it re-evaluates live
-  // as the host edits the form; also re-checked on submit as the source of truth.
+  // Block past dates/times outright — no +15-min grace. Derived (not state)
+  // so it re-evaluates live as the host edits; re-checked on submit.
   // F.6 — a wholly missing date folds into this same inline message rather
   // than only surfacing in a bottom banner.
   const dateError = !form.isFlexibleDate && !form.date
@@ -326,8 +366,8 @@ export function CreatePlanPage() {
       : null;
   const timeError =
     !dateError && !form.isFlexibleDate && !form.isFlexibleTime && form.date === today() && form.time
-      ? form.time < minTimeForToday()
-        ? `Pick a time at least ${MIN_LEAD_MINUTES} minutes from now.`
+      ? form.time < nowTime()
+        ? "That time is in the past — pick a later time."
         : null
       : null;
   const locationError =
@@ -411,8 +451,8 @@ export function CreatePlanPage() {
           flyerLinkUrl: form.flyerLinkUrl.trim() || undefined,
           flyerLinkPreview: form.flyerLinkPreview ?? undefined,
           fromPlanId: carryFromId ?? undefined,
-          communityId: communityId ?? undefined,
-          communityVisibility: communityId ? communityVisibility : undefined,
+          communityId: effectiveCommunityId ?? undefined,
+          communityVisibility: effectiveCommunityId ? communityVisibility : undefined,
         }),
       });
       // The co-host (seeded inviteUser) is already added server-side — don't
@@ -526,11 +566,11 @@ export function CreatePlanPage() {
   if (path === "choose") {
     const firstName = user?.firstName || "there";
     return (
-      <main className="app-shell app-shell--mid">
-        <header className="app-header app-header--minimal app-header--sticky">
-          <Link to="/" className="detail-back">
+      <main className="app-shell app-shell--mid path-picker-page">
+        <header className="app-header app-header--minimal app-header--sticky path-picker-header">
+          <button type="button" className="detail-back" onClick={leaveCreatePlan}>
             ← Back
-          </Link>
+          </button>
         </header>
         <h1 className="path-picker-intent-head">
           Hey {firstName},<br />what&apos;s on your mind?
@@ -606,13 +646,17 @@ export function CreatePlanPage() {
           attemptedSubmit={attemptedSubmit}
           dateError={dateError}
           toggleVibe={toggleVibe}
-          onBack={() => {
-            if (backToSourceId) navigate(`/plans/${backToSourceId}`);
-            else setPath("choose");
-          }}
+          onBack={backFromForm}
           onOpenFlyer={() => void openFlyerPicker()}
           onShowCoverLib={() => setShowCoverLib(true)}
           onClearFlyer={() => setForm((f) => ({ ...f, flyerDataUrl: null }))}
+          inviteUserName={inviteUserName}
+          inviteNames={inviteNames}
+          invitedCount={invitedIds.size}
+          pickedCommunityId={pickedCommunityId}
+          onPickCommunity={setPickedCommunityId}
+          communityVisibility={communityVisibility}
+          onCommunityVisibilityChange={setCommunityVisibility}
         />
         <input
           ref={flyerRef}
@@ -644,12 +688,7 @@ export function CreatePlanPage() {
         <button
           type="button"
           className="detail-back"
-          onClick={() => {
-            // 0.9 — recreating a past plan sends Back to that plan instead of
-            // the blank path picker.
-            if (backToSourceId) navigate(`/plans/${backToSourceId}`);
-            else setPath("choose");
-          }}
+          onClick={backFromForm}
         >
           ← Back
         </button>
@@ -682,7 +721,46 @@ export function CreatePlanPage() {
         </div>
       ) : null}
 
+      {fromForumTag ? (
+        <div className="create-plan-invite-banner" role="note">
+          Tagged{" "}
+          <strong>{VIBE_OPTIONS.find((o) => o.tag === fromForumTag)?.label ?? fromForumTag}</strong>
+          {" "}— everyone with that interest will see this plan in their feed.
+        </div>
+      ) : null}
+
       <form id="create-plan-form" onSubmit={submit} className="create-form">
+        {effectiveCommunityId ? (
+          <div className="create-community-tag">
+            <p className="create-community-tag-title">
+              🏙️ Posting to <strong>{communityName ?? "your community"}</strong>
+            </p>
+            <div className="seg-toggle" role="group" aria-label="Community visibility">
+              <button
+                type="button"
+                className={`seg-toggle-btn ${communityVisibility === "public" ? "is-active" : ""}`}
+                onClick={() => setCommunityVisibility("public")}
+                aria-pressed={communityVisibility === "public"}
+              >
+                Public
+              </button>
+              <button
+                type="button"
+                className={`seg-toggle-btn ${communityVisibility === "community_only" ? "is-active" : ""}`}
+                onClick={() => setCommunityVisibility("community_only")}
+                aria-pressed={communityVisibility === "community_only"}
+              >
+                Community only
+              </button>
+            </div>
+            <p className="create-community-tag-hint">
+              {communityVisibility === "public"
+                ? "Shows on the main feed with a community tag, and on the community's events board."
+                : "Only community members can see this — it won't appear on the main feed."}
+            </p>
+          </div>
+        ) : null}
+
         {/* Cover image — prominent at the top, per New Plan handoff. */}
         {form.flyerDataUrl ? (
           <div className="cover-picker cover-picker--filled">
@@ -775,7 +853,7 @@ export function CreatePlanPage() {
                   id="time"
                   type="time"
                   className="luma-input"
-                  min={!form.isFlexibleDate && form.date === today() ? minTimeForToday() : undefined}
+                  min={!form.isFlexibleDate && form.date === today() ? nowTime() : undefined}
                   value={form.time}
                   aria-invalid={Boolean(timeError)}
                   onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
@@ -804,6 +882,7 @@ export function CreatePlanPage() {
             <div className="location-row-main">
               {!form.isFlexibleLocation ? (
                 <PlacePicker
+                  autoFocusOnMount
                   value={form.locationName}
                   address={form.locationAddress}
                   placeholder="Search a venue, or type your own — e.g. Somewhere in Fishtown"
@@ -879,7 +958,7 @@ export function CreatePlanPage() {
         />
 
         {/* Category — wrapping pills. */}
-        <p className="form-eyebrow">Category</p>
+        <p className="form-eyebrow">Category <span className="form-eyebrow-optional">— optional</span></p>
         <div className="vibe-grid">
           {VIBE_OPTIONS.map((opt) => {
             const selected = form.vibes.includes(opt.id);
@@ -940,8 +1019,7 @@ export function CreatePlanPage() {
             onClick={() => setShowMore((s) => !s)}
             aria-expanded={showMore}
           >
-            <span className="settings-row-label">Options</span>
-            <span className="settings-options-hint">Spots, repeats, link</span>
+            <span className="settings-row-label">Additional details</span>
             <ChevronIcon open={showMore} />
           </button>
 
@@ -951,8 +1029,7 @@ export function CreatePlanPage() {
             <section className="form-section" ref={capacityRowRef}>
               <div className="form-row-flex">
                 <div className="form-row-flex-main">
-                  <label className="form-question">Limited spots?</label>
-                  <p className="form-help" style={{ marginTop: 2, marginBottom: 4 }}>Optional</p>
+                  <label className="form-question">Capacity</label>
                   {!form.capacityOn ? (
                     <p className="form-help" style={{ marginTop: 4 }}>
                       Open — no cap on who can join
@@ -1048,7 +1125,6 @@ export function CreatePlanPage() {
               <label className="form-question" htmlFor="flyer-link">
                 Add a link
               </label>
-              <p className="form-help">Paste a link — it'll show as a preview on the card.</p>
           <input
             id="flyer-link"
             type="url"
@@ -1061,7 +1137,7 @@ export function CreatePlanPage() {
           {linkBusy && <p className="form-help">Loading preview…</p>}
           {linkError && <p className="form-help" style={{ color: "var(--accent)" }}>{linkError}</p>}
           {form.flyerLinkPreview && (
-            <div className="link-preview" style={{ marginTop: 8 }}>
+            <div className="link-preview link-preview--form">
               {form.flyerLinkPreview.image && (
                 <img src={form.flyerLinkPreview.image} alt="" className="link-preview-image" />
               )}
@@ -1156,36 +1232,7 @@ export function CreatePlanPage() {
           {submitting ? "Posting…" : "Post it"}
         </button>
 
-        {communityId ? (
-          <div className="create-community-tag">
-            <p className="create-community-tag-title">
-              🏙️ Posting to <strong>{communityName ?? "your community"}</strong>
-            </p>
-            <div className="seg-toggle" role="group" aria-label="Community visibility">
-              <button
-                type="button"
-                className={`seg-toggle-btn ${communityVisibility === "public" ? "is-active" : ""}`}
-                onClick={() => setCommunityVisibility("public")}
-                aria-pressed={communityVisibility === "public"}
-              >
-                Public
-              </button>
-              <button
-                type="button"
-                className={`seg-toggle-btn ${communityVisibility === "community_only" ? "is-active" : ""}`}
-                onClick={() => setCommunityVisibility("community_only")}
-                aria-pressed={communityVisibility === "community_only"}
-              >
-                Community only
-              </button>
-            </div>
-            <p className="create-community-tag-hint">
-              {communityVisibility === "public"
-                ? "Shows on the main feed with a community tag, and on the community's events board."
-                : "Only community members can see this — it won't appear on the main feed."}
-            </p>
-          </div>
-        ) : (
+        {!effectiveCommunityId ? (
           <p className="create-communities-footer">
             <strong>Communities</strong>{" "}
             <Link to="/communities" className="visibility-option-pill">
@@ -1194,7 +1241,7 @@ export function CreatePlanPage() {
             <br />
             Run clubs, book clubs, recurring crews.
           </p>
-        )}
+        ) : null}
       </form>
 
       {showCoverLib && (
@@ -1390,7 +1437,9 @@ function LazyCoverTile({
       onClick={() => onPick(url)}
       aria-label={label || "Cover image"}
     >
-      {src ? <img src={src} alt="" decoding="async" /> : <span className="cover-lib-skel" aria-hidden />}
+      <span className="cover-lib-tile-frame">
+        {src ? <img src={src} alt="" decoding="async" /> : <span className="cover-lib-skel" aria-hidden />}
+      </span>
     </button>
   );
 }
@@ -1427,11 +1476,8 @@ type FormShape = {
 };
 
 /**
- * Just an Idea form — a loose, casual post. Location, a rough date bucket,
- * and a cover photo all live in the main flow now (F.12); spots and the
- * Communities row are dropped entirely since ideas aren't meant to be that
- * formal. "Add details" is left for lower-priority extras (more color,
- * category tags).
+ * Just an Idea form — prompt, text box, and image up front; everything else
+ * lives under a collapsible "Additional details — optional" section.
  */
 function IdeaForm({
   form,
@@ -1447,6 +1493,13 @@ function IdeaForm({
   onOpenFlyer,
   onShowCoverLib,
   onClearFlyer,
+  inviteUserName,
+  inviteNames,
+  invitedCount,
+  pickedCommunityId,
+  onPickCommunity,
+  communityVisibility,
+  onCommunityVisibilityChange,
 }: {
   form: FormShape;
   setForm: (updater: (f: FormShape) => FormShape) => void;
@@ -1461,12 +1514,36 @@ function IdeaForm({
   onOpenFlyer: () => void;
   onShowCoverLib: () => void;
   onClearFlyer: () => void;
+  inviteUserName: string | null;
+  inviteNames: string[];
+  invitedCount: number;
+  pickedCommunityId: string | null;
+  onPickCommunity: (id: string | null) => void;
+  communityVisibility: "public" | "community_only";
+  onCommunityVisibilityChange: (v: "public" | "community_only") => void;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [dateMode, setDateMode] = useState<IdeaDateMode>(form.isFlexibleDate ? "anytime" : "specific");
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
+  const [postToCommunity, setPostToCommunity] = useState(Boolean(pickedCommunityId));
+  const [myCommunities, setMyCommunities] = useState<CommunityCardDTO[] | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const detailsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!postToCommunity) return;
+    let alive = true;
+    void api<{ communities: CommunityCardDTO[] }>("/api/communities/mine")
+      .then((r) => {
+        if (alive) setMyCommunities(r.communities);
+      })
+      .catch(() => {
+        if (alive) setMyCommunities([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [postToCommunity]);
 
   // F.10 — rotate the placeholder copy so the empty field reads as an
   // invitation to riff, not a blank homework assignment.
@@ -1488,15 +1565,20 @@ function IdeaForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attemptedSubmit]);
 
-  // 0.6 — when "Add details" opens, bring it above the keyboard instead of
-  // letting the accessory bar bury its fields.
+  // When "Additional details" opens, bring it above the keyboard.
   useEffect(() => {
     if (!detailsOpen) return;
     const t = setTimeout(() => {
-      detailsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      detailsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 150);
     return () => clearTimeout(t);
   }, [detailsOpen]);
+
+  const scrollFieldIntoView = (el: HTMLElement | null) => {
+    setTimeout(() => {
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 300);
+  };
 
   // Reserve room at the bottom of the form for however much the on-screen
   // keyboard is currently covering, via the visualViewport API where it's
@@ -1538,8 +1620,8 @@ function IdeaForm({
   const titleMissing = attemptedSubmit && !form.title.trim();
 
   return (
-    <main className="app-shell app-shell--mid">
-      <header className="app-header app-header--minimal app-header--sticky">
+    <main className="app-shell app-shell--mid path-picker-page idea-form-page">
+      <header className="app-header app-header--minimal app-header--sticky path-picker-header">
         <button type="button" className="detail-back" onClick={onBack}>
           ← Back
         </button>
@@ -1549,11 +1631,21 @@ function IdeaForm({
         Just a thought. See who&apos;s down.
       </p>
 
+      {(inviteUserName || inviteNames.length > 0) && (
+        <div className="create-plan-invite-banner" role="note">
+          Inviting{" "}
+          <strong>{inviteUserName ?? inviteNames[0]}</strong>
+          {invitedCount > 1 ? ` + ${invitedCount - 1} more` : ""} once you post
+        </div>
+      )}
+
       <form
         onSubmit={submit}
         className="form-card"
-        style={detailsOpen && keyboardInset > 0 ? { paddingBottom: keyboardInset } : undefined}
+        style={keyboardInset > 0 ? { paddingBottom: keyboardInset } : undefined}
       >
+        <p className="idea-inspiration-line">Need some inspiration? No plan too big or small</p>
+
         {/* F.10 — tappable starters pre-fill the field with a fuller phrase. */}
         <div className="idea-starter-chips" role="group" aria-label="Idea starters">
           {IDEA_STARTER_CHIPS.map((chip) => (
@@ -1577,127 +1669,10 @@ function IdeaForm({
             aria-invalid={titleMissing}
             onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
             rows={3}
-            autoFocus
           />
           {titleMissing && <p className="luma-inline-error">Add a few words about the idea.</p>}
         </section>
 
-        {/* F.11 — loose date options: a specific day, sometime this week, or
-            wide open. */}
-        <p className="form-eyebrow">When?</p>
-        <div className="seg-toggle idea-date-toggle" role="group" aria-label="When">
-          <button
-            type="button"
-            className={`seg-toggle-btn ${dateMode === "specific" ? "is-active" : ""}`}
-            onClick={() => selectDateMode("specific")}
-            aria-pressed={dateMode === "specific"}
-          >
-            A day
-          </button>
-          <button
-            type="button"
-            className={`seg-toggle-btn ${dateMode === "week" ? "is-active" : ""}`}
-            onClick={() => selectDateMode("week")}
-            aria-pressed={dateMode === "week"}
-          >
-            This week
-          </button>
-          <button
-            type="button"
-            className={`seg-toggle-btn ${dateMode === "anytime" ? "is-active" : ""}`}
-            onClick={() => selectDateMode("anytime")}
-            aria-pressed={dateMode === "anytime"}
-          >
-            Anytime
-          </button>
-        </div>
-        {dateMode === "specific" && (
-          <div className="idea-date-input-row">
-            <input
-              type="date"
-              className="luma-input idea-date-input"
-              min={today()}
-              value={form.date}
-              aria-invalid={Boolean(dateError)}
-              onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-            />
-            {dateError && <p className="luma-inline-error">{dateError}</p>}
-          </div>
-        )}
-
-        {/* F.12 / 0.1 — optional location, same venue picker as the full
-            form. Left flexible unless the host picks a spot. */}
-        <p className="form-eyebrow">Where?</p>
-        <div className="luma-card">
-          <div className="location-row">
-            <div className="location-row-main">
-              {!form.isFlexibleLocation ? (
-                <PlacePicker
-                  value={form.locationName}
-                  address={form.locationAddress}
-                  placeholder="Search a spot, or leave it flexible"
-                  onChange={(name) =>
-                    setForm((f) => ({
-                      ...f,
-                      locationName: name,
-                      locationAddress: "",
-                      locationLat: undefined,
-                      locationLng: undefined,
-                      locationPlaceId: undefined,
-                    }))
-                  }
-                  onSelect={(p) =>
-                    setForm((f) => ({
-                      ...f,
-                      locationName: p.name,
-                      locationAddress: p.address,
-                      locationLat: p.lat,
-                      locationLng: p.lng,
-                      locationPlaceId: p.placeId,
-                      isFlexibleLocation: false,
-                    }))
-                  }
-                  onClear={() =>
-                    setForm((f) => ({
-                      ...f,
-                      locationName: "",
-                      locationAddress: "",
-                      locationLat: undefined,
-                      locationLng: undefined,
-                      locationPlaceId: undefined,
-                    }))
-                  }
-                />
-              ) : (
-                <span className="luma-flex-text location-row-flex-text">Flexible location</span>
-              )}
-            </div>
-            <FlexToggle
-              active={form.isFlexibleLocation}
-              onClick={() =>
-                setForm((f) => {
-                  const next = !f.isFlexibleLocation;
-                  return next
-                    ? {
-                        ...f,
-                        isFlexibleLocation: true,
-                        locationName: "",
-                        locationAddress: "",
-                        locationLat: undefined,
-                        locationLng: undefined,
-                        locationPlaceId: undefined,
-                      }
-                    : { ...f, isFlexibleLocation: false };
-                })
-              }
-              label="Flexible"
-            />
-          </div>
-        </div>
-
-        {/* F.12 — cover photo moved out of "Add details" into the main flow.
-            No redundant "Cover image" label above it (1.17) — the picker's
-            own copy already says as much. */}
         {form.flyerDataUrl ? (
           <div className="cover-picker cover-picker--filled">
             <img src={form.flyerDataUrl} alt="" className="cover-picker-img" />
@@ -1713,7 +1688,7 @@ function IdeaForm({
         ) : (
           <div className="cover-picker">
             <span className="cover-picker-title">Add a cover image</span>
-            <span className="cover-picker-sub">Make your idea stand out</span>
+            <span className="cover-picker-sub">Optional — your idea shows with a red edge if you skip</span>
             <div className="cover-picker-buttons">
               <button type="button" className="cover-btn" onClick={onShowCoverLib}>
                 <LibraryIcon />
@@ -1727,49 +1702,229 @@ function IdeaForm({
           </div>
         )}
 
-        {/* 1.17 — tighter gap under the label, and the toggle no longer
-            stretches the full width of the card. */}
-        <p className="form-eyebrow idea-visibility-label">Who can see this?</p>
-        <div className="seg-toggle idea-visibility-toggle" role="group" aria-label="Visibility">
-          <button
-            type="button"
-            className={`seg-toggle-btn ${form.visibility === "everyone" ? "is-active" : ""}`}
-            onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
-            aria-pressed={form.visibility === "everyone"}
-          >
-            Everyone
-          </button>
-          <button
-            type="button"
-            className={`seg-toggle-btn ${form.visibility === "network" ? "is-active" : ""}`}
-            onClick={() => setForm((f) => ({ ...f, visibility: "network" }))}
-            aria-pressed={form.visibility === "network"}
-          >
-            Your network
-          </button>
-        </div>
-
         <button
           type="button"
           className="idea-disclosure"
           aria-expanded={detailsOpen}
           onClick={() => setDetailsOpen((v) => !v)}
         >
-          <span>Add details</span>
+          <span>Additional details — optional</span>
           <span className={`idea-disclosure-chevron ${detailsOpen ? "is-open" : ""}`}>›</span>
         </button>
         {detailsOpen && (
           <div className="idea-details" ref={detailsRef}>
+            <p className="form-eyebrow">When?</p>
+            <div className="seg-toggle idea-date-toggle" role="group" aria-label="When">
+              <button
+                type="button"
+                className={`seg-toggle-btn ${dateMode === "specific" ? "is-active" : ""}`}
+                onClick={() => selectDateMode("specific")}
+                aria-pressed={dateMode === "specific"}
+              >
+                A day
+              </button>
+              <button
+                type="button"
+                className={`seg-toggle-btn ${dateMode === "week" ? "is-active" : ""}`}
+                onClick={() => selectDateMode("week")}
+                aria-pressed={dateMode === "week"}
+              >
+                This week
+              </button>
+              <button
+                type="button"
+                className={`seg-toggle-btn ${dateMode === "anytime" ? "is-active" : ""}`}
+                onClick={() => selectDateMode("anytime")}
+                aria-pressed={dateMode === "anytime"}
+              >
+                Anytime
+              </button>
+            </div>
+            {dateMode === "specific" && (
+              <div className="idea-date-input-row">
+                <input
+                  type="date"
+                  className="luma-input idea-date-input"
+                  min={today()}
+                  value={form.date}
+                  aria-invalid={Boolean(dateError)}
+                  onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                  onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
+                />
+                {dateError && <p className="luma-inline-error">{dateError}</p>}
+              </div>
+            )}
+
+            <p className="form-eyebrow">Where?</p>
+            <div className="luma-card">
+              <div className="location-row">
+                <div className="location-row-main">
+                  {!form.isFlexibleLocation ? (
+                    <PlacePicker
+                      value={form.locationName}
+                      address={form.locationAddress}
+                      placeholder="Search a spot, or leave it flexible"
+                      onChange={(name) =>
+                        setForm((f) => ({
+                          ...f,
+                          locationName: name,
+                          locationAddress: "",
+                          locationLat: undefined,
+                          locationLng: undefined,
+                          locationPlaceId: undefined,
+                        }))
+                      }
+                      onSelect={(p) =>
+                        setForm((f) => ({
+                          ...f,
+                          locationName: p.name,
+                          locationAddress: p.address,
+                          locationLat: p.lat,
+                          locationLng: p.lng,
+                          locationPlaceId: p.placeId,
+                          isFlexibleLocation: false,
+                        }))
+                      }
+                      onClear={() =>
+                        setForm((f) => ({
+                          ...f,
+                          locationName: "",
+                          locationAddress: "",
+                          locationLat: undefined,
+                          locationLng: undefined,
+                          locationPlaceId: undefined,
+                        }))
+                      }
+                      onFieldFocus={(el) => scrollFieldIntoView(el)}
+                    />
+                  ) : (
+                    <span className="luma-flex-text location-row-flex-text">Flexible location</span>
+                  )}
+                </div>
+                <FlexToggle
+                  active={form.isFlexibleLocation}
+                  onClick={() =>
+                    setForm((f) => {
+                      const next = !f.isFlexibleLocation;
+                      return next
+                        ? {
+                            ...f,
+                            isFlexibleLocation: true,
+                            locationName: "",
+                            locationAddress: "",
+                            locationLat: undefined,
+                            locationLng: undefined,
+                            locationPlaceId: undefined,
+                          }
+                        : { ...f, isFlexibleLocation: false };
+                    })
+                  }
+                  label="Flexible"
+                />
+              </div>
+            </div>
+
+            <p className="form-eyebrow idea-visibility-label">Who can see this?</p>
+            <div className="seg-toggle idea-visibility-toggle idea-visibility-toggle--three" role="group" aria-label="Visibility">
+              <button
+                type="button"
+                className={`seg-toggle-btn ${!postToCommunity && form.visibility === "everyone" ? "is-active" : ""}`}
+                onClick={() => {
+                  setPostToCommunity(false);
+                  onPickCommunity(null);
+                  setForm((f) => ({ ...f, visibility: "everyone" }));
+                }}
+                aria-pressed={!postToCommunity && form.visibility === "everyone"}
+              >
+                Everyone
+              </button>
+              <button
+                type="button"
+                className={`seg-toggle-btn ${!postToCommunity && form.visibility === "network" ? "is-active" : ""}`}
+                onClick={() => {
+                  setPostToCommunity(false);
+                  onPickCommunity(null);
+                  setForm((f) => ({ ...f, visibility: "network" }));
+                }}
+                aria-pressed={!postToCommunity && form.visibility === "network"}
+              >
+                Network
+              </button>
+              <button
+                type="button"
+                className={`seg-toggle-btn ${postToCommunity ? "is-active" : ""}`}
+                onClick={() => {
+                  setPostToCommunity(true);
+                  setForm((f) => ({ ...f, visibility: "everyone" }));
+                }}
+                aria-pressed={postToCommunity}
+              >
+                Communities
+              </button>
+            </div>
+            {postToCommunity && (
+              <div className="idea-community-pick">
+                {myCommunities === null && (
+                  <p className="form-help">Loading your communities…</p>
+                )}
+                {myCommunities !== null && myCommunities.length === 0 && (
+                  <p className="form-help">
+                    You&apos;re not in a community yet.{" "}
+                    <Link to="/communities" className="btn-link">Explore communities →</Link>
+                  </p>
+                )}
+                {myCommunities !== null && myCommunities.length > 0 && (
+                  <div className="idea-community-list" role="listbox" aria-label="Pick a community">
+                    {myCommunities.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        role="option"
+                        aria-selected={pickedCommunityId === c.id}
+                        className={`idea-community-option ${pickedCommunityId === c.id ? "is-active" : ""}`}
+                        onClick={() => onPickCommunity(c.id)}
+                      >
+                        {c.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {pickedCommunityId && (
+                  <div className="seg-toggle idea-community-vis" role="group" aria-label="Community visibility">
+                    <button
+                      type="button"
+                      className={`seg-toggle-btn ${communityVisibility === "public" ? "is-active" : ""}`}
+                      onClick={() => onCommunityVisibilityChange("public")}
+                      aria-pressed={communityVisibility === "public"}
+                    >
+                      Public
+                    </button>
+                    <button
+                      type="button"
+                      className={`seg-toggle-btn ${communityVisibility === "community_only" ? "is-active" : ""}`}
+                      onClick={() => onCommunityVisibilityChange("community_only")}
+                      aria-pressed={communityVisibility === "community_only"}
+                    >
+                      Community only
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             <label className="form-question">Add more detail</label>
             <textarea
               className="idea-detail-input"
               placeholder="Any more color? Who it's for, timing, what to bring…"
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
               rows={3}
             />
 
-            <label className="form-question" style={{ marginTop: 14 }}>Category</label>
+            <label className="form-question" style={{ marginTop: 14 }}>
+              Category <span className="form-question-optional">— optional</span>
+            </label>
             <div className="vibe-grid">
               {VIBE_OPTIONS.map((opt) => {
                 const selected = form.vibes.includes(opt.id);
@@ -1947,6 +2102,8 @@ function PlacePicker({
   onSelect,
   onClear,
   placeholder,
+  autoFocusOnMount = false,
+  onFieldFocus,
 }: {
   value: string;
   address: string;
@@ -1954,6 +2111,8 @@ function PlacePicker({
   onSelect: (p: { name: string; address: string; lat?: number; lng?: number; placeId?: string }) => void;
   onClear: () => void;
   placeholder?: string;
+  autoFocusOnMount?: boolean;
+  onFieldFocus?: (el: HTMLElement) => void;
 }) {
   const [results, setResults] = useState<PlaceHit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1962,9 +2121,16 @@ function PlacePicker({
   const [errored, setErrored] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blurRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   // Seed true when a venue is already filled (e.g. prefilled from Explore) so
   // we don't auto-search and pop the dropdown on mount.
   const skipNextSearch = useRef(value.trim().length >= 2);
+
+  useEffect(() => {
+    if (!autoFocusOnMount || value.trim()) return;
+    const t = setTimeout(() => inputRef.current?.focus(), 50);
+    return () => clearTimeout(t);
+  }, [autoFocusOnMount, value]);
 
   useEffect(() => {
     if (skipNextSearch.current) {
@@ -2020,11 +2186,15 @@ function PlacePicker({
       <div className="place-picker-field">
         <PinIcon />
         <input
+          ref={inputRef}
           type="text"
           placeholder={placeholder ?? "Search a venue, or type your own"}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setFocused(true)}
+          onFocus={(e) => {
+            setFocused(true);
+            onFieldFocus?.(e.currentTarget);
+          }}
           onBlur={() => {
             // Delay so a result tap (mousedown) registers before we hide.
             blurRef.current = setTimeout(() => setFocused(false), 150);

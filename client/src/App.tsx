@@ -37,6 +37,7 @@ import { PrivacyPage } from "./pages/Privacy";
 import { CommunitiesPage } from "./pages/Communities";
 import { CommunityDetailPage } from "./pages/CommunityDetail";
 import { CommunityChatPage } from "./pages/CommunityChat";
+import { SettingsForumsPage } from "./pages/SettingsForums";
 import { CreateCommunityPage } from "./pages/CreateCommunity";
 
 const APP_BOOT_AT = Date.now();
@@ -164,6 +165,7 @@ export default function App() {
         <Route path="/invite" element={<Protected><InvitePage /></Protected>} />
         <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />
         <Route path="/settings/interests" element={<Protected><SettingsInterestsPage /></Protected>} />
+        <Route path="/settings/forums" element={<Protected><SettingsForumsPage /></Protected>} />
         <Route path="/settings/notifications" element={<Protected><NotificationPrefsPage /></Protected>} />
         <Route path="/settings/privacy" element={<Protected><PrivacyPage /></Protected>} />
         <Route path="/settings/blocked" element={<Protected><BlockedListPage /></Protected>} />

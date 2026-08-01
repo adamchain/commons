@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { GetThereSheet } from "../components/GetThereSheet";
@@ -12,6 +12,7 @@ import { useAuth } from "../context/AuthContext";
 import { planHasEnded } from "../lib/planTime";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
 import { formatPlaceAddress, formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
+import { hrefForBack, type NavFromState } from "../lib/navState";
 import { type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
 
 /** Same "set parts + · flexible" convention as the feed card — never show a
@@ -26,6 +27,9 @@ export function PlanDetailPage() {
   const { id = "" } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const navFrom = (location.state as NavFromState | null) ?? null;
+  const backHref = hrefForBack(navFrom);
   const [plan, setPlan] = useState<PlanDTO | null>(null);
   const [showShare, setShowShare] = useState(false);
   const [showGetThere, setShowGetThere] = useState(false);
@@ -51,6 +55,13 @@ export function PlanDetailPage() {
   useEffect(() => {
     void load();
   }, [id]);
+
+  // Deep-link from feed "X Going" into the guest list.
+  useEffect(() => {
+    if (!plan || location.hash !== "#guests") return;
+    const el = document.getElementById("guests");
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [plan?.id, location.hash]);
 
   useEffect(() => {
     if (!plan) return;
@@ -209,7 +220,7 @@ export function PlanDetailPage() {
       <div className="plan-detail-hero">
         {coverSrc && <img src={coverSrc} alt="" loading="lazy" />}
         <div className="plan-detail-hero-overlay" aria-hidden="true" />
-        <Link to="/" className="plan-detail-back" aria-label="Back">
+        <Link to={backHref} className="plan-detail-back" aria-label="Back">
           ←
         </Link>
         <div className="plan-detail-hero-text">
@@ -224,7 +235,9 @@ export function PlanDetailPage() {
         <button
           type="button"
           className="host-row plan-detail-card"
-          onClick={() => navigate(`/profile/${plan.creator.id}`)}
+          onClick={() =>
+            navigate(`/profile/${plan.creator.id}`, { state: { from: "plan", planId: plan.id } })
+          }
         >
           <Avatar seed={plan.creator.avatarSeed} style={plan.creator.avatarStyle} photoDataUrl={plan.creator.avatarPhotoDataUrl} params={plan.creator.avatarParams} size="md" />
           <span className="host-row-text">
@@ -280,13 +293,17 @@ export function PlanDetailPage() {
               type="button"
               className="btn-primary btn-block plan-past-action-btn"
               onClick={() =>
-                navigate(`/plans/new`, { state: { hostAgainFrom: plan.id } })
+                navigate(`/plans/new?fromPlanId=${plan.id}`, { state: { hostAgainFrom: plan.id } })
               }
             >
               <RepeatIcon />
               Do it again
             </button>
-            <Link to={`/plans/${plan.id}/chat`} className="btn-secondary btn-block plan-past-action-btn">
+            <Link
+              to={`/plans/${plan.id}/chat`}
+              state={{ from: "plan", planId: plan.id }}
+              className="btn-secondary btn-block plan-past-action-btn"
+            >
               <ChatBubbleIcon />
               Open group chat
             </Link>
@@ -385,7 +402,7 @@ export function PlanDetailPage() {
               goingCount={plan.participants.going.length}
               joinType={plan.joinType}
               isHosting={isHosting}
-              onJustMarkedInterested={() => setShowInvite(true)}
+              onJustMarkedGoing={() => setShowInvite(true)}
             />
           </div>
         )}
@@ -393,7 +410,7 @@ export function PlanDetailPage() {
         {!isPast && canChat && (
           <Link
             to={`/plans/${plan.id}/chat`}
-            state={{ from: "plan" }}
+            state={{ from: "plan", planId: plan.id }}
             className="chat-entry chat-entry--prominent plan-detail-card"
           >
             <span className="chat-entry-icon" aria-hidden="true"><ChatBubbleIcon /></span>
@@ -527,14 +544,15 @@ export function PlanDetailPage() {
         )}
       </div>
 
-      <section className="who-block plan-detail-card" style={{ margin: "0 14px 32px" }}>
+      <section id="guests" className="who-block plan-detail-card" style={{ margin: "0 14px 32px" }}>
         <div className="who-row">
           <h3 className="who-block-heading">Going · {plan.participants.going.length}</h3>
           {plan.participants.going.length === 0 ? (
-            <p className="subtle" style={{ margin: 0 }}>Be the first to say "I'm in."</p>
+            <p className="subtle" style={{ margin: 0 }}>Be the first to say "In."</p>
           ) : (
             <ParticipantsRow
               people={plan.participants.going}
+              planId={plan.id}
               expanded={showAllGoing}
               onToggle={() => setShowAllGoing((v) => !v)}
               countLabel={`${plan.participants.going.length} going`}
@@ -553,7 +571,11 @@ export function PlanDetailPage() {
               <div className="participant-list-interested">
                 {plan.participants.interested.map((person) => (
                   <div key={person.id} className="participant-row participant-row--with-action">
-                    <Link to={`/profile/${person.id}`} className="participant-row-link">
+                    <Link
+                      to={`/profile/${person.id}`}
+                      state={{ from: "plan", planId: plan.id }}
+                      className="participant-row-link"
+                    >
                       <Avatar seed={person.avatarSeed} style={person.avatarStyle} photoDataUrl={person.avatarPhotoDataUrl} params={person.avatarParams} size="sm" />
                       <span className="participant-name">
                         {person.firstName}
@@ -585,6 +607,7 @@ export function PlanDetailPage() {
             ) : (
               <ParticipantsRow
                 people={plan.participants.interested}
+                planId={plan.id}
                 expanded={showAllInterested}
                 onToggle={() => setShowAllInterested((v) => !v)}
                 countLabel={`${plan.participants.interested.length} interested`}
@@ -610,15 +633,18 @@ export function PlanDetailPage() {
  */
 function ParticipantsRow({
   people,
+  planId,
   expanded,
   onToggle,
   countLabel,
 }: {
   people: PublicUser[];
+  planId: string;
   expanded: boolean;
   onToggle: () => void;
   countLabel: string;
 }) {
+  const profileFrom: NavFromState = { from: "plan", planId };
   const visible = expanded ? people : people.slice(0, 5);
   return (
     <>
@@ -628,6 +654,7 @@ function ParticipantsRow({
             <Link
               key={person.id}
               to={`/profile/${person.id}`}
+              state={profileFrom}
               className="avatar-stack-link"
               aria-label={person.firstName}
             >
@@ -655,7 +682,7 @@ function ParticipantsRow({
         <ul className="who-row-name-list">
           {people.map((person) => (
             <li key={person.id}>
-              <Link to={`/profile/${person.id}`} className="who-row-name">
+              <Link to={`/profile/${person.id}`} state={profileFrom} className="who-row-name">
                 {person.firstName}
               </Link>
             </li>

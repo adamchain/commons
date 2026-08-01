@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import { clearAuthToken } from "../api/authToken";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate } from "../lib/format";
+import { hrefForBack, type NavFromState } from "../lib/navState";
 import {
   COMMUNITY_CATEGORY_LABELS,
   INTEREST_LABELS,
@@ -25,6 +26,8 @@ interface ProfilePayload {
   sharedPlanId: string | null;
   /** Null until viewer earns visibility (shared completed plan or in network). */
   socialLinks: { instagram?: string; tiktok?: string } | null;
+  /** True when upcoming/past plans are hidden until viewer adds this person. */
+  plansGated?: boolean;
   network: {
     inMyNetwork: boolean;
     requestSent?: boolean;
@@ -36,14 +39,15 @@ interface ProfilePayload {
 
 export function ProfilePage() {
   const { userId = "" } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
+  const navFrom = (location.state as NavFromState | null) ?? null;
+  const backHref = hrefForBack(navFrom);
   const { user, setUser } = useAuth();
   const [profile, setProfile] = useState<ProfilePayload | null>(null);
-  const [feedPlans, setFeedPlans] = useState<PlanDTO[]>([]);
-  const [savedPlans, setSavedPlans] = useState<PlanDTO[]>([]);
   const [network, setNetwork] = useState<PublicUser[] | null>(null);
   const [communities, setCommunities] = useState<CommunityCardDTO[]>([]);
-  const [plansView, setPlansView] = useState<"list" | "calendar" | "saved">("list");
+  const [plansView, setPlansView] = useState<"list" | "calendar">("list");
   const isSelf = user?.id === userId;
 
   const reloadProfile = () =>
@@ -51,11 +55,11 @@ export function ProfilePage() {
 
   useEffect(() => {
     reloadProfile();
-  }, [userId]);
+    setPlansView("list");
+  }, [userId, location.pathname]);
 
   useEffect(() => {
     if (isSelf) {
-      void api<PlanDTO[]>("/api/plans").then(setFeedPlans).catch(() => setFeedPlans([]));
       void api<{ communities: CommunityCardDTO[] }>("/api/communities/mine")
         .then((r) => setCommunities(r.communities))
         .catch(() => setCommunities([]));
@@ -68,26 +72,6 @@ export function ProfilePage() {
       .then((r) => setNetwork(r.users))
       .catch(() => setNetwork([]));
   }, [isSelf, user?.networkUserIds?.length]);
-
-  // Saved plans (bookmarked, not necessarily going/interested/hosting) — the
-  // feed already covers most of them; backfill any saved ids the feed's
-  // neighborhood scope left out.
-  useEffect(() => {
-    if (!isSelf) return;
-    const savedIds = user?.savedPlanIds ?? [];
-    if (savedIds.length === 0) {
-      setSavedPlans([]);
-      return;
-    }
-    const have = new Set(feedPlans.map((p) => p.id));
-    const missing = savedIds.filter((id) => !have.has(id));
-    void Promise.all(missing.map((id) => api<PlanDTO>(`/api/plans/${id}`).catch(() => null))).then((extra) => {
-      setSavedPlans([
-        ...feedPlans.filter((p) => savedIds.includes(p.id)),
-        ...extra.filter((p): p is PlanDTO => !!p),
-      ]);
-    });
-  }, [isSelf, feedPlans, user?.savedPlanIds]);
 
   if (!profile) {
     return (
@@ -105,7 +89,7 @@ export function ProfilePage() {
     <main className="app-shell app-shell--with-nav app-shell--with-topbar profile-shell">
       {!isSelf && (
         <header className="app-header app-header--minimal">
-          <Link to="/" className="detail-back">← Back</Link>
+          <Link to={backHref} className="detail-back">← Back</Link>
         </header>
       )}
 
@@ -173,11 +157,6 @@ export function ProfilePage() {
           tiktok={profile.socialLinks?.tiktok}
           onEdit={() => navigate(`/profile/${userId}/edit`)}
         />
-        {!isSelf && profile.socialLinks === null && (
-          <p className="profile-social-locked">
-            Add to your network to see more — face and interests stay public.
-          </p>
-        )}
 
         {!isSelf && profile.network.mutualCount > 0 && (
           <div className="profile-mutuals">
@@ -214,6 +193,15 @@ export function ProfilePage() {
 
         {!isSelf && (
           <div className="profile-hero-actions-row">
+            {profile.sharedPlanId && (
+              <Link
+                to={`/plans/${profile.sharedPlanId}/chat`}
+                state={{ from: "profile", planId: userId }}
+                className="btn-secondary"
+              >
+                Message
+              </Link>
+            )}
             <FriendButton profile={profile} onUpdated={reloadProfile} />
             <BlockButton profileUserId={profile.user.id} firstName={profile.user.firstName} />
           </div>
@@ -258,29 +246,34 @@ export function ProfilePage() {
         </section>
       )}
 
-      {(profile.upcoming.length > 0 || profile.past.length > 0) && (
+      {isSelf ? (
         <YourPlansBlock
           id="profile-plans-block"
           upcoming={profile.upcoming}
           past={profile.past}
-          saved={savedPlans}
-          isSelf={isSelf}
-          viewerId={user?.id}
-          calendarPlans={isSelf ? feedPlans : profile.upcoming}
+          isSelf
+          profileUserId={userId}
           view={plansView}
           onViewChange={setPlansView}
         />
-      )}
-
-      {profile.upcoming.length === 0 && profile.past.length === 0 && isSelf && (
+      ) : profile.plansGated ? (
         <section className="profile-block">
-          <p className="empty-state" style={{ marginTop: 8 }}>
-            No plans yet — join something from the feed or post your own.
+          <h3 className="profile-section-label">Plans</h3>
+          <p className="profile-social-locked" style={{ marginTop: 8 }}>
+            Add to your network to see their plans — photo and interests stay public.
           </p>
         </section>
-      )}
-
-      {profile.upcoming.length === 0 && profile.past.length === 0 && !isSelf && (
+      ) : profile.upcoming.length > 0 || profile.past.length > 0 ? (
+        <YourPlansBlock
+          id="profile-plans-block"
+          upcoming={profile.upcoming}
+          past={profile.past}
+          isSelf={false}
+          profileUserId={userId}
+          view="list"
+          onViewChange={() => {}}
+        />
+      ) : (
         <section className="profile-block">
           <p className="empty-state" style={{ marginTop: 8 }}>No plans yet.</p>
         </section>
@@ -528,7 +521,8 @@ function FriendButton({
 }
 
 
-function MonthCalendar({ plans }: { plans: PlanDTO[] }) {
+function MonthCalendar({ plans, profileUserId }: { plans: PlanDTO[]; profileUserId: string }) {
+  const profileBack: NavFromState = { from: "profile", planId: profileUserId };
   const [monthOffset, setMonthOffset] = useState(0);
   const [openDay, setOpenDay] = useState<number | null>(null);
   const now = new Date();
@@ -586,7 +580,12 @@ function MonthCalendar({ plans }: { plans: PlanDTO[] }) {
               {openDay === dom && (byDay.get(dom) ?? []).length > 0 && (
                 <div className="month-cal-dropdown">
                   {(byDay.get(dom) ?? []).map((p) => (
-                    <Link key={p.id} to={`/plans/${p.id}`} className="month-cal-dropdown-item">
+                    <Link
+                      key={p.id}
+                      to={`/plans/${p.id}`}
+                      state={profileBack}
+                      className="month-cal-dropdown-item"
+                    >
                       <span>{p.hostEmoji}</span>
                       <span className="month-cal-dot-title">{p.title}</span>
                     </Link>
@@ -601,37 +600,46 @@ function MonthCalendar({ plans }: { plans: PlanDTO[] }) {
   );
 }
 
+function planRelationshipBadge(
+  plan: PlanDTO,
+  profileUserId: string,
+): { label: string; className: string } {
+  if (plan.creator.id === profileUserId) {
+    return { label: "Your plan", className: "profile-plan-chip--host" };
+  }
+  if (plan.participants.going.some((u) => u.id === profileUserId)) {
+    return { label: "In", className: "profile-plan-chip--going" };
+  }
+  return { label: "Interested", className: "profile-plan-chip--interested" };
+}
+
 /**
  * Combined "Your Plans" section — upcoming (collapsed to 3, "Show X more"),
  * then a Past accordion. Upcoming rows tag each plan with YOUR PLAN (you
- * started it) or INTERESTED so users see at a glance what their relationship
- * to each plan is. Past rows tag HOSTED or WENT.
+ * started it), IN, or INTERESTED.
  */
 function YourPlansBlock({
   id,
   upcoming,
   past,
-  saved,
   isSelf,
-  viewerId,
-  calendarPlans,
+  profileUserId,
   view,
   onViewChange,
 }: {
   id?: string;
   upcoming: PlanDTO[];
   past: Array<{ id: string; title: string; date: string; wentCount: number }>;
-  saved: PlanDTO[];
   isSelf: boolean;
-  viewerId: string | undefined;
-  calendarPlans: PlanDTO[];
-  view: "list" | "calendar" | "saved";
-  onViewChange: (v: "list" | "calendar" | "saved") => void;
+  profileUserId: string;
+  view: "list" | "calendar";
+  onViewChange: (v: "list" | "calendar") => void;
 }) {
   const [upcomingExpanded, setUpcomingExpanded] = useState(false);
   const [pastOpen, setPastOpen] = useState(false);
   const visibleUpcoming = upcomingExpanded ? upcoming : upcoming.slice(0, 3);
   const hiddenCount = Math.max(0, upcoming.length - visibleUpcoming.length);
+  const profileBack: NavFromState = { from: "profile", planId: profileUserId };
 
   const seeAllLink = (
     <Link to="/my-plans" className="profile-see-all-link" style={{ display: "inline-block", marginTop: 10 }}>
@@ -663,43 +671,13 @@ function YourPlansBlock({
             >
               Calendar
             </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view === "saved"}
-              className={view === "saved" ? "is-active" : ""}
-              onClick={() => onViewChange("saved")}
-            >
-              Saved
-            </button>
           </div>
         )}
       </div>
 
       {view === "calendar" && (
         <>
-          <MonthCalendar plans={calendarPlans} />
-          {isSelf && seeAllLink}
-        </>
-      )}
-
-      {view === "saved" && (
-        <>
-          {saved.length === 0 ? (
-            <p className="empty-state" style={{ marginTop: 8 }}>
-              No saved plans yet — tap the ★ on any plan card to save it.
-            </p>
-          ) : (
-            <div className="profile-plan-card">
-              {saved.map((p) => (
-                <Link key={p.id} to={`/plans/${p.id}`} className="profile-plan-row">
-                  <span className="profile-list-emoji">{p.hostEmoji}</span>
-                  <span className="profile-list-title">{p.title}</span>
-                  <span className="profile-list-when">{formatPlanDate(p.date)}</span>
-                </Link>
-              ))}
-            </div>
-          )}
+          <MonthCalendar plans={upcoming} profileUserId={profileUserId} />
           {isSelf && seeAllLink}
         </>
       )}
@@ -718,17 +696,19 @@ function YourPlansBlock({
           {visibleUpcoming.length > 0 ? (
             <div className="profile-plan-card">
               {visibleUpcoming.map((p) => {
-                const youStarted = viewerId !== undefined && p.creator.id === viewerId;
-                const badge = youStarted ? "Your plan" : "Interested";
+                const badge = planRelationshipBadge(p, profileUserId);
                 return (
-                  <Link key={p.id} to={`/plans/${p.id}`} className="profile-plan-row">
+                  <Link
+                    key={p.id}
+                    to={`/plans/${p.id}`}
+                    state={profileBack}
+                    className="profile-plan-row"
+                  >
                     <span className="profile-list-emoji">{p.hostEmoji}</span>
                     <span className="profile-list-title">{p.title}</span>
                     <span className="profile-list-when">{formatPlanDate(p.date)}</span>
-                    <span
-                      className={`profile-plan-chip ${youStarted ? "profile-plan-chip--host" : "profile-plan-chip--interested"}`}
-                    >
-                      {badge}
+                    <span className={`profile-plan-chip ${badge.className}`}>
+                      {badge.label}
                     </span>
                   </Link>
                 );
@@ -745,7 +725,11 @@ function YourPlansBlock({
               )}
             </div>
           ) : (
-            <p className="empty-state" style={{ marginTop: 8 }}>No upcoming plans yet.</p>
+            <p className="empty-state" style={{ marginTop: 8 }}>
+              {isSelf
+                ? "No plans yet — join something from the feed or post your own."
+                : "No upcoming plans yet."}
+            </p>
           )}
 
           {past.length > 0 && (
@@ -764,7 +748,12 @@ function YourPlansBlock({
                   {past.map((p) => (
                     // Past events are just a record: title + date. "Do it again"
                     // lives on the event page itself, not as a per-row button.
-                    <Link key={p.id} to={`/plans/${p.id}`} className="profile-plan-row">
+                    <Link
+                    key={p.id}
+                    to={`/plans/${p.id}`}
+                    state={profileBack}
+                    className="profile-plan-row"
+                  >
                       <span className="profile-list-title">{p.title}</span>
                       <span className="profile-list-when">{formatPlanDate(p.date)}</span>
                     </Link>

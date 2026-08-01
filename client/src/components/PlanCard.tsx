@@ -1,11 +1,13 @@
 import { useState } from "react";
 import type { MouseEvent } from "react";
+import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "./Avatar";
 import { useAuth } from "../context/AuthContext";
-import type { MeDTO, PlanDTO } from "../types/shared";
+import type { PlanDTO } from "../types/shared";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
+import { saveFeedScroll, type NavFromState } from "../lib/navState";
 import { planHasEnded } from "../lib/planTime";
 import { useNeighborhoods } from "../lib/useNeighborhoods";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
@@ -20,46 +22,30 @@ export function PlanCard({
   onPlanRefresh,
   highlight = false,
   highlightFading = false,
+  navFrom = { from: "feed" },
 }: {
   plan: PlanDTO;
   onPlanRefresh?: () => void;
   highlight?: boolean;
   highlightFading?: boolean;
+  navFrom?: NavFromState;
 }) {
   const title = sentenceCaseTitle(plan.title);
   const flexCount = (plan.isFlexibleTime ? 1 : 0) + (plan.isFlexibleLocation ? 1 : 0);
   // Only 2+ flexible fields = Looking For card. One flexible field = confirmed.
   const isLooking = plan.planKind === "looking_for" && flexCount > 1 && !plan.lockedAt;
   const coverPool = useCardImages();
-  const coverImage = plan.flyerDataUrl ?? pickCoverImage(coverPool, plan.id);
+  const coverImage =
+    plan.flyerDataUrl ??
+    (plan.planKind === "looking_for" ? null : pickCoverImage(coverPool, plan.id));
   const hoods = useNeighborhoods();
   const hoodName = hoods[plan.neighborhoodId]?.name ?? null;
   const isCancelled = Boolean(plan.cancelledAt);
   const hasEnded = !isCancelled && planHasEnded(plan);
-  const { user, setUser } = useAuth();
+  const { user } = useAuth();
   const isHosting = !!user && plan.creator.id === user.id;
-  const isSaved = !!user?.savedPlanIds?.includes(plan.id);
-  const [savePending, setSavePending] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const cardNavigate = useNavigate();
-
-  async function toggleSave(e: MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (savePending) return;
-    setSavePending(true);
-    try {
-      const r = await api<{ me: MeDTO }>("/api/auth/save-plan", {
-        method: "POST",
-        body: JSON.stringify({ planId: plan.id }),
-      });
-      setUser(r.me);
-    } catch {
-      /* swallow */
-    } finally {
-      setSavePending(false);
-    }
-  }
 
   // Flexible parts say "flexible" — never invent a fixed date that contradicts Lock It In.
   const whenParts: string[] = [];
@@ -90,19 +76,24 @@ export function PlanCard({
   const isFull = plan.capacity !== null && goingCount >= plan.capacity;
 
   const footerCount = almostPlan
-    ? `${totalRsvps} interested · almost a plan`
+    ? `${totalRsvps} Interested · almost a plan`
     : hasEnded && goingCount >= 1
       ? `${goingCount} went`
       : isFull && !hasEnded && !isCancelled
-        ? `${goingCount} going · full`
+        ? `${goingCount} Going · full`
         : showSpotsRemaining
-          ? `${goingCount} going · ${spotsRemaining} spot${spotsRemaining === 1 ? "" : "s"} left`
+          ? `${goingCount} Going · ${spotsRemaining} spot${spotsRemaining === 1 ? "" : "s"} left`
           : goingCount >= 1 || interestedCount >= 1
-            ? `${goingCount} going${interestedCount > 0 ? ` · ${interestedCount} interested` : ""}`
+            ? `${goingCount} Going${interestedCount > 0 ? ` · ${interestedCount} Interested` : ""}`
             : null;
 
-  // Host-only banner, few minutes after posting, never on past/cancelled.
+  // Host-only chip, few minutes after posting, never on past/cancelled.
   const showBanner = highlight && isHosting && !hasEnded && !isCancelled;
+
+  const openPlan = (hash?: string) => {
+    if (navFrom.from === "feed") saveFeedScroll();
+    cardNavigate(`/plans/${plan.id}${hash ?? ""}`, { state: navFrom });
+  };
 
   return (
     <div
@@ -111,20 +102,14 @@ export function PlanCard({
         isLooking ? "plan-card--looking" : "plan-card--confirmed"
       } ${showBanner ? "plan-card--just-posted" : ""} ${hasEnded ? "plan-card--happened" : ""} ${isCancelled ? "plan-card--cancelled" : ""} ${plan.visibility === "network" ? "plan-card--network" : ""}`}
     >
-      {user && (
-        <button
-          type="button"
-          className={`plan-card-save-btn ${isSaved ? "is-saved" : ""} ${!coverImage ? "plan-card-save-btn--body" : ""}`}
-          onClick={(e) => void toggleSave(e)}
-          disabled={savePending}
-          aria-pressed={isSaved}
-          aria-label={isSaved ? "Saved — tap to unsave" : "Save to Your plans"}
-          title={isSaved ? "Saved" : "Save"}
-        >
-          {isSaved ? "★" : "☆"}
-        </button>
-      )}
-      <Link to={`/plans/${plan.id}`} className="plan-card plan-card-link plan-card--compact">
+      <Link
+        to={`/plans/${plan.id}`}
+        state={navFrom}
+        onClick={() => {
+          if (navFrom.from === "feed") saveFeedScroll();
+        }}
+        className="plan-card plan-card-link plan-card--compact"
+      >
         {coverImage ? (
           <div className="plan-card-flyer">
             <img src={coverImage} alt="" loading="lazy" />
@@ -213,24 +198,18 @@ export function PlanCard({
 
           <footer className="plan-card-footer-row">
             <div className="plan-card-attendees">
-              {(plan.participants.going.length > 0 || plan.participants.interested.length > 0) && (
-                <div className="avatar-stack">
-                  {[...plan.participants.going, ...plan.participants.interested]
-                    .slice(0, 3)
-                    .map((p) => (
-                      <Avatar
-                        key={p.id}
-                        seed={p.avatarSeed}
-                        style={p.avatarStyle}
-                        photoDataUrl={p.avatarPhotoDataUrl}
-                        params={p.avatarParams}
-                        size="xs"
-                      />
-                    ))}
-                </div>
-              )}
               {footerCount && (
-                <span className="plan-card-going-count">{footerCount}</span>
+                <button
+                  type="button"
+                  className="plan-card-going-count plan-card-going-count--link"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openPlan("#guests");
+                  }}
+                >
+                  {footerCount}
+                </button>
               )}
             </div>
             {!isHosting && !hasEnded && !isCancelled && (
@@ -248,7 +227,7 @@ export function PlanCard({
 
       {hasEnded && isHosting && (
         <Link
-          to="/plans/new"
+          to={`/plans/new?fromPlanId=${plan.id}`}
           state={{ hostAgainFrom: plan.id }}
           className="plan-card-host-again"
           onClick={(e) => e.stopPropagation()}
@@ -311,27 +290,30 @@ function QuickJoin({
   isFull?: boolean;
   onPlanRefresh?: () => void;
 }) {
-  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
-  // Feed: one outlined Join pill. Interested lives only on plan detail.
-  const target: "going" | "interested" = isLooking ? "interested" : "going";
-  const active = state === "going" || state === "interested";
+  const [showSheet, setShowSheet] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
-  async function commit(e: MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (busy || (isFull && !active && !isLooking)) return;
-    if (active) {
-      navigate(`/plans/${planId}`);
-      return;
-    }
+  const goingActive = state === "going";
+  const interestedActive = state === "interested";
+
+  async function setState(next: "going" | "interested" | null) {
+    if (busy) return;
     setBusy(true);
+    setShowSheet(false);
     try {
-      await api(`/api/plans/${planId}/participation`, {
-        method: "PUT",
-        body: JSON.stringify({ state: target }),
-      });
+      if (next) {
+        await api(`/api/plans/${planId}/participation`, {
+          method: "PUT",
+          body: JSON.stringify({ state: next }),
+        });
+        setToast(next === "going" ? "You're In" : "Marked Interested");
+      } else {
+        await api(`/api/plans/${planId}/participation`, { method: "DELETE" });
+        setToast("Dropped out");
+      }
       onPlanRefresh?.();
+      window.setTimeout(() => setToast(null), 2000);
     } catch {
       /* surface nothing on the card */
     } finally {
@@ -339,7 +321,23 @@ function QuickJoin({
     }
   }
 
-  if (isFull && !active && !isLooking) {
+  async function onTap(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (busy || (isFull && !goingActive && !interestedActive && !isLooking)) return;
+    if (goingActive) {
+      setShowSheet(true);
+      return;
+    }
+    if (interestedActive) {
+      // Soft state — open sheet to drop or upgrade to In.
+      setShowSheet(true);
+      return;
+    }
+    await setState(isLooking ? "interested" : "going");
+  }
+
+  if (isFull && !goingActive && !interestedActive && !isLooking) {
     return (
       <span className="plan-card-quick-join is-full" aria-disabled="true">
         Full
@@ -347,16 +345,66 @@ function QuickJoin({
     );
   }
 
-  const label = active ? "You're in ✓" : "Join";
+  const label = goingActive
+    ? "In ✓"
+    : interestedActive
+      ? "Interested ✓"
+      : isLooking
+        ? "Interested"
+        : "In";
 
   return (
-    <button
-      type="button"
-      className={`plan-card-quick-join ${active ? "is-active" : ""}`}
-      onClick={(e) => void commit(e)}
-      disabled={busy}
-    >
-      {busy ? "…" : label}
-    </button>
+    <>
+      <button
+        type="button"
+        className={`plan-card-quick-join ${goingActive || interestedActive ? "is-active" : ""}`}
+        onClick={(e) => void onTap(e)}
+        disabled={busy}
+      >
+        {busy ? "…" : label}
+      </button>
+      {toast && (
+        <span className="plan-card-toast" role="status">
+          {toast}
+        </span>
+      )}
+      {showSheet &&
+        createPortal(
+          <div
+            className="sheet-backdrop"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowSheet(false);
+            }}
+          >
+            <div className="sheet" onClick={(e) => e.stopPropagation()}>
+              <div className="sheet-handle" />
+              <div className="sheet-title">{goingActive ? "You're In" : "Interested"}</div>
+              {goingActive && (
+                <button type="button" className="sheet-link" onClick={() => void setState("interested")}>
+                  Switch to Interested
+                </button>
+              )}
+              {interestedActive && !isLooking && !isFull && (
+                <button type="button" className="sheet-link" onClick={() => void setState("going")}>
+                  Switch to In
+                </button>
+              )}
+              <button
+                type="button"
+                className="sheet-link sheet-link--danger"
+                onClick={() => void setState(null)}
+              >
+                Drop out
+              </button>
+              <button type="button" className="btn-link sheet-cancel" onClick={() => setShowSheet(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }

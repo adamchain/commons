@@ -50,6 +50,7 @@ function EditProfileForm({
   onSaved: (next: MeDTO) => void;
   onCancel: () => void;
 }) {
+  const { setUser } = useAuth();
   const [firstName, setFirstName] = useState(me.firstName);
   const [lastName, setLastName] = useState(me.lastName ?? "");
   const [bio, setBio] = useState(me.bio ?? "");
@@ -58,6 +59,7 @@ function EditProfileForm({
   const [presetOpen, setPresetOpen] = useState(false);
   const [instagram, setInstagram] = useState(me.socialLinks?.instagram ?? "");
   const [tiktok, setTiktok] = useState(me.socialLinks?.tiktok ?? "");
+  const [discoverable, setDiscoverable] = useState(me.discoverableBySearch);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -99,44 +101,7 @@ function EditProfileForm({
 
   return (
     <section className="profile-edit-panel">
-      <label className="form-question" htmlFor="profile-edit-name">
-        First name
-      </label>
-      <input
-        id="profile-edit-name"
-        className="onboarding-input"
-        value={firstName}
-        onChange={(e) => setFirstName(e.target.value)}
-        maxLength={40}
-      />
-
-      <label className="form-question" htmlFor="profile-edit-last" style={{ marginTop: 10 }}>
-        Last name
-      </label>
-      <input
-        id="profile-edit-last"
-        className="onboarding-input"
-        value={lastName}
-        onChange={(e) => setLastName(e.target.value)}
-        maxLength={40}
-      />
-
-      <label className="form-question" htmlFor="profile-edit-bio" style={{ marginTop: 10 }}>
-        Bio
-      </label>
-      <textarea
-        id="profile-edit-bio"
-        className="onboarding-input profile-edit-bio"
-        value={bio}
-        onChange={(e) => setBio(e.target.value)}
-        maxLength={160}
-        rows={3}
-        placeholder="A short line about you…"
-      />
-
-      <label className="form-question" style={{ marginTop: 14 }}>
-        Profile image
-      </label>
+      <label className="form-question">Profile image</label>
       <p className="form-help">Upload a photo or pick a character below — one or the other.</p>
 
       <div className="profile-edit-photo-row">
@@ -219,13 +184,49 @@ function EditProfileForm({
         </div>
       </details>
 
-      <label className="form-question" htmlFor="profile-edit-ig" style={{ marginTop: 14 }}>
+      <label className="form-question" htmlFor="profile-edit-name" style={{ marginTop: 14 }}>
+        First name
+      </label>
+      <input
+        id="profile-edit-name"
+        className="onboarding-input"
+        value={firstName}
+        onChange={(e) => setFirstName(e.target.value)}
+        maxLength={40}
+      />
+
+      <label className="form-question" htmlFor="profile-edit-last" style={{ marginTop: 10 }}>
+        Last name
+      </label>
+      <input
+        id="profile-edit-last"
+        className="onboarding-input"
+        value={lastName}
+        onChange={(e) => setLastName(e.target.value)}
+        maxLength={40}
+      />
+
+      <label className="form-question" htmlFor="profile-edit-bio" style={{ marginTop: 10 }}>
+        Bio
+      </label>
+      <textarea
+        id="profile-edit-bio"
+        className="onboarding-input profile-edit-bio"
+        value={bio}
+        onChange={(e) => setBio(e.target.value)}
+        maxLength={160}
+        rows={3}
+        placeholder="A short line about you…"
+      />
+
+      <label className="form-question" style={{ marginTop: 14 }}>
+        Socials
+      </label>
+      <p className="form-help">Optional — shown on your profile for everyone to see.</p>
+
+      <label className="form-question" htmlFor="profile-edit-ig" style={{ marginTop: 10 }}>
         Instagram
       </label>
-      <p className="form-help">
-        Only visible to people you&apos;ve actually shown up for — others have to share
-        a completed plan with you first.
-      </p>
       <input
         id="profile-edit-ig"
         className="onboarding-input"
@@ -246,6 +247,41 @@ function EditProfileForm({
         onChange={(e) => setTiktok(e.target.value)}
         maxLength={40}
       />
+
+      <div className="settings-row" style={{ marginTop: 16, padding: "12px 0", borderTop: "1px solid var(--border)" }}>
+        <div className="settings-row-body" style={{ paddingLeft: 0 }}>
+          <div className="settings-row-title">Public profile</div>
+          <div className="settings-row-sub" style={{ whiteSpace: "normal" }}>
+            Let people find you by name in search
+          </div>
+        </div>
+        <label className="pref-toggle">
+          <input
+            type="checkbox"
+            checked={discoverable}
+            disabled={busy}
+            onChange={() => {
+              void (async () => {
+                setBusy(true);
+                setError(null);
+                try {
+                  const next = await api<MeDTO>("/api/auth/me", {
+                    method: "PATCH",
+                    body: JSON.stringify({ discoverableBySearch: !discoverable }),
+                  });
+                  setDiscoverable(next.discoverableBySearch);
+                  setUser(next);
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : "Couldn't update privacy");
+                } finally {
+                  setBusy(false);
+                }
+              })();
+            }}
+            aria-label="Public profile — discoverable in search"
+          />
+        </label>
+      </div>
 
       {error && <p className="onboarding-error" style={{ marginTop: 8 }}>{error}</p>}
 

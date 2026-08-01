@@ -61,6 +61,12 @@ export function SettingsPage() {
           sub="Name, photo, neighborhood"
         />
         <SettingsRow
+          to="/settings/forums"
+          icon={<MessageIcon />}
+          title="Forums"
+          sub="Join or leave interest forums"
+        />
+        <SettingsRow
           to="/settings/interests"
           icon={<HeartIcon />}
           title="Interests"
@@ -331,6 +337,13 @@ function DeleteAccountRow({ onSignedOut }: { onSignedOut: () => void }) {
 
 /* ---------- icons (line-based, inherit currentColor) ---------- */
 
+function MessageIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+    </svg>
+  );
+}
 function UserIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

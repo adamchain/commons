@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
 import type { JoinType, ParticipationState, PlanKind } from "../types/shared";
@@ -34,8 +34,14 @@ function markPromptedInvite(planId: string, userId: string | undefined): void {
   try {
     localStorage.setItem(`${INVITE_PROMPT_KEY_PREFIX}${planId}:${userId ?? "anon"}`, "1");
   } catch {
-    /* storage unavailable — non-blocking, just skip the prompt next time too */
+    /* storage unavailable — non-blocking */
   }
+}
+
+function confirmCopy(next: ParticipationState | null): string {
+  if (next === "going") return "You're In";
+  if (next === "interested") return "Marked Interested";
+  return "Dropped out";
 }
 
 export function ParticipationButtons({
@@ -47,7 +53,7 @@ export function ParticipationButtons({
   goingCount = 0,
   joinType = "open",
   isHosting = false,
-  onJustMarkedInterested,
+  onJustMarkedGoing,
 }: {
   planId: string;
   initialState: ParticipationState | null;
@@ -60,18 +66,28 @@ export function ParticipationButtons({
   joinType?: JoinType;
   /** Host bypasses capacity and approve gates. */
   isHosting?: boolean;
-  /** Called the first time someone commits (going or interested) — opens the full invite sheet. */
-  onJustMarkedInterested?: () => void;
+  /** Called the first time someone confirms In — opens the invite sheet. */
+  onJustMarkedGoing?: () => void;
 }) {
   const { user } = useAuth();
   const [state, setState] = useState<ParticipationState | null>(initialState);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showGoingSheet, setShowGoingSheet] = useState(false);
-  const [invitePromptFor, setInvitePromptFor] = useState<ParticipationState | null>(null);
+  const [showInterestedSheet, setShowInterestedSheet] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
-  // Shared commit path for every state transition — optimistic update, real
-  // request, roll back on failure. Returns whether it actually landed.
+  useEffect(() => {
+    setState(initialState);
+  }, [initialState]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 2200);
+    return () => window.clearTimeout(t);
+  }, [toast]);
+
+  // Shared commit path — optimistic update, real request, roll back on failure.
   const commit = async (next: ParticipationState | null): Promise<boolean> => {
     const prev = state;
     setState(next);
@@ -87,6 +103,7 @@ export function ParticipationButtons({
       } else {
         await api(`/api/plans/${planId}/participation`, { method: "DELETE" });
       }
+      setToast(confirmCopy(next));
       return true;
     } catch (err) {
       setState(prev);
@@ -98,29 +115,29 @@ export function ParticipationButtons({
     }
   };
 
-  const promptInviteIfNeeded = (next: ParticipationState) => {
+  const promptInviteIfNeeded = () => {
     if (hasPromptedInvite(planId, user?.id)) return;
     markPromptedInvite(planId, user?.id);
-    setInvitePromptFor(next);
+    onJustMarkedGoing?.();
   };
 
   const tapGoing = async () => {
     if (pending) return;
-    // Active "going" opens a sheet instead of toggling off on a plain re-tap
-    // — dropping out (and leaving the group chat) should be a conscious act.
     if (goingActive) {
       setShowGoingSheet(true);
       return;
     }
     const ok = await commit("going");
-    if (ok) promptInviteIfNeeded("going");
+    if (ok) promptInviteIfNeeded();
   };
 
   const tapInterested = async () => {
     if (pending) return;
-    const next = state === "interested" ? null : "interested";
-    const ok = await commit(next);
-    if (ok && next === "interested") promptInviteIfNeeded("interested");
+    if (interestedActive) {
+      setShowInterestedSheet(true);
+      return;
+    }
+    await commit("interested");
   };
 
   const switchToInterested = async () => {
@@ -135,6 +152,21 @@ export function ParticipationButtons({
     await commit(null);
   };
 
+  const dropOutFromInterested = async () => {
+    const confirmed = window.confirm(
+      "Drop Interested? You'll leave the count and the group chat.",
+    );
+    if (!confirmed) return;
+    setShowInterestedSheet(false);
+    await commit(null);
+  };
+
+  const switchToGoing = async () => {
+    setShowInterestedSheet(false);
+    const ok = await commit("going");
+    if (ok) promptInviteIfNeeded();
+  };
+
   const goingActive = state === "going";
   const interestedActive = state === "interested";
   const loose = planKind === "looking_for";
@@ -146,12 +178,12 @@ export function ParticipationButtons({
       {!loose && (
         <p className="participation-hint">
           {isApproveOnly
-            ? "Application-only — tap interested to request a spot."
+            ? "Application-only — tap Interested to request a spot."
             : isFull
               ? "This plan is full."
               : capacity !== null
                 ? `${goingCount}/${capacity} spots taken — first come, first serve.`
-                : "Committed vs tentative — pick what fits."}
+                : "In is committed. Interested is soft — both count and join the chat."}
         </p>
       )}
       {!loose && (
@@ -162,12 +194,12 @@ export function ParticipationButtons({
           disabled={pending || isFull || isApproveOnly}
         >
           {goingActive
-            ? "You're in ✓"
+            ? "You're In ✓"
             : isFull
               ? "Full"
               : isApproveOnly
                 ? "Application-only"
-                : "I'm in"}
+                : "In"}
         </button>
       )}
       <button
@@ -179,7 +211,7 @@ export function ParticipationButtons({
         {interestedActive
           ? isApproveOnly
             ? "Withdraw application"
-            : "Drop out"
+            : "Interested ✓"
           : loose
             ? "Interested"
             : isApproveOnly
@@ -187,12 +219,17 @@ export function ParticipationButtons({
               : "Interested"}
       </button>
       {error && <p className="onboarding-error" style={{ marginTop: 8 }}>{error}</p>}
+      {toast && (
+        <p className="participation-toast" role="status" aria-live="polite">
+          {toast}
+        </p>
+      )}
 
       {showGoingSheet && (
         <div className="sheet-backdrop" onClick={() => setShowGoingSheet(false)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
             <div className="sheet-handle" />
-            <div className="sheet-title">You're in</div>
+            <div className="sheet-title">You're In</div>
             <button type="button" className="sheet-link" onClick={() => void switchToInterested()}>
               Switch to Interested
             </button>
@@ -206,26 +243,25 @@ export function ParticipationButtons({
         </div>
       )}
 
-      {invitePromptFor && (
-        <div className="sheet-backdrop" onClick={() => setInvitePromptFor(null)}>
+      {showInterestedSheet && (
+        <div className="sheet-backdrop" onClick={() => setShowInterestedSheet(false)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
             <div className="sheet-handle" />
-            <div className="sheet-title">
-              {invitePromptFor === "going" ? "You're in 🎉" : "Nice — you're on the list"}
-            </div>
-            <p className="invite-prompt-copy">Know someone who'd love this?</p>
+            <div className="sheet-title">Interested</div>
+            {!loose && !isApproveOnly && !isFull && (
+              <button type="button" className="sheet-link" onClick={() => void switchToGoing()}>
+                Switch to In
+              </button>
+            )}
             <button
               type="button"
-              className="btn-primary btn-block"
-              onClick={() => {
-                setInvitePromptFor(null);
-                onJustMarkedInterested?.();
-              }}
+              className="sheet-link sheet-link--danger"
+              onClick={() => void dropOutFromInterested()}
             >
-              Invite friends
+              Drop out
             </button>
-            <button type="button" className="btn-link sheet-cancel" onClick={() => setInvitePromptFor(null)}>
-              Done
+            <button type="button" className="btn-link sheet-cancel" onClick={() => setShowInterestedSheet(false)}>
+              Cancel
             </button>
           </div>
         </div>

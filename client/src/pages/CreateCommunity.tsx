@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/http";
+import { fileToResizedDataUrl } from "../lib/imageResize";
+import { pickPhotoNative } from "../lib/photoPicker";
+import { isNative } from "../lib/platform";
 import {
   ALL_COMMUNITY_CATEGORIES,
   COMMUNITY_CATEGORY_LABELS,
@@ -11,15 +14,34 @@ import "./Communities.css";
 
 export function CreateCommunityPage() {
   const navigate = useNavigate();
+  const coverRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<CommunityCategory>("social");
   const [screening, setScreening] = useState("");
-  const [coverImage, setCoverImage] = useState("");
+  const [coverImage, setCoverImage] = useState<string | null>(null);
+  const [coverBusy, setCoverBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const canSubmit = name.trim().length > 0 && description.trim().length > 0 && !busy;
+
+  async function pickCover(file?: File) {
+    setCoverBusy(true);
+    try {
+      let dataUrl: string | null = null;
+      if (isNative()) {
+        dataUrl = await pickPhotoNative({ maxPx: 1024, quality: 0.85 });
+      } else if (file) {
+        dataUrl = await fileToResizedDataUrl(file, 1024, 0.85);
+      }
+      if (dataUrl) setCoverImage(dataUrl);
+    } catch {
+      setErr("Couldn't read that image. Try another.");
+    } finally {
+      setCoverBusy(false);
+    }
+  }
 
   async function submit() {
     if (!canSubmit) return;
@@ -33,7 +55,7 @@ export function CreateCommunityPage() {
           description: description.trim(),
           category,
           screeningQuestion: screening.trim() || undefined,
-          coverImage: coverImage.trim() || undefined,
+          coverImage: coverImage ?? undefined,
         }),
       });
       navigate(`/communities/${created.id}`);
@@ -59,10 +81,45 @@ export function CreateCommunityPage() {
     <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy">
       <header className="cmy-create-head">
         <button type="button" className="cmy-btn cmy-btn--ghost cmy-btn--sm" onClick={() => navigate(-1)}>← Back</button>
-        <h1 className="cmy-name">Start a community</h1>
+        <h1 className="cmy-name">Create a community</h1>
       </header>
 
       <div className="cmy-settings">
+        <div className="cmy-cover-upload">
+          <span className="cmy-field-label">Cover image <em className="cmy-hint">(optional)</em></span>
+          {coverImage ? (
+            <div className="cmy-cover-preview" style={{ backgroundImage: `url(${coverImage})` }}>
+              <div className="cmy-cover-preview-actions">
+                <button type="button" className="cmy-btn cmy-btn--ghost cmy-btn--sm" disabled={coverBusy} onClick={() => void pickCover()}>
+                  Change
+                </button>
+                <button type="button" className="cmy-btn cmy-btn--ghost cmy-btn--sm" onClick={() => setCoverImage(null)}>
+                  Remove
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" className="cmy-cover-upload-btn" disabled={coverBusy} onClick={() => void pickCover()}>
+              {coverBusy ? "Uploading…" : "Upload cover photo"}
+            </button>
+          )}
+          <input
+            ref={coverRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void pickCover(f);
+              if (coverRef.current) coverRef.current.value = "";
+            }}
+          />
+          {!isNative() && !coverImage && (
+            <button type="button" className="cmy-btn cmy-btn--ghost cmy-btn--sm" onClick={() => coverRef.current?.click()}>
+              Choose from library
+            </button>
+          )}
+        </div>
         <label className="cmy-field">
           <span>Name</span>
           <input className="cmy-input" value={name} placeholder="Saturday Long Run" maxLength={80} onChange={(e) => setName(e.target.value)} />
@@ -78,10 +135,6 @@ export function CreateCommunityPage() {
               <option key={c} value={c}>{COMMUNITY_CATEGORY_LABELS[c]}</option>
             ))}
           </select>
-        </label>
-        <label className="cmy-field">
-          <span>Cover image URL <em className="cmy-hint">(optional)</em></span>
-          <input className="cmy-input" value={coverImage} placeholder="https://…" onChange={(e) => setCoverImage(e.target.value)} />
         </label>
         <label className="cmy-field">
           <span>Screening question <em className="cmy-hint">(optional — leave blank for instant join)</em></span>

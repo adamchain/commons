@@ -30,16 +30,17 @@ import {
   type PlanDTO,
 } from "../types/shared";
 
-// Warm one-time interstitial shown right after onboarding completes (F.1). The
-// flag is stored locally so it never re-appears for this device even if the
-// onboarding flow is somehow re-entered later.
-const WELCOME_SEEN_KEY = "commons_welcome_seen";
-function hasSeenWelcome(): boolean {
-  if (typeof window === "undefined") return false;
-  return localStorage.getItem(WELCOME_SEEN_KEY) === "1";
+// Warm one-time interstitial shown right after onboarding completes (F.1).
+// Keyed per account so a new signup always sees it, even on a shared device.
+function welcomeSeenKey(userId: string): string {
+  return `commons_welcome_seen_${userId}`;
 }
-function markWelcomeSeen(): void {
-  if (typeof window !== "undefined") localStorage.setItem(WELCOME_SEEN_KEY, "1");
+function hasSeenWelcome(userId: string): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(welcomeSeenKey(userId)) === "1";
+}
+function markWelcomeSeen(userId: string): void {
+  if (typeof window !== "undefined") localStorage.setItem(welcomeSeenKey(userId), "1");
 }
 
 // TEMP launch gate: after verifying their phone, every (non-admin) member must
@@ -260,7 +261,11 @@ export function OnboardingPage() {
         landing
         title=""
         subtitle="A place for plans meant to be shared."
-        onBack={!isNative() ? () => navigate("/welcome") : undefined}
+        onBack={() => {
+          if (!isNative()) navigate("/welcome");
+          else if (window.history.length > 1) navigate(-1);
+          else navigate("/welcome");
+        }}
       >
         <input
           className="onboarding-input"
@@ -480,13 +485,14 @@ export function OnboardingPage() {
           // Set the step BEFORE refreshUser resolves so the completion guard
           // above sees "welcome" (or "download") and doesn't redirect out from
           // under it.
-          if (!hasSeenWelcome()) {
+          const uid = user?.id;
+          if (uid && !hasSeenWelcome(uid)) {
             setStep("welcome");
           } else if (!isNative()) {
             setStep("download");
           }
           await refreshUser();
-          if (hasSeenWelcome() && isNative()) {
+          if (uid && hasSeenWelcome(uid) && isNative()) {
             navigate(redirectTo, { replace: true });
           }
         }}
@@ -498,7 +504,7 @@ export function OnboardingPage() {
       <WelcomeStep
         user={user}
         onContinue={() => {
-          markWelcomeSeen();
+          markWelcomeSeen(user.id);
           if (!isNative()) {
             setStep("download");
           } else {
@@ -686,6 +692,7 @@ function OnboardingShell({
   children,
   landing = false,
   onBack,
+  compact = false,
 }: {
   title: string;
   subtitle: string;
@@ -694,6 +701,8 @@ function OnboardingShell({
   landing?: boolean;
   /** When provided, renders a back arrow to return to the previous step. */
   onBack?: () => void;
+  /** Tighter top spacing for dense grids (e.g. interests). */
+  compact?: boolean;
 }) {
   return (
     <div className={`onboarding-shell ${landing ? "onboarding-shell--landing" : ""}`}>
@@ -720,7 +729,7 @@ function OnboardingShell({
       <div
         className={`onboarding-card ${landing ? "onboarding-card--landing" : ""} ${
           onBack ? "onboarding-card--has-nav" : ""
-        }`}
+        } ${compact ? "onboarding-card--compact" : ""}`}
       >
         {onBack && (
           <button type="button" className="onboarding-back" onClick={onBack} aria-label="Back">
@@ -757,6 +766,7 @@ function LocationStep({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("");
   const [busy, setBusy] = useState(false);
+  const scrollLockRef = useRef(0);
   const [permissionState, setPermissionState] = useState<"idle" | "asking" | "granted" | "denied">(
     coords ? "granted" : "idle"
   );
@@ -789,6 +799,13 @@ function LocationStep({
     return list.filter((n) => n.name.toLowerCase().includes(q) || n.metro.toLowerCase().includes(q));
   }, [neighborhoods, coords, filter]);
 
+  // Keep the page from jumping to the top while filtering the neighborhood list.
+  useEffect(() => {
+    if (scrollLockRef.current > 0) {
+      window.scrollTo(0, scrollLockRef.current);
+    }
+  }, [filter, sorted]);
+
   if (permissionState === "idle") {
     return (
       <OnboardingShell title="Share your location" subtitle="So we can show you what's happening nearby." onBack={onBack}>
@@ -815,7 +832,10 @@ function LocationStep({
         className="onboarding-input"
         placeholder="Search neighborhoods…"
         value={filter}
-        onChange={(e) => setFilter(e.target.value)}
+        onChange={(e) => {
+          scrollLockRef.current = window.scrollY;
+          setFilter(e.target.value);
+        }}
       />
       <ul className="neighborhood-list">
         {sorted.map((n) => {
@@ -871,14 +891,9 @@ function LocationStep({
 }
 
 /**
- * Scroll-to-bottom consent gate for the Terms of Service and Privacy Policy.
- * Each document must be scrolled to its end before the "I agree" checkbox
- * unlocks — required for new users during onboarding. Reading state is tracked
- * per document and persists across tab switches.
+ * Scroll-to-bottom consent gate for Terms and Privacy. Each document opens in a
+ * modal; the agree chip stays disabled until both are read to the bottom.
  */
-// Combined consent gate: the community guidelines, Terms of Service, and Privacy
-// Policy all live on one screen so members agree to everything in a single flow
-// rather than clearing two near-identical "agree & continue" steps back to back.
 function LegalConsentStep({
   onAgree,
   onBack,
@@ -886,46 +901,34 @@ function LegalConsentStep({
   onAgree: () => Promise<void>;
   onBack?: () => void;
 }) {
-  const [active, setActive] = useState<"terms" | "privacy">("terms");
   const [read, setRead] = useState<{ terms: boolean; privacy: boolean }>({
     terms: false,
     privacy: false,
   });
+  const [openDoc, setOpenDoc] = useState<"terms" | "privacy" | null>(null);
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
 
-  const doc = LEGAL_DOCS[active];
   const bothRead = read.terms && read.privacy;
-
-  // Mark the active doc read once its panel is scrolled to (or already sits at)
-  // the bottom. A generous tolerance keeps short viewports / momentum scroll
-  // from getting stuck one pixel shy of the end.
-  function markIfAtBottom() {
-    const el = panelRef.current;
-    if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 28;
-    if (atBottom) setRead((r) => (r[active] ? r : { ...r, [active]: true }));
-  }
-
-  // On tab switch, reset scroll to the top and re-measure after layout settles —
-  // a document short enough to fit without scrolling counts as read immediately.
-  useEffect(() => {
-    const el = panelRef.current;
-    if (!el) return;
-    el.scrollTop = 0;
-    const id = window.setTimeout(markIfAtBottom, 60);
-    return () => window.clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active]);
 
   return (
     <OnboardingShell
       title="Before you join."
-      subtitle="Our community guidelines, Terms, and Privacy Policy — one quick read."
+      subtitle="Read our community guidelines, Terms, and Privacy Policy."
       onBack={onBack}
     >
+      <h3 className="guidelines-heading">Community guidelines</h3>
       <ul className="guidelines-list">
+        <li>
+          <span className="guidelines-icon" aria-hidden="true">💛</span>
+          <div>
+            <strong>Built for women.</strong>
+            <p>
+              COMMONS is a women-forward community, built for finding your people and making real
+              plans in the city.
+            </p>
+          </div>
+        </li>
         <li>
           <span className="guidelines-icon" aria-hidden="true">🤝</span>
           <div>
@@ -963,13 +966,16 @@ function LegalConsentStep({
         </li>
       </ul>
 
-      <div className="legal-consent-tabs">
+      <p className="legal-consent-intro">
+        You must read both documents before you can agree.
+      </p>
+      <div className="legal-consent-openers">
         {(["terms", "privacy"] as const).map((slug) => (
           <button
             key={slug}
             type="button"
-            className={`legal-consent-tab ${active === slug ? "is-active" : ""}`}
-            onClick={() => setActive(slug)}
+            className={`legal-consent-opener ${read[slug] ? "is-read" : ""}`}
+            onClick={() => setOpenDoc(slug)}
           >
             {read[slug] && (
               <span className="legal-consent-tab-check" aria-hidden="true">
@@ -977,13 +983,9 @@ function LegalConsentStep({
               </span>
             )}
             {LEGAL_DOCS[slug].title}
+            {!read[slug] && <span className="legal-consent-opener-hint">Read required</span>}
           </button>
         ))}
-      </div>
-
-      <div className="legal-consent-panel" ref={panelRef} onScroll={markIfAtBottom}>
-        <LegalContent doc={doc} />
-        {!read[active] && <div className="legal-consent-scrollhint">Scroll to continue ↓</div>}
       </div>
 
       {!bothRead && (
@@ -992,26 +994,29 @@ function LegalConsentStep({
             ? "Now read the Privacy Policy."
             : read.privacy
               ? "Now read the Terms of Service."
-              : "Scroll to the bottom of each document to continue."}
+              : "Open and scroll to the bottom of each document to continue."}
         </p>
       )}
 
-      <p className="onboarding-women-note">
-        COMMONS is a community platform built for women.
-      </p>
-
-      <label className="guidelines-agree">
-        <input
-          type="checkbox"
-          checked={agreed}
-          disabled={!bothRead}
-          onChange={(e) => setAgreed(e.target.checked)}
-        />
+      <button
+        type="button"
+        className={`legal-agree-chip ${agreed ? "is-active" : ""}`}
+        disabled={!bothRead}
+        aria-pressed={agreed}
+        onClick={() => {
+          if (bothRead) setAgreed((v) => !v);
+        }}
+      >
+        {agreed && (
+          <span className="legal-agree-chip-check" aria-hidden="true">
+            ✓
+          </span>
+        )}
         <span>
           I have read and agree to the Commons Community Guidelines, Terms of Service, and Privacy
           Policy.
         </span>
-      </label>
+      </button>
 
       <button
         type="button"
@@ -1028,7 +1033,78 @@ function LegalConsentStep({
       >
         {busy ? "One sec…" : "Agree & continue"}
       </button>
+
+      {openDoc && (
+        <LegalDocModal
+          doc={LEGAL_DOCS[openDoc]}
+          onClose={() => setOpenDoc(null)}
+          onReadComplete={() => setRead((r) => ({ ...r, [openDoc]: true }))}
+        />
+      )}
     </OnboardingShell>
+  );
+}
+
+function LegalDocModal({
+  doc,
+  onClose,
+  onReadComplete,
+}: {
+  doc: (typeof LEGAL_DOCS)[keyof typeof LEGAL_DOCS];
+  onClose: () => void;
+  onReadComplete: () => void;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [atBottom, setAtBottom] = useState(false);
+
+  function markIfAtBottom() {
+    const el = panelRef.current;
+    if (!el) return;
+    const bottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 28;
+    setAtBottom(bottom);
+  }
+
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    el.scrollTop = 0;
+    setAtBottom(false);
+    const id = window.setTimeout(markIfAtBottom, 60);
+    return () => window.clearTimeout(id);
+  }, [doc.slug]);
+
+  return (
+    <div className="legal-modal-backdrop" onClick={onClose}>
+      <div
+        className="legal-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={doc.title}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="legal-modal-header">
+          <h3 className="legal-modal-title">{doc.title}</h3>
+          <button type="button" className="legal-modal-close" onClick={onClose} aria-label="Close">
+            ✕
+          </button>
+        </div>
+        <div className="legal-modal-panel" ref={panelRef} onScroll={markIfAtBottom}>
+          <LegalContent doc={doc} />
+          {!atBottom && <div className="legal-consent-scrollhint">Scroll to continue ↓</div>}
+        </div>
+        <button
+          type="button"
+          className="btn-primary btn-block"
+          disabled={!atBottom}
+          onClick={() => {
+            onReadComplete();
+            onClose();
+          }}
+        >
+          {atBottom ? "I've read this" : "Scroll to the bottom"}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -1045,7 +1121,7 @@ function InterestsStep({ me, onSave, onSkip, onBack }: { me: MeDTO; onSave: (int
   }
 
   return (
-    <OnboardingShell title="What are you into?" subtitle="Pick what you’re into. Your feed does the rest." onBack={onBack}>
+    <OnboardingShell title="What are you into?" subtitle="Pick what you're into. Your feed does the rest." onBack={onBack} compact>
       <div className="interest-grid">
         {ALL_INTERESTS.map((t) => {
           const isPicked = picked.includes(t);

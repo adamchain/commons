@@ -42,7 +42,6 @@ export function CommunitiesPage() {
         <div>
           <div className="cmy-list-eyebrow">Philadelphia</div>
           <h1 className="cmy-list-title">Communities</h1>
-          <p className="cmy-list-sub">Find your people.</p>
           <p className="cmy-list-sub">Run clubs, book clubs, and the regulars — find your people.</p>
         </div>
         <button type="button" className="cmy-btn cmy-btn--primary" onClick={() => navigate("/communities/new")}>
@@ -64,7 +63,7 @@ export function CommunitiesPage() {
       <section className="cmy-list-section">
         <h2 className="cmy-list-section-title">Browse</h2>
         {loaded && browse.length === 0 && (
-          <p className="cmy-muted">No communities to browse yet. Be the first to start one.</p>
+          <p className="cmy-muted">No communities to browse yet. Be the first to create a community.</p>
         )}
         <div className="cmy-card-grid">
           {browse.map((c) => (
@@ -115,7 +114,7 @@ function CommunityJoinButton({ c, onJoined }: { c: CommunityCardDTO; onJoined: (
   if (status === "pending") {
     return (
       <span className="cmy-card-join cmy-card-join--pending" onClick={(e) => e.preventDefault()}>
-        Pending
+        Requested
       </span>
     );
   }

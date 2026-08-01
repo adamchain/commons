@@ -52,16 +52,20 @@
   --r-xl: 32px;
   --r-pill: 999px;
 
-  /* Type */
+  /* Type — Figma scale (supersedes older body-15 / card-20) */
   --font-display: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-ui: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-serif: var(--font-ui);
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  --text-page: 26px; /* page titles, bold */
-  --text-card: 20px; /* card/plan titles, bold */
-  --text-row: 16px; /* row titles + buttons, semibold */
-  --text-body: 15px;
+  --text-page: 26px; /* page titles */
+  --text-screen-title: 20px; /* screen titles */
+  --text-card-large: 17px; /* large card titles */
+  --text-card: 16px; /* card / plan titles */
+  --text-card-small: 13px; /* small card text */
+  --text-body: 13px; /* body */
   --text-meta: 13px; /* meta + section labels */
+  /* Legacy aliases → Figma scale */
+  --text-row: var(--text-card); /* was 16 — still maps to card */
 
   /* Semantic */
   --accent-rgb: 193, 59, 59;

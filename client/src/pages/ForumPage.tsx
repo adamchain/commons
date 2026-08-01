@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
 import { formatRelative } from "../lib/format";
+import { hrefForBack, type NavFromState } from "../lib/navState";
 import type { ForumPostDTO, ForumSort, InterestTag } from "../types/shared";
 
 interface ForumPostsResponse {
@@ -17,6 +18,9 @@ interface ForumPostsResponse {
 export function ForumPage() {
   const { tag = "" } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const navFrom = (location.state as NavFromState | null) ?? null;
+  const backHref = hrefForBack(navFrom?.from ? navFrom : { from: "messages" });
   const { user } = useAuth();
   const [data, setData] = useState<ForumPostsResponse | null>(null);
   const [sort, setSort] = useState<ForumSort>("recent");
@@ -26,6 +30,7 @@ export function ForumPage() {
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
+  const [planModalOpen, setPlanModalOpen] = useState(false);
 
   const load = (nextSort: ForumSort) => {
     setReady(false);
@@ -82,9 +87,13 @@ export function ForumPage() {
   };
 
   const makeThisAPlan = () => {
-    navigate("/plans/new", { state: { fromForumTag: tag } });
+    setPlanModalOpen(true);
   };
 
+  const confirmPostPlan = () => {
+    setPlanModalOpen(false);
+    navigate("/plans/new", { state: { fromForumTag: tag } });
+  };
   if (!ready && !data) {
     return (
       <main className="app-shell app-shell--mid app-shell--with-nav app-shell--with-topbar">
@@ -112,8 +121,8 @@ export function ForumPage() {
   return (
     <main className="app-shell app-shell--mid app-shell--with-nav app-shell--with-topbar forum-page">
       <header className="app-header create-header">
-        <Link to="/messages" className="detail-back">
-          ← Messages
+        <Link to={backHref} className="detail-back">
+          ← {navFrom?.from === "feed" ? "Home" : "Messages"}
         </Link>
         <span className="create-header-title">
           {data.emoji} {data.label}
@@ -143,7 +152,7 @@ export function ForumPage() {
           </button>
         </div>
         <button type="button" className="btn forum-make-plan-btn" onClick={makeThisAPlan}>
-          Make this a plan
+          Post a Plan
         </button>
       </div>
 
@@ -193,13 +202,33 @@ export function ForumPage() {
 
       {data.posts.length === 0 ? (
         <div className="empty-state" style={{ marginTop: 16 }}>
-          <p style={{ margin: 0 }}>No posts yet — be the first to say something.</p>
+          <p style={{ margin: 0 }}>Nothing here yet — say hi or post a plan to get things going.</p>
         </div>
       ) : (
         <div className="forum-post-list">
           {data.posts.map((post) => (
             <ForumPostCard key={post.id} post={post} tag={tag} onLike={() => void toggleLike(post.id)} />
           ))}
+        </div>
+      )}
+
+      {planModalOpen && (
+        <div className="modal-backdrop" onClick={() => setPlanModalOpen(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <h2 className="poll-modal-title">Post a {data.label} plan</h2>
+            <p className="poll-modal-sub">
+              Your plan will be tagged <strong>{data.label}</strong> and show up for everyone on COMMONS
+              with that interest — not just people in this forum thread.
+            </p>
+            <div className="poll-modal-actions">
+              <button type="button" className="btn-link" onClick={() => setPlanModalOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" className="btn-primary" onClick={confirmPostPlan}>
+                Continue
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </main>

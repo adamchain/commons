@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/http";
-import { formatRelative } from "../lib/format";
+import { formatRelative, sentenceCaseTitle } from "../lib/format";
 import type { ConversationSummaryDTO, ForumSummaryDTO } from "../types/shared";
 
 function previewLooksLikePoll(text: string | null | undefined): boolean {
@@ -38,6 +38,16 @@ export function MessagesPage() {
         setReady(true);
       });
   }, []);
+
+  async function dismissPastChat(conversationId: string) {
+    if (!window.confirm("Remove this chat from your inbox? You can still open it from the plan.")) return;
+    try {
+      await api(`/api/conversations/${conversationId}/leave`, { method: "POST" });
+      setItems((prev) => prev.filter((c) => c.conversationId !== conversationId));
+    } catch {
+      /* swallow */
+    }
+  }
 
   useEffect(() => {
     if (tab !== "interests" || forumsReady) return;
@@ -93,7 +103,12 @@ export function MessagesPage() {
           <div className="messages-card">
             <div className="messages-list">
               {forums.map((f) => (
-                <Link key={f.interestTag} to={`/forums/${f.interestTag}`} className="messages-row">
+                <Link
+                  key={f.interestTag}
+                  to={`/forums/${f.interestTag}`}
+                  state={{ from: "messages" }}
+                  className="messages-row"
+                >
                   <span className="messages-row-emoji" aria-hidden="true">
                     {f.emoji}
                   </span>
@@ -139,21 +154,18 @@ export function MessagesPage() {
             {items.map((c) => {
               const preview = cleanPreview(c.lastMessagePreview);
               const isPoll = previewLooksLikePoll(c.lastMessagePreview);
-              return (
-                <Link
-                  key={c.communityId ? `comm-${c.communityId}` : c.planId}
-                  to={c.communityId ? `/communities/${c.communityId}/chat` : `/plans/${c.planId}/chat`}
-                  state={{ from: "messages" }}
-                  className="messages-row"
-                >
+              const todayIso = new Date().toISOString().slice(0, 10);
+              const isPastPlan = !c.communityId && c.planDate < todayIso;
+              const canDismiss = isPastPlan && Boolean(c.conversationId);
+              const title = c.communityName ?? sentenceCaseTitle(c.planTitle);
+              const rowInner = (
+                <>
                   <span className="messages-row-emoji" aria-hidden="true">
-                    {c.hostEmoji}
+                    {c.hostEmoji || "💬"}
                   </span>
                   <div className="messages-row-body">
                     <div className="messages-row-top">
-                      <span className="messages-row-title">
-                        {c.communityName ?? c.planTitle}
-                      </span>
+                      <span className="messages-row-title">{title}</span>
                       {c.lastMessageAt && (
                         <span className="messages-row-time">{formatRelative(c.lastMessageAt)}</span>
                       )}
@@ -172,7 +184,28 @@ export function MessagesPage() {
                       {c.unreadCount > 9 ? "9+" : c.unreadCount}
                     </span>
                   )}
-                </Link>
+                </>
+              );
+              return (
+                <div key={c.communityId ? `comm-${c.communityId}` : c.planId} className="messages-row-wrap">
+                  <Link
+                    to={c.communityId ? `/communities/${c.communityId}/chat` : `/plans/${c.planId}/chat`}
+                    state={{ from: "messages" }}
+                    className="messages-row"
+                  >
+                    {rowInner}
+                  </Link>
+                  {canDismiss && (
+                    <button
+                      type="button"
+                      className="messages-row-dismiss"
+                      aria-label="Remove from inbox"
+                      onClick={() => void dismissPastChat(c.conversationId!)}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>

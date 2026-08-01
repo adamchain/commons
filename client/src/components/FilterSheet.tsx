@@ -13,12 +13,10 @@ export function FilterSheet({
   selectedTag,
   selectedHoodId,
   selectedAgeRange,
-  hideHappened,
   hideCancelled,
   onTagChange,
   onHoodChange,
   onAgeRangeChange,
-  onHideHappenedChange,
   onHideCancelledChange,
   onClose,
   onClear,
@@ -29,12 +27,10 @@ export function FilterSheet({
   selectedTag: InterestTag | null;
   selectedHoodId: string | null;
   selectedAgeRange: AgeRange | null;
-  hideHappened: boolean;
   hideCancelled: boolean;
   onTagChange: (t: InterestTag | null) => void;
   onHoodChange: (id: string | null) => void;
   onAgeRangeChange: (r: AgeRange | null) => void;
-  onHideHappenedChange: (v: boolean) => void;
   onHideCancelledChange: (v: boolean) => void;
   onClose: () => void;
   onClear: () => void;
@@ -71,14 +67,6 @@ export function FilterSheet({
         <div className="filter-sheet-group">
           <div className="filter-sheet-group-label">Show</div>
           <div className="filter-sheet-chips">
-            <button
-              type="button"
-              className={`community-chip ${hideHappened ? "is-active" : ""}`}
-              onClick={() => onHideHappenedChange(!hideHappened)}
-              aria-pressed={hideHappened}
-            >
-              Hide past
-            </button>
             <button
               type="button"
               className={`community-chip ${hideCancelled ? "is-active" : ""}`}

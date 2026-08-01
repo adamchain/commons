@@ -33,7 +33,7 @@ export function NetworkPage() {
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">
       <header className="app-header app-header--minimal">
         <Link to={user ? `/profile/${user.id}` : "/"} className="detail-back">
-          ← Back
+          ← Profile
         </Link>
       </header>
       <h1 className="brand" style={{ marginBottom: 4 }}>
