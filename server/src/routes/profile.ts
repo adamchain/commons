@@ -25,14 +25,13 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
     : null;
   // Plans authored (all-time, for stats + past accordion).
   const allPlans = store.listPlansByCreator(targetId);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const past = allPlans.filter((p) => new Date(p.date).getTime() < today.getTime());
+  // Compare YYYY-MM-DD strings — never `new Date("YYYY-MM-DD")` (UTC midnight
+  // shifts the calendar day in US timezones and drops "today" from upcoming).
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const past = allPlans.filter((p) => p.date < todayIso);
 
   // Upcoming = hosting + actively In or Interested (not saved/bookmarked-only).
-  const upcomingHosted = allPlans.filter(
-    (p) => !p.cancelledAt && new Date(p.date).getTime() >= today.getTime(),
-  );
+  const upcomingHosted = allPlans.filter((p) => !p.cancelledAt && p.date >= todayIso);
   const upcomingJoined = store
     .listParticipationsForUser(targetId)
     .filter((p) => p.state === "going" || p.state === "interested")
@@ -40,7 +39,7 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
     .filter((p): p is NonNullable<typeof p> => {
       if (!p || p.cancelledAt) return false;
       if (p.creatorId === targetId) return false;
-      return new Date(p.date).getTime() >= today.getTime();
+      return p.date >= todayIso;
     });
   const upcomingById = new Map<string, (typeof upcomingHosted)[number]>();
   for (const p of [...upcomingHosted, ...upcomingJoined]) upcomingById.set(p.id, p);

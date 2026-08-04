@@ -147,7 +147,7 @@ export function CommunityDetailPage() {
         )}
         <TabButton id="events" tab={tab} setTab={setTab}>Events</TabButton>
         {showChatTab && (
-          <TabButton id="chat" tab={tab} setTab={setTab} onSelect={() => navigate(`/communities/${community.id}/chat`, { state: { from: "community" } })}>
+          <TabButton id="chat" tab={tab} setTab={setTab} onSelect={() => navigate(`/communities/${community.id}/chat`, { state: { from: "community", communityId: community.id } })}>
             Chat
           </TabButton>
         )}

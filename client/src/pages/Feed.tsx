@@ -285,12 +285,17 @@ export function FeedPage() {
 
   // Restore scroll position when returning from a plan detail view.
   useEffect(() => {
-    if (!feedReady || highlightId) return;
+    if (!feedReady) return;
+    // Just-posted highlight owns scroll once — don't fight it.
+    if (highlightId) return;
     const y = consumeFeedScroll();
     if (y != null && y > 0) {
-      requestAnimationFrame(() => window.scrollTo(0, y));
+      // Double rAF waits for layout after skeleton → cards swap.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => window.scrollTo(0, y));
+      });
     }
-  }, [feedReady, highlightId]);
+  }, [feedReady, highlightId, location.key]);
 
   useEffect(() => {
     if (user?.notificationPrefs && user.notificationPrefs.postPlanNetworkNudge === false) {

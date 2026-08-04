@@ -56,7 +56,16 @@ export function ProfilePage() {
   useEffect(() => {
     reloadProfile();
     setPlansView("list");
-  }, [userId, location.pathname]);
+  }, [userId, location.pathname, location.key]);
+
+  // Refetch when returning to the tab so joins show up without a hard reload.
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") reloadProfile();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [userId]);
 
   useEffect(() => {
     if (isSelf) {
@@ -196,7 +205,7 @@ export function ProfilePage() {
             {profile.sharedPlanId && (
               <Link
                 to={`/plans/${profile.sharedPlanId}/chat`}
-                state={{ from: "profile", planId: userId }}
+                state={{ from: "profile", profileUserId: userId }}
                 className="btn-secondary"
               >
                 Message
@@ -522,7 +531,7 @@ function FriendButton({
 
 
 function MonthCalendar({ plans, profileUserId }: { plans: PlanDTO[]; profileUserId: string }) {
-  const profileBack: NavFromState = { from: "profile", planId: profileUserId };
+  const profileBack: NavFromState = { from: "profile", profileUserId };
   const [monthOffset, setMonthOffset] = useState(0);
   const [openDay, setOpenDay] = useState<number | null>(null);
   const now = new Date();
@@ -534,11 +543,12 @@ function MonthCalendar({ plans, profileUserId }: { plans: PlanDTO[]; profileUser
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const byDay = new Map<number, PlanDTO[]>();
   for (const p of plans) {
-    const d = new Date(p.date);
-    if (d.getFullYear() !== year || d.getMonth() !== month) continue;
-    const dom = d.getDate();
-    if (!byDay.has(dom)) byDay.set(dom, []);
-    byDay.get(dom)!.push(p);
+    // Parse YYYY-MM-DD as local calendar parts — never `new Date(isoDate)`.
+    const [py, pm, pd] = p.date.split("-").map(Number);
+    if (!py || !pm || !pd) continue;
+    if (py !== year || pm - 1 !== month) continue;
+    if (!byDay.has(pd)) byDay.set(pd, []);
+    byDay.get(pd)!.push(p);
   }
   const cells: (number | null)[] = [];
   for (let i = 0; i < startPad; i++) cells.push(null);
@@ -639,7 +649,7 @@ function YourPlansBlock({
   const [pastOpen, setPastOpen] = useState(false);
   const visibleUpcoming = upcomingExpanded ? upcoming : upcoming.slice(0, 3);
   const hiddenCount = Math.max(0, upcoming.length - visibleUpcoming.length);
-  const profileBack: NavFromState = { from: "profile", planId: profileUserId };
+  const profileBack: NavFromState = { from: "profile", profileUserId };
 
   const seeAllLink = (
     <Link to="/my-plans" className="profile-see-all-link" style={{ display: "inline-block", marginTop: 10 }}>

@@ -29,9 +29,14 @@ export function ChatPage() {
           : navFrom?.from === "plan"
             ? "← Plan"
             : "← Plan";
-  const planLinkState: NavFromState = navFrom?.from === "messages"
-    ? { from: "messages" }
-    : { from: "chat", planId };
+  const planLinkState: NavFromState =
+    navFrom?.from === "messages"
+      ? { from: "messages" }
+      : navFrom?.from === "notifications"
+        ? { from: "notifications" }
+        : navFrom?.from === "profile"
+          ? { from: "profile", profileUserId: navFrom.profileUserId ?? navFrom.planId }
+          : { from: "chat", planId };
   const { user } = useAuth();
   const [plan, setPlan] = useState<PlanDTO | null>(null);
   const [conv, setConv] = useState<ConversationDTO | null>(null);

@@ -458,6 +458,8 @@ export interface MeDTO {
   discoverableBySearch: boolean;
   /** Conversation ids this user has muted. */
   mutedConversationIds?: string[];
+  /** Conversations the user explicitly left / removed from inbox. */
+  leftConversationIds?: string[];
 }
 
 export interface NetworkPromptDTO {

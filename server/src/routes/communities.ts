@@ -778,7 +778,12 @@ communitiesRouter.get("/:id/conversation", requireAuth, async (req, res) => {
     return;
   }
   const activeIds = store.listActiveCommunityMembers(community.id).map((m) => m.userId);
-  const conv = store.ensureCommunityConversation(community.id, activeIds);
+  const existing = store.findCommunityConversation(community.id);
+  // Opening chat intentionally rejoins after an inbox leave.
+  if (existing) store.setConversationLeft(viewerId, existing.id, false);
+  const conv = store.ensureCommunityConversation(community.id, activeIds, {
+    rejoinIds: [viewerId],
+  });
   const users = await findUsersByIds(conv.participantIds);
   const messages = store.listMessagesForConversation(conv.id);
   const hostId = community.organizerId;

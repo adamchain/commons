@@ -40,12 +40,12 @@ export function MessagesPage() {
   }, []);
 
   async function dismissPastChat(conversationId: string) {
-    if (!window.confirm("Remove this chat from your inbox? You can still open it from the plan.")) return;
+    if (!window.confirm("Leave this chat? It'll disappear from your Messages. You can still open it from the plan.")) return;
     try {
       await api(`/api/conversations/${conversationId}/leave`, { method: "POST" });
       setItems((prev) => prev.filter((c) => c.conversationId !== conversationId));
-    } catch {
-      /* swallow */
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Couldn't remove this chat.");
     }
   }
 
@@ -156,7 +156,8 @@ export function MessagesPage() {
               const isPoll = previewLooksLikePoll(c.lastMessagePreview);
               const todayIso = new Date().toISOString().slice(0, 10);
               const isPastPlan = !c.communityId && c.planDate < todayIso;
-              const canDismiss = isPastPlan && Boolean(c.conversationId);
+              // Past plan chats + any community thread with a real conversation id.
+              const canDismiss = Boolean(c.conversationId) && (isPastPlan || Boolean(c.communityId));
               const title = c.communityName ?? sentenceCaseTitle(c.planTitle);
               const rowInner = (
                 <>
@@ -199,7 +200,7 @@ export function MessagesPage() {
                     <button
                       type="button"
                       className="messages-row-dismiss"
-                      aria-label="Remove from inbox"
+                        aria-label="Leave chat"
                       onClick={() => void dismissPastChat(c.conversationId!)}
                     >
                       ×

@@ -44,6 +44,9 @@ export function PlanDetailPage() {
   const [lockBusy, setLockBusy] = useState(false);
   const [showAllGoing, setShowAllGoing] = useState(false);
   const [showAllInterested, setShowAllInterested] = useState(false);
+  const [confirmGrabs, setConfirmGrabs] = useState(false);
+  const [grabsError, setGrabsError] = useState<string | null>(null);
+  const [grabsBusy, setGrabsBusy] = useState(false);
   const lockFormRef = useRef<HTMLDivElement | null>(null);
   const coverPool = useCardImages();
 
@@ -141,12 +144,16 @@ export function PlanDetailPage() {
 
   async function putUpForGrabs() {
     if (!plan) return;
-    if (!confirm(`Put "${plan.title}" up for grabs? Anyone who's in can take over hosting instead of it being cancelled.`)) return;
+    setGrabsBusy(true);
+    setGrabsError(null);
     try {
       await api(`/api/plans/${plan.id}/up-for-grabs`, { method: "POST" });
+      setConfirmGrabs(false);
       await load();
-    } catch {
-      /* surface via reload */
+    } catch (e) {
+      setGrabsError(e instanceof Error ? e.message : "Couldn't put this plan up for grabs.");
+    } finally {
+      setGrabsBusy(false);
     }
   }
 
@@ -220,9 +227,22 @@ export function PlanDetailPage() {
       <div className="plan-detail-hero">
         {coverSrc && <img src={coverSrc} alt="" loading="lazy" />}
         <div className="plan-detail-hero-overlay" aria-hidden="true" />
-        <Link to={backHref} className="plan-detail-back" aria-label="Back">
+        <button
+          type="button"
+          className="plan-detail-back"
+          aria-label="Back"
+          onClick={() => {
+            // Guest-list deep-link: first back clears #guests (stay on plan),
+            // second back returns to feed/messages/etc.
+            if (location.hash === "#guests") {
+              navigate(location.pathname, { replace: true, state: navFrom });
+              return;
+            }
+            navigate(backHref);
+          }}
+        >
           ←
-        </Link>
+        </button>
         <div className="plan-detail-hero-text">
           <div className="plan-detail-hero-when">
             {formatWhen(plan.date, plan.time, plan.isFlexibleTime)}
@@ -361,13 +381,16 @@ export function PlanDetailPage() {
             <label className="form-question" htmlFor="lock-date">
               Day
             </label>
-            <input
-              id="lock-date"
-              className="onboarding-input"
-              type="date"
-              value={lockDate}
-              onChange={(e) => setLockDate(e.target.value)}
-            />
+            <div className="lock-time-row">
+              <input
+                id="lock-date"
+                className="onboarding-input"
+                type="date"
+                value={lockDate}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setLockDate(e.target.value)}
+              />
+            </div>
             <label className="form-question" htmlFor="lock-time">
               Time
             </label>
@@ -528,13 +551,47 @@ export function PlanDetailPage() {
               Cancel plan
             </button>
             {!plan.upForGrabsAt && (
-              <button
-                type="button"
-                className="btn-secondary plan-host-action-btn plan-host-action-btn--full"
-                onClick={() => void putUpForGrabs()}
-              >
-                Can't make it — put up for grabs
-              </button>
+              confirmGrabs ? (
+                <div className="plan-grabs-confirm" role="group" aria-label="Confirm put up for grabs">
+                  <p className="plan-grabs-confirm-copy">
+                    Put &ldquo;{plan.title}&rdquo; up for grabs? Anyone who&rsquo;s in can take over hosting
+                    instead of cancelling.
+                  </p>
+                  {grabsError && <p className="luma-inline-error">{grabsError}</p>}
+                  <div className="plan-grabs-confirm-actions">
+                    <button
+                      type="button"
+                      className="btn-secondary plan-host-action-btn"
+                      disabled={grabsBusy}
+                      onClick={() => {
+                        setConfirmGrabs(false);
+                        setGrabsError(null);
+                      }}
+                    >
+                      Keep hosting
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-primary plan-host-action-btn"
+                      disabled={grabsBusy}
+                      onClick={() => void putUpForGrabs()}
+                    >
+                      {grabsBusy ? "Saving…" : "Put up for grabs"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="btn-secondary plan-host-action-btn plan-host-action-btn--full"
+                  onClick={() => {
+                    setConfirmGrabs(true);
+                    setGrabsError(null);
+                  }}
+                >
+                  Can't make it — put up for grabs
+                </button>
+              )
             )}
             <HostTransferControl
               candidates={plan.participants.going.filter((p) => p.id !== user.id)}

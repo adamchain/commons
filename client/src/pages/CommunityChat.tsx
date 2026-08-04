@@ -28,7 +28,10 @@ export function CommunityChatPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const fromMessages = (location.state as { from?: string } | null)?.from === "messages";
-  const backTo = fromMessages ? "/messages" : `/communities/${id}`;
+  const communityIdFromState = (location.state as { communityId?: string } | null)?.communityId;
+  const backTo = fromMessages
+    ? "/messages"
+    : `/communities/${communityIdFromState || id}`;
   const backLabel = fromMessages ? "← Messages" : "← Community";
   const { user } = useAuth();
   const [conv, setConv] = useState<CommunityConversation | null>(null);

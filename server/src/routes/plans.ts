@@ -1017,10 +1017,10 @@ plansRouter.put("/:id/participation", requireAuth, async (req, res) => {
     }
   }
   store.upsertParticipation(planId, userId, state);
-  if (state === "going") {
-    store.ensureGroupConversation(planId, [plan.creatorId, userId]);
-  } else if (state === "interested" && (plan.planKind ?? "standard") === "looking_for") {
-    store.ensureGroupConversation(planId, [plan.creatorId, userId]);
+  if (state === "going" || state === "interested") {
+    const existing = store.findGroupConversationByPlan(planId);
+    if (existing) store.setConversationLeft(userId, existing.id, false);
+    store.ensureGroupConversation(planId, [plan.creatorId, userId], { rejoinIds: [userId] });
   }
   store.log("participation_changed", {
     planId,

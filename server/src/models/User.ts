@@ -52,6 +52,7 @@ const UserSchema = new mongoose.Schema<UserRecord>(
     blockedUserIds: { type: [String], default: undefined },
     discoverableBySearch: { type: Boolean, default: undefined },
     mutedConversationIds: { type: [String], default: undefined },
+    leftConversationIds: { type: [String], default: undefined },
   },
   { collection: "users" },
 );

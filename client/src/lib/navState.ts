@@ -10,9 +10,14 @@ export type NavFromState = {
     | "my-plans"
     | "search"
     | "explore"
-    | "profile";
+    | "profile"
+    | "community"
+    | "settings-forums";
   planId?: string;
+  /** Profile back targets — do not overload planId for this. */
+  profileUserId?: string;
   forumTag?: string;
+  communityId?: string;
 };
 
 export function hrefForBack(state: NavFromState | null | undefined): string {
@@ -29,14 +34,20 @@ export function hrefForBack(state: NavFromState | null | undefined): string {
       return state.planId ? `/plans/${state.planId}/chat` : "/messages";
     case "forum":
       return state.forumTag ? `/forums/${state.forumTag}` : "/messages";
+    case "settings-forums":
+      return "/settings/forums";
     case "my-plans":
       return "/my-plans";
     case "search":
       return "/search";
     case "explore":
       return "/explore";
-    case "profile":
-      return state.planId ? `/profile/${state.planId}` : "/";
+    case "community":
+      return state.communityId ? `/communities/${state.communityId}` : "/explore";
+    case "profile": {
+      const uid = state.profileUserId ?? state.planId;
+      return uid ? `/profile/${uid}` : "/";
+    }
     default:
       return "/";
   }
@@ -52,13 +63,19 @@ export function saveFeedScroll() {
   }
 }
 
+/** Read + clear saved feed scroll. Safe under React Strict Mode double-invoke
+ *  because we only clear after a successful numeric parse. */
 export function consumeFeedScroll(): number | null {
   try {
     const raw = sessionStorage.getItem(FEED_SCROLL_KEY);
-    sessionStorage.removeItem(FEED_SCROLL_KEY);
     if (raw == null) return null;
     const y = Number(raw);
-    return Number.isFinite(y) ? y : null;
+    if (!Number.isFinite(y)) {
+      sessionStorage.removeItem(FEED_SCROLL_KEY);
+      return null;
+    }
+    sessionStorage.removeItem(FEED_SCROLL_KEY);
+    return y;
   } catch {
     return null;
   }

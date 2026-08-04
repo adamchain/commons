@@ -255,7 +255,8 @@ export function OnboardingPage() {
 
   if (step === "phone") {
     const phoneValid = isValidPhoneInput(phoneNumber);
-    const phoneTouched = phoneNumber.replace(/\D/g, "").length >= 10;
+    const digitsOnly = phoneNumber.replace(/\D/g, "");
+    const phoneTouched = digitsOnly.length >= 3;
     return (
       <OnboardingShell
         landing
@@ -280,7 +281,11 @@ export function OnboardingPage() {
           }}
         />
         {phoneTouched && !phoneValid && (
-          <div className="onboarding-error">Enter a valid phone number.</div>
+          <div className="onboarding-error">
+            {digitsOnly.length < 10
+              ? "Enter a 10-digit US phone number."
+              : "Enter a valid phone number."}
+          </div>
         )}
         {error && <div className="onboarding-error">{error}</div>}
         <button

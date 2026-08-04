@@ -568,6 +568,13 @@ function EditForm({
         onTransferred={() => navigate(`/plans/${plan.id}`)}
       />
 
+      {!plan.upForGrabsAt && !plan.cancelledAt && (
+        <PutUpForGrabsControl
+          plan={plan}
+          onDone={() => navigate(`/plans/${plan.id}`)}
+        />
+      )}
+
       <button
         type="button"
         className="btn-secondary btn-block"
@@ -577,6 +584,66 @@ function EditForm({
         Done
       </button>
     </main>
+  );
+}
+
+/**
+ * "Can't make it — put up for grabs" on Edit so the host doesn't depend on
+ * plan-detail (native confirm often fails in Capacitor WebViews).
+ */
+function PutUpForGrabsControl({
+  plan,
+  onDone,
+}: {
+  plan: PlanDTO;
+  onDone: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function confirm() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api(`/api/plans/${plan.id}/up-for-grabs`, { method: "POST" });
+      onDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't put this plan up for grabs.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className="btn-secondary btn-block"
+        style={{ marginTop: 16 }}
+        onClick={() => setOpen(true)}
+      >
+        Can't make it — put up for grabs
+      </button>
+    );
+  }
+
+  return (
+    <div className="plan-grabs-confirm" style={{ marginTop: 16 }} role="group">
+      <p className="plan-grabs-confirm-copy">
+        Put &ldquo;{plan.title}&rdquo; up for grabs? Anyone who&rsquo;s in can take over hosting
+        instead of cancelling.
+      </p>
+      {error && <p className="luma-inline-error">{error}</p>}
+      <div className="plan-grabs-confirm-actions">
+        <button type="button" className="btn-secondary" disabled={busy} onClick={() => setOpen(false)}>
+          Keep hosting
+        </button>
+        <button type="button" className="btn-primary" disabled={busy} onClick={() => void confirm()}>
+          {busy ? "Saving…" : "Put up for grabs"}
+        </button>
+      </div>
+    </div>
   );
 }
 

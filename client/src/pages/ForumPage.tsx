@@ -20,7 +20,21 @@ export function ForumPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const navFrom = (location.state as NavFromState | null) ?? null;
-  const backHref = hrefForBack(navFrom?.from ? navFrom : { from: "messages" });
+  const backHref = hrefForBack(
+    navFrom?.from
+      ? navFrom.from === "forum"
+        ? { ...navFrom, forumTag: navFrom.forumTag ?? tag }
+        : navFrom
+      : { from: "messages" },
+  );
+  const backLabel =
+    navFrom?.from === "feed"
+      ? "Home"
+      : navFrom?.from === "settings-forums"
+        ? "Interests"
+        : navFrom?.from === "notifications"
+          ? "Notifications"
+          : "Messages";
   const { user } = useAuth();
   const [data, setData] = useState<ForumPostsResponse | null>(null);
   const [sort, setSort] = useState<ForumSort>("recent");
@@ -122,7 +136,7 @@ export function ForumPage() {
     <main className="app-shell app-shell--mid app-shell--with-nav app-shell--with-topbar forum-page">
       <header className="app-header create-header">
         <Link to={backHref} className="detail-back">
-          ← {navFrom?.from === "feed" ? "Home" : "Messages"}
+          ← {backLabel}
         </Link>
         <span className="create-header-title">
           {data.emoji} {data.label}

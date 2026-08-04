@@ -303,11 +303,13 @@ export function CreatePlanPage() {
   }, [user, form.neighborhoodId]);
 
   // "Host another like this" — prefill the form from the past plan, but
-  // never carry its (now-past) date/time forward.
+  // never carry its (now-past) date/time forward. Prefer router state, but
+  // fall back to ?fromPlanId= so a lost state still seeds the form.
   useEffect(() => {
-    if (!hostAgainFrom) return;
+    const seedId = hostAgainFrom ?? fromPlanId;
+    if (!seedId) return;
     let alive = true;
-    void api<PlanDTO>(`/api/plans/${hostAgainFrom}`)
+    void api<PlanDTO>(`/api/plans/${seedId}`)
       .then((prev) => {
         if (!alive) return;
         const vibeIds = Array.from(
@@ -331,14 +333,14 @@ export function CreatePlanPage() {
           joinType: prev.joinType,
           flyerDataUrl: prev.flyerDataUrl ?? null,
         }));
-        setCarryFromId(hostAgainFrom);
+        setCarryFromId(seedId);
         setPath("plan");
       })
       .catch(() => undefined);
     return () => {
       alive = false;
     };
-  }, [hostAgainFrom]);
+  }, [hostAgainFrom, fromPlanId]);
 
   const resolvedTags = useMemo<InterestTag[]>(() => {
     const set = new Set<InterestTag>();
@@ -2147,16 +2149,82 @@ function PlacePicker({
     debounceRef.current = setTimeout(() => {
       setLoading(true);
       setErrored(false);
-      void api<{ results: PlaceHit[] }>(`/api/places/search?q=${encodeURIComponent(q)}`)
-        .then((r) => setResults(r.results ?? []))
-        .catch(() => {
+      void (async () => {
+        try {
+          // Prefer Autocomplete (more reliable / cheaper than Text Search).
+          const g = await api<{
+            predictions: Array<{ placeId: string; name: string; address: string }>;
+          }>(`/api/places/autocomplete?q=${encodeURIComponent(q)}`);
+          if (g.predictions?.length) {
+            setResults(
+              g.predictions.map((p) => ({
+                placeId: p.placeId,
+                name: p.name,
+                address: p.address,
+              })),
+            );
+            setErrored(false);
+            setSearched(true);
+            setLoading(false);
+            return;
+          }
+        } catch {
+          /* fall through */
+        }
+
+        try {
+          const r = await api<{ results: PlaceHit[] }>(
+            `/api/places/search?q=${encodeURIComponent(q)}`,
+          );
+          if (r.results?.length) {
+            setResults(r.results);
+            setErrored(false);
+            setSearched(true);
+            setLoading(false);
+            return;
+          }
+        } catch {
+          /* fall through to OSM */
+        }
+
+        // OpenStreetMap fallback when Google isn't configured or returns empty.
+        if (q.length < 3) {
+          setResults([]);
+          setSearched(true);
+          setLoading(false);
+          return;
+        }
+        try {
+          const url =
+            `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6` +
+            `&countrycodes=us&viewbox=-75.60,40.20,-74.90,39.70&bounded=0` +
+            `&q=${encodeURIComponent(q)}`;
+          const res = await fetch(url, { headers: { Accept: "application/json" } });
+          if (!res.ok) throw new Error("nominatim");
+          const rows = (await res.json()) as Array<{
+            display_name: string;
+            name?: string;
+            lat?: string;
+            lon?: string;
+          }>;
+          setResults(
+            rows.map((row, i) => ({
+              placeId: `osm-${i}-${row.lat ?? ""}`,
+              name: (row.name && row.name.trim()) || row.display_name.split(",")[0]?.trim() || row.display_name,
+              address: row.display_name,
+              lat: row.lat ? Number(row.lat) : undefined,
+              lng: row.lon ? Number(row.lon) : undefined,
+            })),
+          );
+          setErrored(false);
+        } catch {
           setResults([]);
           setErrored(true);
-        })
-        .finally(() => {
-          setLoading(false);
+        } finally {
           setSearched(true);
-        });
+          setLoading(false);
+        }
+      })();
     }, 300);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -2170,7 +2238,26 @@ function PlacePicker({
 
   const choose = (p: PlaceHit) => {
     skipNextSearch.current = true;
-    onSelect({ name: p.name, address: p.address, lat: p.lat, lng: p.lng, placeId: p.placeId });
+    // Autocomplete hits often lack lat/lng — resolve via Place Details when needed.
+    if (p.placeId && !p.placeId.startsWith("osm-") && (p.lat == null || p.lng == null)) {
+      void api<{ name: string; address: string; lat?: number; lng?: number }>(
+        `/api/places/details?placeId=${encodeURIComponent(p.placeId)}`,
+      )
+        .then((d) => {
+          onSelect({
+            name: d.name || p.name,
+            address: d.address || p.address,
+            lat: d.lat,
+            lng: d.lng,
+            placeId: p.placeId,
+          });
+        })
+        .catch(() => {
+          onSelect({ name: p.name, address: p.address, placeId: p.placeId });
+        });
+    } else {
+      onSelect({ name: p.name, address: p.address, lat: p.lat, lng: p.lng, placeId: p.placeId });
+    }
     setResults([]);
     setSearched(false);
     setFocused(false);

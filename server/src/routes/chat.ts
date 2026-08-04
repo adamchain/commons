@@ -35,6 +35,7 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
     // If a conversation exists but the user explicitly left it, keep it out of
     // their inbox even though they're still on the plan.
     if (conv && !conv.participantIds.includes(userId)) continue;
+    if (conv && store.hasLeftConversation(userId, conv.id)) continue;
     const msgs = conv ? store.listMessagesForConversation(conv.id) : [];
     const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
     const hasRealChatter = msgs.some((m) => m.kind !== "system");
@@ -74,6 +75,7 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
     if (!community || !community.chatEnabled || community.creationStatus !== "approved") continue;
     const conv = store.findCommunityConversation(community.id);
     if (conv && !conv.participantIds.includes(userId)) continue;
+    if (conv && store.hasLeftConversation(userId, conv.id)) continue;
     const msgs = conv ? store.listMessagesForConversation(conv.id) : [];
     const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
     summaries.push({
@@ -137,7 +139,11 @@ chatRouter.get("/plans/:planId/conversation", requireAuth, async (req, res) => {
   }
   const existed = store.findGroupConversationByPlan(planId);
   const alreadyHadUser = existed?.participantIds.includes(userId) ?? false;
-  const conv = store.ensureGroupConversation(planId, [plan.creatorId, userId]);
+  // Opening chat intentionally rejoins after an inbox leave.
+  if (existed) store.setConversationLeft(userId, existed.id, false);
+  const conv = store.ensureGroupConversation(planId, [plan.creatorId, userId], {
+    rejoinIds: [userId],
+  });
 
   // First non-creator joiner: drop a one-time welcome so the thread feels alive.
   if (!alreadyHadUser && userId !== plan.creatorId) {

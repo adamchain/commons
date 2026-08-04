@@ -84,7 +84,7 @@ export function SettingsForumsPage() {
         <div className="settings-card" style={{ marginBottom: 20 }}>
           {forums.map((f) => (
             <div key={f.interestTag} className="settings-forum-row">
-              <Link to={`/forums/${f.interestTag}`} className="settings-forum-link">
+              <Link to={`/forums/${f.interestTag}`} state={{ from: "settings-forums" }} className="settings-forum-link">
                 <span className="messages-row-emoji" aria-hidden="true">{f.emoji}</span>
                 <span className="settings-forum-label">{f.label}</span>
               </Link>

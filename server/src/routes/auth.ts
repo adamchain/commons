@@ -89,6 +89,7 @@ function meFromUser(user: UserRecord): MeDTO {
     blockedUserIds: user.blockedUserIds?.length ? user.blockedUserIds : [],
     discoverableBySearch: user.discoverableBySearch !== false,
     mutedConversationIds: user.mutedConversationIds?.length ? user.mutedConversationIds : [],
+    leftConversationIds: user.leftConversationIds?.length ? user.leftConversationIds : [],
   };
 }
 

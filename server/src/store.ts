@@ -77,6 +77,9 @@ export interface UserRecord {
   discoverableBySearch?: boolean;
   /** Conversation ids this user has muted — chat still works, notifications go quiet. */
   mutedConversationIds?: string[];
+  /** Conversations the user explicitly left / removed from inbox. ensure* must
+   *  not re-add them until they open the thread again (which clears this). */
+  leftConversationIds?: string[];
 }
 
 export interface NeighborhoodRecord {
@@ -883,6 +886,31 @@ export const store = {
     return (snapshot.users.find((u) => u.id === userId)?.mutedConversationIds ?? []).includes(conversationId);
   },
 
+  // ---- Left / hidden-from-inbox conversations ----
+  setConversationLeft(userId: string, conversationId: string, left: boolean): UserRecord | undefined {
+    const user = snapshot.users.find((u) => u.id === userId);
+    if (!user) return undefined;
+    const set = new Set(user.leftConversationIds ?? []);
+    if (left) set.add(conversationId);
+    else set.delete(conversationId);
+    user.leftConversationIds = [...set];
+    persist();
+    mongoMirror.upsertUser(user);
+    return user;
+  },
+  hasLeftConversation(userId: string, conversationId: string): boolean {
+    return (snapshot.users.find((u) => u.id === userId)?.leftConversationIds ?? []).includes(
+      conversationId,
+    );
+  },
+  /** Filter out users who explicitly left this conversation (unless force-included). */
+  filterNotLeft(conversationId: string, userIds: string[], forceInclude: string[] = []): string[] {
+    const force = new Set(forceInclude);
+    return userIds.filter(
+      (id) => force.has(id) || !this.hasLeftConversation(id, conversationId),
+    );
+  },
+
   // Neighborhoods
   listNeighborhoods(): NeighborhoodRecord[] {
     return [...snapshot.neighborhoods];
@@ -1145,11 +1173,15 @@ export const store = {
         c.participantIds.includes(b)
     );
   },
-  ensureGroupConversation(planId: string, participantIds: string[]): ConversationRecord {
+  ensureGroupConversation(
+    planId: string,
+    participantIds: string[],
+    opts?: { rejoinIds?: string[] },
+  ): ConversationRecord {
     const existing = this.findGroupConversationByPlan(planId);
     if (existing) {
-      // make sure participants are up to date
-      existing.participantIds = Array.from(new Set([...existing.participantIds, ...participantIds]));
+      const toAdd = this.filterNotLeft(existing.id, participantIds, opts?.rejoinIds ?? []);
+      existing.participantIds = Array.from(new Set([...existing.participantIds, ...toAdd]));
       persist();
       mongoMirror.upsertConversation(existing);
       return existing;
@@ -1172,8 +1204,12 @@ export const store = {
   removeConversationParticipant(convId: string, userId: string): ConversationRecord | undefined {
     const conv = snapshot.conversations.find((c) => c.id === convId);
     if (!conv) return undefined;
-    if (!conv.participantIds.includes(userId)) return conv;
+    if (!conv.participantIds.includes(userId)) {
+      this.setConversationLeft(userId, convId, true);
+      return conv;
+    }
     conv.participantIds = conv.participantIds.filter((id) => id !== userId);
+    this.setConversationLeft(userId, convId, true);
     persist();
     mongoMirror.upsertConversation(conv);
     return conv;
@@ -1901,12 +1937,15 @@ export const store = {
       (c) => c.communityId === communityId && c.type === "group",
     );
   },
-  ensureCommunityConversation(communityId: string, participantIds: string[]): ConversationRecord {
+  ensureCommunityConversation(
+    communityId: string,
+    participantIds: string[],
+    opts?: { rejoinIds?: string[] },
+  ): ConversationRecord {
     const existing = this.findCommunityConversation(communityId);
     if (existing) {
-      existing.participantIds = Array.from(
-        new Set([...existing.participantIds, ...participantIds]),
-      );
+      const toAdd = this.filterNotLeft(existing.id, participantIds, opts?.rejoinIds ?? []);
+      existing.participantIds = Array.from(new Set([...existing.participantIds, ...toAdd]));
       persist();
       mongoMirror.upsertConversation(existing);
       return existing;
