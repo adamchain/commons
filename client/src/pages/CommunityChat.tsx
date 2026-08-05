@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { BarChart2 } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { PollCard } from "../components/PollCard";
@@ -369,7 +370,9 @@ export function CommunityChatPage() {
               onClick={() => setPinnedPollsOpen((v) => !v)}
               aria-expanded={pinnedPollsOpen}
             >
-              <span className="chat-pinned-polls-badge" aria-hidden="true">📊</span>
+              <span className="chat-pinned-polls-badge" aria-hidden="true">
+                <BarChart2 size={13} strokeWidth={1.8} color="var(--red)" />
+              </span>
               <span className="chat-pinned-polls-summary">
                 {openPolls.length === 1
                   ? openPolls[0].poll!.question

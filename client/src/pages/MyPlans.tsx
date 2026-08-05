@@ -1,16 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { Calendar, Star } from "lucide-react";
 import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
-import { PlanCard } from "../components/PlanCard";
+import { EmptyCard, Label, ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
+import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
 import { planHasEnded } from "../lib/planTime";
 import type { PlanDTO } from "../types/shared";
 
 /**
- * My Plans — the user's plans on their own page (previously a cramped section
- * on the profile). Groups into Hosting, Going, Interested, and Past
- * (with "Do it again").
+ * My Plans — Upcoming (hosting/going), Interested, and Past.
  */
 export function MyPlansPage() {
   const { user } = useAuth();
@@ -27,46 +27,37 @@ export function MyPlansPage() {
 
   if (!plans || !user) return <LoadingScreen tagline="Your plans" />;
 
-  const upcoming = (p: PlanDTO) => !p.cancelledAt && !planHasEnded(p);
-  const hosting = plans.filter((p) => p.creator.id === user.id && upcoming(p));
-  const going = plans.filter((p) => p.creator.id !== user.id && p.myState === "going" && upcoming(p));
-  const interested = plans.filter(
-    (p) => p.creator.id !== user.id && p.myState === "interested" && upcoming(p),
-  );
+  const isUpcoming = (p: PlanDTO) => !p.cancelledAt && !planHasEnded(p);
+  const upcoming = plans
+    .filter(
+      (p) =>
+        isUpcoming(p) &&
+        (p.creator.id === user.id || p.myState === "going"),
+    )
+    .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+  const interested = plans
+    .filter((p) => p.creator.id !== user.id && p.myState === "interested" && isUpcoming(p))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
   const past = plans
     .filter((p) => (p.creator.id === user.id || p.myState === "going") && (planHasEnded(p) || p.cancelledAt))
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  const empty =
-    hosting.length === 0 &&
-    going.length === 0 &&
-    interested.length === 0 &&
-    past.length === 0;
-  // 2.13 — a couple lonely RSVPs still feel thin; nudge toward Explore/Communities
-  // rather than leaving the page looking done.
-  const activeCount = hosting.length + going.length + interested.length;
+  const empty = upcoming.length === 0 && interested.length === 0 && past.length === 0;
+  const activeCount = upcoming.length + interested.length;
   const isThin = !empty && activeCount > 0 && activeCount < 3;
 
   return (
-    <main className="app-shell app-shell--wide app-shell--with-nav app-shell--with-topbar">
-      <header className="app-header app-header--minimal">
-        <Link to={`/profile/${user.id}`} className="detail-back">← Profile</Link>
-      </header>
-      <h1 className="brand" style={{ marginBottom: 4 }}>My plans</h1>
-      <p className="brand-tagline" style={{ marginBottom: 20 }}>
-        Everything you're hosting, in on, interested in, or did before.
-      </p>
+    <main className="app-shell app-shell--with-nav app-shell--with-topbar my-plans-page">
+      <ScreenTitle title="My Plans" />
 
       {empty && (
-        <div className="feed-empty" role="status">
-          <div className="feed-empty-glyph" aria-hidden="true">📌</div>
-          <h2 className="feed-empty-headline">No plans yet</h2>
-          <p className="feed-empty-body">Join something from the feed — see what's happening this week.</p>
-          <div className="feed-empty-actions">
-            <Link to="/" className="btn-primary">See what's happening →</Link>
-            <Link to="/communities" className="btn-secondary">Explore communities</Link>
-          </div>
-        </div>
+        <EmptyCard
+          icon={<Calendar size={22} strokeWidth={1.6} color="#3A6A8A" />}
+          tint="#C8DCF0"
+          title="No upcoming plans yet."
+          body="When you host or join a plan, it'll show up here."
+          cta={{ to: "/", label: "See what's happening" }}
+        />
       )}
 
       {isThin && (
@@ -79,17 +70,32 @@ export function MyPlansPage() {
         </div>
       )}
 
-      <Section title="Hosting" plans={hosting} onRefresh={load} />
-      <Section title="Going" plans={going} onRefresh={load} />
-      <Section title="Interested" plans={interested} onRefresh={load} />
+      <PlanSection
+        label={
+          <>
+            <Calendar size={10} strokeWidth={2} color="var(--muted)" aria-hidden="true" />
+            Upcoming
+          </>
+        }
+        plans={upcoming}
+      />
+      <PlanSection
+        label={
+          <>
+            <Star size={10} strokeWidth={2} color="var(--muted)" aria-hidden="true" />
+            Interested
+          </>
+        }
+        plans={interested}
+      />
 
       {past.length > 0 && (
         <section className="my-plans-section">
-          <h2 className="my-plans-section-title">Past</h2>
-          <div className="plan-grid">
+          <Label>Past</Label>
+          <div className="my-plans-rows">
             {past.map((plan) => (
               <div key={plan.id} className="my-plans-past-item">
-                <PlanCard plan={plan} onPlanRefresh={load} />
+                <PlanRow plan={plan} />
                 <Link
                   to={`/plans/new?fromPlanId=${plan.id}&title=${encodeURIComponent(plan.title)}`}
                   state={{ hostAgainFrom: plan.id }}
@@ -106,26 +112,36 @@ export function MyPlansPage() {
   );
 }
 
-function Section({
-  title,
-  plans,
-  onRefresh,
-}: {
-  title: string;
-  plans: PlanDTO[];
-  onRefresh: () => void;
-}) {
+function PlanSection({ label, plans }: { label: ReactNode; plans: PlanDTO[] }) {
   if (plans.length === 0) return null;
   return (
     <section className="my-plans-section">
-      <h2 className="my-plans-section-title">
-        {title} <span className="my-plans-section-count">{plans.length}</span>
-      </h2>
-      <div className="plan-grid">
+      <Label>{label}</Label>
+      <div className="my-plans-rows">
         {plans.map((plan) => (
-          <PlanCard key={plan.id} plan={plan} onPlanRefresh={onRefresh} navFrom={{ from: "my-plans" }} />
+          <PlanRow key={plan.id} plan={plan} />
         ))}
       </div>
     </section>
+  );
+}
+
+function PlanRow({ plan }: { plan: PlanDTO }) {
+  const locationPart = plan.isFlexibleLocation
+    ? "Flexible location"
+    : plan.location.name || null;
+  const meta = [
+    formatPlanDate(plan.date),
+    formatPlanTime(plan.time, plan.isFlexibleTime),
+    locationPart,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <Link to={`/plans/${plan.id}`} state={{ from: "my-plans" }} className="my-plans-row">
+      <span className="my-plans-row-name">{sentenceCaseTitle(plan.title)}</span>
+      <span className="my-plans-row-meta">{meta}</span>
+    </Link>
   );
 }

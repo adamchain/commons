@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
+import { interestVisual } from "../lib/interestIcons";
 import {
   ALL_INTERESTS,
   INTEREST_LABELS,
@@ -11,10 +14,7 @@ import {
 } from "../types/shared";
 
 /**
- * Dedicated interests editor. The old Settings → Interests row linked to the
- * user's profile, which felt like the app was bouncing them somewhere random
- * since the profile doesn't expose interests for editing. This screen mirrors
- * the onboarding picker and saves directly.
+ * Dedicated interests editor. Mirrors onboarding picker with icon wells.
  */
 export function SettingsInterestsPage() {
   const { user, setUser } = useAuth();
@@ -53,25 +53,33 @@ export function SettingsInterestsPage() {
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">
       <header className="app-header app-header--minimal">
-        <Link to="/settings" className="detail-back">← Settings</Link>
+        <Link to="/settings" className="detail-back">
+          <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" /> Settings
+        </Link>
       </header>
-      <h1 className="brand" style={{ marginBottom: 8 }}>Interests</h1>
-      <p className="brand-tagline" style={{ marginBottom: 24 }}>
-        Pick what you're into. Your feed does the rest.
-      </p>
+      <ScreenTitle title="Interests" subtitle="Pick what you're into. Your feed does the rest." />
 
-      <div className="settings-interests-grid">
+      <div className="vibe-grid settings-interests-grid">
         {ALL_INTERESTS.map((t) => {
           const isPicked = picked.includes(t);
+          const { Icon, iconColor, tint } = interestVisual(t);
           return (
             <button
               key={t}
               type="button"
-              className={`settings-interest-pill ${isPicked ? "is-active" : ""}`}
+              className={`vibe-tile ${isPicked ? "is-selected" : ""}`}
               onClick={() => toggle(t)}
               aria-pressed={isPicked}
             >
-              {INTEREST_LABELS[t]}
+              {isPicked && <span className="vibe-tile-dot" aria-hidden="true" />}
+              <span
+                className="vibe-tile-icon"
+                style={{ background: tint, color: iconColor }}
+                aria-hidden="true"
+              >
+                <Icon size={18} strokeWidth={1.8} />
+              </span>
+              <span className="vibe-tile-label">{INTEREST_LABELS[t]}</span>
             </button>
           );
         })}

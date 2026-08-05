@@ -1,6 +1,8 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Users } from "lucide-react";
 import { api } from "../api/http";
+import { EmptyCard } from "../components/ui";
 import {
   COMMUNITY_CATEGORY_LABELS,
   type CommunityCardDTO,
@@ -63,7 +65,13 @@ export function CommunitiesPage() {
       <section className="cmy-list-section">
         <h2 className="cmy-list-section-title">Browse</h2>
         {loaded && browse.length === 0 && (
-          <p className="cmy-muted">No communities to browse yet. Be the first to create a community.</p>
+          <EmptyCard
+            icon={<Users size={22} strokeWidth={1.6} color="#3A6A3A" />}
+            tint="#C8DDC8"
+            title="No communities to browse yet."
+            body="Be the first to create a community — run clubs, book clubs, and the regulars."
+            cta={{ to: "/communities/new", label: "Create a community" }}
+          />
         )}
         <div className="cmy-card-grid">
           {browse.map((c) => (

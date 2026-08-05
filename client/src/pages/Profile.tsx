@@ -1,20 +1,53 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  Activity,
+  ArrowLeft,
+  Ban,
+  BookOpen,
+  Camera,
+  Check,
+  ChevronRight,
+  Flag,
+  Leaf,
+  MapPin,
+  MessageCircle,
+  MoreHorizontal,
+  Palette,
+  Share2,
+  UserPlus,
+  Users,
+  UtensilsCrossed,
+  type LucideIcon,
+} from "lucide-react";
 import { api } from "../api/http";
 import { clearAuthToken } from "../api/authToken";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
-import { formatPlanDate } from "../lib/format";
+import { formatPlanDate, formatPlanTime } from "../lib/format";
+import { interestVisual } from "../lib/interestIcons";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import {
   COMMUNITY_CATEGORY_LABELS,
   INTEREST_LABELS,
   type CommunityCardDTO,
+  type CommunityCategory,
   type InterestTag,
   type MeDTO,
   type PlanDTO,
   type PublicUser,
 } from "../types/shared";
+
+const COMMUNITY_VISUAL: Record<CommunityCategory, { Icon: LucideIcon; iconColor: string; tint: string }> = {
+  run_club: { Icon: Activity, iconColor: "#5B8FBF", tint: "#C8DCF0" },
+  book_club: { Icon: BookOpen, iconColor: "#7A5BA0", tint: "#D8D0F0" },
+  fitness: { Icon: Activity, iconColor: "#5B8FBF", tint: "#C8DCF0" },
+  food_drink: { Icon: UtensilsCrossed, iconColor: "#8A6A2A", tint: "#F5DDBB" },
+  arts: { Icon: Palette, iconColor: "#A05B5B", tint: "#F0D8D8" },
+  social: { Icon: Users, iconColor: "#A05B5B", tint: "#F0D8D8" },
+  wellness: { Icon: Leaf, iconColor: "#7A8F6A", tint: "#D4E0CC" },
+  other: { Icon: Users, iconColor: "#8A8A9A", tint: "#EDE5D8" },
+};
 
 interface ProfilePayload {
   user: PublicUser;
@@ -48,6 +81,7 @@ export function ProfilePage() {
   const [network, setNetwork] = useState<PublicUser[] | null>(null);
   const [communities, setCommunities] = useState<CommunityCardDTO[]>([]);
   const [plansView, setPlansView] = useState<"list" | "calendar">("list");
+  const [actionSheetOpen, setActionSheetOpen] = useState(false);
   const isSelf = user?.id === userId;
 
   const reloadProfile = () =>
@@ -93,35 +127,315 @@ export function ProfilePage() {
   }
 
   const displayName = [profile.user.firstName, profile.user.lastName].filter(Boolean).join(" ") || "Unnamed";
+  const firstName = profile.user.firstName || "them";
+  const locationLabel = profile.neighborhood
+    ? [profile.neighborhood.name, profile.neighborhood.metro].filter(Boolean).join(" · ")
+    : null;
+
+  async function shareProfile() {
+    const url = `${window.location.origin}/profile/${userId}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: displayName, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+      }
+    } catch {
+      /* dismissed */
+    }
+    setActionSheetOpen(false);
+  }
+
+  async function reportProfile() {
+    setActionSheetOpen(false);
+    window.location.href = `mailto:safety@oncommons.co?subject=${encodeURIComponent(`Report ${displayName}`)}&body=${encodeURIComponent(`I'd like to report this profile:\n${window.location.href}`)}`;
+  }
+
+  async function blockFromSheet() {
+    setActionSheetOpen(false);
+    const name = firstName || "this person";
+    const targetId = profile?.user.id;
+    if (!targetId) return;
+    if (
+      !window.confirm(
+        `Block ${name}? They won't be able to see your plans or profile, and you won't see theirs.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      await api(`/api/users/${targetId}/block`, { method: "POST" });
+      navigate("/", { replace: true });
+    } catch {
+      /* swallow */
+    }
+  }
+
+  if (!isSelf) {
+    const mutuals = profile.network.mutuals;
+    const mutualLabel = (() => {
+      if (mutuals.length === 0) return null;
+      if (mutuals.length === 1) {
+        return (
+          <>
+            Connected to <span className="profile-mutuals-name">{mutuals[0].firstName}</span> you know
+          </>
+        );
+      }
+      const rest = profile.network.mutualCount - 1;
+      return (
+        <>
+          Connected to <span className="profile-mutuals-name">{mutuals[0].firstName}</span>
+          {rest > 0 && (
+            <>
+              {" "}and {rest} other{rest === 1 ? "" : "s"} you know
+            </>
+          )}
+        </>
+      );
+    })();
+
+    return (
+      <main className="app-shell app-shell--with-nav app-shell--with-topbar profile-shell profile-other">
+        <header className="profile-other-nav">
+          <Link to={backHref} className="profile-other-back">
+            <ArrowLeft size={14} strokeWidth={2} aria-hidden="true" />
+            Back
+          </Link>
+          <button
+            type="button"
+            className="profile-other-more"
+            aria-label="More options"
+            onClick={() => setActionSheetOpen(true)}
+          >
+            <MoreHorizontal size={18} strokeWidth={1.8} aria-hidden="true" />
+          </button>
+        </header>
+
+        <section className="profile-other-hero">
+          <div className="profile-other-hero-row">
+            <div className="profile-other-avatar">
+              <Avatar
+                seed={profile.user.avatarSeed}
+                style={profile.user.avatarStyle}
+                photoDataUrl={profile.user.avatarPhotoDataUrl}
+                params={profile.user.avatarParams}
+                name={profile.user.firstName}
+                size="lg"
+              />
+            </div>
+            <div className="profile-other-hero-text">
+              <div className="profile-other-name">{displayName}</div>
+              {locationLabel && (
+                <div className="profile-other-location">
+                  <MapPin size={11} strokeWidth={1.8} aria-hidden="true" />
+                  {locationLabel}
+                </div>
+              )}
+              <div className="profile-other-stats" aria-label="Profile stats">
+                <div className="profile-other-stat">
+                  <span className="profile-other-stat-num">{profile.stats.hosted}</span>
+                  <span className="profile-other-stat-label">Made</span>
+                </div>
+                <span className="profile-other-stat-divider" aria-hidden="true" />
+                <div className="profile-other-stat">
+                  <span className="profile-other-stat-num">{profile.stats.joined}</span>
+                  <span className="profile-other-stat-label">Joined</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="profile-other-ctas">
+            <FriendButton profile={profile} onUpdated={reloadProfile} variant="other" />
+            <Link
+              to={
+                profile.sharedPlanId
+                  ? `/plans/${profile.sharedPlanId}/chat`
+                  : `/plans/new?inviteUser=${encodeURIComponent(profile.user.id)}&inviteName=${encodeURIComponent(profile.user.firstName)}`
+              }
+              state={profile.sharedPlanId ? { from: "profile", profileUserId: userId } : undefined}
+              className="profile-other-cta profile-other-cta--message"
+            >
+              <MessageCircle size={13} strokeWidth={1.8} aria-hidden="true" />
+              Message
+            </Link>
+          </div>
+
+          {profile.network.mutualCount > 0 && mutualLabel && (
+            <div className="profile-other-mutuals">
+              <div className="profile-other-mutuals-avatars">
+                {mutuals.map((u) => (
+                  <span key={u.id} className="profile-other-mutuals-avatar">
+                    <Avatar
+                      seed={u.avatarSeed}
+                      style={u.avatarStyle}
+                      photoDataUrl={u.avatarPhotoDataUrl}
+                      params={u.avatarParams}
+                      name={u.firstName}
+                      size="sm"
+                    />
+                  </span>
+                ))}
+              </div>
+              <span className="profile-other-mutuals-text">{mutualLabel}</span>
+            </div>
+          )}
+        </section>
+
+        <div className="profile-other-divider" />
+
+        {profile.plansGated ? (
+          <section className="profile-other-section">
+            <h3 className="profile-other-section-label">Upcoming plans</h3>
+            <p className="profile-social-locked">
+              Add to your network to see their plans — photo and interests stay public.
+            </p>
+          </section>
+        ) : profile.upcoming.length > 0 ? (
+          <section className="profile-other-section">
+            <div className="profile-other-section-head">
+              <h3 className="profile-other-section-label">Upcoming plans</h3>
+              <span className="profile-other-section-count">
+                {profile.upcoming.length} plan{profile.upcoming.length === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div className="profile-other-plans">
+              {profile.upcoming.map((p) => {
+                const vis = interestVisual(p.tags[0]);
+                const Icon = vis.Icon;
+                const going = p.participants.going.length;
+                return (
+                  <Link
+                    key={p.id}
+                    to={`/plans/${p.id}`}
+                    state={{ from: "profile", profileUserId: userId }}
+                    className="profile-other-plan-card"
+                  >
+                    <span
+                      className="profile-other-plan-icon"
+                      style={{ background: vis.tint, color: vis.iconColor }}
+                      aria-hidden="true"
+                    >
+                      <Icon size={15} strokeWidth={1.8} />
+                    </span>
+                    <span className="profile-other-plan-body">
+                      <span className="profile-other-plan-title">{p.title}</span>
+                      <span className="profile-other-plan-date">
+                        {formatPlanDate(p.date)}
+                        {p.time ? ` · ${formatPlanTime(p.time, p.isFlexibleTime)}` : ""}
+                      </span>
+                    </span>
+                    <span className="profile-other-plan-going">
+                      <Users size={11} strokeWidth={1.8} aria-hidden="true" />
+                      {going}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
+
+        {profile.interests.length > 0 && (
+          <>
+            <div className="profile-other-divider" />
+            <section className="profile-other-section">
+              <h3 className="profile-other-section-label">Interests</h3>
+              <div className="profile-interests">
+                {profile.interests.map((t) => (
+                  <span key={t} className="profile-interest-chip">
+                    {INTEREST_LABELS[t]}
+                  </span>
+                ))}
+              </div>
+            </section>
+          </>
+        )}
+
+        {communities.length > 0 && (
+          <>
+            <div className="profile-other-divider" />
+            <section className="profile-other-section">
+              <h3 className="profile-other-section-label">Communities</h3>
+              <div className="profile-other-communities">
+                {communities.map((c) => {
+                  const vis = COMMUNITY_VISUAL[c.category];
+                  const Icon = vis.Icon;
+                  return (
+                    <Link key={c.id} to={`/communities/${c.id}`} className="profile-other-community-row">
+                      <span
+                        className="profile-other-community-icon"
+                        style={{ background: vis.tint, color: vis.iconColor }}
+                        aria-hidden="true"
+                      >
+                        <Icon size={13} strokeWidth={1.8} />
+                      </span>
+                      <span className="profile-other-community-info">
+                        <span className="profile-other-community-name">{c.name}</span>
+                        <span className="profile-other-community-meta">
+                          {COMMUNITY_CATEGORY_LABELS[c.category]} · {c.memberCount}{" "}
+                          {c.memberCount === 1 ? "member" : "members"}
+                        </span>
+                      </span>
+                      <ChevronRight size={13} strokeWidth={1.6} className="profile-other-community-chevron" aria-hidden="true" />
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          </>
+        )}
+
+        {actionSheetOpen && (
+          <div
+            className="profile-action-overlay"
+            role="presentation"
+            onClick={() => setActionSheetOpen(false)}
+          >
+            <div
+              className="profile-action-sheet"
+              role="dialog"
+              aria-label="Profile actions"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="profile-action-handle" aria-hidden="true" />
+              <button type="button" className="profile-action-row" onClick={() => void shareProfile()}>
+                <Share2 size={16} strokeWidth={1.8} aria-hidden="true" />
+                Share profile
+              </button>
+              <button type="button" className="profile-action-row is-danger" onClick={() => void reportProfile()}>
+                <Flag size={16} strokeWidth={1.8} aria-hidden="true" />
+                Report {firstName}
+              </button>
+              <button type="button" className="profile-action-row is-danger" onClick={() => void blockFromSheet()}>
+                <Ban size={16} strokeWidth={1.8} aria-hidden="true" />
+                Block {firstName}
+              </button>
+              <button
+                type="button"
+                className="profile-action-cancel"
+                onClick={() => setActionSheetOpen(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </main>
+    );
+  }
 
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar profile-shell">
-      {!isSelf && (
-        <header className="app-header app-header--minimal">
-          <Link to={backHref} className="detail-back">← Back</Link>
-        </header>
-      )}
-
       <section className="profile-hero">
         <div className="profile-hero-top">
           <div className="profile-hero-main">
-            {isSelf ? (
-              <Link
-                to={`/profile/${userId}/edit`}
-                className="profile-hero-avatar-btn"
-                aria-label="Update profile photo"
-              >
-                <Avatar
-                  seed={profile.user.avatarSeed}
-                  style={profile.user.avatarStyle}
-                  photoDataUrl={profile.user.avatarPhotoDataUrl}
-                  params={profile.user.avatarParams}
-                  name={profile.user.firstName}
-                  size="xl"
-                />
-                <span className="profile-hero-avatar-edit" aria-hidden="true">✎</span>
-              </Link>
-            ) : (
+            <Link
+              to={`/profile/${userId}/edit`}
+              className="profile-hero-avatar-btn"
+              aria-label="Update profile photo"
+            >
               <Avatar
                 seed={profile.user.avatarSeed}
                 style={profile.user.avatarStyle}
@@ -130,7 +444,10 @@ export function ProfilePage() {
                 name={profile.user.firstName}
                 size="xl"
               />
-            )}
+              <span className="profile-hero-avatar-edit" aria-hidden="true">
+                <Camera size={12} strokeWidth={2} />
+              </span>
+            </Link>
             <div className="profile-hero-text">
               <div className="profile-name">{displayName}</div>
               {profile.user.bio && (
@@ -138,7 +455,7 @@ export function ProfilePage() {
               )}
               {profile.neighborhood && (
                 <div className="profile-meta-line">
-                  <PinIcon />
+                  <MapPin size={11} strokeWidth={1.8} aria-hidden="true" />
                   {profile.neighborhood.name}
                 </div>
               )}
@@ -154,173 +471,91 @@ export function ProfilePage() {
               </div>
             </div>
           </div>
-          {isSelf && (
-            <Link to={`/profile/${userId}/edit`} className="profile-edit-btn">
-              Edit
-            </Link>
-          )}
+          <Link to={`/profile/${userId}/edit`} className="profile-edit-btn">
+            Edit
+          </Link>
         </div>
         <SocialPills
-          isSelf={isSelf}
+          isSelf
           instagram={profile.socialLinks?.instagram}
           tiktok={profile.socialLinks?.tiktok}
           onEdit={() => navigate(`/profile/${userId}/edit`)}
         />
 
-        {!isSelf && profile.network.mutualCount > 0 && (
-          <div className="profile-mutuals">
-            <div className="profile-mutuals-avatars">
-              {profile.network.mutuals.map((u) => (
-                <Avatar
-                  key={u.id}
-                  seed={u.avatarSeed}
-                  style={u.avatarStyle}
-                  photoDataUrl={u.avatarPhotoDataUrl}
-                  params={u.avatarParams}
-                  name={u.firstName}
-                  size="sm"
-                />
-              ))}
-            </div>
-            <span className="profile-mutuals-text">
-              {profile.network.mutualCount} mutual{profile.network.mutualCount === 1 ? "" : "s"} in your network
-            </span>
-          </div>
-        )}
-
         <div className="profile-divider" />
-
-        {!isSelf && (
-          <Link
-            to={`/plans/new?inviteUser=${encodeURIComponent(profile.user.id)}&inviteName=${encodeURIComponent(profile.user.firstName)}`}
-            className="btn-primary btn-block"
-            style={{ marginTop: 14, textAlign: "center", display: "block" }}
-          >
-            Make a plan with {profile.user.firstName}
-          </Link>
-        )}
-
-        {!isSelf && (
-          <div className="profile-hero-actions-row">
-            {profile.sharedPlanId && (
-              <Link
-                to={`/plans/${profile.sharedPlanId}/chat`}
-                state={{ from: "profile", profileUserId: userId }}
-                className="btn-secondary"
-              >
-                Message
-              </Link>
-            )}
-            <FriendButton profile={profile} onUpdated={reloadProfile} />
-            <BlockButton profileUserId={profile.user.id} firstName={profile.user.firstName} />
-          </div>
-        )}
       </section>
 
-      {profile.interests.length > 0 && !isSelf && (
-        <section className="profile-block">
-          <h3 className="profile-section-label">Interests</h3>
-          <div className="profile-interests">
-            {profile.interests.map((t) => (
-              <span key={t} className="profile-interest-chip">
-                {INTEREST_LABELS[t]}
-              </span>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {isSelf && communities.length > 0 && (
+      {communities.length > 0 && (
         <section className="profile-block">
           <h3 className="profile-section-label">Communities</h3>
           <div className="profile-communities-list">
-            {communities.map((c) => (
-              <Link key={c.id} to={`/communities/${c.id}`} className="profile-community-row">
-                {c.coverImage ? (
-                  <img src={c.coverImage} alt="" className="profile-community-thumb" loading="lazy" />
-                ) : (
-                  <span className="profile-community-thumb profile-community-thumb--fallback" aria-hidden="true" />
-                )}
-                <span className="profile-community-info">
-                  <span className="profile-community-name">{c.name}</span>
-                  <span className="profile-community-meta">
-                    {c.myRole === "organizer" ? "Organizer · " : ""}
-                    {COMMUNITY_CATEGORY_LABELS[c.category]} · {c.memberCount}{" "}
-                    {c.memberCount === 1 ? "member" : "members"}
+            {communities.map((c) => {
+              const vis = COMMUNITY_VISUAL[c.category];
+              const Icon = vis.Icon;
+              return (
+                <Link key={c.id} to={`/communities/${c.id}`} className="profile-community-row">
+                  <span
+                    className="profile-community-icon-well"
+                    style={{ background: vis.tint, color: vis.iconColor }}
+                    aria-hidden="true"
+                  >
+                    <Icon size={13} strokeWidth={1.8} />
                   </span>
-                </span>
-              </Link>
-            ))}
+                  <span className="profile-community-info">
+                    <span className="profile-community-name">{c.name}</span>
+                    <span className="profile-community-meta">
+                      {c.myRole === "organizer" ? "Organizer · " : ""}
+                      {COMMUNITY_CATEGORY_LABELS[c.category]} · {c.memberCount}{" "}
+                      {c.memberCount === 1 ? "member" : "members"}
+                    </span>
+                  </span>
+                  <ChevronRight size={13} strokeWidth={1.6} className="profile-community-chevron" aria-hidden="true" />
+                </Link>
+              );
+            })}
           </div>
         </section>
       )}
 
-      {isSelf ? (
-        <YourPlansBlock
-          id="profile-plans-block"
-          upcoming={profile.upcoming}
-          past={profile.past}
-          isSelf
-          profileUserId={userId}
-          view={plansView}
-          onViewChange={setPlansView}
-        />
-      ) : profile.plansGated ? (
-        <section className="profile-block">
-          <h3 className="profile-section-label">Plans</h3>
-          <p className="profile-social-locked" style={{ marginTop: 8 }}>
-            Add to your network to see their plans — photo and interests stay public.
-          </p>
-        </section>
-      ) : profile.upcoming.length > 0 || profile.past.length > 0 ? (
-        <YourPlansBlock
-          id="profile-plans-block"
-          upcoming={profile.upcoming}
-          past={profile.past}
-          isSelf={false}
-          profileUserId={userId}
-          view="list"
-          onViewChange={() => {}}
-        />
-      ) : (
-        <section className="profile-block">
-          <p className="empty-state" style={{ marginTop: 8 }}>No plans yet.</p>
-        </section>
-      )}
+      <YourPlansBlock
+        id="profile-plans-block"
+        upcoming={profile.upcoming}
+        past={profile.past}
+        isSelf
+        profileUserId={userId}
+        view={plansView}
+        onViewChange={setPlansView}
+      />
 
-      {isSelf && <ProfileMenu network={network} />}
+      <ProfileMenu network={network} />
 
-      {isSelf && (
-        <a
-          className="settings-feedback"
-          href="https://docs.google.com/forms/u/0/d/e/1FAIpQLSfiQUov1e2K9wUlgvIR26Qxnm9MPhQ88MHgophxKS4AClZwZQ/viewform"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <FeedbackGlyph />
-          <span className="settings-feedback-text">
-            Share beta feedback
-            <span className="settings-feedback-sub">Tell us what's working and what's not</span>
-          </span>
-        </a>
-      )}
+      <a
+        className="settings-feedback"
+        href="https://docs.google.com/forms/u/0/d/e/1FAIpQLSfiQUov1e2K9wUlgvIR26Qxnm9MPhQ88MHgophxKS4AClZwZQ/viewform"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <FeedbackGlyph />
+        <span className="settings-feedback-text">
+          Share beta feedback
+          <span className="settings-feedback-sub">Tell us what's working and what's not</span>
+        </span>
+      </a>
 
-      {isSelf && (
-        <button
-          type="button"
-          className="settings-signout"
-          onClick={async () => {
-            sessionStorage.removeItem("commons_pending_admin_choice");
-            await api("/api/auth/logout", { method: "POST" });
-            await clearAuthToken();
-            setUser(null);
-            navigate("/onboarding", { replace: true });
-          }}
-        >
-          <SignOutGlyph />
-          Sign out of COMMONS
-        </button>
-      )}
+      <button
+        type="button"
+        className="settings-signout"
+        onClick={async () => {
+          sessionStorage.removeItem("commons_pending_admin_choice");
+          await api("/api/auth/logout", { method: "POST" });
+          await clearAuthToken();
+          setUser(null);
+          navigate("/onboarding", { replace: true });
+        }}
+      >
+        <SignOutGlyph />
+        Sign out of COMMONS
+      </button>
     </main>
   );
 }
@@ -330,15 +565,6 @@ function SignOutGlyph() {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />
       <path d="M10 17 5 12l5-5M5 12h11" />
-    </svg>
-  );
-}
-
-function PinIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" width="11" height="11">
-      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-      <circle cx="12" cy="10" r="3" />
     </svg>
   );
 }
@@ -439,15 +665,18 @@ function FeedbackGlyph() {
 function FriendButton({
   profile,
   onUpdated,
+  variant = "default",
 }: {
   profile: ProfilePayload;
   onUpdated: () => void;
+  variant?: "default" | "other";
 }) {
   const [busy, setBusy] = useState(false);
   const { setUser } = useAuth();
   const inNet = profile.network.inMyNetwork;
   const requestSent = profile.network.requestSent ?? false;
   const requestReceived = profile.network.requestReceived ?? false;
+  const other = variant === "other";
 
   async function call(path: string) {
     setBusy(true);
@@ -465,11 +694,24 @@ function FriendButton({
     }
   }
 
-  // Connected — show status + explicit remove.
+  // Connected — show status + optional remove.
   if (inNet) {
+    if (other) {
+      return (
+        <button
+          type="button"
+          className="profile-other-cta profile-other-cta--connected"
+          onClick={() => void call("/api/auth/friend-remove")}
+          disabled={busy}
+        >
+          <Check size={13} strokeWidth={2.5} aria-hidden="true" />
+          {busy ? "…" : "In your network"}
+        </button>
+      );
+    }
     return (
       <div className="friend-button-connected" style={{ marginTop: 10 }}>
-        <span className="friend-connected-pill">✓ In your network</span>
+        <span className="friend-connected-pill">In your network</span>
         <button
           type="button"
           className="btn-link friend-remove-btn"
@@ -484,6 +726,18 @@ function FriendButton({
 
   // They requested you — show Accept / Decline.
   if (requestReceived) {
+    if (other) {
+      return (
+        <button
+          type="button"
+          className="profile-other-cta profile-other-cta--primary"
+          onClick={() => void call("/api/auth/network-accept")}
+          disabled={busy}
+        >
+          {busy ? "…" : "Accept request"}
+        </button>
+      );
+    }
     return (
       <div className="friend-button-connected" style={{ marginTop: 10 }}>
         <button
@@ -508,6 +762,13 @@ function FriendButton({
 
   // You already requested them — pending.
   if (requestSent) {
+    if (other) {
+      return (
+        <button type="button" className="profile-other-cta profile-other-cta--connected" disabled>
+          Request sent
+        </button>
+      );
+    }
     return (
       <button type="button" className="btn-secondary" disabled style={{ marginTop: 10 }}>
         Request sent
@@ -516,6 +777,20 @@ function FriendButton({
   }
 
   // No relationship yet — send a request.
+  if (other) {
+    return (
+      <button
+        type="button"
+        className="profile-other-cta profile-other-cta--primary"
+        onClick={() => void call("/api/auth/friend-add")}
+        disabled={busy}
+      >
+        <UserPlus size={13} strokeWidth={2} aria-hidden="true" />
+        {busy ? "…" : "Add to network"}
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -596,7 +871,6 @@ function MonthCalendar({ plans, profileUserId }: { plans: PlanDTO[]; profileUser
                       state={profileBack}
                       className="month-cal-dropdown-item"
                     >
-                      <span>{p.hostEmoji}</span>
                       <span className="month-cal-dot-title">{p.title}</span>
                     </Link>
                   ))}
@@ -707,6 +981,8 @@ function YourPlansBlock({
             <div className="profile-plan-card">
               {visibleUpcoming.map((p) => {
                 const badge = planRelationshipBadge(p, profileUserId);
+                const vis = interestVisual(p.tags[0]);
+                const Icon = vis.Icon;
                 return (
                   <Link
                     key={p.id}
@@ -714,7 +990,13 @@ function YourPlansBlock({
                     state={profileBack}
                     className="profile-plan-row"
                   >
-                    <span className="profile-list-emoji">{p.hostEmoji}</span>
+                    <span
+                      className="profile-list-icon-well"
+                      style={{ background: vis.tint, color: vis.iconColor }}
+                      aria-hidden="true"
+                    >
+                      <Icon size={15} strokeWidth={1.8} />
+                    </span>
                     <span className="profile-list-title">{p.title}</span>
                     <span className="profile-list-when">{formatPlanDate(p.date)}</span>
                     <span className={`profile-plan-chip ${badge.className}`}>
@@ -778,41 +1060,6 @@ function YourPlansBlock({
   );
 }
 
-function BlockButton({ profileUserId, firstName }: { profileUserId: string; firstName: string }) {
-  const navigate = useNavigate();
-  const [busy, setBusy] = useState(false);
-
-  async function block() {
-    if (busy) return;
-    const name = firstName || "this person";
-    if (
-      !window.confirm(
-        `Block ${name}? They won't be able to see your plans or profile, and you won't see theirs.`,
-      )
-    ) {
-      return;
-    }
-    setBusy(true);
-    try {
-      await api(`/api/users/${profileUserId}/block`, { method: "POST" });
-      navigate("/", { replace: true });
-    } catch {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <button
-      type="button"
-      className="btn-link friend-remove-btn profile-block-btn"
-      onClick={() => void block()}
-      disabled={busy}
-    >
-      {busy ? "…" : "Block"}
-    </button>
-  );
-}
-
 function ProfileMenu({ network }: { network: PublicUser[] | null }) {
   return (
     <nav className="profile-menu" aria-label="Profile menu">
@@ -824,7 +1071,7 @@ function ProfileMenu({ network }: { network: PublicUser[] | null }) {
           <span className="profile-menu-label">Invite friends</span>
           <span className="profile-menu-sub">Share your codes</span>
         </span>
-        <ChevronRight />
+        <ChevronRight size={13} strokeWidth={1.6} className="profile-menu-chevron" aria-hidden="true" />
       </Link>
       <Link to="/settings" className="profile-menu-row profile-menu-row--settings">
         <span className="profile-menu-icon" aria-hidden="true"><SettingsIcon /></span>
@@ -832,7 +1079,7 @@ function ProfileMenu({ network }: { network: PublicUser[] | null }) {
           <span className="profile-menu-label">Settings</span>
           <span className="profile-menu-sub">Notifications, interests, account</span>
         </span>
-        <ChevronRight />
+        <ChevronRight size={13} strokeWidth={1.6} className="profile-menu-chevron" aria-hidden="true" />
       </Link>
     </nav>
   );
@@ -911,19 +1158,3 @@ function NetworkCard({ network }: { network: PublicUser[] | null }) {
   );
 }
 
-function ChevronRight() {
-  return (
-    <svg
-      className="profile-menu-chevron"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="m9 18 6-6-6-6" />
-    </svg>
-  );
-}

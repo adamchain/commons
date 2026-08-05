@@ -1,35 +1,46 @@
 /* COMMONS design tokens — single source for color, type, space, radius, shadow.
-   Imported by index.css. Prefer these variables in new screens/components. */
+   Imported by index.css. Prefer these variables in new screens/components.
+   Spec: Visual Design Specification — apply everywhere, no hardcoded values outside this list. */
 
 :root {
-  /* --- Color primitives --- */
-  --paper-50: #faf5ec;
-  --paper-100: #ede8e0;
-  --paper-200: #ede5d8; /* tan — interest tags, icon containers, pills */
+  /* --- Spec color tokens --- */
+  --bg: #f0e9df;
+  --card: #fdfaf7;
+  --red: #c13b3b;
+  --ink: #1a1a2e;
+  --muted: #7a7a8a;
+  --faint: #8a8a9a;
+  --tan: #ede5d8;
+  --tan-mid: #e0d5c8;
+  --idea-bg: #fef4f4;
+  --border: rgba(0, 0, 0, 0.07);
+  --shadow: 0 1px 0 rgba(180, 160, 140, 0.18), 0 4px 20px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --shadow-sm: 0 1px 0 rgba(180, 160, 140, 0.15), 0 2px 8px rgba(0, 0, 0, 0.05);
+
+  /* --- Color primitives (aliases + extended) --- */
+  --paper-50: #faf8f5;
+  --paper-100: #f0e9df;
+  --paper-200: #ede5d8;
   --paper-300: #d9c9aa;
 
   --ink-900: #1a1a2e;
   --ink-800: #1c1c4a;
   --ink-700: #2a2a5e;
   --ink-600: #4a4a72;
-  --ink-500: #7a7a8a; /* muted */
-  --ink-400: #a8a8b4; /* faint */
+  --ink-500: #7a7a8a;
+  --ink-400: #8a8a9a;
 
-  --signal-500: #c13b3b; /* the only red */
+  --signal-500: #c13b3b;
   --signal-600: #a62525;
   --signal-700: #8c1e1e;
-  /* No pale-red fills — selected/winner = red outline on white */
 
-  --tan: #ede5d8;
-  --tan-mid: #e0d5c8;
-  --faint: #a8a8b4;
-  --hairline: #e8e0d4;
+  --hairline: rgba(0, 0, 0, 0.07);
   --hairline-strong: #d4c9b8;
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
-  /* Spacing — preferred UI scale 8/12/16/20/24 (plus 4 for micro).
-     --s-* keeps the legacy ladder; --space-* is the preferred 8px scale. */
+  /* Spacing — preferred UI scale 8/12/16/20/24 (plus 4 for micro). */
   --s-1: 4px;
   --s-2: 8px;
   --s-3: 12px;
@@ -52,34 +63,37 @@
   --r-xl: 32px;
   --r-pill: 999px;
 
-  /* Type — Figma scale (supersedes older body-15 / card-20) */
+  /* Type — Inter (or system sans). Body line-height 1.6–1.7. */
   --font-display: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-ui: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-serif: var(--font-ui);
-  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  --text-page: 26px; /* page titles */
-  --text-screen-title: 20px; /* screen titles */
-  --text-card-large: 17px; /* large card titles */
-  --text-card: 16px; /* card / plan titles */
-  --text-card-small: 13px; /* small card text */
-  --text-body: 13px; /* body */
-  --text-meta: 13px; /* meta + section labels */
-  /* Legacy aliases → Figma scale */
-  --text-row: var(--text-card); /* was 16 — still maps to card */
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono-Regular", Menlo, monospace;
 
-  /* Semantic */
+  /* Typography scale (spec roles) */
+  --text-hero: 40px; /* Explore masthead — weight 800, white, ls -1.8 */
+  --text-page: 26px; /* Settings, Notifications — weight 800, ls -0.8 */
+  --text-screen-title: 20px; /* Messages, section heads — weight 700, ls -0.5 */
+  --text-card-large: 17px; /* Plan card — weight 600, ls -0.3 */
+  --text-card: 16px; /* Intent options — weight 700, ls -0.3 */
+  --text-card-small: 13px; /* Row titles, chat names — weight 600, ls -0.2 */
+  --text-body: 13px; /* Descriptions — weight 400 */
+  --text-body-small: 12px; /* Meta, previews — muted */
+  --text-caption: 10px; /* Section labels ALL CAPS — weight 600, ls 1.5 */
+  --text-micro: 9px; /* Pills, tags, timestamps — weight 600, faint, ls 1.2–1.5 */
+  --text-meta: 12px;
+  --text-row: var(--text-card);
+
+  /* Semantic aliases (legacy + new) */
   --accent-rgb: 193, 59, 59;
-  --bg: #ede8e0;
   --bg-gradient: var(--bg);
-  --surface: #fdfaf7; /* cards + ALL inputs */
-  --surface-2: var(--tan); /* pills / icon chips only — never inputs */
+  --surface: var(--card);
+  --surface-2: var(--tan);
   --surface-hover: var(--tan-mid);
-  --border: var(--hairline);
   --border-strong: var(--hairline-strong);
-  --text: var(--ink-900);
-  --text-muted: var(--ink-500);
-  --text-subtle: var(--ink-400);
-  --accent: var(--signal-500);
+  --text: var(--ink);
+  --text-muted: var(--muted);
+  --text-subtle: var(--faint);
+  --accent: var(--red);
   --accent-hover: var(--signal-600);
   --accent-soft: transparent;
   --accent-on: #ffffff;
@@ -87,15 +101,13 @@
   --success-bg: #e8f5ee;
   --success-border: #b5dcc6;
   --warning: #c97a1a;
-  --danger: var(--signal-500);
+  --danger: var(--red);
 
-  /* Card elevation: warm drop + inner light line */
-  --shadow-card: 0 2px 8px rgba(180, 160, 140, 0.22), 0 1px 2px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.85);
-  --shadow-sm: 0 1px 0 rgba(180, 160, 140, 0.15), 0 2px 8px rgba(0, 0, 0, 0.05);
+  /* Card elevation */
+  --shadow-card: var(--shadow);
   --shadow-elevate: var(--shadow-sm);
   --shadow-fab: 0 4px 16px rgba(193, 59, 59, 0.42), 0 2px 6px rgba(0, 0, 0, 0.12);
-  --shadow-nav: 0 -1px 0 var(--hairline);
+  --shadow-nav: 0 -1px 0 var(--border);
 
   --radius: var(--r-md);
   --radius-lg: var(--r-lg);
@@ -104,16 +116,15 @@
   --max-shell-mid: 720px;
   --max-shell-wide: 1180px;
 
-  --nav-height: 72px;
-  /* Alias: communities use brand red, never maroon */
-  --community-pink: var(--signal-500);
+  --nav-height: 58px;
+  --community-pink: var(--red);
   --community-pink-soft: transparent;
   --community-pink-border: rgba(var(--accent-rgb), 0.35);
 
-  /* Legacy aliases kept so older CSS keeps compiling */
+  /* Legacy aliases */
   --signal-100: transparent;
   --signal-300: #e89a9b;
-  --looking-orange: var(--signal-500);
+  --looking-orange: var(--red);
 
   font-family: var(--font-ui);
   color: var(--text);

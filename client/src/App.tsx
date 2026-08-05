@@ -31,6 +31,7 @@ import { MessagesPage } from "./pages/Messages";
 import { ForumPage } from "./pages/ForumPage";
 import { ForumPostPage } from "./pages/ForumPostPage";
 import { MyPlansPage } from "./pages/MyPlans";
+import { EmptyStatesPage } from "./pages/EmptyStates";
 import { SearchPage } from "./pages/Search";
 import { BlockedListPage } from "./pages/BlockedList";
 import { PrivacyPage } from "./pages/Privacy";
@@ -157,6 +158,7 @@ export default function App() {
         <Route path="/forums/:tag" element={<Protected><ForumPage /></Protected>} />
         <Route path="/forums/:tag/posts/:postId" element={<Protected><ForumPostPage /></Protected>} />
         <Route path="/my-plans" element={<Protected><MyPlansPage /></Protected>} />
+        <Route path="/empty-states" element={<Protected><EmptyStatesPage /></Protected>} />
         <Route path="/plans/new" element={<Protected><CreatePlanPage /></Protected>} />
         <Route path="/plans/:id/edit" element={<Protected><EditPlanPage /></Protected>} />
         <Route path="/plans/:id" element={<PlanRoute />} />

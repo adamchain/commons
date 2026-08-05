@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { ArrowLeft, Users } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { EmptyCard, ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import type { PublicUser } from "../types/shared";
 
@@ -33,15 +35,13 @@ export function NetworkPage() {
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">
       <header className="app-header app-header--minimal">
         <Link to={user ? `/profile/${user.id}` : "/"} className="detail-back">
-          ← Profile
+          <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" /> Profile
         </Link>
       </header>
-      <h1 className="brand" style={{ marginBottom: 4 }}>
-        Your network
-      </h1>
-      <p className="brand-tagline" style={{ marginBottom: 16 }}>
-        {network.length} {network.length === 1 ? "person" : "people"} you&apos;ve added
-      </p>
+      <ScreenTitle
+        title="Your network"
+        subtitle={`${network.length} ${network.length === 1 ? "person" : "people"} you've added`}
+      />
 
       {network.length > 0 && (
         <div className="network-search-wrap">
@@ -58,17 +58,13 @@ export function NetworkPage() {
       )}
 
       {network.length === 0 ? (
-        <div className="feed-empty" role="status">
-          <div className="feed-empty-glyph" aria-hidden="true">👋</div>
-          <h2 className="feed-empty-headline">Your network starts with one invite.</h2>
-          <p className="feed-empty-body">
-            Meet people at plans and add them after — or invite a friend to skip straight to it.
-          </p>
-          <div className="feed-empty-actions">
-            <Link to="/invite" className="btn-primary">Invite a friend</Link>
-            <Link to="/" className="btn-secondary">Browse plans</Link>
-          </div>
-        </div>
+        <EmptyCard
+          icon={<Users size={22} strokeWidth={1.6} color="#3A6A3A" />}
+          tint="#C8DDC8"
+          title="No network yet."
+          body="Meet people at plans and add them after — or invite a friend to skip straight to it."
+          cta={{ to: "/invite", label: "Invite friends →" }}
+        />
       ) : filtered.length === 0 ? (
         <p className="form-help">No one in your network matches &ldquo;{query.trim()}&rdquo;.</p>
       ) : (

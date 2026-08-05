@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
+import { interestVisual } from "../lib/interestIcons";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
 import { formatPlanDate, formatPlanTime } from "../lib/format";
@@ -285,12 +288,14 @@ function EditForm({
   return (
     <main className="app-shell app-shell--mid">
       <header className="app-header app-header--minimal app-header--sticky">
-        <Link to={`/plans/${plan.id}`} className="detail-back">← Back to plan</Link>
+        <Link to={`/plans/${plan.id}`} className="detail-back">
+          <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" /> Back to plan
+        </Link>
       </header>
-      <h1 className="brand" style={{ marginBottom: 8 }}>Edit plan</h1>
-      <p className="brand-tagline" style={{ marginBottom: 24 }}>
-        Most edits save instantly · date and time changes go through a proposal
-      </p>
+      <ScreenTitle
+        title="Edit plan"
+        subtitle="Most edits save instantly · date and time changes go through a proposal"
+      />
 
       <form onSubmit={(e) => void save(e)} className="form-card">
         <section className="form-section">
@@ -298,6 +303,7 @@ function EditForm({
           <div className="vibe-grid">
             {VIBE_OPTIONS.map((opt) => {
               const selected = form.vibes.includes(opt.id);
+              const { Icon, iconColor, tint } = interestVisual(opt.tag);
               return (
                 <button
                   key={opt.id}
@@ -306,7 +312,14 @@ function EditForm({
                   onClick={() => toggleVibe(opt.id)}
                   aria-pressed={selected}
                 >
-                  <span className="vibe-tile-emoji" aria-hidden="true">{opt.emoji}</span>
+                  {selected && <span className="vibe-tile-dot" aria-hidden="true" />}
+                  <span
+                    className="vibe-tile-icon"
+                    style={{ background: tint, color: iconColor }}
+                    aria-hidden="true"
+                  >
+                    <Icon size={18} strokeWidth={1.8} />
+                  </span>
                   <span className="vibe-tile-label">{opt.label}</span>
                 </button>
               );

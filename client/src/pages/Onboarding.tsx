@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import type { CSSProperties, ReactNode } from "react";
+import { Check, Coffee, Flame, Star, Wine, type LucideIcon } from "lucide-react";
 import { api } from "../api/http";
 import { formatPhoneInput, isValidPhoneInput } from "../lib/format";
 import { APP_STORE_URL } from "../lib/appStore";
@@ -16,9 +17,9 @@ import { LoadingScreen } from "../components/LoadingScreen";
 import { LegalContent } from "../components/LegalContent";
 import { LEGAL_DOCS } from "../content/legal";
 import wordmark from "../assets/wordmark.png";
+import { interestVisual } from "../lib/interestIcons";
 import {
   ALL_INTERESTS,
-  INTEREST_EMOJI,
   INTEREST_LABELS,
   AGE_RANGE_LABELS,
   ALL_AGE_RANGES,
@@ -29,6 +30,13 @@ import {
   type NeighborhoodDTO,
   type PlanDTO,
 } from "../types/shared";
+
+const AGE_ERA_ICONS: Record<AgeRange, LucideIcon> = {
+  "18_24": Flame,
+  "25_35": Coffee,
+  "35_50": Wine,
+  "50_plus": Star,
+};
 
 // Warm one-time interstitial shown right after onboarding completes (F.1).
 // Keyed per account so a new signup always sees it, even on a shared device.
@@ -554,15 +562,15 @@ function WelcomeStep({ user, onContinue }: { user: MeDTO; onContinue: () => void
   return (
     <OnboardingShell title="" subtitle="">
       <div className="welcome-hero">
-        <h2 className="welcome-headline">Welcome to COMMONS 💛</h2>
+        <h2 className="welcome-headline">You&apos;re in.</h2>
         <p className="welcome-body">
-          You're in — here's what's happening{neighborhoodName ? ` in ${neighborhoodName}` : ""} this
-          week.
+          Welcome to COMMONS — a city full of women who actually do things
+          {neighborhoodName ? ` in ${neighborhoodName}` : ""}.
         </p>
         {stat && <span className="welcome-stat-chip">{stat}</span>}
       </div>
       <button type="button" className="btn-primary btn-block" onClick={onContinue} style={{ marginTop: 20 }}>
-        Let's go →
+        Explore the app
       </button>
     </OnboardingShell>
   );
@@ -578,7 +586,7 @@ function DownloadAppStep({ redirectTo, onContinue }: { redirectTo: string; onCon
   const goingToEvent = redirectTo.startsWith("/plans/");
   return (
     <OnboardingShell
-      title="You're in! 🎉"
+      title="You're in."
       subtitle="Commons lives on your phone. Get the app for notifications when plans fill up, chat, and one-tap RSVPs."
     >
       <div className="download-app">
@@ -587,7 +595,7 @@ function DownloadAppStep({ redirectTo, onContinue }: { redirectTo: string; onCon
              Download for iPhone
           </a>
         ) : (
-          <div className="download-app-soon">📱 iPhone app coming soon — we'll text you the link.</div>
+          <div className="download-app-soon">iPhone app coming soon — we'll text you the link.</div>
         )}
         <button className="btn-link btn-block" type="button" onClick={onContinue}>
           {goingToEvent ? "Continue to the event on web →" : "Continue on the web →"}
@@ -1130,6 +1138,7 @@ function InterestsStep({ me, onSave, onSkip, onBack }: { me: MeDTO; onSave: (int
       <div className="interest-grid">
         {ALL_INTERESTS.map((t) => {
           const isPicked = picked.includes(t);
+          const { Icon, iconColor, tint } = interestVisual(t);
           return (
             <button
               key={t}
@@ -1137,7 +1146,14 @@ function InterestsStep({ me, onSave, onSkip, onBack }: { me: MeDTO; onSave: (int
               className={`interest-tile ${isPicked ? "is-picked" : ""}`}
               onClick={() => toggle(t)}
             >
-              <span className="interest-emoji" aria-hidden="true">{INTEREST_EMOJI[t]}</span>
+              {isPicked && <span className="interest-tile-dot" aria-hidden="true" />}
+              <span
+                className="interest-tile-icon"
+                style={{ background: tint, color: iconColor }}
+                aria-hidden="true"
+              >
+                <Icon size={20} strokeWidth={1.8} />
+              </span>
               <span className="interest-label">{INTEREST_LABELS[t]}</span>
             </button>
           );
@@ -1317,40 +1333,43 @@ function AgeStep({
   return (
     <OnboardingShell
       title="Quick age check."
-      subtitle="COMMONS is for adults. Pick your age range so we can personalize your feed."
+      subtitle="COMMONS is for adults. Pick your era."
       onBack={onBack}
     >
-      <button
-        type="button"
-        className={`age-confirm-chip ${confirmed ? "is-active" : ""}`}
-        onClick={() => setConfirmed((v) => !v)}
-        aria-pressed={confirmed}
-      >
-        {confirmed && (
-          <span className="age-confirm-chip-check" aria-hidden="true">
-            ✓
-          </span>
-        )}
-        <span>I confirm I am 18 years or older.</span>
-      </button>
-
-      <div className="filter-sheet-chips" style={{ marginTop: 16 }}>
-        {ALL_AGE_RANGES.map((r) => (
-          <button
-            key={r}
-            type="button"
-            className={`community-chip ${ageRange === r ? "is-active" : ""}`}
-            onClick={() => setAgeRange(r)}
-          >
-            {AGE_RANGE_LABELS[r]}
-          </button>
-        ))}
+      <div className="age-era-grid">
+        {ALL_AGE_RANGES.map((r) => {
+          const Icon = AGE_ERA_ICONS[r];
+          const selected = ageRange === r;
+          return (
+            <button
+              key={r}
+              type="button"
+              className={`age-era-tile ${selected ? "is-selected" : ""}`}
+              onClick={() => setAgeRange(r)}
+              aria-pressed={selected}
+            >
+              <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
+              <span className="age-era-label">{AGE_RANGE_LABELS[r]}</span>
+            </button>
+          );
+        })}
       </div>
 
       <button
         type="button"
+        className={`age-confirm-row ${confirmed ? "is-active" : ""}`}
+        onClick={() => setConfirmed((v) => !v)}
+        aria-pressed={confirmed}
+      >
+        <span className={`age-confirm-box ${confirmed ? "is-checked" : ""}`} aria-hidden="true">
+          {confirmed && <Check size={11} strokeWidth={2.8} color="#fff" />}
+        </span>
+        <span>I confirm I am 18 years or older.</span>
+      </button>
+
+      <button
+        type="button"
         className="btn-primary btn-block"
-        style={{ marginTop: 18 }}
         disabled={busy || !confirmed || !ageRange}
         onClick={async () => {
           if (!ageRange) return;

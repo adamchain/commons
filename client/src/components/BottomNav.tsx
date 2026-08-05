@@ -1,20 +1,20 @@
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import { Home, Search, Plus, MessageCircle, User } from "lucide-react";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
 import type { ConversationSummaryDTO } from "../types/shared";
 
 /**
- * Global bottom nav — Home · Explore · Make a Plan (center) · Messages · Profile.
- * Messages + Profile also still live in the top bar for now, so the two
- * placements can be compared before we commit to one.
+ * Bottom nav — Home · Search · Plus (create) · MessageCircle · User.
+ * Height 58px, bg card, borderTop border. Active = red; inactive = faint.
+ * Plus: 44×44 circle, red, icon 20 white.
  */
 export function BottomNav() {
   const { pathname } = useLocation();
   const { user } = useAuth();
   const [unreadMessages, setUnreadMessages] = useState(0);
 
-  // Keep the Messages badge fresh — same lightweight poll the top bar uses.
   useEffect(() => {
     if (!user) {
       setUnreadMessages(0);
@@ -51,8 +51,6 @@ export function BottomNav() {
     pathname === "/plans/new" ||
     pathname.match(/^\/plans\/[^/]+\/chat$/) ||
     pathname.match(/^\/communities\/[^/]+\/chat$/) ||
-    // Logged-out visitor on a public shared-event page — no app chrome, its
-    // links point at member-only routes.
     (!user && Boolean(pathname.match(/^\/plans\/[^/]+$/)));
   if (hide) return null;
 
@@ -73,98 +71,50 @@ export function BottomNav() {
         }}
       >
         <span className="bottom-nav-icon-wrap">
-          <HomeIcon />
+          <Home size={22} strokeWidth={1.6} />
         </span>
         <span className="bottom-nav-label">Home</span>
-        <span className="bottom-nav-dot" aria-hidden="true" />
       </NavLink>
 
       <NavLink
         to="/explore"
         className={({ isActive }) => `bottom-nav-item ${isActive ? "is-active" : ""}`}
-        aria-label="Explore"
+        aria-label="Search"
       >
         <span className="bottom-nav-icon-wrap">
-          <SearchIcon />
+          <Search size={22} strokeWidth={1.6} />
         </span>
-        <span className="bottom-nav-label">Explore</span>
-        <span className="bottom-nav-dot" aria-hidden="true" />
+        <span className="bottom-nav-label">Search</span>
       </NavLink>
 
       <NavLink to="/plans/new" className="bottom-nav-cta" aria-label="Make a plan">
-        <PlusIcon />
+        <Plus size={20} strokeWidth={2.2} color="white" />
       </NavLink>
 
       <NavLink
         to="/messages"
         className={({ isActive }) => `bottom-nav-item ${isActive ? "is-active" : ""}`}
-        aria-label={unreadMessages > 0 ? `Chats, ${unreadMessages} unread` : "Chats"}
+        aria-label={unreadMessages > 0 ? `Messages, ${unreadMessages} unread` : "Messages"}
       >
         <span className="bottom-nav-icon-wrap">
-          <ChatIcon />
+          <MessageCircle size={22} strokeWidth={1.6} />
           {unreadMessages > 0 && (
             <span className="bottom-nav-badge">{unreadMessages > 9 ? "9+" : unreadMessages}</span>
           )}
         </span>
-        <span className="bottom-nav-label">Chats</span>
-        <span className="bottom-nav-dot" aria-hidden="true" />
+        <span className="bottom-nav-label">Messages</span>
       </NavLink>
 
-        <NavLink
+      <NavLink
         to={profileTo}
         className={({ isActive }) => `bottom-nav-item ${isActive ? "is-active" : ""}`}
         aria-label="Your profile"
       >
         <span className="bottom-nav-icon-wrap">
-          <UserIcon />
+          <User size={22} strokeWidth={1.6} />
         </span>
         <span className="bottom-nav-label">Profile</span>
-        <span className="bottom-nav-dot" aria-hidden="true" />
       </NavLink>
     </nav>
-  );
-}
-
-function HomeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="m3 11 9-7 9 7" />
-      <path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9" />
-    </svg>
-  );
-}
-
-function SearchIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-3.5-3.5" />
-    </svg>
-  );
-}
-
-function ChatIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-    </svg>
-  );
-}
-
-function UserIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21v-1a7 7 0 0 1 14 0v1" />
-    </svg>
-  );
-}
-
-function PlusIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 5v14" />
-      <path d="M5 12h14" />
-    </svg>
   );
 }

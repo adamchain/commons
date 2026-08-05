@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, RefObject } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  Calendar,
+  ChevronDown,
+  Globe,
+  ImagePlus,
+  MapPin,
+  Pin,
+  Tag,
+  Users,
+} from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
@@ -8,9 +19,11 @@ import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
 import { NumberPicker } from "../components/NumberPicker";
+import { interestVisual } from "../lib/interestIcons";
 import {
+  ALL_INTERESTS,
+  INTEREST_LABELS,
   VIBE_OPTIONS,
-  type CommunityCardDTO,
   type InterestTag,
   type JoinType,
   type PlanDTO,
@@ -65,24 +78,12 @@ const endOfThisWeek = (): string => {
 // week, or fully open-ended).
 type IdeaDateMode = "specific" | "week" | "anytime";
 
-// F.10 — placeholder copy rotates through these so the empty field doesn't
-// feel like a blank homework assignment.
+// Placeholder copy — pick one at random on mount (not on keystroke).
 const IDEA_PLACEHOLDERS = [
-  "Want to try a yoga class?",
-  "Free for a drink on Thursday?",
-  "Want to cross something off your Philly bucket list?",
-  "Anyone up for a walk this weekend?",
-  "Looking for a coffee shop to work from — join me?",
-  "New to the city — show me your favorite spot",
-];
-
-// Tappable starters — short chip label mapped to the fuller phrase it drops
-// into the field.
-const IDEA_STARTER_CHIPS: { label: string; text: string }[] = [
-  { label: "Yoga class", text: "Want to try a yoga class?" },
-  { label: "Drinks Thursday", text: "Free for a drink on Thursday?" },
-  { label: "Bucket list", text: "Want to cross something off your Philly bucket list?" },
-  { label: "Weekend walk", text: "Anyone up for a walk this weekend?" },
+  "Anyone down for a spontaneous dinner tonight?",
+  "Thinking about hitting a yoga class this week...",
+  "Would love to find a running buddy in Fishtown",
+  "Anyone want to check out that new wine bar on Passyunk?",
 ];
 
 export function CreatePlanPage() {
@@ -228,7 +229,7 @@ export function CreatePlanPage() {
   // (?communityId=…), the plan is tagged to that community and the host picks
   // whether it's public (feed + community) or community-only.
   const communityId = searchParams.get("communityId");
-  const [pickedCommunityId, setPickedCommunityId] = useState<string | null>(communityId);
+  const [pickedCommunityId] = useState<string | null>(communityId);
   const effectiveCommunityId = pickedCommunityId ?? communityId;
   const [communityName, setCommunityName] = useState<string | null>(null);
   const [communityVisibility, setCommunityVisibility] = useState<"public" | "community_only">(
@@ -571,7 +572,7 @@ export function CreatePlanPage() {
       <main className="app-shell app-shell--mid path-picker-page">
         <header className="app-header app-header--minimal app-header--sticky path-picker-header">
           <button type="button" className="detail-back" onClick={leaveCreatePlan}>
-            ← Back
+            <ArrowLeft size={13} strokeWidth={2} aria-hidden="true" /> Back
           </button>
         </header>
         <h1 className="path-picker-intent-head">
@@ -650,15 +651,10 @@ export function CreatePlanPage() {
           toggleVibe={toggleVibe}
           onBack={backFromForm}
           onOpenFlyer={() => void openFlyerPicker()}
-          onShowCoverLib={() => setShowCoverLib(true)}
           onClearFlyer={() => setForm((f) => ({ ...f, flyerDataUrl: null }))}
           inviteUserName={inviteUserName}
           inviteNames={inviteNames}
           invitedCount={invitedIds.size}
-          pickedCommunityId={pickedCommunityId}
-          onPickCommunity={setPickedCommunityId}
-          communityVisibility={communityVisibility}
-          onCommunityVisibilityChange={setCommunityVisibility}
         />
         <input
           ref={flyerRef}
@@ -735,7 +731,7 @@ export function CreatePlanPage() {
         {effectiveCommunityId ? (
           <div className="create-community-tag">
             <p className="create-community-tag-title">
-              🏙️ Posting to <strong>{communityName ?? "your community"}</strong>
+              Posting to <strong>{communityName ?? "your community"}</strong>
             </p>
             <div className="seg-toggle" role="group" aria-label="Community visibility">
               <button
@@ -964,6 +960,7 @@ export function CreatePlanPage() {
         <div className="vibe-grid">
           {VIBE_OPTIONS.map((opt) => {
             const selected = form.vibes.includes(opt.id);
+            const { Icon, iconColor, tint } = interestVisual(opt.tag);
             return (
               <button
                 key={opt.id}
@@ -972,6 +969,14 @@ export function CreatePlanPage() {
                 onClick={() => toggleVibe(opt.id)}
                 aria-pressed={selected}
               >
+                {selected && <span className="vibe-tile-dot" aria-hidden="true" />}
+                <span
+                  className="vibe-tile-icon"
+                  style={{ background: tint, color: iconColor }}
+                  aria-hidden="true"
+                >
+                  <Icon size={18} strokeWidth={1.8} />
+                </span>
                 <span className="vibe-tile-label">{opt.label}</span>
               </button>
             );
@@ -983,22 +988,24 @@ export function CreatePlanPage() {
         <div className="settings-card">
           <div className="settings-row">
             <span className="settings-row-label">Visibility</span>
-            <div className="seg-toggle" role="group" aria-label="Visibility">
+            <div className="vis-pill-toggle" role="group" aria-label="Visibility">
               <button
                 type="button"
-                className={`seg-toggle-btn ${form.visibility === "everyone" ? "is-active" : ""}`}
+                className={`vis-pill ${form.visibility === "everyone" ? "is-active" : ""}`}
                 onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
                 aria-pressed={form.visibility === "everyone"}
               >
+                <Globe size={12} strokeWidth={1.8} aria-hidden="true" />
                 Everyone
               </button>
               <button
                 type="button"
-                className={`seg-toggle-btn ${form.visibility === "network" ? "is-active" : ""}`}
+                className={`vis-pill ${form.visibility === "network" ? "is-active" : ""}`}
                 onClick={() => setForm((f) => ({ ...f, visibility: "network" }))}
                 aria-pressed={form.visibility === "network"}
               >
-                Network
+                <Users size={12} strokeWidth={1.8} aria-hidden="true" />
+                Your network
               </button>
             </div>
           </div>
@@ -1479,7 +1486,7 @@ type FormShape = {
 
 /**
  * Just an Idea form — prompt, text box, and image up front; everything else
- * lives under a collapsible "Additional details — optional" section.
+ * lives under a collapsible "Additional Details" accordion.
  */
 function IdeaForm({
   form,
@@ -1493,15 +1500,10 @@ function IdeaForm({
   toggleVibe,
   onBack,
   onOpenFlyer,
-  onShowCoverLib,
   onClearFlyer,
   inviteUserName,
   inviteNames,
   invitedCount,
-  pickedCommunityId,
-  onPickCommunity,
-  communityVisibility,
-  onCommunityVisibilityChange,
 }: {
   form: FormShape;
   setForm: (updater: (f: FormShape) => FormShape) => void;
@@ -1514,60 +1516,25 @@ function IdeaForm({
   toggleVibe: (id: VibeIcon) => void;
   onBack: () => void;
   onOpenFlyer: () => void;
-  onShowCoverLib: () => void;
   onClearFlyer: () => void;
   inviteUserName: string | null;
   inviteNames: string[];
   invitedCount: number;
-  pickedCommunityId: string | null;
-  onPickCommunity: (id: string | null) => void;
-  communityVisibility: "public" | "community_only";
-  onCommunityVisibilityChange: (v: "public" | "community_only") => void;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [dateMode, setDateMode] = useState<IdeaDateMode>(form.isFlexibleDate ? "anytime" : "specific");
-  const [placeholderIdx, setPlaceholderIdx] = useState(0);
-  const [postToCommunity, setPostToCommunity] = useState(Boolean(pickedCommunityId));
-  const [myCommunities, setMyCommunities] = useState<CommunityCardDTO[] | null>(null);
+  const [placeholderIdx] = useState(() => Math.floor(Math.random() * IDEA_PLACEHOLDERS.length));
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const detailsRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!postToCommunity) return;
-    let alive = true;
-    void api<{ communities: CommunityCardDTO[] }>("/api/communities/mine")
-      .then((r) => {
-        if (alive) setMyCommunities(r.communities);
-      })
-      .catch(() => {
-        if (alive) setMyCommunities([]);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [postToCommunity]);
-
-  // F.10 — rotate the placeholder copy so the empty field reads as an
-  // invitation to riff, not a blank homework assignment.
-  useEffect(() => {
-    const t = setInterval(() => {
-      setPlaceholderIdx((i) => (i + 1) % IDEA_PLACEHOLDERS.length);
-    }, 3200);
-    return () => clearInterval(t);
-  }, []);
-
-  // F.6 — focus the field that's actually missing instead of leaving a
-  // disabled Post button with no explanation.
   useEffect(() => {
     if (attemptedSubmit && !form.title.trim()) {
       textareaRef.current?.focus();
       textareaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-    // Only re-run when a submit attempt actually happens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attemptedSubmit]);
 
-  // When "Additional details" opens, bring it above the keyboard.
   useEffect(() => {
     if (!detailsOpen) return;
     const t = setTimeout(() => {
@@ -1582,9 +1549,6 @@ function IdeaForm({
     }, 300);
   };
 
-  // Reserve room at the bottom of the form for however much the on-screen
-  // keyboard is currently covering, via the visualViewport API where it's
-  // available (iOS/Android web views).
   const [keyboardInset, setKeyboardInset] = useState(0);
   useEffect(() => {
     const vv = window.visualViewport;
@@ -1601,9 +1565,6 @@ function IdeaForm({
     };
   }, []);
 
-  // F.11 — three loose date buckets. "This week" anchors to the coming
-  // Saturday so the plan still sorts sensibly without over-committing to a
-  // single day; "Anytime" stays fully open-ended.
   const selectDateMode = (mode: IdeaDateMode) => {
     setDateMode(mode);
     if (mode === "specific") {
@@ -1622,16 +1583,28 @@ function IdeaForm({
   const titleMissing = attemptedSubmit && !form.title.trim();
 
   return (
-    <main className="app-shell app-shell--mid path-picker-page idea-form-page">
-      <header className="app-header app-header--minimal app-header--sticky path-picker-header">
-        <button type="button" className="detail-back" onClick={onBack}>
-          ← Back
+    <main className="app-shell app-shell--mid idea-form-page">
+      <header className="idea-form-header">
+        <button type="button" className="idea-form-back" onClick={onBack}>
+          <ArrowLeft size={14} strokeWidth={2} aria-hidden="true" />
+          Back
+        </button>
+        <button
+          type="submit"
+          form="idea-form"
+          className="idea-form-submit-link"
+          disabled={submitting}
+        >
+          {submitting ? "Posting…" : "Put it out there"}
         </button>
       </header>
-      <h1 className="brand" style={{ marginBottom: 8 }}>Just an idea</h1>
-      <p className="brand-tagline" style={{ marginBottom: 24 }}>
-        Just a thought. See who&apos;s down.
-      </p>
+
+      <div className="idea-form-title-block">
+        <h1 className="idea-form-title">Just an Idea</h1>
+        <p className="idea-form-sub">
+          Just a thought. See who&apos;s down. No plan too big or small.
+        </p>
+      </div>
 
       {(inviteUserName || inviteNames.length > 0) && (
         <div className="create-plan-invite-banner" role="note">
@@ -1642,27 +1615,14 @@ function IdeaForm({
       )}
 
       <form
+        id="idea-form"
         onSubmit={submit}
-        className="form-card"
+        className="idea-form"
         style={keyboardInset > 0 ? { paddingBottom: keyboardInset } : undefined}
       >
-        <p className="idea-inspiration-line">Need some inspiration? No plan too big or small</p>
+        <p className="idea-inspiration-label">Need some inspiration?</p>
 
-        {/* F.10 — tappable starters pre-fill the field with a fuller phrase. */}
-        <div className="idea-starter-chips" role="group" aria-label="Idea starters">
-          {IDEA_STARTER_CHIPS.map((chip) => (
-            <button
-              key={chip.label}
-              type="button"
-              className={`idea-starter-chip ${form.title === chip.text ? "is-active" : ""}`}
-              onClick={() => setForm((f) => ({ ...f, title: chip.text }))}
-            >
-              {chip.label}
-            </button>
-          ))}
-        </div>
-
-        <section className="form-section">
+        <div className="idea-textarea-card">
           <textarea
             ref={textareaRef}
             className="idea-textarea"
@@ -1670,16 +1630,16 @@ function IdeaForm({
             value={form.title}
             aria-invalid={titleMissing}
             onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-            rows={3}
+            rows={5}
           />
-          {titleMissing && <p className="luma-inline-error">Add a few words about the idea.</p>}
-        </section>
+        </div>
+        {titleMissing && <p className="luma-inline-error">Add a few words about the idea.</p>}
 
         {form.flyerDataUrl ? (
-          <div className="cover-picker cover-picker--filled">
-            <img src={form.flyerDataUrl} alt="" className="cover-picker-img" />
-            <div className="cover-picker-overlay">
-              <button type="button" className="cover-chip" onClick={onShowCoverLib}>
+          <div className="idea-photo-preview">
+            <img src={form.flyerDataUrl} alt="" />
+            <div className="idea-photo-preview-actions">
+              <button type="button" className="cover-chip" onClick={onOpenFlyer}>
                 Change
               </button>
               <button type="button" className="cover-chip" onClick={onClearFlyer}>
@@ -1688,263 +1648,222 @@ function IdeaForm({
             </div>
           </div>
         ) : (
-          <div className="cover-picker">
-            <span className="cover-picker-title">Add a cover image</span>
-            <span className="cover-picker-sub">Optional — your idea shows with a red edge if you skip</span>
-            <div className="cover-picker-buttons">
-              <button type="button" className="cover-btn" onClick={onShowCoverLib}>
-                <LibraryIcon />
-                Choose from our library
-              </button>
-              <button type="button" className="cover-btn" onClick={onOpenFlyer}>
-                <UploadIcon />
-                Upload your own
-              </button>
-            </div>
-          </div>
+          <button type="button" className="idea-photo-upload" onClick={onOpenFlyer}>
+            <ImagePlus size={15} strokeWidth={1.8} aria-hidden="true" />
+            <span>Add a photo</span>
+          </button>
         )}
 
-        <button
-          type="button"
-          className="idea-disclosure"
-          aria-expanded={detailsOpen}
-          onClick={() => setDetailsOpen((v) => !v)}
-        >
-          <span>Additional details — optional</span>
-          <span className={`idea-disclosure-chevron ${detailsOpen ? "is-open" : ""}`}>›</span>
-        </button>
-        {detailsOpen && (
-          <div className="idea-details" ref={detailsRef}>
-            <p className="form-eyebrow">When?</p>
-            <div className="seg-toggle idea-date-toggle" role="group" aria-label="When">
-              <button
-                type="button"
-                className={`seg-toggle-btn ${dateMode === "specific" ? "is-active" : ""}`}
-                onClick={() => selectDateMode("specific")}
-                aria-pressed={dateMode === "specific"}
-              >
-                A day
-              </button>
-              <button
-                type="button"
-                className={`seg-toggle-btn ${dateMode === "week" ? "is-active" : ""}`}
-                onClick={() => selectDateMode("week")}
-                aria-pressed={dateMode === "week"}
-              >
-                This week
-              </button>
-              <button
-                type="button"
-                className={`seg-toggle-btn ${dateMode === "anytime" ? "is-active" : ""}`}
-                onClick={() => selectDateMode("anytime")}
-                aria-pressed={dateMode === "anytime"}
-              >
-                Anytime
-              </button>
-            </div>
-            {dateMode === "specific" && (
-              <div className="idea-date-input-row">
-                <input
-                  type="date"
-                  className="luma-input idea-date-input"
-                  min={today()}
-                  value={form.date}
-                  aria-invalid={Boolean(dateError)}
-                  onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-                  onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
-                />
-                {dateError && <p className="luma-inline-error">{dateError}</p>}
-              </div>
-            )}
-
-            <p className="form-eyebrow">Where?</p>
-            <div className="luma-card">
-              <div className="location-row">
-                <div className="location-row-main">
-                  {!form.isFlexibleLocation ? (
-                    <PlacePicker
-                      value={form.locationName}
-                      address={form.locationAddress}
-                      placeholder="Search a spot, or leave it flexible"
-                      onChange={(name) =>
-                        setForm((f) => ({
-                          ...f,
-                          locationName: name,
-                          locationAddress: "",
-                          locationLat: undefined,
-                          locationLng: undefined,
-                          locationPlaceId: undefined,
-                        }))
-                      }
-                      onSelect={(p) =>
-                        setForm((f) => ({
-                          ...f,
-                          locationName: p.name,
-                          locationAddress: p.address,
-                          locationLat: p.lat,
-                          locationLng: p.lng,
-                          locationPlaceId: p.placeId,
-                          isFlexibleLocation: false,
-                        }))
-                      }
-                      onClear={() =>
-                        setForm((f) => ({
-                          ...f,
-                          locationName: "",
-                          locationAddress: "",
-                          locationLat: undefined,
-                          locationLng: undefined,
-                          locationPlaceId: undefined,
-                        }))
-                      }
-                      onFieldFocus={(el) => scrollFieldIntoView(el)}
-                    />
-                  ) : (
-                    <span className="luma-flex-text location-row-flex-text">Flexible location</span>
+        <div className={`idea-accordion ${detailsOpen ? "is-open" : ""}`}>
+          <button
+            type="button"
+            className="idea-accordion-trigger"
+            aria-expanded={detailsOpen}
+            onClick={() => setDetailsOpen((v) => !v)}
+          >
+            <span>
+              Additional Details <span className="idea-accordion-optional">(Optional)</span>
+            </span>
+            <ChevronDown
+              size={14}
+              strokeWidth={2}
+              className={`idea-accordion-chevron ${detailsOpen ? "is-open" : ""}`}
+              aria-hidden="true"
+            />
+          </button>
+          {detailsOpen && (
+            <div className="idea-accordion-panel" ref={detailsRef}>
+              <div className="idea-detail-row">
+                <span className="idea-detail-well" style={{ background: "#D8D0F0", color: "#7A5BA0" }} aria-hidden="true">
+                  <Calendar size={14} strokeWidth={1.8} />
+                </span>
+                <div className="idea-detail-body">
+                  <div className="seg-toggle idea-date-toggle" role="group" aria-label="When">
+                    <button
+                      type="button"
+                      className={`seg-toggle-btn ${dateMode === "specific" ? "is-active" : ""}`}
+                      onClick={() => selectDateMode("specific")}
+                      aria-pressed={dateMode === "specific"}
+                    >
+                      A day
+                    </button>
+                    <button
+                      type="button"
+                      className={`seg-toggle-btn ${dateMode === "week" ? "is-active" : ""}`}
+                      onClick={() => selectDateMode("week")}
+                      aria-pressed={dateMode === "week"}
+                    >
+                      This week
+                    </button>
+                    <button
+                      type="button"
+                      className={`seg-toggle-btn ${dateMode === "anytime" ? "is-active" : ""}`}
+                      onClick={() => selectDateMode("anytime")}
+                      aria-pressed={dateMode === "anytime"}
+                    >
+                      Anytime
+                    </button>
+                  </div>
+                  {dateMode === "specific" && (
+                    <div className="idea-date-input-row">
+                      <input
+                        type="date"
+                        className="luma-input idea-date-input"
+                        min={today()}
+                        value={form.date}
+                        aria-invalid={Boolean(dateError)}
+                        onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                        onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
+                      />
+                      {dateError && <p className="luma-inline-error">{dateError}</p>}
+                    </div>
                   )}
                 </div>
-                <FlexToggle
-                  active={form.isFlexibleLocation}
-                  onClick={() =>
-                    setForm((f) => {
-                      const next = !f.isFlexibleLocation;
-                      return next
-                        ? {
-                            ...f,
-                            isFlexibleLocation: true,
-                            locationName: "",
-                            locationAddress: "",
-                            locationLat: undefined,
-                            locationLng: undefined,
-                            locationPlaceId: undefined,
+              </div>
+
+              <div className="idea-detail-row">
+                <span className="idea-detail-well" style={{ background: "#C8DCF0", color: "#5B8FBF" }} aria-hidden="true">
+                  <MapPin size={14} strokeWidth={1.8} />
+                </span>
+                <div className="idea-detail-body">
+                  <div className="location-row">
+                    <div className="location-row-main">
+                      {!form.isFlexibleLocation ? (
+                        <PlacePicker
+                          value={form.locationName}
+                          address={form.locationAddress}
+                          placeholder="Neighbourhood, venue, or vibe"
+                          onChange={(name) =>
+                            setForm((f) => ({
+                              ...f,
+                              locationName: name,
+                              locationAddress: "",
+                              locationLat: undefined,
+                              locationLng: undefined,
+                              locationPlaceId: undefined,
+                            }))
                           }
-                        : { ...f, isFlexibleLocation: false };
-                    })
-                  }
-                  label="Flexible"
-                />
-              </div>
-            </div>
-
-            <p className="form-eyebrow idea-visibility-label">Who can see this?</p>
-            <div className="seg-toggle idea-visibility-toggle idea-visibility-toggle--three" role="group" aria-label="Visibility">
-              <button
-                type="button"
-                className={`seg-toggle-btn ${!postToCommunity && form.visibility === "everyone" ? "is-active" : ""}`}
-                onClick={() => {
-                  setPostToCommunity(false);
-                  onPickCommunity(null);
-                  setForm((f) => ({ ...f, visibility: "everyone" }));
-                }}
-                aria-pressed={!postToCommunity && form.visibility === "everyone"}
-              >
-                Everyone
-              </button>
-              <button
-                type="button"
-                className={`seg-toggle-btn ${!postToCommunity && form.visibility === "network" ? "is-active" : ""}`}
-                onClick={() => {
-                  setPostToCommunity(false);
-                  onPickCommunity(null);
-                  setForm((f) => ({ ...f, visibility: "network" }));
-                }}
-                aria-pressed={!postToCommunity && form.visibility === "network"}
-              >
-                Network
-              </button>
-              <button
-                type="button"
-                className={`seg-toggle-btn ${postToCommunity ? "is-active" : ""}`}
-                onClick={() => {
-                  setPostToCommunity(true);
-                  setForm((f) => ({ ...f, visibility: "everyone" }));
-                }}
-                aria-pressed={postToCommunity}
-              >
-                Communities
-              </button>
-            </div>
-            {postToCommunity && (
-              <div className="idea-community-pick">
-                {myCommunities === null && (
-                  <p className="form-help">Loading your communities…</p>
-                )}
-                {myCommunities !== null && myCommunities.length === 0 && (
-                  <p className="form-help">
-                    You&apos;re not in a community yet.{" "}
-                    <Link to="/communities" className="btn-link">Explore communities →</Link>
-                  </p>
-                )}
-                {myCommunities !== null && myCommunities.length > 0 && (
-                  <div className="idea-community-list" role="listbox" aria-label="Pick a community">
-                    {myCommunities.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        role="option"
-                        aria-selected={pickedCommunityId === c.id}
-                        className={`idea-community-option ${pickedCommunityId === c.id ? "is-active" : ""}`}
-                        onClick={() => onPickCommunity(c.id)}
-                      >
-                        {c.name}
-                      </button>
-                    ))}
+                          onSelect={(p) =>
+                            setForm((f) => ({
+                              ...f,
+                              locationName: p.name,
+                              locationAddress: p.address,
+                              locationLat: p.lat,
+                              locationLng: p.lng,
+                              locationPlaceId: p.placeId,
+                              isFlexibleLocation: false,
+                            }))
+                          }
+                          onClear={() =>
+                            setForm((f) => ({
+                              ...f,
+                              locationName: "",
+                              locationAddress: "",
+                              locationLat: undefined,
+                              locationLng: undefined,
+                              locationPlaceId: undefined,
+                            }))
+                          }
+                          onFieldFocus={(el) => scrollFieldIntoView(el)}
+                        />
+                      ) : (
+                        <span className="luma-flex-text location-row-flex-text">Flexible location</span>
+                      )}
+                    </div>
+                    <FlexToggle
+                      active={form.isFlexibleLocation}
+                      onClick={() =>
+                        setForm((f) => {
+                          const next = !f.isFlexibleLocation;
+                          return next
+                            ? {
+                                ...f,
+                                isFlexibleLocation: true,
+                                locationName: "",
+                                locationAddress: "",
+                                locationLat: undefined,
+                                locationLng: undefined,
+                                locationPlaceId: undefined,
+                              }
+                            : { ...f, isFlexibleLocation: false };
+                        })
+                      }
+                      label="Flexible"
+                    />
                   </div>
-                )}
-                {pickedCommunityId && (
-                  <div className="seg-toggle idea-community-vis" role="group" aria-label="Community visibility">
+                </div>
+              </div>
+
+              <div className="idea-detail-row">
+                <span className="idea-detail-well" style={{ background: "#C8DDC8", color: "#3A6A3A" }} aria-hidden="true">
+                  <Globe size={14} strokeWidth={1.8} />
+                </span>
+                <div className="idea-detail-body">
+                  <div className="vis-pill-toggle" role="group" aria-label="Who can see this">
                     <button
                       type="button"
-                      className={`seg-toggle-btn ${communityVisibility === "public" ? "is-active" : ""}`}
-                      onClick={() => onCommunityVisibilityChange("public")}
-                      aria-pressed={communityVisibility === "public"}
+                      className={`vis-pill ${form.visibility === "everyone" ? "is-active" : ""}`}
+                      onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
+                      aria-pressed={form.visibility === "everyone"}
                     >
-                      Public
+                      <Globe size={12} strokeWidth={1.8} aria-hidden="true" />
+                      Everyone
                     </button>
                     <button
                       type="button"
-                      className={`seg-toggle-btn ${communityVisibility === "community_only" ? "is-active" : ""}`}
-                      onClick={() => onCommunityVisibilityChange("community_only")}
-                      aria-pressed={communityVisibility === "community_only"}
+                      className={`vis-pill ${form.visibility === "network" ? "is-active" : ""}`}
+                      onClick={() => setForm((f) => ({ ...f, visibility: "network" }))}
+                      aria-pressed={form.visibility === "network"}
                     >
-                      Community only
+                      <Users size={12} strokeWidth={1.8} aria-hidden="true" />
+                      Your network
                     </button>
                   </div>
-                )}
+                </div>
               </div>
-            )}
 
-            <label className="form-question">Add more detail</label>
-            <textarea
-              className="idea-detail-input"
-              placeholder="Any more color? Who it's for, timing, what to bring…"
-              value={form.description}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
-              rows={3}
-            />
+              <div className="idea-detail-row idea-detail-row--top">
+                <span className="idea-detail-well" style={{ background: "#F5E4C8", color: "#B8864A" }} aria-hidden="true">
+                  <Pin size={14} strokeWidth={1.8} />
+                </span>
+                <div className="idea-detail-body">
+                  <textarea
+                    className="idea-detail-input"
+                    placeholder="Anything else worth knowing?"
+                    value={form.description}
+                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                    onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
+                    rows={3}
+                  />
+                </div>
+              </div>
 
-            <label className="form-question" style={{ marginTop: 14 }}>
-              Category <span className="form-question-optional">— optional</span>
-            </label>
-            <div className="vibe-grid">
-              {VIBE_OPTIONS.map((opt) => {
-                const selected = form.vibes.includes(opt.id);
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    className={`vibe-tile ${selected ? "is-selected" : ""}`}
-                    onClick={() => toggleVibe(opt.id)}
-                    aria-pressed={selected}
-                  >
-                    <span className="vibe-tile-label">{opt.label}</span>
-                  </button>
-                );
-              })}
+              <div className="idea-detail-row idea-detail-row--tags">
+                <span className="idea-detail-well" style={{ background: "#F0D8D8", color: "#A05B5B" }} aria-hidden="true">
+                  <Tag size={14} strokeWidth={1.8} />
+                </span>
+                <div className="idea-detail-body">
+                  <div className="idea-interest-grid" role="group" aria-label="Interest tags">
+                    {ALL_INTERESTS.map((tag) => {
+                      const selected = form.vibes.includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          className={`idea-interest-pill ${selected ? "is-selected" : ""}`}
+                          onClick={() => toggleVibe(tag)}
+                          aria-pressed={selected}
+                        >
+                          {INTEREST_LABELS[tag]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {error && (
           <div className="form-error-banner">
@@ -1955,7 +1874,11 @@ function IdeaForm({
           </div>
         )}
 
-        <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
+        <button
+          type="submit"
+          className={`btn btn-primary btn-block idea-primary-cta ${detailsOpen ? "idea-primary-cta--spaced" : ""}`}
+          disabled={submitting}
+        >
           {submitting ? "Posting…" : "Put it out there"}
         </button>
       </form>

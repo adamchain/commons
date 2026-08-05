@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
+import { ScreenTitle } from "../components/ui";
 import { getPublicWebOrigin } from "../lib/platform";
 import type { InviteCodeDTO } from "../types/shared";
 
@@ -55,15 +57,17 @@ export function InvitePage() {
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">
       <header className="app-header app-header--minimal">
         <Link to={`/profile/${user?.id ?? ""}`} className="detail-back">
-          ← Profile
+          <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" /> Profile
         </Link>
       </header>
-      <h1 className="brand" style={{ marginBottom: 6 }}>
-        Invite your friends
-      </h1>
-      <p className="brand-tagline" style={{ marginBottom: 20, textTransform: "none", letterSpacing: 0 }}>
-        You’ve got <strong>{remaining}</strong> code{remaining === 1 ? "" : "s"} left. Each one gets one person in.
-      </p>
+      <ScreenTitle
+        title="Invite your friends"
+        subtitle={
+          <>
+            You&apos;ve got <strong>{remaining}</strong> code{remaining === 1 ? "" : "s"} left. Each one gets one person in.
+          </>
+        }
+      />
 
       {codes === null && <p className="form-help">Loading…</p>}
       {codes !== null && (

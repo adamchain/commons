@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { LegalContent } from "../components/LegalContent";
+import { ScreenTitle } from "../components/ui";
 import { LEGAL_DOCS } from "../content/legal";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -46,12 +48,10 @@ export function SettingsPage() {
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">
       <header className="app-header app-header--minimal">
         <Link to={`/profile/${user.id}`} className="detail-back">
-          ← Profile
+          <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" /> Profile
         </Link>
       </header>
-      <h1 className="brand" style={{ marginBottom: 8 }}>
-        Settings
-      </h1>
+      <ScreenTitle title="Settings" />
 
       <SettingsGroup label="Account">
         <SettingsRow

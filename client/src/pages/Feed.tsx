@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Coffee, MessageCircle, SlidersHorizontal } from "lucide-react";
 import { api } from "../api/http";
 import { FilterSheet } from "../components/FilterSheet";
 import { InviteSheet } from "../components/InviteSheet";
@@ -410,7 +411,7 @@ export function FeedPage() {
         {!forumSuggestionDismissed && suggestedForumTag && (
           <div className="feed-forum-suggestion" role="status">
             <span className="feed-forum-suggestion-glyph" aria-hidden="true">
-              <MessageCircleIcon />
+              <MessageCircle size={18} strokeWidth={1.6} />
             </span>
             <Link
               to={`/forums/${suggestedForumTag}`}
@@ -458,7 +459,7 @@ export function FeedPage() {
             onClick={() => setFilterOpen(true)}
             aria-label="Filter plans"
           >
-            <FilterIcon />
+            <SlidersHorizontal size={12} strokeWidth={1.8} />
             Filters
             {activeFilterCount > 0 && <span className="page-filter-count">{activeFilterCount}</span>}
           </button>
@@ -577,7 +578,7 @@ function FeedEmptyState({
   return (
     <div className="feed-empty" role="status">
       <div className="feed-empty-glyph" aria-hidden="true">
-        ☕
+        <Coffee size={26} strokeWidth={1.6} color="var(--muted)" />
       </div>
       <h2 className="feed-empty-headline">{headline}</h2>
       <p className="feed-empty-body">{body}</p>
@@ -598,24 +599,6 @@ function FeedEmptyState({
         )}
       </div>
     </div>
-  );
-}
-
-function MessageCircleIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
-    </svg>
-  );
-}
-
-function FilterIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 6h18" />
-      <path d="M6 12h12" />
-      <path d="M10 18h4" />
-    </svg>
   );
 }
 

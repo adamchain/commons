@@ -1,17 +1,30 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { BarChart2, MessageCircle } from "lucide-react";
 import { api } from "../api/http";
+import { EmptyCard, ScreenTitle } from "../components/ui";
 import { formatRelative, sentenceCaseTitle } from "../lib/format";
-import type { ConversationSummaryDTO, ForumSummaryDTO } from "../types/shared";
+import { interestVisual } from "../lib/interestIcons";
+import type { ConversationSummaryDTO, ForumSummaryDTO, InterestTag } from "../types/shared";
 
 function previewLooksLikePoll(text: string | null | undefined): boolean {
   if (!text) return false;
-  return /📊|poll|voted/i.test(text);
+  return /poll|voted/i.test(text);
 }
 
 function cleanPreview(text: string | null | undefined): string {
   if (!text) return "No messages yet";
   return text.replace(/📊\s*/g, "").trim() || "No messages yet";
+}
+
+function chatVisual(c: ConversationSummaryDTO) {
+  const explicit = (c as { interestTag?: InterestTag }).interestTag;
+  if (explicit) return interestVisual(explicit);
+  const title = c.planTitle?.toLowerCase() ?? "";
+  if (title.includes("yoga")) return interestVisual("wellness");
+  if (title.includes("run")) return interestVisual("workouts");
+  if (title.includes("coffee") || title.includes("core")) return interestVisual("coffee");
+  return interestVisual(null);
 }
 
 export function MessagesPage() {
@@ -59,7 +72,7 @@ export function MessagesPage() {
 
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar app-shell--messages-lock">
-      <h1 className="messages-page-title">Messages</h1>
+      <ScreenTitle title="Messages" />
 
       <div className="messages-tabs" role="tablist">
         <button
@@ -84,57 +97,74 @@ export function MessagesPage() {
 
       {tab === "interests" ? (
         <>
-        <p className="messages-tab-sub">Citywide conversations by interest — no commitment, just talk.</p>
-        {!forumsReady ? (
-          <div className="feed-skeleton" aria-hidden="true">
-            <div className="feed-skeleton-card" />
-            <div className="feed-skeleton-card" />
-          </div>
-        ) : forums.length === 0 ? (
-          <div className="empty-state" style={{ marginTop: 24 }}>
-            <p style={{ margin: 0 }}>
-              Join an interest to unlock its citywide forum — Coffee, Workouts, and more.
-            </p>
-            <Link to="/settings/interests" className="btn-link" style={{ marginTop: 12, display: "inline-block", color: "var(--accent)" }}>
-              Join more interests →
-            </Link>
-          </div>
-        ) : (
-          <div className="messages-card">
-            <div className="messages-list">
-              {forums.map((f) => (
-                <Link
-                  key={f.interestTag}
-                  to={`/forums/${f.interestTag}`}
-                  state={{ from: "messages" }}
-                  className="messages-row"
-                >
-                  <span className="messages-row-emoji" aria-hidden="true">
-                    {f.emoji}
-                  </span>
-                  <div className="messages-row-body">
-                    <div className="messages-row-top">
-                      <span className="messages-row-title">{f.label}</span>
-                      {f.latestPost && (
-                        <span className="messages-row-time">{formatRelative(f.latestPost.createdAt)}</span>
-                      )}
-                    </div>
-                    <div className="messages-row-preview">
-                      <span>
-                        {f.latestPost
-                          ? `${f.latestPost.authorName}: ${f.latestPost.preview}`
-                          : "No posts yet — be the first"}
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
+          <p className="messages-tab-sub">
+            Citywide conversations by interest — no commitment, just talk.
+          </p>
+          {!forumsReady ? (
+            <div className="feed-skeleton" aria-hidden="true">
+              <div className="feed-skeleton-card" />
+              <div className="feed-skeleton-card" />
             </div>
-            <Link to="/settings/interests" className="forum-join-more">
-              Join more interests →
-            </Link>
-          </div>
-        )}
+          ) : forums.length === 0 ? (
+            <EmptyCard
+              icon={<MessageCircle size={22} strokeWidth={1.6} color="var(--muted)" />}
+              title="No interest forums yet."
+              body="Join an interest to unlock its citywide forum — Coffee, Workouts, and more."
+              cta={{ to: "/settings/interests", label: "Join more interests →" }}
+            />
+          ) : (
+            <div className="messages-card">
+              <div className="messages-list">
+                {forums.map((f) => {
+                  const { Icon, iconColor, tint } = interestVisual(f.interestTag);
+                  return (
+                    <Link
+                      key={f.interestTag}
+                      to={`/forums/${f.interestTag}`}
+                      state={{ from: "messages" }}
+                      className="messages-row"
+                    >
+                      <span
+                        className="messages-row-icon"
+                        style={{ background: tint, color: iconColor }}
+                        aria-hidden="true"
+                      >
+                        <Icon size={18} strokeWidth={1.8} />
+                      </span>
+                      <div className="messages-row-body">
+                        <div className="messages-row-top">
+                          <span className="messages-row-title">{f.label}</span>
+                          {f.hasUnread && (
+                            <span className="messages-row-unread-dot" aria-label="Unread" />
+                          )}
+                          {f.latestPost && (
+                            <span className="messages-row-time">
+                              {formatRelative(f.latestPost.createdAt)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="messages-row-preview">
+                          {f.latestPost ? (
+                            <span>
+                              <span className="messages-row-author">{f.latestPost.authorName}</span>
+                              {`: ${f.latestPost.preview}`}
+                            </span>
+                          ) : (
+                            <span className="messages-row-preview--empty">
+                              No posts yet — be the first
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+              <Link to="/settings/interests" className="forum-join-more">
+                Join more interests →
+              </Link>
+            </div>
+          )}
         </>
       ) : !ready ? (
         <div className="feed-skeleton" aria-hidden="true">
@@ -142,87 +172,95 @@ export function MessagesPage() {
           <div className="feed-skeleton-card" />
         </div>
       ) : items.length === 0 ? (
-        <div className="empty-state">
-          <p style={{ margin: 0 }}>No chats yet — join a plan and its group chat shows up here.</p>
-          <Link to="/" className="btn-primary" style={{ marginTop: 14, display: "inline-block" }}>
-            Find plans
+        <div className="ref-empty-card" role="status" style={{ marginTop: 24 }}>
+          <div className="ref-empty-glyph" style={{ background: "rgba(237,229,216,0.8)" }} aria-hidden="true">
+            <MessageCircle size={22} strokeWidth={1.6} color="var(--muted)" />
+          </div>
+          <h2 className="ref-empty-title">Nothing in your inbox yet.</h2>
+          <p className="ref-empty-body">Join a plan and its group chat shows up here.</p>
+          <Link to="/" className="ref-empty-cta">
+            See what&apos;s happening
           </Link>
         </div>
       ) : (
-        <div className="messages-card">
-          <div className="messages-list">
-            {items.map((c) => {
-              const preview = cleanPreview(c.lastMessagePreview);
-              const isPoll = previewLooksLikePoll(c.lastMessagePreview);
-              const todayIso = new Date().toISOString().slice(0, 10);
-              const isPastPlan = !c.communityId && c.planDate < todayIso;
-              // Past plan chats + any community thread with a real conversation id.
-              const canDismiss = Boolean(c.conversationId) && (isPastPlan || Boolean(c.communityId));
-              const title = c.communityName ?? sentenceCaseTitle(c.planTitle);
-              const rowInner = (
-                <>
-                  <span className="messages-row-emoji" aria-hidden="true">
-                    {c.hostEmoji || "💬"}
-                  </span>
-                  <div className="messages-row-body">
-                    <div className="messages-row-top">
-                      <span className="messages-row-title">{title}</span>
-                      {c.lastMessageAt && (
-                        <span className="messages-row-time">{formatRelative(c.lastMessageAt)}</span>
-                      )}
-                    </div>
-                    <div className="messages-row-preview">
-                      {isPoll && <PollPreviewIcon />}
-                      <span>{preview}</span>
-                    </div>
-                    <div className="messages-row-meta">
-                      {c.lastMessageAt ? "Started" : "Not started yet"} · {c.participantCount}{" "}
-                      {c.participantCount === 1 ? "person" : "people"}
-                    </div>
-                  </div>
-                  {c.unreadCount > 0 && (
-                    <span className="messages-row-unread" aria-label={`${c.unreadCount} unread`}>
-                      {c.unreadCount > 9 ? "9+" : c.unreadCount}
-                    </span>
-                  )}
-                </>
-              );
-              return (
-                <div key={c.communityId ? `comm-${c.communityId}` : c.planId} className="messages-row-wrap">
-                  <Link
-                    to={c.communityId ? `/communities/${c.communityId}/chat` : `/plans/${c.planId}/chat`}
-                    state={{ from: "messages" }}
-                    className="messages-row"
-                  >
-                    {rowInner}
-                  </Link>
-                  {canDismiss && (
-                    <button
-                      type="button"
-                      className="messages-row-dismiss"
-                        aria-label="Leave chat"
-                      onClick={() => void dismissPastChat(c.conversationId!)}
+        <>
+          <p className="messages-tab-sub">Group chats for plans you&apos;re in.</p>
+          <div className="messages-card">
+            <div className="messages-list">
+              {items.map((c) => {
+                const preview = cleanPreview(c.lastMessagePreview);
+                const isPoll = previewLooksLikePoll(c.lastMessagePreview);
+                const todayIso = new Date().toISOString().slice(0, 10);
+                const isPastPlan = !c.communityId && c.planDate < todayIso;
+                const canDismiss =
+                  Boolean(c.conversationId) && (isPastPlan || Boolean(c.communityId));
+                const title = c.communityName ?? sentenceCaseTitle(c.planTitle);
+                const { Icon, iconColor, tint } = chatVisual(c);
+                const rowInner = (
+                  <>
+                    <span
+                      className="messages-row-icon"
+                      style={{ background: tint, color: iconColor }}
+                      aria-hidden="true"
                     >
-                      ×
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+                      <Icon size={18} strokeWidth={1.8} />
+                    </span>
+                    <div className="messages-row-body">
+                      <div className="messages-row-top">
+                        <span className="messages-row-title">{title}</span>
+                        {c.lastMessageAt && (
+                          <span className="messages-row-time">{formatRelative(c.lastMessageAt)}</span>
+                        )}
+                      </div>
+                      <div className="messages-row-preview">
+                        {isPoll && <BarChart2 size={14} strokeWidth={1.8} />}
+                        <span>{preview}</span>
+                      </div>
+                      <div className="messages-row-meta">
+                        {c.lastMessageAt ? "Started" : "Not started yet"} · {c.participantCount}{" "}
+                        {c.participantCount === 1 ? "person" : "people"}
+                      </div>
+                    </div>
+                    {c.unreadCount > 0 && (
+                      <span className="messages-row-unread" aria-label={`${c.unreadCount} unread`}>
+                        {c.unreadCount > 9 ? "9+" : c.unreadCount}
+                      </span>
+                    )}
+                  </>
+                );
+                return (
+                  <div
+                    key={c.communityId ? `comm-${c.communityId}` : c.planId}
+                    className="messages-row-wrap"
+                  >
+                    <Link
+                      to={
+                        c.communityId
+                          ? `/communities/${c.communityId}/chat`
+                          : `/plans/${c.planId}/chat`
+                      }
+                      state={{ from: "messages" }}
+                      className="messages-row"
+                    >
+                      {rowInner}
+                    </Link>
+                    {canDismiss && (
+                      <button
+                        type="button"
+                        className="messages-row-dismiss"
+                        aria-label="Leave chat"
+                        onClick={() => void dismissPastChat(c.conversationId!)}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        </>
       )}
     </main>
-  );
-}
-
-function PollPreviewIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 3v18h18" />
-      <path d="M7 14v4" />
-      <path d="M12 9v9" />
-      <path d="M17 5v13" />
-    </svg>
   );
 }

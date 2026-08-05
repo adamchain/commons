@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
+import { interestVisual } from "../lib/interestIcons";
 import {
   FORUM_INTERESTS,
-  INTEREST_EMOJI,
   INTEREST_LABELS,
   type ForumSummaryDTO,
   type InterestTag,
@@ -67,12 +69,14 @@ export function SettingsForumsPage() {
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">
       <header className="app-header app-header--minimal">
-        <Link to="/settings" className="detail-back">← Settings</Link>
+        <Link to="/settings" className="detail-back">
+          <ArrowLeft size={14} strokeWidth={2} aria-hidden="true" /> Settings
+        </Link>
       </header>
-      <h1 className="brand" style={{ marginBottom: 8 }}>Forums</h1>
-      <p className="brand-tagline" style={{ marginBottom: 24 }}>
-        Citywide conversations by interest — join or leave anytime.
-      </p>
+      <ScreenTitle
+        title="Forums"
+        subtitle="Citywide conversations by interest — join or leave anytime."
+      />
 
       {!ready ? (
         <div className="feed-skeleton" aria-hidden="true">
@@ -81,23 +85,36 @@ export function SettingsForumsPage() {
       ) : forums.length === 0 ? (
         <p className="form-help">You haven&apos;t joined any forums yet. Pick one below.</p>
       ) : (
-        <div className="settings-card" style={{ marginBottom: 20 }}>
-          {forums.map((f) => (
-            <div key={f.interestTag} className="settings-forum-row">
-              <Link to={`/forums/${f.interestTag}`} state={{ from: "settings-forums" }} className="settings-forum-link">
-                <span className="messages-row-emoji" aria-hidden="true">{f.emoji}</span>
-                <span className="settings-forum-label">{f.label}</span>
-              </Link>
-              <button
-                type="button"
-                className="forum-leave-btn"
-                disabled={busyTag === f.interestTag}
-                onClick={() => void leave(f.interestTag)}
-              >
-                {busyTag === f.interestTag ? "Leaving…" : "Leave"}
-              </button>
-            </div>
-          ))}
+        <div className="settings-card settings-forums-card" style={{ marginBottom: 20 }}>
+          {forums.map((f) => {
+            const { Icon, iconColor, tint } = interestVisual(f.interestTag);
+            return (
+              <div key={f.interestTag} className="settings-forum-row">
+                <Link
+                  to={`/forums/${f.interestTag}`}
+                  state={{ from: "settings-forums" }}
+                  className="settings-forum-link"
+                >
+                  <span
+                    className="settings-forum-icon"
+                    style={{ background: tint, color: iconColor }}
+                    aria-hidden="true"
+                  >
+                    <Icon size={18} strokeWidth={1.8} />
+                  </span>
+                  <span className="settings-forum-label">{f.label}</span>
+                </Link>
+                <button
+                  type="button"
+                  className="forum-leave-btn"
+                  disabled={busyTag === f.interestTag}
+                  onClick={() => void leave(f.interestTag)}
+                >
+                  {busyTag === f.interestTag ? "Leaving…" : "Leave"}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -105,17 +122,27 @@ export function SettingsForumsPage() {
         <>
           <p className="form-eyebrow">Join more forums</p>
           <div className="settings-interests-grid">
-            {available.map((t) => (
-              <button
-                key={t}
-                type="button"
-                className="settings-interest-pill"
-                disabled={busyTag === t}
-                onClick={() => void join(t)}
-              >
-                {INTEREST_EMOJI[t]} {INTEREST_LABELS[t]}
-              </button>
-            ))}
+            {available.map((t) => {
+              const { Icon, iconColor, tint } = interestVisual(t);
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  className="settings-interest-pill settings-forum-join-pill"
+                  disabled={busyTag === t}
+                  onClick={() => void join(t)}
+                >
+                  <span
+                    className="settings-forum-icon settings-forum-icon--sm"
+                    style={{ background: tint, color: iconColor }}
+                    aria-hidden="true"
+                  >
+                    <Icon size={14} strokeWidth={1.8} />
+                  </span>
+                  {INTEREST_LABELS[t]}
+                </button>
+              );
+            })}
           </div>
         </>
       )}

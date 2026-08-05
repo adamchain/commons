@@ -1,5 +1,29 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import {
+  AlarmClock,
+  Bell,
+  Calendar,
+  CheckCircle2,
+  Handshake,
+  Lightbulb,
+  Mail,
+  MessageCircle,
+  Newspaper,
+  PartyPopper,
+  RefreshCw,
+  Search,
+  Trash2,
+  Unlock,
+  UserPlus,
+  UserRound,
+  Users,
+  AlertTriangle,
+  Frown,
+  Pin,
+  Hand,
+  Clock,
+} from "lucide-react";
 import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { useAuth } from "../context/AuthContext";
@@ -61,11 +85,9 @@ export function NotificationsPage() {
   if (items === null) return <LoadingScreen tagline="Catching up" />;
 
   return (
-    <main className="app-shell app-shell--mid app-shell--with-nav app-shell--with-topbar">
+    <main className="app-shell app-shell--mid app-shell--with-nav app-shell--with-topbar notif-page">
       <div className="notif-header">
-        <h1 className="brand" style={{ margin: 0 }}>
-          Notifications
-        </h1>
+        <h1 className="notif-title">Notifications</h1>
         <button
           type="button"
           className="notif-close"
@@ -95,17 +117,19 @@ export function NotificationsPage() {
               className="notif-toolbar-link notif-toolbar-link--accent"
               onClick={clearAll}
             >
-              <span aria-hidden="true">🗑</span> Clear all
+              <Trash2 size={13} strokeWidth={1.8} aria-hidden="true" /> Clear all
             </button>
           </div>
         </div>
       )}
 
       {sorted.length === 0 ? (
-        <div className="feed-empty" role="status">
-          <div className="feed-empty-glyph" aria-hidden="true">🔔</div>
-          <h2 className="feed-empty-headline">{hasPlans ? "All quiet." : "Nothing yet."}</h2>
-          <p className="feed-empty-body">
+        <div className="notif-empty" role="status">
+          <div className="notif-empty-glyph" aria-hidden="true">
+            <Bell size={28} strokeWidth={1.5} color="#6B5AA0" />
+          </div>
+          <h2 className="notif-empty-title">{hasPlans ? "All quiet." : "Nothing yet."}</h2>
+          <p className="notif-empty-body">
             {hasPlans
               ? "We'll ping you when someone joins or a plan updates."
               : "Join a plan and this is where you'll hear about it."}
@@ -180,50 +204,51 @@ function hrefFor(n: NotificationDTO): string | null {
   return null;
 }
 
-function iconFor(kind: NotificationKind): string {
+function iconFor(kind: NotificationKind): ReactNode {
+  const props = { size: 16 as const, strokeWidth: 1.6 as const, color: "var(--muted)" };
   switch (kind) {
     case "someoneJoinedYourPlan":
-      return "👤";
+      return <UserRound {...props} />;
     case "planTomorrow":
     case "planDayOf":
-      return "📅";
+      return <Calendar {...props} />;
     case "planInTwoHours":
-      return "⏰";
+      return <AlarmClock {...props} />;
     case "interestedNudge":
-      return "💭";
+      return <Lightbulb {...props} />;
     case "didThisHappen":
-      return "✅";
+      return <CheckCircle2 {...props} />;
     case "planSpotReopen":
-      return "🔓";
+      return <Unlock {...props} />;
     case "newGroupChatMessage":
-      return "💬";
+      return <MessageCircle {...props} />;
     case "postPlanNetworkNudge":
-      return "🤝";
+      return <Handshake {...props} />;
     case "planCancellation":
-      return "⚠️";
+      return <AlertTriangle {...props} />;
     case "weeklyFridayDigest":
-      return "📰";
+      return <Newspaper {...props} />;
     case "lookingForRecovery":
-      return "🔍";
+      return <Search {...props} />;
     case "planTimeProposed":
-      return "🕰️";
+      return <Clock {...props} />;
     case "planTimeChanged":
-      return "🔄";
+      return <RefreshCw {...props} />;
     case "planInvite":
-      return "✉️";
+      return <Mail {...props} />;
     case "networkRequest":
-      return "🫱";
+      return <Hand {...props} />;
     case "networkAccepted":
-      return "🤝";
+      return <Handshake {...props} />;
     case "communityJoinRequest":
-      return "🙋";
+      return <UserPlus {...props} />;
     case "communityRequestApproved":
-      return "🎉";
+      return <PartyPopper {...props} />;
     case "communityRequestDeclined":
-      return "🙁";
+      return <Frown {...props} />;
     case "communityPlanPosted":
-      return "📌";
+      return <Pin {...props} />;
     case "welcome":
-      return "👋";
+      return <Users {...props} />;
   }
 }

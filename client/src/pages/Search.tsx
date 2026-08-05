@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { PlanCard } from "../components/PlanCard";
+import { Label, ScreenTitle } from "../components/ui";
 import type { PersonSearchResultDTO, SearchResultsDTO } from "../types/shared";
 
 const DEBOUNCE_MS = 300;
@@ -58,10 +60,11 @@ export function SearchPage() {
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">
       <header className="app-header app-header--minimal">
-        <Link to="/explore" className="detail-back">← Explore</Link>
+        <Link to="/explore" className="detail-back">
+          <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" /> Explore
+        </Link>
       </header>
-      <h1 className="brand" style={{ marginBottom: 4 }}>Search</h1>
-      <p className="brand-tagline" style={{ marginBottom: 16 }}>Find plans and people on COMMONS</p>
+      <ScreenTitle title="Search" subtitle="Find plans and people on COMMONS" />
 
       <div className="network-search-wrap">
         <SearchIcon />
@@ -86,7 +89,7 @@ export function SearchPage() {
 
       {results && results.people.length > 0 && (
         <section className="profile-block" style={{ marginTop: hasQuery ? 4 : 0 }}>
-          <h3 className="profile-section-label">People</h3>
+          <Label>People</Label>
           <div className="search-people-list">
             {results.people.map((p) => (
               <PersonRow key={p.user.id} result={p} />
@@ -97,7 +100,7 @@ export function SearchPage() {
 
       {results && results.plans.length > 0 && (
         <section className="profile-block">
-          <h3 className="profile-section-label">Plans</h3>
+          <Label>Plans</Label>
           <div className="plan-grid">
             {results.plans.map((plan) => (
               <PlanCard key={plan.id} plan={plan} onPlanRefresh={reloadResults} />

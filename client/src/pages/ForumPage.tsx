@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Heart, MessageCircle } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
 import { formatRelative } from "../lib/format";
+import { interestVisual } from "../lib/interestIcons";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import type { ForumPostDTO, ForumSort, InterestTag } from "../types/shared";
 
@@ -108,6 +110,7 @@ export function ForumPage() {
     setPlanModalOpen(false);
     navigate("/plans/new", { state: { fromForumTag: tag } });
   };
+
   if (!ready && !data) {
     return (
       <main className="app-shell app-shell--mid app-shell--with-nav app-shell--with-topbar">
@@ -132,15 +135,20 @@ export function ForumPage() {
     );
   }
 
+  const { Icon, iconColor, tint } = interestVisual(data.interestTag ?? tag);
+
   return (
     <main className="app-shell app-shell--mid app-shell--with-nav app-shell--with-topbar forum-page">
-      <header className="app-header create-header">
-        <Link to={backHref} className="detail-back">
-          ← {backLabel}
+      <header className="forum-header">
+        <Link to={backHref} className="forum-header-back" aria-label={`Back to ${backLabel}`}>
+          <ArrowLeft size={18} strokeWidth={1.8} />
         </Link>
-        <span className="create-header-title">
-          {data.emoji} {data.label}
+        <span className="forum-header-icon" style={{ background: tint, color: iconColor }} aria-hidden="true">
+          <Icon size={18} strokeWidth={1.8} />
         </span>
+        <div className="forum-header-text">
+          <span className="forum-header-title">{data.label}</span>
+        </div>
         <button type="button" className="forum-leave-btn" onClick={() => void leaveForum()} disabled={leaving}>
           {leaving ? "Leaving…" : "Leave"}
         </button>
@@ -292,38 +300,14 @@ function ForumPostCard({
           onClick={onLike}
           aria-pressed={post.likedByMe}
         >
-          <HeartIcon filled={post.likedByMe} /> {post.likeCount}
+          <Heart size={16} strokeWidth={1.8} fill={post.likedByMe ? "currentColor" : "none"} />{" "}
+          {post.likeCount}
         </button>
         <Link to={`/forums/${tag}/posts/${post.id}`} className="forum-reply-link">
-          <ReplyIcon /> {post.replyCount} {post.replyCount === 1 ? "reply" : "replies"}
+          <MessageCircle size={16} strokeWidth={1.8} /> {post.replyCount}{" "}
+          {post.replyCount === 1 ? "reply" : "replies"}
         </Link>
       </div>
     </article>
-  );
-}
-
-function HeartIcon({ filled }: { filled: boolean }) {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill={filled ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />
-    </svg>
-  );
-}
-
-function ReplyIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-    </svg>
   );
 }

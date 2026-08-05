@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { Bell, User } from "lucide-react";
 import wordmark from "../assets/wordmark.png";
-import { Avatar } from "./Avatar";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
 import type { NotificationDTO } from "../types/shared";
 
 /**
- * Global top bar — COMMONS wordmark on the left, a notifications bell (with an
- * unread dot) and the user's avatar on the right. Hidden on full-screen flows.
+ * AppHeader — wordmark left, Bell + User right.
+ * Padding 16h / 14 top / 10 bottom; icons 18px stroke 1.6 muted; gap 14px.
+ * Hairline rule below (margin 0 20px).
  */
 export function TopBar() {
   const { pathname } = useLocation();
@@ -22,12 +23,11 @@ export function TopBar() {
     pathname.startsWith("/login") ||
     pathname.startsWith("/admin") ||
     pathname === "/plans/new" ||
+    pathname === "/explore" ||
     pathname.startsWith("/notifications") ||
     /^\/plans\/[^/]+(\/chat)?$/.test(pathname) ||
     /^\/communities\/[^/]+\/chat$/.test(pathname);
 
-  // Keep the bell's unread dot fresh — same lightweight visibility-aware poll
-  // the bottom nav uses for the Messages badge.
   useEffect(() => {
     if (!user || hide) {
       setHasUnread(false);
@@ -80,46 +80,14 @@ export function TopBar() {
           className="top-bar-icon-btn"
           aria-label={hasUnread ? "Notifications, unread" : "Notifications"}
         >
-          <BellIcon />
+          <Bell size={18} strokeWidth={1.6} />
           {hasUnread && <span className="top-bar-bell-dot" aria-hidden="true" />}
         </Link>
-        <Link
-          to={profileTo}
-          className="top-bar-icon-btn top-bar-icon-btn--avatar"
-          aria-label="Your profile"
-        >
-          {user ? (
-            <Avatar
-              seed={user.avatarSeed}
-              style={user.avatarStyle}
-              photoDataUrl={user.avatarPhotoDataUrl}
-              params={user.avatarParams}
-              name={user.firstName || undefined}
-              size="sm"
-            />
-          ) : (
-            <UserIcon />
-          )}
+        <Link to={profileTo} className="top-bar-icon-btn" aria-label="Your profile">
+          <User size={18} strokeWidth={1.6} />
         </Link>
       </div>
+      <div className="top-bar-rule" aria-hidden="true" />
     </header>
-  );
-}
-
-function BellIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-    </svg>
-  );
-}
-
-function UserIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21v-1a7 7 0 0 1 14 0v1" />
-    </svg>
   );
 }

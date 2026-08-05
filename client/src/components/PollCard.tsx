@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { BarChart2, Check, ChevronDown } from "lucide-react";
 import { Avatar } from "./Avatar";
 import type { PollDTO, PublicUser } from "../types/shared";
 
@@ -52,6 +53,11 @@ export function PollCard({
   const revealed = poll.myVote !== null || poll.closed;
   const total = poll.totalVotes;
 
+  const maxVotes = useMemo(() => {
+    if (!revealed || total === 0) return 0;
+    return Math.max(...poll.options.map((o) => o.voterIds.length));
+  }, [poll.options, revealed, total]);
+
   return (
     <div className={`poll-card poll-card--${variant} ${poll.closed ? "is-closed" : ""} ${collapsed ? "is-collapsed" : ""}`}>
       {showQuestion && (
@@ -62,13 +68,19 @@ export function PollCard({
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
           >
-            <span className="poll-card-badge" aria-hidden="true">📊</span>
+            <span className="poll-card-badge" aria-hidden="true">
+              <BarChart2 size={14} strokeWidth={1.8} />
+            </span>
             <div className="poll-card-question">{poll.question}</div>
-            <span className={`poll-card-chevron ${open ? "is-open" : ""}`} aria-hidden="true">▾</span>
+            <span className={`poll-card-chevron ${open ? "is-open" : ""}`} aria-hidden="true">
+              <ChevronDown size={12} strokeWidth={2} />
+            </span>
           </button>
         ) : (
           <div className="poll-card-head">
-            <span className="poll-card-badge" aria-hidden="true">📊</span>
+            <span className="poll-card-badge" aria-hidden="true">
+              <BarChart2 size={14} strokeWidth={1.8} />
+            </span>
             <div className="poll-card-question">{poll.question}</div>
           </div>
         )
@@ -87,22 +99,23 @@ export function PollCard({
           const count = opt.voterIds.length;
           const pct = total > 0 ? Math.round((count / total) * 100) : 0;
           const mine = poll.myVote === opt.id;
+          const isWinner = revealed && maxVotes > 0 && count === maxVotes;
+          const showCheck = isWinner || (!revealed && mine);
           const voters = opt.voterIds.map((id) => byId.get(id)).filter(Boolean) as PublicUser[];
           return (
             <li key={opt.id}>
               <button
                 type="button"
-                className={`poll-option ${revealed ? "is-revealed" : ""} ${mine ? "is-mine" : ""}`}
+                className={`poll-option ${revealed ? "is-revealed" : ""} ${mine ? "is-mine" : ""} ${isWinner ? "is-winner" : ""}`}
                 onClick={() => onVote(opt.id)}
                 disabled={busy || poll.closed}
                 aria-pressed={mine}
               >
-                {revealed && (
-                  <span className="poll-option-fill" style={{ width: `${pct}%` }} aria-hidden="true" />
-                )}
                 <span className="poll-option-label">
-                  {mine && <span className="poll-option-check" aria-hidden="true">✓</span>}
-                  <span className="poll-option-text">{opt.text}</span>
+                  {showCheck && (
+                    <Check className="poll-option-check" size={11} strokeWidth={2.5} aria-hidden="true" />
+                  )}
+                  <span className={`poll-option-text ${isWinner ? "is-winner-text" : ""}`}>{opt.text}</span>
                 </span>
                 {revealed && (
                   <span className="poll-option-stats">

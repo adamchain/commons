@@ -1,10 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  ArrowUp,
+  BarChart2,
+  ChevronDown,
+  ChevronRight,
+  MessageCircle,
+  MoreVertical,
+  Plus,
+} from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { PollCard } from "../components/PollCard";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
+import { interestVisual } from "../lib/interestIcons";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import { planHasEnded } from "../lib/planTime";
 import type { ConversationDTO, MessageDTO, PlanDTO, PublicUser } from "../types/shared";
@@ -21,14 +32,12 @@ export function ChatPage() {
   const backHref = hrefForBack(backState);
   const backLabel =
     navFrom?.from === "messages"
-      ? "← Messages"
+      ? "Messages"
       : navFrom?.from === "notifications"
-        ? "← Notifications"
+        ? "Notifications"
         : navFrom?.from === "profile"
-          ? "← Profile"
-          : navFrom?.from === "plan"
-            ? "← Plan"
-            : "← Plan";
+          ? "Profile"
+          : "Plan";
   const planLinkState: NavFromState =
     navFrom?.from === "messages"
       ? { from: "messages" }
@@ -278,7 +287,10 @@ export function ChatPage() {
   return (
     <main className="app-shell app-shell--chat">
       <header className="app-header app-header--minimal chat-header-bar chat-header-bar--thread app-header--sticky">
-        <Link to={backHref} className="detail-back">{backLabel}</Link>
+        <Link to={backHref} className="detail-back chat-back-link">
+          <ArrowLeft size={13} strokeWidth={2.2} aria-hidden="true" />
+          {backLabel}
+        </Link>
         <div className="chat-thread-title">{sentenceCaseTitle(plan.title)}</div>
         <div className="chat-header-menu-wrap" ref={headerMenuRef}>
           <button
@@ -288,7 +300,7 @@ export function ChatPage() {
             aria-label="Chat options"
             aria-expanded={headerMenuOpen}
           >
-            <MoreIcon />
+            <MoreVertical size={20} strokeWidth={1.8} aria-hidden="true" />
           </button>
           {headerMenuOpen && (
             <div className="chat-header-menu" role="menu">
@@ -318,9 +330,19 @@ export function ChatPage() {
           className="chat-header-card chat-header-card--compact"
           aria-label="Open plan details"
         >
-          <span className="chat-header-emoji" aria-hidden="true">
-            {plan.hostEmoji || "💬"}
-          </span>
+          {(() => {
+            const vis = interestVisual(plan.tags[0]);
+            const Icon = vis.Icon;
+            return (
+              <span
+                className="chat-header-icon-well"
+                style={{ background: vis.tint, color: vis.iconColor }}
+                aria-hidden="true"
+              >
+                <Icon size={18} strokeWidth={1.8} />
+              </span>
+            );
+          })()}
           <div className="chat-header-text">
             <div className="chat-header-meta">
               {formatPlanDate(plan.date)} · {formatPlanTime(plan.time, plan.isFlexibleTime)} · {participantLabel}
@@ -350,7 +372,9 @@ export function ChatPage() {
               <strong>Plan the next one</strong>
               <span>Post another with this group.</span>
             </span>
-            <span className="chat-replan-arrow" aria-hidden="true">→</span>
+            <span className="chat-replan-arrow" aria-hidden="true">
+              <ChevronRight size={16} strokeWidth={2} />
+            </span>
           </Link>
         )}
 
@@ -362,14 +386,20 @@ export function ChatPage() {
               onClick={() => setPinnedPollsOpen((v) => !v)}
               aria-expanded={pinnedPollsOpen}
             >
-              <span className="chat-pinned-polls-badge" aria-hidden="true">📊</span>
+              <span className="chat-pinned-polls-badge" aria-hidden="true">
+                <BarChart2 size={13} strokeWidth={1.8} />
+              </span>
               <span className="chat-pinned-polls-summary">
                 {openPolls.length === 1
                   ? openPolls[0].poll!.question
                   : `${openPolls.length} active polls`}
               </span>
               <span className="chat-pinned-polls-chevron" aria-hidden="true">
-                {pinnedPollsOpen ? "▾" : "▸"}
+                {pinnedPollsOpen ? (
+                  <ChevronDown size={12} strokeWidth={2} />
+                ) : (
+                  <ChevronRight size={12} strokeWidth={2} />
+                )}
               </span>
             </button>
             {pinnedPollsOpen && (
@@ -396,7 +426,7 @@ export function ChatPage() {
           {grouped.length === 0 ? (
             <div className="chat-empty-card">
               <div className="chat-empty-glyph" aria-hidden>
-                <MessageCircleIcon />
+                <MessageCircle size={24} strokeWidth={1.6} />
               </div>
               <div className="chat-empty-headline">It's quiet in here</div>
               <p className="chat-empty-body">
@@ -502,7 +532,7 @@ export function ChatPage() {
               aria-label="More actions"
               aria-expanded={composerMenuOpen}
             >
-              +
+              <Plus size={14} strokeWidth={2} aria-hidden="true" />
             </button>
             {composerMenuOpen && (
               <div className="chat-composer-menu" role="menu">
@@ -547,7 +577,7 @@ export function ChatPage() {
             disabled={sending || !body.trim()}
             aria-label="Send message"
           >
-            <ArrowSendIcon />
+            <ArrowUp size={13} strokeWidth={2.2} aria-hidden="true" />
           </button>
         </form>
       </div>
@@ -625,25 +655,6 @@ export function ChatPage() {
   );
 }
 
-function MoreIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <circle cx="12" cy="5" r="1.8" />
-      <circle cx="12" cy="12" r="1.8" />
-      <circle cx="12" cy="19" r="1.8" />
-    </svg>
-  );
-}
-
-function ArrowSendIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="m13 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 function formatTimeOnly(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
@@ -705,14 +716,6 @@ function groupMessages(msgs: MessageDTO[]): GroupedEntry[] {
     lastUserAt = date.getTime();
   }
   return out;
-}
-
-function MessageCircleIcon() {
-  return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
-    </svg>
-  );
 }
 
 function dayLabel(d: Date): string {
