@@ -21,6 +21,16 @@ export const authRouter = Router();
 
 const CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
+// Dev/QA-only login bypass. Lets you sign in as a fixed fake number with a
+// fixed code — no Twilio SMS required — so you can test the app as a plain
+// non-member / non-admin account. HARD-disabled when NODE_ENV=production.
+const TEST_LOGIN_ACCOUNTS: Record<string, string> =
+  process.env.NODE_ENV === "production" ? {} : { "+19999999999": "999999" };
+
+function testLoginCodeFor(phone: string): string | undefined {
+  return TEST_LOGIN_ACCOUNTS[phone];
+}
+
 type TwilioLikeError = {
   code?: number;
   status?: number;
@@ -106,6 +116,13 @@ authRouter.post("/request-code", async (req, res) => {
     return;
   }
 
+  // Dev/QA test accounts skip Twilio entirely — the code is fixed, not sent.
+  if (testLoginCodeFor(phone)) {
+    console.log(`[auth] test-login account ${phone}: use code ${testLoginCodeFor(phone)}`);
+    res.json({ ok: true, phoneNumber: phone, smsConfigured: false, authMode: "dev" as const });
+    return;
+  }
+
   if (isTwilioVerifyConfigured()) {
     try {
       await startPhoneVerification(phone);
@@ -141,7 +158,14 @@ authRouter.post("/verify-code", async (req, res) => {
     return;
   }
 
-  if (isTwilioVerifyConfigured()) {
+  const testCode = testLoginCodeFor(phone);
+  if (testCode) {
+    if (code !== testCode) {
+      res.status(401).json({ error: "Invalid or expired code" });
+      return;
+    }
+    // Valid test code — skip Twilio + sms-code checks, fall through to sign-in.
+  } else if (isTwilioVerifyConfigured()) {
     let approved = false;
     try {
       approved = await checkPhoneVerification(phone, code);

@@ -1,12 +1,35 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { store } from "../store.js";
+import type { ConversationRecord } from "../store.js";
 import { findUserById, findUsersByIds } from "../userRepo.js";
 import { userToPublic } from "./plans.js";
 import { emit } from "../lib/notify.js";
+import { isAdminPhone } from "../lib/adminPhones.js";
 import type { ConversationDTO, ConversationSummaryDTO, MessageDTO, PollDTO } from "../types/shared.js";
 
 export const chatRouter = Router();
+
+// For community group chats, being present in `participantIds` is not enough to
+// keep writing — a user can be in the roster yet no longer be an active member
+// (pending, removed, or a drift between roster and membership). Re-verify active
+// membership (or organizer / admin) before any write. Plan chats have no
+// community and pass straight through. Returns a 403 message when blocked, else
+// null. Mirrors the gate in communities.ts (bulletin) and plans.ts (plan posts).
+async function communityPostBlockReason(
+  conv: ConversationRecord,
+  userId: string,
+): Promise<string | null> {
+  if (!conv.communityId) return null;
+  const community = store.findCommunityById(conv.communityId);
+  if (!community) return "Community not found";
+  const membership = store.findCommunityMembership(conv.communityId, userId);
+  if (membership?.status === "active") return null;
+  if (community.organizerId === userId) return null;
+  const me = await findUserById(userId);
+  if (me && isAdminPhone(me.phoneNumber)) return null;
+  return "Join the community to post here";
+}
 
 // GET /api/conversations — unified inbox: group chats for every plan the user
 // is hosting / going to / interested in. Upcoming plans always show; past plans
@@ -200,6 +223,11 @@ chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => 
     res.status(403).json({ error: "Not a participant" });
     return;
   }
+  const blocked = await communityPostBlockReason(conv, userId);
+  if (blocked) {
+    res.status(403).json({ error: blocked });
+    return;
+  }
   const message = store.createMessage(convId, userId, body);
   // Notify every other group participant. Group chat only — DM rooms collapse
   // unread to a single signal that's already in conversation lists.
@@ -254,6 +282,11 @@ chatRouter.post("/conversations/:id/polls", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Not a participant" });
     return;
   }
+  const blocked = await communityPostBlockReason(conv, userId);
+  if (blocked) {
+    res.status(403).json({ error: blocked });
+    return;
+  }
   const message = store.createPollMessage(convId, userId, question, options);
   if (conv.type === "group") {
     const sender = await findUserById(userId);
@@ -289,6 +322,11 @@ chatRouter.post("/conversations/:id/messages/:msgId/vote", requireAuth, async (r
   }
   if (!conv.participantIds.includes(userId)) {
     res.status(403).json({ error: "Not a participant" });
+    return;
+  }
+  const blocked = await communityPostBlockReason(conv, userId);
+  if (blocked) {
+    res.status(403).json({ error: blocked });
     return;
   }
   const updated = store.votePoll(msgId, userId, optionId);
@@ -417,6 +455,11 @@ chatRouter.post("/conversations/:id/messages/:msgId/react", requireAuth, async (
   }
   if (!conv.participantIds.includes(userId)) {
     res.status(403).json({ error: "Not a participant" });
+    return;
+  }
+  const blocked = await communityPostBlockReason(conv, userId);
+  if (blocked) {
+    res.status(403).json({ error: blocked });
     return;
   }
   const updated = store.toggleReaction(msgId, userId, emoji);
