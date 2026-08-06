@@ -8,7 +8,8 @@ export function sentenceCaseTitle(raw: string): string {
     .join(" ");
 }
 
-export function formatPlanDate(iso: string): string {
+export function formatPlanDate(iso: string, opts?: { isFlexibleDate?: boolean }): string {
+  if (opts?.isFlexibleDate || iso.startsWith("2099-12-31")) return "Anytime";
   const d = new Date(iso);
   const today = new Date();
   today.setHours(0, 0, 0, 0);

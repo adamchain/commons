@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { api } from "../api/http";
+import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
@@ -677,21 +677,48 @@ function PassItOnControl({
     (p) => user && p.id !== user.id,
   );
   const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState<PublicUser | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   if (candidates.length === 0) return null;
 
   async function handOff(c: PublicUser) {
-    if (!confirm(`Transfer hosting of "${plan.title}" to ${c.firstName}? You'll drop off the going list.`)) return;
     setBusy(true);
+    setError(null);
     try {
       await api(`/api/plans/${plan.id}/transfer-host`, {
         method: "POST",
         body: JSON.stringify({ newHostId: c.id }),
       });
+      setPending(null);
+      setOpen(false);
       onTransferred();
+    } catch (e) {
+      setError(parseApiError(e));
     } finally {
       setBusy(false);
     }
+  }
+
+  if (pending) {
+    return (
+      <section className="form-card" style={{ marginTop: 16 }}>
+        <div className="plan-grabs-confirm" role="group">
+          <p className="plan-grabs-confirm-copy">
+            Hand off hosting of &ldquo;{plan.title}&rdquo; to {pending.firstName}? You&apos;ll drop off the going list.
+          </p>
+          {error && <p className="luma-inline-error">{error}</p>}
+          <div className="plan-grabs-confirm-actions">
+            <button type="button" className="btn-secondary" disabled={busy} onClick={() => setPending(null)}>
+              Cancel
+            </button>
+            <button type="button" className="btn-primary" disabled={busy} onClick={() => void handOff(pending)}>
+              {busy ? "Handing off…" : `Hand off to ${pending.firstName}`}
+            </button>
+          </div>
+        </div>
+      </section>
+    );
   }
 
   return (
@@ -716,7 +743,7 @@ function PassItOnControl({
               type="button"
               className="plan-transfer-pick"
               disabled={busy}
-              onClick={() => void handOff(c)}
+              onClick={() => setPending(c)}
             >
               <Avatar
                 seed={c.avatarSeed}

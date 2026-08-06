@@ -13,6 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import { api } from "../api/http";
+import { FLEXIBLE_DATE_PLACEHOLDER } from "../lib/planTime";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
@@ -430,9 +431,10 @@ export function CreatePlanPage() {
             lng: form.locationLng,
             placeId: form.locationPlaceId,
           },
-          date: form.isFlexibleDate ? today() : form.date,
+          date: form.isFlexibleDate ? FLEXIBLE_DATE_PLACEHOLDER : form.date,
           time: form.isFlexibleTime ? "" : form.time,
           isFlexibleTime: form.isFlexibleTime || form.isFlexibleDate,
+          isFlexibleDate: form.isFlexibleDate,
           isFlexibleLocation: form.isFlexibleLocation,
           tags: resolvedTags,
           description: form.description.trim() || undefined,

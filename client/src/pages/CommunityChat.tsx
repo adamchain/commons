@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { BarChart2 } from "lucide-react";
-import { api } from "../api/http";
+import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { PollCard } from "../components/PollCard";
 import { useAuth } from "../context/AuthContext";
@@ -64,7 +64,7 @@ export function CommunityChatPage() {
         if (!alive) return;
         setMessages(msgs.sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
       } catch (e) {
-        if (alive) setError(e instanceof Error ? e.message : "Couldn't open chat");
+        if (alive) setError(parseApiError(e));
       } finally {
         if (alive) setChatReady(true);
       }

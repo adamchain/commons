@@ -32,10 +32,10 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
     const plan = store.findPlanById(planId);
     if (!plan) continue;
     const conv = store.findGroupConversationByPlan(planId);
+    if (conv && store.hasLeftConversation(userId, conv.id)) continue;
     // If a conversation exists but the user explicitly left it, keep it out of
     // their inbox even though they're still on the plan.
     if (conv && !conv.participantIds.includes(userId)) continue;
-    if (conv && store.hasLeftConversation(userId, conv.id)) continue;
     const msgs = conv ? store.listMessagesForConversation(conv.id) : [];
     const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
     const hasRealChatter = msgs.some((m) => m.kind !== "system");
@@ -74,8 +74,8 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
     const community = store.findCommunityById(membership.communityId);
     if (!community || !community.chatEnabled || community.creationStatus !== "approved") continue;
     const conv = store.findCommunityConversation(community.id);
-    if (conv && !conv.participantIds.includes(userId)) continue;
     if (conv && store.hasLeftConversation(userId, conv.id)) continue;
+    if (conv && !conv.participantIds.includes(userId)) continue;
     const msgs = conv ? store.listMessagesForConversation(conv.id) : [];
     const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
     summaries.push({

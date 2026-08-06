@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api } from "../api/http";
+import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { PlanCard } from "../components/PlanCard";
 import {
@@ -78,9 +78,10 @@ export function CommunityDetailPage() {
   const catLabel = COMMUNITY_CATEGORY_LABELS[community.category];
   const isActiveMember = community.myMembership?.status === "active";
   const showChatTab = community.chatEnabled && (isActiveMember || community.isOrganizer);
-  // "Members only" communities keep discovery info (name/cover/description/count)
-  // public, but lock the bulletin/events/members tabs to active members + the organizer.
-  const canSeeInside = community.visibility !== "members_only" || isActiveMember || community.isOrganizer;
+  // Bulletin, events, members, and posting require active membership (organizer counts).
+  const canSeeInside = isActiveMember || community.isOrganizer;
+  const canPostBulletin = community.canPostBulletin && canSeeInside;
+  const canPostPlan = community.canPostPlan && canSeeInside;
 
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy">
@@ -155,16 +156,16 @@ export function CommunityDetailPage() {
         {community.isOrganizer && <TabButton id="settings" tab={tab} setTab={setTab}>Settings</TabButton>}
       </nav>
 
-      {tab === "bulletin" && community.bulletinEnabled && (canSeeInside ? <BulletinTab community={community} onPendingChange={load} /> : <LockedPanel />)}
+      {tab === "bulletin" && community.bulletinEnabled && (canSeeInside ? <BulletinTab community={community} canPost={canPostBulletin} onPendingChange={load} /> : <LockedPanel />)}
       {tab === "events" && (
         canSeeInside ? (
-          <EventsTab community={community} onPostPlan={() => navigate(`/plans/new?communityId=${community.id}`)} />
+          <EventsTab community={community} canPost={canPostPlan} onPostPlan={() => navigate(`/plans/new?communityId=${community.id}`)} />
         ) : (
           <LockedPanel />
         )
       )}
       {tab === "members" && (canSeeInside ? <MembersTab community={community} onCountChange={load} /> : <LockedPanel />)}
-      {tab === "settings" && community.isOrganizer && (
+      {tab === "settings" && community.isOrganizer && canSeeInside && (
         <SettingsTab community={community} onSaved={setCommunity} />
       )}
     </main>
@@ -332,11 +333,20 @@ function JoinControl({
   );
 }
 
-function BulletinTab({ community, onPendingChange }: { community: CommunityDTO; onPendingChange?: () => void }) {
+function BulletinTab({
+  community,
+  canPost,
+  onPendingChange,
+}: {
+  community: CommunityDTO;
+  canPost: boolean;
+  onPendingChange?: () => void;
+}) {
   const [posts, setPosts] = useState<CommunityPostDTO[]>([]);
   const [pending, setPending] = useState<CommunityPostDTO[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [postErr, setPostErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const r = await api<{ posts: CommunityPostDTO[]; pending?: CommunityPostDTO[] }>(
@@ -353,6 +363,7 @@ function BulletinTab({ community, onPendingChange }: { community: CommunityDTO; 
   async function submit() {
     if (!draft.trim() || busy) return;
     setBusy(true);
+    setPostErr(null);
     try {
       await api(`/api/communities/${community.id}/posts`, {
         method: "POST",
@@ -361,6 +372,8 @@ function BulletinTab({ community, onPendingChange }: { community: CommunityDTO; 
       setDraft("");
       await load();
       onPendingChange?.();
+    } catch (e) {
+      setPostErr(parseApiError(e));
     } finally {
       setBusy(false);
     }
@@ -478,8 +491,9 @@ function BulletinTab({ community, onPendingChange }: { community: CommunityDTO; 
         ))}
       </ul>
 
-      {community.canPostBulletin && (
+      {canPost && (
         <div className="cmy-composer">
+          {postErr && <p className="cmy-err">{postErr}</p>}
           <input
             type="text"
             className="cmy-composer-input"
@@ -499,7 +513,15 @@ function BulletinTab({ community, onPendingChange }: { community: CommunityDTO; 
   );
 }
 
-function EventsTab({ community, onPostPlan }: { community: CommunityDTO; onPostPlan: () => void }) {
+function EventsTab({
+  community,
+  canPost,
+  onPostPlan,
+}: {
+  community: CommunityDTO;
+  canPost: boolean;
+  onPostPlan: () => void;
+}) {
   const [plans, setPlans] = useState<PlanDTO[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -515,7 +537,7 @@ function EventsTab({ community, onPostPlan }: { community: CommunityDTO; onPostP
 
   return (
     <section className="cmy-tabpanel">
-      {community.canPostPlan && (
+      {canPost && (
         <button type="button" className="cmy-btn cmy-btn--primary cmy-btn--block" onClick={onPostPlan}>
           + Post a plan
         </button>
@@ -536,6 +558,7 @@ function MembersTab({ community, onCountChange }: { community: CommunityDTO; onC
   const [addQuery, setAddQuery] = useState("");
   const [addResults, setAddResults] = useState<PersonSearchResultDTO[]>([]);
   const [addBusy, setAddBusy] = useState(false);
+  const [addErr, setAddErr] = useState<string | null>(null);
   const [shareMsg, setShareMsg] = useState<string | null>(null);
   const addDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -570,6 +593,7 @@ function MembersTab({ community, onCountChange }: { community: CommunityDTO; onC
 
   async function addMember(userId: string) {
     setAddBusy(true);
+    setAddErr(null);
     try {
       await api(`/api/communities/${community.id}/members`, {
         method: "POST",
@@ -579,6 +603,8 @@ function MembersTab({ community, onCountChange }: { community: CommunityDTO; onC
       setAddResults([]);
       await load();
       await onCountChange();
+    } catch (e) {
+      setAddErr(parseApiError(e));
     } finally {
       setAddBusy(false);
     }
@@ -627,6 +653,7 @@ function MembersTab({ community, onCountChange }: { community: CommunityDTO; onC
 
       {community.isOrganizer && (
         <div className="cmy-add-member">
+          {addErr && <p className="cmy-err">{addErr}</p>}
           <label className="cmy-field">
             <span>Add a member</span>
             <input
@@ -889,16 +916,5 @@ function Segmented<T extends string>({
 }
 
 function cleanError(e: unknown): string {
-  const raw = e instanceof Error ? e.message : String(e);
-  const m = raw.match(/^\d+:\s*(.*)$/);
-  if (m) {
-    try {
-      const parsed = JSON.parse(m[1]!);
-      if (parsed?.error) return parsed.error;
-    } catch {
-      /* not JSON */
-    }
-    return m[1]!;
-  }
-  return raw;
+  return parseApiError(e);
 }

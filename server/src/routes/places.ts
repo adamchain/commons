@@ -26,7 +26,7 @@ placesRouter.get("/autocomplete", requireAuth, async (req, res) => {
   const key = googleKey();
   const input = String(req.query.q ?? "").trim();
   if (!key) {
-    res.status(503).json({ error: "Places API not configured", predictions: [] });
+    res.json({ predictions: [] });
     return;
   }
   if (input.length < 2) {
@@ -115,7 +115,7 @@ placesRouter.get("/search", requireAuth, async (req, res) => {
   const key = googleKey();
   const query = String(req.query.q ?? "").trim();
   if (!key) {
-    res.status(503).json({ error: "Places API not configured", results: [] });
+    res.json({ results: [] });
     return;
   }
   if (query.length < 2) {
@@ -195,7 +195,7 @@ function mapNearbyPlace(p: NewPlace) {
 placesRouter.get("/nearby", requireAuth, async (req, res) => {
   const key = googleKey();
   if (!key) {
-    res.status(503).json({ error: "Places API not configured", results: [] });
+    res.json({ results: [] });
     return;
   }
   const lat = Number(req.query.lat);
@@ -285,7 +285,7 @@ placesRouter.get("/details", requireAuth, async (req, res) => {
   const key = googleKey();
   const placeId = String(req.query.placeId ?? "").trim();
   if (!key) {
-    res.status(503).json({ error: "Places API not configured" });
+    res.status(404).json({ error: "Place not found" });
     return;
   }
   if (!placeId) {

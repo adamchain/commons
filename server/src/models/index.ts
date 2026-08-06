@@ -66,6 +66,7 @@ const PlanSchema = new Schema<PlanRecord>(
     date: { type: String, required: true },
     time: { type: String, default: "" },
     isFlexibleTime: { type: Boolean, default: false },
+    isFlexibleDate: { type: Boolean, default: false },
     isFlexibleLocation: { type: Boolean, default: false },
     endTime: { type: String },
     tags: { type: [String], default: [] },

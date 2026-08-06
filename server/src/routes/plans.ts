@@ -16,7 +16,8 @@ import {
 } from "../types/shared.js";
 import { onPlanCreatedVenueNudge, notifyInterestedPlanLocked } from "../lib/nudges.js";
 import { emit } from "../lib/notify.js";
-import { plansOverlap } from "../lib/planTime.js";
+import { isAdminPhone } from "../lib/adminPhones.js";
+import { plansOverlap, FLEXIBLE_DATE_PLACEHOLDER } from "../lib/planTime.js";
 import { coverUrlFor } from "./share.js";
 import type { PublicPlanDTO } from "../types/shared.js";
 
@@ -145,6 +146,7 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     date: plan.date,
     time: plan.time,
     isFlexibleTime: plan.isFlexibleTime,
+    isFlexibleDate: plan.isFlexibleDate ?? false,
     isFlexibleLocation: plan.isFlexibleLocation ?? false,
     endTime: plan.endTime,
     tags: plan.tags,
@@ -274,6 +276,7 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   const dateInput = String(req.body?.date ?? "").trim();
   const time = String(req.body?.time ?? "").trim();
   const isFlexibleTime = Boolean(req.body?.isFlexibleTime);
+  const isFlexibleDate = Boolean(req.body?.isFlexibleDate);
   const isFlexibleLocation = Boolean(req.body?.isFlexibleLocation);
   const description = req.body?.description ? String(req.body.description).trim() : undefined;
   const hostEmoji = String(req.body?.hostEmoji ?? "").trim() || "✨";
@@ -310,10 +313,11 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     visibilityCommunityTag = tagPick as InterestTag;
   }
 
-  if (!title || !dateInput) {
+  if (!title || (!dateInput && !isFlexibleDate)) {
     res.status(400).json({ error: "Title and date are required" });
     return;
   }
+  const resolvedDate = isFlexibleDate ? FLEXIBLE_DATE_PLACEHOLDER : dateInput;
   // Neighborhood is required unless the host explicitly toggled flexible. The
   // form no longer renders a free-text "Where" field — the neighborhood is the
   // location signal — so we don't enforce locationName here.
@@ -336,12 +340,23 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   let communityVisibility: "public" | "community_only" | null = null;
   if (communityId) {
     const community = store.findCommunityById(communityId);
-    if (!community || community.creationStatus !== "approved") {
+    if (!community) {
+      res.status(400).json({ error: "Community not found" });
+      return;
+    }
+    const meForAdmin = await findUserById(userId);
+    const isOrganizer =
+      community.organizerId === userId || (!!meForAdmin && isAdminPhone(meForAdmin.phoneNumber));
+    if (community.creationStatus === "pending") {
+      if (!isOrganizer) {
+        res.status(403).json({ error: "This community is pending review" });
+        return;
+      }
+    } else if (community.creationStatus !== "approved") {
       res.status(400).json({ error: "Community not found" });
       return;
     }
     const membership = store.findCommunityMembership(communityId, userId);
-    const isOrganizer = community.organizerId === userId;
     const isActiveMember = membership?.status === "active";
     const mayPost =
       isOrganizer ||
@@ -411,9 +426,10 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     title,
     neighborhoodId,
     location: { name: resolvedLocationName, address: resolvedAddress, lat, lng, placeId },
-    date: dateInput,
-    time: isFlexibleTime ? "" : time,
-    isFlexibleTime: isFlexibleTime || !time,
+    date: resolvedDate,
+    time: isFlexibleTime || isFlexibleDate ? "" : time,
+    isFlexibleTime: isFlexibleTime || isFlexibleDate,
+    isFlexibleDate,
     isFlexibleLocation,
     tags,
     description,

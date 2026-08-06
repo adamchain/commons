@@ -21,7 +21,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { api } from "../api/http";
-import { clearAuthToken } from "../api/authToken";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime } from "../lib/format";
@@ -76,7 +75,7 @@ export function ProfilePage() {
   const navigate = useNavigate();
   const navFrom = (location.state as NavFromState | null) ?? null;
   const backHref = hrefForBack(navFrom);
-  const { user, setUser } = useAuth();
+  const { user } = useAuth();
   const [profile, setProfile] = useState<ProfilePayload | null>(null);
   const [network, setNetwork] = useState<PublicUser[] | null>(null);
   const [communities, setCommunities] = useState<CommunityCardDTO[]>([]);
@@ -541,31 +540,7 @@ export function ProfilePage() {
           <span className="settings-feedback-sub">Tell us what's working and what's not</span>
         </span>
       </a>
-
-      <button
-        type="button"
-        className="settings-signout"
-        onClick={async () => {
-          sessionStorage.removeItem("commons_pending_admin_choice");
-          await api("/api/auth/logout", { method: "POST" });
-          await clearAuthToken();
-          setUser(null);
-          navigate("/onboarding", { replace: true });
-        }}
-      >
-        <SignOutGlyph />
-        Sign out of COMMONS
-      </button>
     </main>
-  );
-}
-
-function SignOutGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />
-      <path d="M10 17 5 12l5-5M5 12h11" />
-    </svg>
   );
 }
 

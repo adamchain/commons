@@ -44,4 +44,22 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+/** Turn `api()` errors into human-readable copy (parses JSON `{ error }` bodies). */
+export function parseApiError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  const m = raw.match(/^(\d+):\s*([\s\S]*)$/);
+  if (!m) return raw;
+  const status = m[1];
+  const body = m[2]?.trim() ?? "";
+  try {
+    const parsed = JSON.parse(body) as { error?: string };
+    if (typeof parsed.error === "string" && parsed.error) return parsed.error;
+  } catch {
+    /* not JSON */
+  }
+  if (status === "403") return "You don't have permission to do that.";
+  if (status === "404") return "Not found.";
+  return body || raw;
+}
+
 export { API_BASE };

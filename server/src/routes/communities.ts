@@ -134,12 +134,41 @@ function memberDTO(
   };
 }
 
-/** "Members only" communities hide their bulletin/events/members from non-members —
- *  discovery info (name, cover, description, member count) always stays public. */
+/** Discovery info (name, cover, description, member count) stays public, but
+ *  bulletin/events/members/chat actions require an active membership (or being
+ *  the organizer / COMMONS admin). */
 function canSeeInside(community: CommunityRecord, viewerId: string, isOrganizer: boolean): boolean {
-  if (community.visibility !== "members_only") return true;
   if (isOrganizer) return true;
   return store.findCommunityMembership(community.id, viewerId)?.status === "active";
+}
+
+/** Shared guard for mutating endpoints that require a live (or in-review) community.
+ *  Organizers may act while their community is pending review; everyone else gets
+ *  a clear error instead of a silent 404. */
+async function requireCommunityForMutation(
+  communityId: string,
+  viewerId: string,
+  res: import("express").Response,
+): Promise<{ community: CommunityRecord; isOrganizer: boolean } | null> {
+  const community = store.findCommunityById(communityId);
+  if (!community) {
+    res.status(404).json({ error: "Community not found" });
+    return null;
+  }
+  const viewerIsAdmin = await isCommonsAdmin(viewerId);
+  const isOrganizer = community.organizerId === viewerId || viewerIsAdmin;
+  if (community.creationStatus === "pending") {
+    if (!isOrganizer) {
+      res.status(403).json({ error: "This community is pending review" });
+      return null;
+    }
+    return { community, isOrganizer };
+  }
+  if (community.creationStatus !== "approved") {
+    res.status(404).json({ error: "Community not found" });
+    return null;
+  }
+  return { community, isOrganizer };
 }
 
 function parsePermission(
@@ -476,12 +505,10 @@ communitiesRouter.post("/:id/members/:userId/decline", requireAuth, async (req, 
 // POST /api/communities/:id/members — organizer adds a member directly (no screening).
 communitiesRouter.post("/:id/members", requireAuth, async (req, res) => {
   const viewerId = String(req.userId);
-  const community = store.findCommunityById(String(req.params.id));
-  if (!community || community.creationStatus !== "approved") {
-    res.status(404).json({ error: "Community not found" });
-    return;
-  }
-  if (community.organizerId !== viewerId && !(await isCommonsAdmin(viewerId))) {
+  const ctx = await requireCommunityForMutation(String(req.params.id), viewerId, res);
+  if (!ctx) return;
+  const { community, isOrganizer } = ctx;
+  if (!isOrganizer) {
     res.status(403).json({ error: "Only the organizer can add members" });
     return;
   }
@@ -586,11 +613,9 @@ communitiesRouter.get("/:id/posts", requireAuth, async (req, res) => {
 // POST /api/communities/:id/posts — post to the bulletin (per bulletin_permission).
 communitiesRouter.post("/:id/posts", requireAuth, async (req, res) => {
   const viewerId = String(req.userId);
-  const community = store.findCommunityById(String(req.params.id));
-  if (!community || community.creationStatus !== "approved") {
-    res.status(404).json({ error: "Community not found" });
-    return;
-  }
+  const ctx = await requireCommunityForMutation(String(req.params.id), viewerId, res);
+  if (!ctx) return;
+  const { community } = ctx;
   if (!(community.bulletinEnabled ?? true)) {
     res.status(403).json({ error: "Bulletin is turned off for this community" });
     return;
@@ -599,6 +624,10 @@ communitiesRouter.post("/:id/posts", requireAuth, async (req, res) => {
     community.organizerId === viewerId || (await isCommonsAdmin(viewerId));
   const membership = store.findCommunityMembership(community.id, viewerId);
   const isActive = membership?.status === "active";
+  if (!viewerIsOrganizer && !isActive) {
+    res.status(403).json({ error: "Join the community to post here" });
+    return;
+  }
   const mayPost =
     viewerIsOrganizer || (community.bulletinPermission === "members" && isActive);
   if (!mayPost) {

@@ -31,7 +31,10 @@ export function PlanCard({
   navFrom?: NavFromState;
 }) {
   const title = sentenceCaseTitle(plan.title);
-  const flexCount = (plan.isFlexibleTime ? 1 : 0) + (plan.isFlexibleLocation ? 1 : 0);
+  const flexCount =
+    (plan.isFlexibleTime ? 1 : 0) +
+    (plan.isFlexibleLocation ? 1 : 0) +
+    (plan.isFlexibleDate ? 1 : 0);
   // Only 2+ flexible fields = Looking For card. One flexible field = confirmed.
   const isLooking = plan.planKind === "looking_for" && flexCount > 1 && !plan.lockedAt;
   const coverPool = useCardImages();

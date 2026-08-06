@@ -10,7 +10,7 @@ import {
   MoreVertical,
   Plus,
 } from "lucide-react";
-import { api } from "../api/http";
+import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { PollCard } from "../components/PollCard";
 import { useAuth } from "../context/AuthContext";
@@ -61,6 +61,10 @@ export function ChatPage() {
   const [composerMenuOpen, setComposerMenuOpen] = useState(false);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [chatReady, setChatReady] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [leaveBusy, setLeaveBusy] = useState(false);
+  const [leaveErr, setLeaveErr] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
   const composerMenuRef = useRef<HTMLDivElement>(null);
@@ -68,15 +72,20 @@ export function ChatPage() {
 
   useEffect(() => {
     void (async () => {
-      const [p, c] = await Promise.all([
-        api<PlanDTO>(`/api/plans/${planId}`),
-        api<ConversationDTO>(`/api/plans/${planId}/conversation`),
-      ]);
-      setPlan(p);
-      setConv(c);
-      const msgs = await api<MessageDTO[]>(`/api/conversations/${c.id}/messages`);
-      setMessages(msgs.sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
-      setChatReady(true);
+      try {
+        const [p, c] = await Promise.all([
+          api<PlanDTO>(`/api/plans/${planId}`),
+          api<ConversationDTO>(`/api/plans/${planId}/conversation`),
+        ]);
+        setPlan(p);
+        setConv(c);
+        const msgs = await api<MessageDTO[]>(`/api/conversations/${c.id}/messages`);
+        setMessages(msgs.sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+      } catch (e) {
+        setChatError(parseApiError(e));
+      } finally {
+        setChatReady(true);
+      }
     })();
   }, [planId]);
 
@@ -133,10 +142,28 @@ export function ChatPage() {
 
   const grouped = useMemo(() => groupMessages(messages), [messages]);
 
-  if (!chatReady || !conv || !user || !plan) {
+  if (!chatReady) {
     return (
       <main className="app-shell app-shell--chat">
         <div className="chat-loading-placeholder" aria-hidden="true" />
+      </main>
+    );
+  }
+
+  if (chatError || !conv || !user || !plan) {
+    return (
+      <main className="app-shell app-shell--chat">
+        <header className="app-header app-header--minimal chat-header-bar chat-header-bar--thread app-header--sticky">
+          <Link to={backHref} className="detail-back chat-back-link">
+            <ArrowLeft size={13} strokeWidth={2.2} aria-hidden="true" />
+            {backLabel}
+          </Link>
+          <div className="chat-thread-title">Chat</div>
+          <span aria-hidden="true" />
+        </header>
+        <div className="empty-state">
+          <p style={{ margin: 0 }}>{chatError ?? "Chat unavailable."}</p>
+        </div>
       </main>
     );
   }
@@ -159,12 +186,16 @@ export function ChatPage() {
 
   async function leaveChat() {
     if (!conv) return;
-    if (!window.confirm("Leave this chat? It'll disappear from your Messages. You stay on the plan.")) return;
+    setLeaveBusy(true);
+    setLeaveErr(null);
     try {
       await api(`/api/conversations/${conv.id}/leave`, { method: "POST" });
+      setConfirmLeave(false);
       navigate("/messages");
-    } catch {
-      /* swallow */
+    } catch (e) {
+      setLeaveErr(parseApiError(e));
+    } finally {
+      setLeaveBusy(false);
     }
   }
 
@@ -313,7 +344,8 @@ export function ChatPage() {
                 className="chat-header-menu-leave"
                 onClick={() => {
                   setHeaderMenuOpen(false);
-                  void leaveChat();
+                  setLeaveErr(null);
+                  setConfirmLeave(true);
                 }}
               >
                 {planConcluded ? "Remove from inbox" : "Leave chat"}
@@ -646,6 +678,31 @@ export function ChatPage() {
                 disabled={!canSubmitPoll || creatingPoll}
               >
                 {creatingPoll ? "Posting…" : "Post poll"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmLeave && (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => !leaveBusy && setConfirmLeave(false)}
+        >
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <h4 style={{ marginTop: 0 }}>{planConcluded ? "Remove from inbox?" : "Leave this chat?"}</h4>
+            <p style={{ marginTop: 0 }}>
+              It&apos;ll disappear from Messages. You stay on the plan.
+            </p>
+            {leaveErr && <p className="error-text">{leaveErr}</p>}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button type="button" className="btn-link" disabled={leaveBusy} onClick={() => setConfirmLeave(false)}>
+                Cancel
+              </button>
+              <button type="button" className="btn-primary" disabled={leaveBusy} onClick={() => void leaveChat()}>
+                {leaveBusy ? "Removing…" : planConcluded ? "Remove" : "Leave chat"}
               </button>
             </div>
           </div>

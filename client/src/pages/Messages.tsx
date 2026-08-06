@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { BarChart2, MessageCircle } from "lucide-react";
-import { api } from "../api/http";
+import { api, parseApiError } from "../api/http";
 import { EmptyCard, ScreenTitle } from "../components/ui";
 import { formatRelative, sentenceCaseTitle } from "../lib/format";
 import { interestVisual } from "../lib/interestIcons";
@@ -33,6 +33,9 @@ export function MessagesPage() {
   const [tab, setTab] = useState<"plans" | "interests">("plans");
   const [forums, setForums] = useState<ForumSummaryDTO[]>([]);
   const [forumsReady, setForumsReady] = useState(false);
+  const [dismissTarget, setDismissTarget] = useState<string | null>(null);
+  const [dismissBusy, setDismissBusy] = useState(false);
+  const [dismissErr, setDismissErr] = useState<string | null>(null);
 
   useEffect(() => {
     void api<ConversationSummaryDTO[]>("/api/conversations")
@@ -53,12 +56,16 @@ export function MessagesPage() {
   }, []);
 
   async function dismissPastChat(conversationId: string) {
-    if (!window.confirm("Leave this chat? It'll disappear from your Messages. You can still open it from the plan.")) return;
+    setDismissBusy(true);
+    setDismissErr(null);
     try {
       await api(`/api/conversations/${conversationId}/leave`, { method: "POST" });
       setItems((prev) => prev.filter((c) => c.conversationId !== conversationId));
+      setDismissTarget(null);
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : "Couldn't remove this chat.");
+      setDismissErr(parseApiError(e));
+    } finally {
+      setDismissBusy(false);
     }
   }
 
@@ -190,10 +197,7 @@ export function MessagesPage() {
               {items.map((c) => {
                 const preview = cleanPreview(c.lastMessagePreview);
                 const isPoll = previewLooksLikePoll(c.lastMessagePreview);
-                const todayIso = new Date().toISOString().slice(0, 10);
-                const isPastPlan = !c.communityId && c.planDate < todayIso;
-                const canDismiss =
-                  Boolean(c.conversationId) && (isPastPlan || Boolean(c.communityId));
+                const canDismiss = Boolean(c.conversationId);
                 const title = c.communityName ?? sentenceCaseTitle(c.planTitle);
                 const { Icon, iconColor, tint } = chatVisual(c);
                 const rowInner = (
@@ -248,8 +252,11 @@ export function MessagesPage() {
                       <button
                         type="button"
                         className="messages-row-dismiss"
-                        aria-label="Leave chat"
-                        onClick={() => void dismissPastChat(c.conversationId!)}
+                        aria-label="Remove from inbox"
+                        onClick={() => {
+                          setDismissErr(null);
+                          setDismissTarget(c.conversationId!);
+                        }}
                       >
                         ×
                       </button>
@@ -260,6 +267,36 @@ export function MessagesPage() {
             </div>
           </div>
         </>
+      )}
+
+      {dismissTarget && (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => !dismissBusy && setDismissTarget(null)}
+        >
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <h4 style={{ marginTop: 0 }}>Remove from inbox?</h4>
+            <p style={{ marginTop: 0 }}>
+              This chat will disappear from Messages. You can still open it from the plan or community page.
+            </p>
+            {dismissErr && <p className="error-text">{dismissErr}</p>}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button type="button" className="btn-link" disabled={dismissBusy} onClick={() => setDismissTarget(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={dismissBusy}
+                onClick={() => void dismissPastChat(dismissTarget)}
+              >
+                {dismissBusy ? "Removing…" : "Remove"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );

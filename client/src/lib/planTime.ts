@@ -1,5 +1,8 @@
 import type { PlanDTO } from "../types/shared";
 
+/** Stored on "Anytime" idea posts — far enough out that feed/end logic never treats them as past. */
+export const FLEXIBLE_DATE_PLACEHOLDER = "2099-12-31";
+
 /** Mirror of server `planTime.ts` — kept in sync. Used for client-side "happened"
  *  treatment on cards and other lifecycle gates without needing a server round-trip. */
 
@@ -28,5 +31,6 @@ export function planEndTimestamp(plan: PlanDTO): number {
 }
 
 export function planHasEnded(plan: PlanDTO, now: Date = new Date()): boolean {
+  if (plan.isFlexibleDate && !plan.lockedAt) return false;
   return planEndTimestamp(plan) < now.getTime();
 }

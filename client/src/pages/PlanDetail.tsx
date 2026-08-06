@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { api } from "../api/http";
+import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { GetThereSheet } from "../components/GetThereSheet";
 import { InviteSheet } from "../components/InviteSheet";
@@ -47,6 +47,9 @@ export function PlanDetailPage() {
   const [confirmGrabs, setConfirmGrabs] = useState(false);
   const [grabsError, setGrabsError] = useState<string | null>(null);
   const [grabsBusy, setGrabsBusy] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
   const lockFormRef = useRef<HTMLDivElement | null>(null);
   const coverPool = useCardImages();
 
@@ -133,12 +136,16 @@ export function PlanDetailPage() {
 
   async function cancelPlan() {
     if (!plan) return;
-    if (!confirm(`Cancel "${plan.title}"? Everyone who RSVP'd will be notified.`)) return;
+    setCancelBusy(true);
+    setCancelError(null);
     try {
       await api(`/api/plans/${plan.id}/cancel`, { method: "POST" });
+      setConfirmCancel(false);
       await load();
-    } catch {
-      /* surface via reload */
+    } catch (e) {
+      setCancelError(parseApiError(e));
+    } finally {
+      setCancelBusy(false);
     }
   }
 
@@ -167,17 +174,16 @@ export function PlanDetailPage() {
     }
   }
 
-  async function transferHost(newHostId: string, newHostName: string) {
+  async function transferHost(newHostId: string) {
     if (!plan) return;
-    if (!confirm(`Transfer hosting of "${plan.title}" to ${newHostName}? You'll drop off the going list.`)) return;
     try {
       await api(`/api/plans/${plan.id}/transfer-host`, {
         method: "POST",
         body: JSON.stringify({ newHostId }),
       });
       await load();
-    } catch {
-      /* surface via reload */
+    } catch (e) {
+      window.alert(parseApiError(e));
     }
   }
 
@@ -543,13 +549,47 @@ export function PlanDetailPage() {
             <Link to={`/plans/${plan.id}/edit`} className="btn-secondary plan-host-action-btn">
               Edit plan
             </Link>
-            <button
-              type="button"
-              className="btn-secondary plan-host-action-btn plan-host-action-btn--danger"
-              onClick={() => void cancelPlan()}
-            >
-              Cancel plan
-            </button>
+            {confirmCancel ? (
+              <div className="plan-grabs-confirm" role="group" aria-label="Confirm cancel plan">
+                <p className="plan-grabs-confirm-copy">
+                  Cancel &ldquo;{plan.title}&rdquo;? Everyone who RSVP&apos;d will be notified.
+                </p>
+                {cancelError && <p className="luma-inline-error">{cancelError}</p>}
+                <div className="plan-grabs-confirm-actions">
+                  <button
+                    type="button"
+                    className="btn-secondary plan-host-action-btn"
+                    disabled={cancelBusy}
+                    onClick={() => {
+                      setConfirmCancel(false);
+                      setCancelError(null);
+                    }}
+                  >
+                    Keep plan
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary plan-host-action-btn plan-host-action-btn--danger"
+                    disabled={cancelBusy}
+                    onClick={() => void cancelPlan()}
+                  >
+                    {cancelBusy ? "Cancelling…" : "Cancel plan"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="btn-secondary plan-host-action-btn plan-host-action-btn--danger"
+                onClick={() => {
+                  setConfirmCancel(true);
+                  setCancelError(null);
+                  setConfirmGrabs(false);
+                }}
+              >
+                Cancel plan
+              </button>
+            )}
             {!plan.upForGrabsAt && (
               confirmGrabs ? (
                 <div className="plan-grabs-confirm" role="group" aria-label="Confirm put up for grabs">
@@ -587,6 +627,7 @@ export function PlanDetailPage() {
                   onClick={() => {
                     setConfirmGrabs(true);
                     setGrabsError(null);
+                    setConfirmCancel(false);
                   }}
                 >
                   Can't make it — put up for grabs
@@ -595,7 +636,7 @@ export function PlanDetailPage() {
             )}
             <HostTransferControl
               candidates={plan.participants.going.filter((p) => p.id !== user.id)}
-              onTransfer={(id, name) => void transferHost(id, name)}
+              onTransfer={(id) => void transferHost(id)}
             />
           </div>
         )}
@@ -843,10 +884,36 @@ function HostTransferControl({
   onTransfer,
 }: {
   candidates: PublicUser[];
-  onTransfer: (id: string, name: string) => void;
+  onTransfer: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState<PublicUser | null>(null);
   if (candidates.length === 0) return null;
+  if (pending) {
+    return (
+      <div className="plan-grabs-confirm" role="group" aria-label="Confirm host transfer">
+        <p className="plan-grabs-confirm-copy">
+          Hand off hosting to {pending.firstName}? You&apos;ll drop off the going list.
+        </p>
+        <div className="plan-grabs-confirm-actions">
+          <button type="button" className="btn-secondary plan-host-action-btn" onClick={() => setPending(null)}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn-primary plan-host-action-btn"
+            onClick={() => {
+              onTransfer(pending.id);
+              setPending(null);
+              setOpen(false);
+            }}
+          >
+            Hand off to {pending.firstName}
+          </button>
+        </div>
+      </div>
+    );
+  }
   if (!open) {
     return (
       <button
@@ -867,7 +934,7 @@ function HostTransferControl({
             key={c.id}
             type="button"
             className="plan-transfer-pick"
-            onClick={() => onTransfer(c.id, c.firstName)}
+            onClick={() => setPending(c)}
           >
             <Avatar
               seed={c.avatarSeed}

@@ -325,7 +325,10 @@ export function FeedPage() {
   // PlanCard's own isLooking check so the feed groups exactly what the cards
   // visually flag as "idea" cards.
   const isIdeaPlan = useCallback((p: PlanDTO) => {
-    const flexCount = (p.isFlexibleTime ? 1 : 0) + (p.isFlexibleLocation ? 1 : 0);
+    const flexCount =
+      (p.isFlexibleTime ? 1 : 0) +
+      (p.isFlexibleLocation ? 1 : 0) +
+      (p.isFlexibleDate ? 1 : 0);
     return p.planKind === "looking_for" && flexCount > 1 && !p.lockedAt;
   }, []);
 

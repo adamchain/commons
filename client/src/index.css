@@ -7767,6 +7767,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 /* Edit + Cancel sit side-by-side; everything else spans the full width. */
 .plan-host-action-btn--full,
+.plan-host-actions .plan-grabs-confirm,
 .plan-host-actions .plan-transfer-link,
 .plan-host-actions .plan-transfer-picker {
   grid-column: 1 / -1;

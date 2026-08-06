@@ -1,5 +1,8 @@
 import type { PlanRecord } from "../store.js";
 
+/** Stored on "Anytime" idea posts — far enough out that feed/end logic never treats them as past. */
+export const FLEXIBLE_DATE_PLACEHOLDER = "2099-12-31";
+
 /** Parse `HH:mm` (24h) for ISO datetime construction. */
 function timeToHms(t: string): string {
   const s = t.trim();
@@ -27,6 +30,7 @@ export function planEndTimestamp(plan: PlanRecord): number {
 }
 
 export function planHasEnded(plan: PlanRecord, now = new Date()): boolean {
+  if (plan.isFlexibleDate && !plan.lockedAt) return false;
   return planEndTimestamp(plan) < now.getTime();
 }
 

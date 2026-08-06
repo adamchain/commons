@@ -168,6 +168,7 @@ export interface PlanDTO {
   date: string;
   time: string;
   isFlexibleTime: boolean;
+  isFlexibleDate: boolean;
   isFlexibleLocation: boolean;
   endTime?: string;
   tags: InterestTag[];

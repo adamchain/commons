@@ -115,6 +115,8 @@ export interface PlanRecord {
   date: string;
   time: string;
   isFlexibleTime: boolean;
+  /** True when the host picked "Anytime" — date is a far-future placeholder until lock-in. */
+  isFlexibleDate?: boolean;
   /** Optional on legacy rows — normalized when serving. */
   isFlexibleLocation?: boolean;
   endTime?: string;
