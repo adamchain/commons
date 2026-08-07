@@ -199,10 +199,6 @@ function EditForm({
       setSubmitErr("Title can't be empty.");
       return;
     }
-    if (!form.neighborhoodId && !form.isFlexibleLocation) {
-      setSubmitErr("Pick a neighborhood or turn on flexible.");
-      return;
-    }
     const capacityNum = form.capacityOn ? Number(form.capacity) : null;
     if (capacityNum !== null && (!Number.isFinite(capacityNum) || capacityNum < 1)) {
       setSubmitErr("Spots must be a positive number, or leave open.");

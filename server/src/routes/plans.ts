@@ -298,7 +298,10 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   const isFlexibleLocation = Boolean(req.body?.isFlexibleLocation);
   const description = req.body?.description ? String(req.body.description).trim() : undefined;
   const hostEmoji = String(req.body?.hostEmoji ?? "").trim() || "✨";
-  const neighborhoodId = String(req.body?.neighborhoodId ?? userHoods(me)[0] ?? "").trim();
+  // Neighborhood is optional at signup — prefer body, then profile, then
+  // nearest hood to the venue coords. Empty string is allowed (flexible /
+  // unknown); never block posting for skipping onboarding location.
+  let neighborhoodId = String(req.body?.neighborhoodId ?? userHoods(me)[0] ?? "").trim();
   const planKind = (req.body?.planKind === "looking_for" ? "looking_for" : "standard") as PlanKind;
   // "Do it again": when set, carry the previous event's crew + group chat into
   // this new plan.
@@ -337,13 +340,10 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   }
   const resolvedDate = isFlexibleDate ? FLEXIBLE_DATE_PLACEHOLDER : dateInput;
   // Exact location is the default; Flexible is opt-in. Require a venue/place
-  // name (and neighborhood) unless the host explicitly toggled flexible.
+  // name unless the host explicitly toggled flexible. Neighborhood is not
+  // required — hosts may have skipped it at signup.
   if (!isFlexibleLocation && !locationName) {
     res.status(400).json({ error: "Pick a location or turn on flexible." });
-    return;
-  }
-  if (!neighborhoodId && !isFlexibleLocation) {
-    res.status(400).json({ error: "Pick a neighborhood or turn on flexible." });
     return;
   }
   if (!isFlexibleTime && !isFlexibleDate && !time) {
@@ -353,6 +353,9 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   if (neighborhoodId && !store.findNeighborhoodById(neighborhoodId)) {
     res.status(400).json({ error: "Unknown neighborhood" });
     return;
+  }
+  if (!neighborhoodId && typeof lat === "number" && typeof lng === "number") {
+    neighborhoodId = store.nearestNeighborhoodId(lat, lng) ?? "";
   }
   const resolvedLocationName = isFlexibleLocation
     ? locationName || "Flexible location"

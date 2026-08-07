@@ -11,7 +11,7 @@ import {
   Tag,
   Users,
 } from "lucide-react";
-import { api } from "../api/http";
+import { api, parseApiError } from "../api/http";
 import { FLEXIBLE_DATE_PLACEHOLDER } from "../lib/planTime";
 import { Avatar } from "../components/Avatar";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
@@ -394,9 +394,7 @@ export function CreatePlanPage() {
       : null;
   const locationError = !form.isFlexibleLocation && !form.locationName.trim()
     ? "Add a location or mark it flexible."
-    : !form.isFlexibleLocation && !form.neighborhoodId
-      ? "Add a location or mark it flexible."
-      : null;
+    : null;
   const capacityNum = form.capacityOn ? Number(form.capacity) : null;
   const capacityError =
     capacityNum !== null && (!Number.isFinite(capacityNum) || capacityNum < 1)
@@ -497,11 +495,7 @@ export function CreatePlanPage() {
       // someone / Done) rather than dropping straight into the invite sheet.
       navigate("/", { state: { justPostedId: created.id, showPostSuccess: true } });
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Couldn't post — check your connection and try again.",
-      );
+      setError(parseApiError(err) || "Couldn't post — check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -953,9 +947,9 @@ export function CreatePlanPage() {
         )}
 
         {/* Location — single row, Google-Places-backed, flexible toggle inline.
-            Neighborhood is kept from the user's default when a place is picked;
-            picking a place and toggling Flexible are mutually exclusive —
-            each one clears the other (req: location fixes). */}
+            Neighborhood is optional (profile default when set; otherwise the
+            server infers from venue coords). Picking a place and toggling
+            Flexible are mutually exclusive — each one clears the other. */}
         <div
           className="luma-card"
           ref={locationCardRef}

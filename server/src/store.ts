@@ -921,6 +921,22 @@ export const store = {
   findNeighborhoodById(id: string): NeighborhoodRecord | undefined {
     return snapshot.neighborhoods.find((n) => n.id === id);
   },
+  /** Nearest hood with coords — used when a plan has a venue but no explicit neighborhood. */
+  nearestNeighborhoodId(lat: number, lng: number): string | undefined {
+    let bestId: string | undefined;
+    let bestD = Infinity;
+    for (const n of snapshot.neighborhoods) {
+      if (typeof n.lat !== "number" || typeof n.lng !== "number") continue;
+      const dLat = n.lat - lat;
+      const dLng = n.lng - lng;
+      const d = dLat * dLat + dLng * dLng;
+      if (d < bestD) {
+        bestD = d;
+        bestId = n.id;
+      }
+    }
+    return bestId;
+  },
   // returns the user's neighborhood + adjacent neighborhood ids
   neighborhoodScope(neighborhoodId: string): string[] {
     const root = this.findNeighborhoodById(neighborhoodId);
