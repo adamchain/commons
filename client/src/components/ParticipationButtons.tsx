@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
 import type { JoinType, ParticipationState, PlanKind } from "../types/shared";
+import { JoinConfirmPopup, joinConfirmKind, type JoinConfirmKind } from "./JoinConfirmPopup";
 
 // API errors arrive as "<status>: <jsonBody>" — pull the friendly message out.
 function extractApiError(err: unknown): string {
@@ -38,12 +39,6 @@ function markPromptedInvite(planId: string, userId: string | undefined): void {
   }
 }
 
-function confirmCopy(next: ParticipationState | null): string {
-  if (next === "going") return "You're In";
-  if (next === "interested") return "Marked Interested";
-  return "Dropped out";
-}
-
 export function ParticipationButtons({
   planId,
   initialState,
@@ -66,7 +61,7 @@ export function ParticipationButtons({
   joinType?: JoinType;
   /** Host bypasses capacity and approve gates. */
   isHosting?: boolean;
-  /** Called the first time someone confirms In — opens the invite sheet. */
+  /** Called the first time someone confirms I'm In — opens the invite sheet. */
   onJustMarkedGoing?: () => void;
 }) {
   const { user } = useAuth();
@@ -75,20 +70,18 @@ export function ParticipationButtons({
   const [error, setError] = useState<string | null>(null);
   const [showGoingSheet, setShowGoingSheet] = useState(false);
   const [showInterestedSheet, setShowInterestedSheet] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<JoinConfirmKind | null>(null);
 
   useEffect(() => {
     setState(initialState);
   }, [initialState]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const t = window.setTimeout(() => setToast(null), 2200);
-    return () => window.clearTimeout(t);
-  }, [toast]);
-
   // Shared commit path — optimistic update, real request, roll back on failure.
-  const commit = async (next: ParticipationState | null): Promise<boolean> => {
+  // Skip the celebratory popup when the invite sheet is about to open.
+  const commit = async (
+    next: ParticipationState | null,
+    opts?: { celebrate?: boolean },
+  ): Promise<boolean> => {
     const prev = state;
     setState(next);
     onChange(next);
@@ -103,7 +96,7 @@ export function ParticipationButtons({
       } else {
         await api(`/api/plans/${planId}/participation`, { method: "DELETE" });
       }
-      setToast(confirmCopy(next));
+      if (opts?.celebrate !== false) setConfirm(joinConfirmKind(next));
       return true;
     } catch (err) {
       setState(prev);
@@ -115,10 +108,11 @@ export function ParticipationButtons({
     }
   };
 
-  const promptInviteIfNeeded = () => {
-    if (hasPromptedInvite(planId, user?.id)) return;
+  const promptInviteIfNeeded = (): boolean => {
+    if (hasPromptedInvite(planId, user?.id)) return false;
     markPromptedInvite(planId, user?.id);
     onJustMarkedGoing?.();
+    return true;
   };
 
   const tapGoing = async () => {
@@ -127,7 +121,8 @@ export function ParticipationButtons({
       setShowGoingSheet(true);
       return;
     }
-    const ok = await commit("going");
+    const willInvite = !hasPromptedInvite(planId, user?.id) && !!onJustMarkedGoing;
+    const ok = await commit("going", { celebrate: !willInvite });
     if (ok) promptInviteIfNeeded();
   };
 
@@ -163,7 +158,8 @@ export function ParticipationButtons({
 
   const switchToGoing = async () => {
     setShowInterestedSheet(false);
-    const ok = await commit("going");
+    const willInvite = !hasPromptedInvite(planId, user?.id) && !!onJustMarkedGoing;
+    const ok = await commit("going", { celebrate: !willInvite });
     if (ok) promptInviteIfNeeded();
   };
 
@@ -183,7 +179,7 @@ export function ParticipationButtons({
               ? "This plan is full."
               : capacity !== null
                 ? `${goingCount}/${capacity} spots taken — first come, first serve.`
-                : "In is committed. Interested is soft — both count and join the chat."}
+                : "“I'm In” is committed. Interested is soft — both count and join the chat."}
         </p>
       )}
       {!loose && (
@@ -194,12 +190,12 @@ export function ParticipationButtons({
           disabled={pending || isFull || isApproveOnly}
         >
           {goingActive
-            ? "You're In ✓"
+            ? "I'm In ✓"
             : isFull
               ? "Full"
               : isApproveOnly
                 ? "Application-only"
-                : "In"}
+                : "I'm In"}
         </button>
       )}
       <button
@@ -219,17 +215,13 @@ export function ParticipationButtons({
               : "Interested"}
       </button>
       {error && <p className="onboarding-error" style={{ marginTop: 8 }}>{error}</p>}
-      {toast && (
-        <p className="participation-toast" role="status" aria-live="polite">
-          {toast}
-        </p>
-      )}
+      {confirm && <JoinConfirmPopup kind={confirm} onClose={() => setConfirm(null)} />}
 
       {showGoingSheet && (
         <div className="sheet-backdrop" onClick={() => setShowGoingSheet(false)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
             <div className="sheet-handle" />
-            <div className="sheet-title">You're In</div>
+            <div className="sheet-title">I'm In</div>
             <button type="button" className="sheet-link" onClick={() => void switchToInterested()}>
               Switch to Interested
             </button>
@@ -250,7 +242,7 @@ export function ParticipationButtons({
             <div className="sheet-title">Interested</div>
             {!loose && !isApproveOnly && !isFull && (
               <button type="button" className="sheet-link" onClick={() => void switchToGoing()}>
-                Switch to In
+                Switch to I'm In
               </button>
             )}
             <button

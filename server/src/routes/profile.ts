@@ -30,7 +30,7 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
   const todayIso = new Date().toISOString().slice(0, 10);
   const past = allPlans.filter((p) => p.date < todayIso);
 
-  // Upcoming = hosting + actively In or Interested (not saved/bookmarked-only).
+  // Upcoming = hosting + I'm In or Interested (two-state participation).
   const upcomingHosted = allPlans.filter((p) => !p.cancelledAt && p.date >= todayIso);
   const upcomingJoined = store
     .listParticipationsForUser(targetId)

@@ -414,7 +414,7 @@
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.62);
   color: #fff;
-  font-size: 13px;
+  font-size: var(--text-body);
   line-height: 1;
   display: inline-flex;
   align-items: center;

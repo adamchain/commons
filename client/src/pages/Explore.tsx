@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { MapPin, Search } from "lucide-react";
 import { api } from "../api/http";
 import { Label } from "../components/ui";
-import { COMMUNITY_CATEGORY_LABELS, type CommunityCardDTO } from "../types/shared";
+import { COMMUNITY_CATEGORY_LABELS, type CommunityCardDTO, type CommunityDTO } from "../types/shared";
 
 // Explore is locked to an editorial "Coming Soon" state for launch (no live
 // search / nearby calls) — EXCEPT the Communities rail, which is the one live
@@ -204,8 +204,16 @@ function CommunityJoinCta({
     if (busy) return;
     setBusy(true);
     try {
-      await api(`/api/communities/${community.id}/join`, { method: "POST", body: JSON.stringify({}) });
-      onJoined({ ...community, myMembershipStatus: "active", memberCount: community.memberCount + 1 });
+      const updated = await api<CommunityDTO>(`/api/communities/${community.id}/join`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      const nextStatus = updated.myMembership?.status ?? "active";
+      onJoined({
+        ...community,
+        myMembershipStatus: nextStatus,
+        memberCount: nextStatus === "active" ? community.memberCount + 1 : community.memberCount,
+      });
     } catch {
       /* rail CTA fails quietly — the full community page has the real error state */
     } finally {
@@ -215,7 +223,7 @@ function CommunityJoinCta({
 
   return (
     <button type="button" className="xpl-comm-join" disabled={busy} onClick={handleClick}>
-      {community.hasScreening ? "Request" : "Join"}
+      {busy ? "…" : community.hasScreening ? "Request" : "Join"}
     </button>
   );
 }

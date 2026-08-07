@@ -6,6 +6,7 @@ import { EmptyCard } from "../components/ui";
 import {
   COMMUNITY_CATEGORY_LABELS,
   type CommunityCardDTO,
+  type CommunityDTO,
 } from "../types/shared";
 import "./Communities.css";
 
@@ -137,8 +138,16 @@ function CommunityJoinButton({ c, onJoined }: { c: CommunityCardDTO; onJoined: (
     if (busy) return;
     setBusy(true);
     try {
-      await api(`/api/communities/${c.id}/join`, { method: "POST", body: JSON.stringify({}) });
-      onJoined({ ...c, myMembershipStatus: "active", memberCount: c.memberCount + 1 });
+      const updated = await api<CommunityDTO>(`/api/communities/${c.id}/join`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      const nextStatus = updated.myMembership?.status ?? "active";
+      onJoined({
+        ...c,
+        myMembershipStatus: nextStatus,
+        memberCount: nextStatus === "active" ? c.memberCount + 1 : c.memberCount,
+      });
     } catch {
       /* card CTA fails quietly — the full community page has the real error state */
     } finally {
@@ -148,7 +157,7 @@ function CommunityJoinButton({ c, onJoined }: { c: CommunityCardDTO; onJoined: (
 
   return (
     <button type="button" className="cmy-card-join" disabled={busy} onClick={handleClick}>
-      {c.hasScreening ? "Request" : "Join"}
+      {busy ? "…" : c.hasScreening ? "Request" : "Join"}
     </button>
   );
 }

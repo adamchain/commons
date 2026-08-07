@@ -15,13 +15,18 @@ import { Avatar } from "../components/Avatar";
 import { PollCard } from "../components/PollCard";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
+import { fileToResizedDataUrl } from "../lib/imageResize";
 import { interestVisual } from "../lib/interestIcons";
 import { hrefForBack, type NavFromState } from "../lib/navState";
+import { pickPhotoNative } from "../lib/photoPicker";
+import { isNative } from "../lib/platform";
 import { planHasEnded } from "../lib/planTime";
 import type { ConversationDTO, MessageDTO, PlanDTO, PublicUser } from "../types/shared";
 
 const POLL_MS = 4000;
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
+const CHAT_IMAGE_MAX_PX = 1024;
+const CHAT_IMAGE_QUALITY = 0.85;
 
 export function ChatPage() {
   const { planId = "" } = useParams();
@@ -52,6 +57,8 @@ export function ChatPage() {
   const [messages, setMessages] = useState<MessageDTO[]>([]);
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [attachingImage, setAttachingImage] = useState(false);
   const [pollModalOpen, setPollModalOpen] = useState(false);
   const [pollQuestion, setPollQuestion] = useState("");
   const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
@@ -69,6 +76,7 @@ export function ChatPage() {
   const atBottomRef = useRef(true);
   const composerMenuRef = useRef<HTMLDivElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void (async () => {
@@ -170,17 +178,62 @@ export function ChatPage() {
 
   async function send() {
     const trimmed = body.trim();
-    if (!trimmed || !conv) return;
+    if ((!trimmed && !pendingImage) || !conv || sending) return;
     setSending(true);
     try {
       const msg = await api<MessageDTO>(`/api/conversations/${conv.id}/messages`, {
         method: "POST",
-        body: JSON.stringify({ body: trimmed }),
+        body: JSON.stringify({
+          ...(trimmed ? { body: trimmed } : {}),
+          ...(pendingImage ? { imageUrl: pendingImage } : {}),
+        }),
       });
       setMessages((prev) => [...prev, msg]);
       setBody("");
+      setPendingImage(null);
+    } catch (e) {
+      window.alert(parseApiError(e) || "Couldn't send that message.");
     } finally {
       setSending(false);
+    }
+  }
+
+  async function attachImage(dataUrl: string) {
+    setPendingImage(dataUrl);
+  }
+
+  async function pickImage() {
+    setComposerMenuOpen(false);
+    try {
+      if (isNative()) {
+        setAttachingImage(true);
+        try {
+          const dataUrl = await pickPhotoNative({
+            maxPx: CHAT_IMAGE_MAX_PX,
+            quality: CHAT_IMAGE_QUALITY,
+          });
+          if (dataUrl) await attachImage(dataUrl);
+        } finally {
+          setAttachingImage(false);
+        }
+        return;
+      }
+      imageInputRef.current?.click();
+    } catch {
+      setAttachingImage(false);
+    }
+  }
+
+  async function onImageFileSelected(file: File | undefined) {
+    if (!file) return;
+    setAttachingImage(true);
+    try {
+      const dataUrl = await fileToResizedDataUrl(file, CHAT_IMAGE_MAX_PX, CHAT_IMAGE_QUALITY);
+      await attachImage(dataUrl);
+    } catch {
+      window.alert("Couldn't read that image. Try another.");
+    } finally {
+      setAttachingImage(false);
     }
   }
 
@@ -520,11 +573,23 @@ export function ChatPage() {
                       ) : null}
                     </span>
                   )}
-                  <div className="chat-bubble">
+                  <div className={`chat-bubble${entry.imageUrl ? " has-image" : ""}`}>
                     {!mine && entry.showAvatar && (
                       <div className="chat-bubble-author">{entry.sender.firstName}</div>
                     )}
-                    <div className="chat-bubble-body">{entry.body}</div>
+                    {entry.imageUrl && (
+                      <a
+                        href={entry.imageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="chat-bubble-image-link"
+                      >
+                        <img src={entry.imageUrl} alt="" className="chat-bubble-image" />
+                      </a>
+                    )}
+                    {entry.body && !(entry.imageUrl && entry.body === "📷 Photo") && (
+                      <div className="chat-bubble-body">{entry.body}</div>
+                    )}
                     <div className="chat-bubble-time">{formatTimeOnly(entry.createdAt)}</div>
                     {(() => {
                       const hearts = entry.reactions["❤️"] ?? [];
@@ -556,61 +621,100 @@ export function ChatPage() {
             void send();
           }}
         >
-          <div className="chat-composer-menu-wrap" ref={composerMenuRef}>
-            <button
-              type="button"
-              className="chat-composer-add"
-              onClick={() => setComposerMenuOpen((v) => !v)}
-              aria-label="More actions"
-              aria-expanded={composerMenuOpen}
-            >
-              <Plus size={14} strokeWidth={2} aria-hidden="true" />
-            </button>
-            {composerMenuOpen && (
-              <div className="chat-composer-menu" role="menu">
+          {pendingImage && (
+            <div className="chat-composer-attach">
+              <div className="chat-composer-attach-thumb">
+                <img src={pendingImage} alt="" />
                 <button
                   type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setComposerMenuOpen(false);
-                    setPollModalOpen(true);
-                  }}
+                  className="chat-composer-attach-remove"
+                  aria-label="Remove image"
+                  onClick={() => setPendingImage(null)}
                 >
-                  Add a poll
-                </button>
-                <Link
-                  to={replanHref}
-                  role="menuitem"
-                  className="chat-composer-menu-link"
-                  onClick={() => setComposerMenuOpen(false)}
-                >
-                  Make a plan
-                </Link>
-                <button type="button" role="menuitem" disabled>
-                  Upload an image (soon)
+                  ×
                 </button>
               </div>
-            )}
+            </div>
+          )}
+          <div className="chat-composer-row">
+            <div className="chat-composer-menu-wrap" ref={composerMenuRef}>
+              <button
+                type="button"
+                className="chat-composer-add"
+                onClick={() => setComposerMenuOpen((v) => !v)}
+                aria-label="More actions"
+                aria-expanded={composerMenuOpen}
+              >
+                <Plus size={14} strokeWidth={2} aria-hidden="true" />
+              </button>
+              {composerMenuOpen && (
+                <div className="chat-composer-menu" role="menu">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setComposerMenuOpen(false);
+                      setPollModalOpen(true);
+                    }}
+                  >
+                    Add a poll
+                  </button>
+                  <Link
+                    to={replanHref}
+                    role="menuitem"
+                    className="chat-composer-menu-link"
+                    onClick={() => setComposerMenuOpen(false)}
+                  >
+                    Make a plan
+                  </Link>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={attachingImage || sending}
+                    onClick={() => void pickImage()}
+                  >
+                    {attachingImage ? "Adding…" : "Upload an image"}
+                  </button>
+                </div>
+              )}
+            </div>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                void onImageFileSelected(f);
+                if (imageInputRef.current) imageInputRef.current.value = "";
+              }}
+            />
+            <input
+              type="text"
+              className="chat-composer-input"
+              placeholder={pendingImage ? "Add a caption…" : "Message the group…"}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                if (sending || (!body.trim() && !pendingImage)) return;
+                void send();
+              }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.currentTarget.focus({ preventScroll: true });
+              }}
+            />
+            <button
+              type="submit"
+              className={`chat-composer-send ${body.trim() || pendingImage ? "is-ready" : ""}`}
+              disabled={sending || (!body.trim() && !pendingImage)}
+              aria-label="Send message"
+            >
+              <ArrowUp size={13} strokeWidth={2.2} aria-hidden="true" />
+            </button>
           </div>
-          <input
-            type="text"
-            className="chat-composer-input"
-            placeholder="Message the group…"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.currentTarget.focus({ preventScroll: true });
-            }}
-          />
-          <button
-            type="submit"
-            className={`chat-composer-send ${body.trim() ? "is-ready" : ""}`}
-            disabled={sending || !body.trim()}
-            aria-label="Send message"
-          >
-            <ArrowUp size={13} strokeWidth={2.2} aria-hidden="true" />
-          </button>
         </form>
       </div>
 
@@ -728,6 +832,7 @@ type GroupedEntry =
       createdAt: string;
       showAvatar: boolean;
       reactions: Record<string, string[]>;
+      imageUrl?: string | null;
     };
 
 function groupMessages(msgs: MessageDTO[]): GroupedEntry[] {
@@ -768,6 +873,7 @@ function groupMessages(msgs: MessageDTO[]): GroupedEntry[] {
       createdAt: m.createdAt,
       showAvatar: !cont,
       reactions: m.reactions ?? {},
+      imageUrl: m.imageUrl,
     });
     lastUserSenderId = sender.id;
     lastUserAt = date.getTime();

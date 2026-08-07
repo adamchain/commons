@@ -17,11 +17,29 @@ import {
 import { onPlanCreatedVenueNudge, notifyInterestedPlanLocked } from "../lib/nudges.js";
 import { emit } from "../lib/notify.js";
 import { isAdminPhone } from "../lib/adminPhones.js";
-import { plansOverlap, FLEXIBLE_DATE_PLACEHOLDER } from "../lib/planTime.js";
+import { planHasEnded, plansOverlap, FLEXIBLE_DATE_PLACEHOLDER } from "../lib/planTime.js";
 import { coverUrlFor } from "./share.js";
 import type { PublicPlanDTO } from "../types/shared.js";
 
 export const plansRouter = Router();
+
+/** Accept uploaded data-URLs or library http(s) covers; drop anything else. */
+function normalizeFlyerDataUrl(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const value = raw.trim();
+  if (value.startsWith("data:image/") && value.length < 1_600_000) return value;
+  // Cover library / GCS URLs — keep the exact string (don't re-serialize via
+  // URL.toString(), which can alter encoding on Firebase download links).
+  if (value.startsWith("https://") || value.startsWith("http://")) {
+    try {
+      const u = new URL(value);
+      if (u.protocol === "http:" || u.protocol === "https:") return value.slice(0, 2048);
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
 
 function userHoods(me: UserRecord): string[] {
   if (me.neighborhoodIds?.length) return me.neighborhoodIds;
@@ -318,18 +336,27 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     return;
   }
   const resolvedDate = isFlexibleDate ? FLEXIBLE_DATE_PLACEHOLDER : dateInput;
-  // Neighborhood is required unless the host explicitly toggled flexible. The
-  // form no longer renders a free-text "Where" field — the neighborhood is the
-  // location signal — so we don't enforce locationName here.
+  // Exact location is the default; Flexible is opt-in. Require a venue/place
+  // name (and neighborhood) unless the host explicitly toggled flexible.
+  if (!isFlexibleLocation && !locationName) {
+    res.status(400).json({ error: "Pick a location or turn on flexible." });
+    return;
+  }
   if (!neighborhoodId && !isFlexibleLocation) {
     res.status(400).json({ error: "Pick a neighborhood or turn on flexible." });
+    return;
+  }
+  if (!isFlexibleTime && !isFlexibleDate && !time) {
+    res.status(400).json({ error: "Pick a time or turn on flexible." });
     return;
   }
   if (neighborhoodId && !store.findNeighborhoodById(neighborhoodId)) {
     res.status(400).json({ error: "Unknown neighborhood" });
     return;
   }
-  const resolvedLocationName = locationName || "Flexible location";
+  const resolvedLocationName = isFlexibleLocation
+    ? locationName || "Flexible location"
+    : locationName;
   const resolvedAddress = locationAddress || resolvedLocationName;
 
   // Community tagging. When set, validate the community is live, the poster is
@@ -386,11 +413,8 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     .filter((id) => Boolean(store.findUserById(id)))
     .slice(0, 5);
 
-  // Optional flyer upload — guard size so a runaway base64 string doesn't blow
-  // up the JSON store. ~1.5MB data URL is plenty for a flyer screenshot.
-  const rawFlyer = typeof req.body?.flyerDataUrl === "string" ? req.body.flyerDataUrl : "";
-  const flyerDataUrl =
-    rawFlyer.startsWith("data:image/") && rawFlyer.length < 1_600_000 ? rawFlyer : undefined;
+  // Optional flyer — uploaded data URL or library https cover.
+  const flyerDataUrl = normalizeFlyerDataUrl(req.body?.flyerDataUrl);
 
   // Optional shareable link. We trust the client-fetched OG preview rather than
   // re-fetching at create time — the preview endpoint already validated and
@@ -461,15 +485,20 @@ plansRouter.post("/", requireAuth, async (req, res) => {
       dedupKey: `coHost:${plan.id}:${coId}`,
     });
   }
-  const conv = store.ensureGroupConversation(plan.id, [userId, ...coHostIds]);
+  const newConv = store.ensureGroupConversation(plan.id, [userId, ...coHostIds]);
 
   // "Do it again": pull the previous event's attendees + group chat forward so
-  // the crew and their conversation carry into the new plan.
-  if (fromPlanId) {
+  // the crew and their conversation carry into the NEW plan only. Never run
+  // this for ordinary creates / edits — fromPlanId must point at a different,
+  // concluded plan the caller hosted or attended.
+  if (fromPlanId && fromPlanId !== plan.id) {
     const prevPlan = store.findPlanById(fromPlanId);
-    // Only the previous host or an attendee may re-plan from it.
     const prevPart = store.findParticipation(fromPlanId, userId);
-    const mayReplan = prevPlan && (prevPlan.creatorId === userId || Boolean(prevPart));
+    const concluded = Boolean(prevPlan?.cancelledAt) || (prevPlan ? planHasEnded(prevPlan) : false);
+    const mayReplan =
+      Boolean(prevPlan) &&
+      concluded &&
+      (prevPlan!.creatorId === userId || Boolean(prevPart));
     if (prevPlan && mayReplan) {
       const prevAttendees = store
         .listParticipationsForPlan(fromPlanId)
@@ -480,14 +509,19 @@ plansRouter.post("/", requireAuth, async (req, res) => {
       if (prevAttendees.length > 0) {
         store.ensureGroupConversation(plan.id, [userId, ...coHostIds, ...prevAttendees]);
       }
-      // Persist the previous group chat history into the new thread.
+      // Persist the previous group chat history into the new thread only.
       const prevConv = store.findGroupConversationByPlan(fromPlanId);
-      if (prevConv) store.cloneConversationMessages(prevConv.id, conv.id);
+      if (prevConv && prevConv.id !== newConv.id) {
+        store.cloneConversationMessages(prevConv.id, newConv.id);
+      }
 
-      // Announce the re-plan in the carried-over thread + ping everyone who came.
-      const whenLabel = isFlexibleTime || !time ? dateInput : `${dateInput} at ${time}`;
+      // Announce on the NEW plan's chat — never the source plan's thread.
+      const whenLabel =
+        isFlexibleTime || isFlexibleDate || !time
+          ? resolvedDate
+          : `${resolvedDate} at ${time}`;
       store.createSystemMessage(
-        conv.id,
+        newConv.id,
         `🔁 ${me.firstName || "The host"} planned "${title}" again — ${whenLabel}. Same crew, new date.`,
       );
       for (const attId of prevAttendees) {
@@ -496,7 +530,7 @@ plansRouter.post("/", requireAuth, async (req, res) => {
           kind: "planInvite",
           body: `${me.firstName || "Someone"} is doing "${title}" again — you're in the group`,
           planId: plan.id,
-          conversationId: conv.id,
+          conversationId: newConv.id,
           dedupKey: `replan:${plan.id}:${attId}`,
         });
       }
@@ -617,9 +651,10 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
   }
   if (req.body?.flyerDataUrl !== undefined) {
     const raw = req.body.flyerDataUrl;
-    if (raw === null) patch.flyerDataUrl = undefined;
-    else if (typeof raw === "string" && raw.startsWith("data:image/") && raw.length < 1_600_000) {
-      patch.flyerDataUrl = raw;
+    if (raw === null || raw === "") patch.flyerDataUrl = undefined;
+    else {
+      const normalized = normalizeFlyerDataUrl(raw);
+      if (normalized) patch.flyerDataUrl = normalized;
     }
   }
   if (req.body?.flyerLinkUrl !== undefined) {
@@ -930,6 +965,19 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
     return;
   }
 
+  // Optional cover chosen at lock-in (upload or library). Null clears; omit
+  // leaves the existing flyer alone.
+  const flyerInBody = req.body?.flyerDataUrl;
+  const flyerPatch =
+    flyerInBody === null || flyerInBody === ""
+      ? { flyerDataUrl: undefined }
+      : flyerInBody !== undefined
+        ? (() => {
+            const normalized = normalizeFlyerDataUrl(flyerInBody);
+            return normalized ? { flyerDataUrl: normalized } : {};
+          })()
+        : {};
+
   // Keep planKind as looking_for after a lock so the card on the feed shows
   // "Plan created" rather than becoming an indistinguishable confirmed plan —
   // the lifecycle history is the point. `lockedAt` distinguishes the locked
@@ -947,6 +995,7 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
     time: isFlexibleTime ? "" : time,
     isFlexibleTime,
     isFlexibleLocation: false,
+    ...flyerPatch,
   };
   store.updatePlan(planId, patch);
 

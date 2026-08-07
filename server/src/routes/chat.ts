@@ -6,7 +6,38 @@ import { findUserById, findUsersByIds } from "../userRepo.js";
 import { userToPublic } from "./plans.js";
 import { emit } from "../lib/notify.js";
 import { isAdminPhone } from "../lib/adminPhones.js";
+import { isGcsConfigured, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
 import type { ConversationDTO, ConversationSummaryDTO, MessageDTO, PollDTO } from "../types/shared.js";
+
+const MAX_CHAT_IMAGE_CHARS = 1_600_000;
+
+function messagePreview(msg: { kind?: string; body: string; imageUrl?: string | null }): string {
+  if (msg.kind === "poll") return `📊 ${truncate(msg.body, 78)}`;
+  if (msg.imageUrl) {
+    const caption = msg.body.trim();
+    if (!caption || caption === "📷 Photo") return "📷 Photo";
+    return `📷 ${truncate(caption, 78)}`;
+  }
+  return truncate(msg.body, 80);
+}
+
+async function resolveChatImageUrl(raw: string): Promise<string | null> {
+  if (raw.startsWith("http://") || raw.startsWith("https://")) {
+    return raw.slice(0, 2048);
+  }
+  if (!raw.startsWith("data:image/") || raw.length >= MAX_CHAT_IMAGE_CHARS) return null;
+  if (isGcsConfigured()) {
+    const parsed = parseDataUrl(raw);
+    if (parsed) {
+      try {
+        return await uploadCardImage(parsed.buffer, parsed.contentType, "chat-images");
+      } catch (err) {
+        console.error("[chat] image GCS upload failed; storing inline", err);
+      }
+    }
+  }
+  return raw;
+}
 
 export const chatRouter = Router();
 
@@ -78,11 +109,7 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
       planDate: plan.date,
       conversationId: conv?.id ?? null,
       lastMessageAt: conv && msgs.length ? conv.lastMessageAt : null,
-      lastMessagePreview: lastMsg
-        ? lastMsg.kind === "poll"
-          ? `📊 ${truncate(lastMsg.body, 78)}`
-          : truncate(lastMsg.body, 80)
-        : null,
+      lastMessagePreview: lastMsg ? messagePreview(lastMsg) : null,
       unreadCount: conv ? msgs.filter((m) => !m.readBy.includes(userId)).length : 0,
       participantCount,
       myRole,
@@ -108,11 +135,7 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
       planDate: community.createdAt.slice(0, 10),
       conversationId: conv?.id ?? null,
       lastMessageAt: conv && msgs.length ? conv.lastMessageAt : null,
-      lastMessagePreview: lastMsg
-        ? lastMsg.kind === "poll"
-          ? `📊 ${truncate(lastMsg.body, 78)}`
-          : truncate(lastMsg.body, 80)
-        : null,
+      lastMessagePreview: lastMsg ? messagePreview(lastMsg) : null,
       unreadCount: conv ? msgs.filter((m) => !m.readBy.includes(userId)).length : 0,
       participantCount: community.memberCount,
       myRole: community.organizerId === userId ? "hosting" : "going",
@@ -205,12 +228,18 @@ chatRouter.get("/conversations/:id/messages", requireAuth, async (req, res) => {
   res.json(messages);
 });
 
-// POST /api/conversations/:id/messages { body }
+// POST /api/conversations/:id/messages { body?, imageUrl? }
 chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => {
   const convId = String(req.params.id);
   const userId = String(req.userId);
-  const body = String(req.body?.body ?? "").trim();
-  if (!body) {
+  const body = String(req.body?.body ?? "").trim().slice(0, 2000);
+  const rawImage = typeof req.body?.imageUrl === "string" ? req.body.imageUrl : "";
+  const imageUrl = rawImage ? await resolveChatImageUrl(rawImage) : null;
+  if (rawImage && !imageUrl) {
+    res.status(400).json({ error: "Couldn't use that image. Try a smaller photo." });
+    return;
+  }
+  if (!body && !imageUrl) {
     res.status(400).json({ error: "Message body required" });
     return;
   }
@@ -228,7 +257,10 @@ chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => 
     res.status(403).json({ error: blocked });
     return;
   }
-  const message = store.createMessage(convId, userId, body);
+  // Image-only messages get a placeholder body so inbox previews + notifications
+  // stay readable without poll/image-specific branching everywhere.
+  const storedBody = body || (imageUrl ? "📷 Photo" : "");
+  const message = store.createMessage(convId, userId, storedBody, imageUrl);
   // Notify every other group participant. Group chat only — DM rooms collapse
   // unread to a single signal that's already in conversation lists.
   if (conv.type === "group") {
@@ -243,7 +275,7 @@ chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => 
       await emit({
         userId: recipientId,
         kind: "newGroupChatMessage",
-        body: `${senderName} in "${planTitle}": ${truncate(body, 80)}`,
+        body: `${senderName} in "${planTitle}": ${messagePreview(message)}`,
         planId: conv.planId,
         conversationId: convId,
         dedupKey: `newGroupChatMessage:${message.id}:${recipientId}`,
@@ -547,6 +579,7 @@ async function toMessageDto(
     body: m.body,
     createdAt: m.createdAt,
     reactions: m.reactions ?? {},
+    ...(m.imageUrl ? { imageUrl: m.imageUrl } : {}),
   };
 }
 

@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "./Avatar";
+import { JoinConfirmPopup, joinConfirmKind, type JoinConfirmKind } from "./JoinConfirmPopup";
 import { useAuth } from "../context/AuthContext";
 import type { PlanDTO } from "../types/shared";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
@@ -78,17 +79,26 @@ export function PlanCard({
     spotsRemaining !== null && plan.capacity !== null && spotsRemaining > 0 && spotsRemaining <= 3;
   const isFull = plan.capacity !== null && goingCount >= plan.capacity;
 
-  const footerCount = almostPlan
-    ? `${totalRsvps} Interested · almost a plan`
+  // Going first, then Interested — up to 3 faces so the footer stays compact.
+  const facepile = [...plan.participants.going, ...plan.participants.interested].slice(0, 3);
+
+  const footerSuffix = almostPlan
+    ? "almost a plan"
     : hasEnded && goingCount >= 1
-      ? `${goingCount} went`
+      ? null
       : isFull && !hasEnded && !isCancelled
-        ? `${goingCount} Going · full`
+        ? "full"
         : showSpotsRemaining
-          ? `${goingCount} Going · ${spotsRemaining} spot${spotsRemaining === 1 ? "" : "s"} left`
-          : goingCount >= 1 || interestedCount >= 1
-            ? `${goingCount} Going${interestedCount > 0 ? ` · ${interestedCount} Interested` : ""}`
-            : null;
+          ? `${spotsRemaining} spot${spotsRemaining === 1 ? "" : "s"} left`
+          : null;
+
+  const showWentLabel = hasEnded && goingCount >= 1;
+  const showGoingLabel =
+    !almostPlan && !hasEnded && (goingCount >= 1 || interestedCount >= 1 || Boolean(footerSuffix));
+  const showInterestedLabel = almostPlan
+    ? totalRsvps >= 1
+    : !hasEnded && interestedCount > 0;
+  const showCountLabels = showWentLabel || showGoingLabel || showInterestedLabel;
 
   // Host-only chip, few minutes after posting, never on past/cancelled.
   const showBanner = highlight && isHosting && !hasEnded && !isCancelled;
@@ -96,6 +106,11 @@ export function PlanCard({
   const openPlan = (hash?: string) => {
     if (navFrom.from === "feed") saveFeedScroll();
     cardNavigate(`/plans/${plan.id}${hash ?? ""}`, { state: navFrom });
+  };
+
+  const openProfile = (userId: string) => {
+    if (navFrom.from === "feed") saveFeedScroll();
+    cardNavigate(`/profile/${userId}`, { state: navFrom });
   };
 
   return (
@@ -201,18 +216,84 @@ export function PlanCard({
 
           <footer className="plan-card-footer-row">
             <div className="plan-card-attendees">
-              {footerCount && (
-                <button
-                  type="button"
-                  className="plan-card-going-count plan-card-going-count--link"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    openPlan("#guests");
-                  }}
-                >
-                  {footerCount}
-                </button>
+              {facepile.length > 0 && (
+                <div className="avatar-stack">
+                  {facepile.map((person) => (
+                    <button
+                      key={person.id}
+                      type="button"
+                      className="avatar-stack-link plan-card-avatar-link"
+                      aria-label={`${person.firstName}'s profile`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openProfile(person.id);
+                      }}
+                    >
+                      <Avatar
+                        seed={person.avatarSeed}
+                        style={person.avatarStyle}
+                        photoDataUrl={person.avatarPhotoDataUrl}
+                        params={person.avatarParams}
+                        size="xs"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+              {showCountLabels && (
+                <div className="plan-card-going-count">
+                  {showWentLabel && (
+                    <button
+                      type="button"
+                      className="plan-card-going-count--link"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openPlan("#guests");
+                      }}
+                    >
+                      {goingCount} went
+                    </button>
+                  )}
+                  {showGoingLabel && (
+                    <button
+                      type="button"
+                      className="plan-card-going-count--link"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openPlan("#guests");
+                      }}
+                    >
+                      {goingCount} Going
+                    </button>
+                  )}
+                  {showGoingLabel && showInterestedLabel && (
+                    <span className="plan-card-going-sep" aria-hidden="true">
+                      {" · "}
+                    </span>
+                  )}
+                  {showInterestedLabel && (
+                    <button
+                      type="button"
+                      className="plan-card-going-count--link"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openPlan("#guests");
+                      }}
+                    >
+                      {almostPlan ? totalRsvps : interestedCount} Interested
+                    </button>
+                  )}
+                  {footerSuffix && (showGoingLabel || showInterestedLabel) && (
+                    <span className="plan-card-going-sep">
+                      {" · "}
+                      {footerSuffix}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
             {!isHosting && !hasEnded && !isCancelled && (
@@ -295,7 +376,7 @@ function QuickJoin({
 }) {
   const [busy, setBusy] = useState(false);
   const [showSheet, setShowSheet] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<JoinConfirmKind | null>(null);
 
   const goingActive = state === "going";
   const interestedActive = state === "interested";
@@ -310,13 +391,11 @@ function QuickJoin({
           method: "PUT",
           body: JSON.stringify({ state: next }),
         });
-        setToast(next === "going" ? "You're In" : "Marked Interested");
       } else {
         await api(`/api/plans/${planId}/participation`, { method: "DELETE" });
-        setToast("Dropped out");
       }
+      setConfirm(joinConfirmKind(next));
       onPlanRefresh?.();
-      window.setTimeout(() => setToast(null), 2000);
     } catch {
       /* surface nothing on the card */
     } finally {
@@ -333,7 +412,7 @@ function QuickJoin({
       return;
     }
     if (interestedActive) {
-      // Soft state — open sheet to drop or upgrade to In.
+      // Soft state — open sheet to drop or upgrade to I'm In.
       setShowSheet(true);
       return;
     }
@@ -349,12 +428,12 @@ function QuickJoin({
   }
 
   const label = goingActive
-    ? "In ✓"
+    ? "I'm In ✓"
     : interestedActive
       ? "Interested ✓"
       : isLooking
         ? "Interested"
-        : "In";
+        : "I'm In";
 
   return (
     <>
@@ -366,11 +445,7 @@ function QuickJoin({
       >
         {busy ? "…" : label}
       </button>
-      {toast && (
-        <span className="plan-card-toast" role="status">
-          {toast}
-        </span>
-      )}
+      {confirm && <JoinConfirmPopup kind={confirm} onClose={() => setConfirm(null)} />}
       {showSheet &&
         createPortal(
           <div
@@ -383,7 +458,7 @@ function QuickJoin({
           >
             <div className="sheet" onClick={(e) => e.stopPropagation()}>
               <div className="sheet-handle" />
-              <div className="sheet-title">{goingActive ? "You're In" : "Interested"}</div>
+              <div className="sheet-title">{goingActive ? "I'm In" : "Interested"}</div>
               {goingActive && (
                 <button type="button" className="sheet-link" onClick={() => void setState("interested")}>
                   Switch to Interested
@@ -391,7 +466,7 @@ function QuickJoin({
               )}
               {interestedActive && !isLooking && !isFull && (
                 <button type="button" className="sheet-link" onClick={() => void setState("going")}>
-                  Switch to In
+                  Switch to I'm In
                 </button>
               )}
               <button

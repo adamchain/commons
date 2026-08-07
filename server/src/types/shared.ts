@@ -205,7 +205,7 @@ export interface PlanDTO {
   upForGrabsAt?: string | null;
   /** Host answer to "Did this happen?" */
   happenedOutcome?: "yes" | "no" | "rescheduled" | null;
-  /** Optional flyer image stored as data URL. */
+  /** Optional flyer/cover — uploaded data URL or library https URL. */
   flyerDataUrl?: string;
   /** Optional shareable link (event page, ticket page, etc.). */
   flyerLinkUrl?: string;
@@ -300,6 +300,8 @@ export interface MessageDTO {
   reactions?: Record<string, string[]>;
   /** Present only on `poll` messages. */
   poll?: PollDTO;
+  /** Optional image on a user message (data URL or https). */
+  imageUrl?: string | null;
 }
 
 export interface FeedbackDTO {
@@ -338,8 +340,6 @@ export interface MeDTO {
   createdAt: string;
   /** User ids in this person’s COMMONS network (one-way). */
   networkUserIds?: string[];
-  /** Plan ids the user saved/pinned for the My Plans page. */
-  savedPlanIds?: string[];
   /** Always present to self; only sent to others when visibility check passes. */
   socialLinks?: SocialLinks;
   /** True when this verified phone may use `/api/admin` and `/admin`. */

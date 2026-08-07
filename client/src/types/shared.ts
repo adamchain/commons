@@ -312,7 +312,7 @@ export interface PlanDTO {
   upForGrabsAt?: string | null;
   /** Host answer to "Did this happen?" */
   happenedOutcome?: "yes" | "no" | "rescheduled" | null;
-  /** Optional flyer image (data URL). People screenshot flyers — attach one. */
+  /** Optional flyer/cover — uploaded data URL or library https URL. */
   flyerDataUrl?: string;
   /** Optional shareable link (event page, ticket page, etc.). */
   flyerLinkUrl?: string;
@@ -404,6 +404,8 @@ export interface MessageDTO {
   reactions?: Record<string, string[]>;
   /** Present only on `poll` messages. */
   poll?: PollDTO;
+  /** Optional image on a user message (data URL or https). */
+  imageUrl?: string | null;
 }
 
 export interface FeedbackDTO {
@@ -442,7 +444,6 @@ export interface MeDTO {
   onboardingComplete: boolean;
   createdAt: string;
   networkUserIds?: string[];
-  savedPlanIds?: string[];
   socialLinks?: SocialLinks;
   /** True when this verified phone may use `/api/admin` and `/admin`. */
   canAccessAdmin?: boolean;

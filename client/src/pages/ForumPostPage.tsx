@@ -64,7 +64,7 @@ export function ForumPostPage() {
   };
 
   const deletePost = async () => {
-    if (!data) return;
+    if (!data || user?.id !== data.post.author.id) return;
     setDeleting(true);
     try {
       await api(`/api/forums/posts/${postId}`, { method: "DELETE" });
@@ -102,6 +102,7 @@ export function ForumPostPage() {
   }
 
   const { post, replies } = data;
+  const isOwner = !!user && user.id === post.author.id;
 
   return (
     <main className="app-shell app-shell--mid app-shell--with-nav app-shell--with-topbar forum-page">
@@ -110,7 +111,7 @@ export function ForumPostPage() {
           ← Forum
         </Link>
         <span className="create-header-title">Post</span>
-        {post.canDelete ? (
+        {isOwner ? (
           <button type="button" className="forum-leave-btn" onClick={() => void deletePost()} disabled={deleting}>
             {deleting ? "Deleting…" : "Delete"}
           </button>

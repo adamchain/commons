@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent, RefObject } from "react";
+import type { FormEvent } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   Calendar,
-  ChevronDown,
   Globe,
   ImagePlus,
   MapPin,
@@ -15,6 +14,7 @@ import {
 import { api } from "../api/http";
 import { FLEXIBLE_DATE_PLACEHOLDER } from "../lib/planTime";
 import { Avatar } from "../components/Avatar";
+import { CoverLibraryModal } from "../components/CoverLibraryModal";
 import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
@@ -122,6 +122,10 @@ export function CreatePlanPage() {
     () => inviteNamesParam.split(",").map((s) => s.trim()).filter(Boolean),
     [inviteNamesParam],
   );
+  // Community "Post a plan" / chat → create. Name is passed for an instant
+  // header banner (same pattern as inviteNames from group chat).
+  const communityId = searchParams.get("communityId");
+  const communityNameParam = searchParams.get("communityName");
   const prefillVibe: VibeIcon | null = useMemo(() => {
     if (!prefillTagParam) return null;
     const opt = VIBE_OPTIONS.find((o) => o.tag === prefillTagParam);
@@ -180,7 +184,7 @@ export function CreatePlanPage() {
   const [showMore, setShowMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Step 1 — user picks Make a plan (full form) vs Just an idea (loose, looking_for).
-  // Skipped automatically when arriving with an invite seed.
+  // Skipped automatically when arriving with an invite seed or community tag.
   type Path = "choose" | "plan" | "idea";
   const [path, setPath] = useState<Path>(
     inviteUserId ||
@@ -189,10 +193,13 @@ export function CreatePlanPage() {
       prefillName ||
       hostAgainFrom ||
       fromPlanId ||
-      fromForumTag
+      fromForumTag ||
+      communityId
       ? "plan"
       : "choose",
   );
+
+  const navigate = useNavigate();
 
   const leaveCreatePlan = () => {
     if (backToSourceId) {
@@ -201,6 +208,10 @@ export function CreatePlanPage() {
     }
     if (fromForumTag) {
       navigate(`/forums/${fromForumTag}`);
+      return;
+    }
+    if (communityId) {
+      navigate(`/communities/${communityId}`);
       return;
     }
     if (window.history.length > 1) navigate(-1);
@@ -216,11 +227,16 @@ export function CreatePlanPage() {
       navigate(`/forums/${fromForumTag}`);
       return;
     }
+    if (communityId) {
+      leaveCreatePlan();
+      return;
+    }
     setPath("choose");
   };
-  // Carries the source plan id server-side so "Host another like this" also
-  // pulls the previous crew + group chat forward, same as "Do it again".
-  const [carryFromId, setCarryFromId] = useState<string | null>(fromPlanId);
+  // Replan source — read live from the URL / nav state on every submit so a
+  // leftover "Do it again" id can't stick around after navigating to a fresh
+  // /plans/new (same route often doesn't remount, so useState would go stale).
+  const replanFromId = hostAgainFrom ?? fromPlanId;
   // The path selector now requires an explicit pick + Continue rather than
   // navigating on the first tap.
   const [pendingPath, setPendingPath] = useState<"plan" | "idea" | null>(null);
@@ -229,10 +245,11 @@ export function CreatePlanPage() {
   // Community tagging — when arriving from a community's "Post a plan" button
   // (?communityId=…), the plan is tagged to that community and the host picks
   // whether it's public (feed + community) or community-only.
-  const communityId = searchParams.get("communityId");
   const [pickedCommunityId] = useState<string | null>(communityId);
   const effectiveCommunityId = pickedCommunityId ?? communityId;
-  const [communityName, setCommunityName] = useState<string | null>(null);
+  const [communityName, setCommunityName] = useState<string | null>(
+    communityNameParam?.trim() || null,
+  );
   const [communityVisibility, setCommunityVisibility] = useState<"public" | "community_only">(
     "public",
   );
@@ -260,7 +277,6 @@ export function CreatePlanPage() {
     for (const id of inviteUserIds) seed.add(id);
     return seed;
   });
-  const navigate = useNavigate();
   const flyerRef = useRef<HTMLInputElement>(null);
   const [showCoverLib, setShowCoverLib] = useState(false);
 
@@ -335,7 +351,6 @@ export function CreatePlanPage() {
           joinType: prev.joinType,
           flyerDataUrl: prev.flyerDataUrl ?? null,
         }));
-        setCarryFromId(seedId);
         setPath("plan");
       })
       .catch(() => undefined);
@@ -368,14 +383,18 @@ export function CreatePlanPage() {
     : !form.isFlexibleDate && form.date && form.date < today()
       ? "Pick today or a future date."
       : null;
-  const timeError =
-    !dateError && !form.isFlexibleDate && !form.isFlexibleTime && form.date === today() && form.time
+  // Exact time/location are the default path — Flexible is opt-in, so an
+  // empty field without that toggle is an error (not an implied flexible).
+  const timeError = !dateError && !form.isFlexibleDate && !form.isFlexibleTime && !form.time
+    ? "Add a time or mark it flexible."
+    : !dateError && !form.isFlexibleDate && !form.isFlexibleTime && form.date === today() && form.time
       ? form.time < nowTime()
         ? "That time is in the past — pick a later time."
         : null
       : null;
-  const locationError =
-    !form.neighborhoodId && !form.isFlexibleLocation
+  const locationError = !form.isFlexibleLocation && !form.locationName.trim()
+    ? "Add a location or mark it flexible."
+    : !form.isFlexibleLocation && !form.neighborhoodId
       ? "Add a location or mark it flexible."
       : null;
   const capacityNum = form.capacityOn ? Number(form.capacity) : null;
@@ -455,7 +474,8 @@ export function CreatePlanPage() {
           flyerDataUrl: form.flyerDataUrl ?? undefined,
           flyerLinkUrl: form.flyerLinkUrl.trim() || undefined,
           flyerLinkPreview: form.flyerLinkPreview ?? undefined,
-          fromPlanId: carryFromId ?? undefined,
+          // Only when this screen was opened as "Do it again" / host-again.
+          fromPlanId: replanFromId || undefined,
           communityId: effectiveCommunityId ?? undefined,
           communityVisibility: effectiveCommunityId ? communityVisibility : undefined,
         }),
@@ -623,6 +643,20 @@ export function CreatePlanPage() {
               }));
               setPath("idea");
             } else if (pendingPath === "plan") {
+              // Make a plan always starts exact — Flexible is opt-in per field.
+              // Reset in case the host peeked at "Just an idea" first (which
+              // seeds all three flexible flags).
+              setForm((f) => ({
+                ...f,
+                isFlexibleLocation: false,
+                isFlexibleTime: false,
+                isFlexibleDate: false,
+                date:
+                  f.date && f.date >= today() && f.date !== FLEXIBLE_DATE_PLACEHOLDER
+                    ? f.date
+                    : today(),
+                time: f.time || defaultPlanTime(),
+              }));
               setPath("plan");
             }
           }}
@@ -652,11 +686,19 @@ export function CreatePlanPage() {
           dateError={dateError}
           toggleVibe={toggleVibe}
           onBack={backFromForm}
+          onOpenLibrary={() => setShowCoverLib(true)}
           onOpenFlyer={() => void openFlyerPicker()}
           onClearFlyer={() => setForm((f) => ({ ...f, flyerDataUrl: null }))}
           inviteUserName={inviteUserName}
           inviteNames={inviteNames}
           invitedCount={invitedIds.size}
+          network={network}
+          invitedIds={invitedIds}
+          onToggleInvited={toggleInvited}
+          communityId={effectiveCommunityId}
+          communityName={communityName}
+          communityVisibility={communityVisibility}
+          onCommunityVisibilityChange={setCommunityVisibility}
         />
         <input
           ref={flyerRef}
@@ -721,6 +763,17 @@ export function CreatePlanPage() {
         </div>
       ) : null}
 
+      {effectiveCommunityId ? (
+        <div className="create-plan-invite-banner" role="note">
+          Posting to{" "}
+          <strong>{communityName ?? "your community"}</strong>
+          {" "}members ·{" "}
+          {communityVisibility === "community_only"
+            ? "Only members can see this"
+            : "Also shows on the main feed"}
+        </div>
+      ) : null}
+
       {fromForumTag ? (
         <div className="create-plan-invite-banner" role="note">
           Tagged{" "}
@@ -732,9 +785,6 @@ export function CreatePlanPage() {
       <form id="create-plan-form" onSubmit={submit} className="create-form">
         {effectiveCommunityId ? (
           <div className="create-community-tag">
-            <p className="create-community-tag-title">
-              Posting to <strong>{communityName ?? "your community"}</strong>
-            </p>
             <div className="seg-toggle" role="group" aria-label="Community visibility">
               <button
                 type="button"
@@ -821,7 +871,11 @@ export function CreatePlanPage() {
         {/* When — Date + Time as Luma-style rows, each with its own Flexible
             pill. Borderless rows on the card, hairline-divided. Req 3.1 —
             past dates are blocked and same-day times need runway. */}
-        <div className="luma-card" ref={dateCardRef}>
+        <div
+          className="luma-card"
+          ref={dateCardRef}
+          aria-invalid={Boolean(dateError || timeError) || undefined}
+        >
           <div className="luma-row">
             <span className="luma-label">Date</span>
             <div className="luma-value">
@@ -840,7 +894,21 @@ export function CreatePlanPage() {
               )}
               <FlexToggle
                 active={form.isFlexibleDate}
-                onClick={() => setForm((f) => ({ ...f, isFlexibleDate: !f.isFlexibleDate }))}
+                onClick={() =>
+                  setForm((f) => {
+                    const next = !f.isFlexibleDate;
+                    return next
+                      ? { ...f, isFlexibleDate: true }
+                      : {
+                          ...f,
+                          isFlexibleDate: false,
+                          date:
+                            f.date && f.date >= today() && f.date !== FLEXIBLE_DATE_PLACEHOLDER
+                              ? f.date
+                              : today(),
+                        };
+                  })
+                }
                 label="Flexible"
               />
             </div>
@@ -863,7 +931,18 @@ export function CreatePlanPage() {
               )}
               <FlexToggle
                 active={form.isFlexibleTime}
-                onClick={() => setForm((f) => ({ ...f, isFlexibleTime: !f.isFlexibleTime }))}
+                onClick={() =>
+                  setForm((f) => {
+                    const next = !f.isFlexibleTime;
+                    return next
+                      ? { ...f, isFlexibleTime: true }
+                      : {
+                          ...f,
+                          isFlexibleTime: false,
+                          time: f.time || defaultPlanTime(),
+                        };
+                  })
+                }
                 label="Flexible"
               />
             </div>
@@ -877,7 +956,11 @@ export function CreatePlanPage() {
             Neighborhood is kept from the user's default when a place is picked;
             picking a place and toggling Flexible are mutually exclusive —
             each one clears the other (req: location fixes). */}
-        <div className="luma-card" ref={locationCardRef}>
+        <div
+          className="luma-card"
+          ref={locationCardRef}
+          aria-invalid={Boolean(attemptedSubmit && locationError) || undefined}
+        >
           <div className="location-row">
             <div className="location-row-main">
               {!form.isFlexibleLocation ? (
@@ -1055,7 +1138,10 @@ export function CreatePlanPage() {
                 </div>
                 <FlexToggle
                   active={form.capacityOn}
-                  onClick={() => setForm((f) => ({ ...f, capacityOn: !f.capacityOn }))}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setForm((f) => ({ ...f, capacityOn: !f.capacityOn }));
+                  }}
                   label="Set limit"
                 />
               </div>
@@ -1268,193 +1354,6 @@ export function CreatePlanPage() {
   );
 }
 
-type CoverCatalogCategory = {
-  id: string;
-  label: string;
-  images: { url: string; label: string; category: string }[];
-};
-
-const COVER_PAGE_SIZE = 12;
-
-function CoverLibraryModal({
-  onPick,
-  onClose,
-}: {
-  onPick: (url: string) => void;
-  onClose: () => void;
-}) {
-  const [categories, setCategories] = useState<CoverCatalogCategory[] | null>(null);
-  const [active, setActive] = useState<string>("");
-  const [error, setError] = useState<string | null>(null);
-  const [visibleCount, setVisibleCount] = useState(COVER_PAGE_SIZE);
-  const gridRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    let alive = true;
-    void (async () => {
-      try {
-        const r = await api<{ categories: CoverCatalogCategory[] }>("/api/card-images/catalog");
-        if (!alive) return;
-        setCategories(r.categories);
-        // Start on the first category — "All" would fire ~100 full-res downloads.
-        setActive(r.categories[0]?.id ?? "all");
-      } catch (e) {
-        if (!alive) return;
-        setError(e instanceof Error ? e.message : "Couldn't load covers");
-        setCategories([]);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  // Reset the progressive window whenever the category changes.
-  useEffect(() => {
-    setVisibleCount(COVER_PAGE_SIZE);
-    gridRef.current?.scrollTo({ top: 0 });
-  }, [active]);
-
-  const chips = categories ?? [];
-  const allImages =
-    !categories
-      ? []
-      : active === "all"
-        ? categories.flatMap((c) => c.images)
-        : (categories.find((c) => c.id === active)?.images ?? []);
-  const images = allImages.slice(0, visibleCount);
-  const hasMore = visibleCount < allImages.length;
-
-  function loadMore() {
-    if (!hasMore) return;
-    setVisibleCount((n) => Math.min(n + COVER_PAGE_SIZE, allImages.length));
-  }
-
-  return (
-    <div
-      className="cover-lib-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Choose a cover image"
-      onClick={onClose}
-    >
-      <div className="cover-lib" onClick={(e) => e.stopPropagation()}>
-        <div className="cover-lib-head">
-          <span className="cover-lib-title">Choose a cover</span>
-          <button type="button" className="cover-lib-close" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </div>
-
-        {chips.length > 1 && (
-          <div className="cover-lib-cats" role="tablist" aria-label="Cover categories">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={active === "all"}
-              className={`cover-lib-cat ${active === "all" ? "is-active" : ""}`}
-              onClick={() => setActive("all")}
-            >
-              All
-            </button>
-            {chips.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                role="tab"
-                aria-selected={active === c.id}
-                className={`cover-lib-cat ${active === c.id ? "is-active" : ""}`}
-                onClick={() => setActive(c.id)}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {categories === null ? (
-          <p className="cover-lib-status">Loading covers…</p>
-        ) : error ? (
-          <p className="cover-lib-status">{error}</p>
-        ) : allImages.length === 0 ? (
-          <p className="cover-lib-status">No covers yet — upload one from your camera roll.</p>
-        ) : (
-          <div
-            ref={gridRef}
-            className="cover-lib-grid"
-            onScroll={(e) => {
-              const el = e.currentTarget;
-              if (el.scrollTop + el.clientHeight >= el.scrollHeight - 160) loadMore();
-            }}
-          >
-            {images.map((img) => (
-              <LazyCoverTile
-                key={img.url}
-                url={img.url}
-                label={img.label}
-                root={gridRef}
-                onPick={onPick}
-              />
-            ))}
-            {hasMore && (
-              <button type="button" className="cover-lib-more" onClick={loadMore}>
-                Show more ({allImages.length - visibleCount} left)
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** Only assign img src once the tile is near the scroll container — native
- *  loading="lazy" often still downloads everything inside overflow panels. */
-function LazyCoverTile({
-  url,
-  label,
-  root,
-  onPick,
-}: {
-  url: string;
-  label: string;
-  root: RefObject<HTMLDivElement | null>;
-  onPick: (url: string) => void;
-}) {
-  const tileRef = useRef<HTMLButtonElement>(null);
-  const [src, setSrc] = useState<string | null>(null);
-
-  useEffect(() => {
-    const node = tileRef.current;
-    if (!node) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          setSrc(url);
-          observer.disconnect();
-        }
-      },
-      { root: root.current, rootMargin: "200px 0px", threshold: 0.01 },
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [url, root]);
-
-  return (
-    <button
-      ref={tileRef}
-      type="button"
-      className={`cover-lib-tile ${src ? "" : "is-pending"}`}
-      onClick={() => onPick(url)}
-      aria-label={label || "Cover image"}
-    >
-      <span className="cover-lib-tile-frame">
-        {src ? <img src={src} alt="" decoding="async" /> : <span className="cover-lib-skel" aria-hidden />}
-      </span>
-    </button>
-  );
-}
-
 type FormShape = {
   title: string;
   locationName: string;
@@ -1487,8 +1386,8 @@ type FormShape = {
 };
 
 /**
- * Just an Idea form — prompt, text box, and image up front; everything else
- * lives under a collapsible "Additional Details" accordion.
+ * Just an Idea form — prompt, text box, and image up front; Settings matches
+ * Make a Plan (visibility + collapsible Additional details).
  */
 function IdeaForm({
   form,
@@ -1501,11 +1400,19 @@ function IdeaForm({
   dateError,
   toggleVibe,
   onBack,
+  onOpenLibrary,
   onOpenFlyer,
   onClearFlyer,
   inviteUserName,
   inviteNames,
   invitedCount,
+  network,
+  invitedIds,
+  onToggleInvited,
+  communityId,
+  communityName,
+  communityVisibility,
+  onCommunityVisibilityChange,
 }: {
   form: FormShape;
   setForm: (updater: (f: FormShape) => FormShape) => void;
@@ -1517,11 +1424,19 @@ function IdeaForm({
   dateError: string | null;
   toggleVibe: (id: VibeIcon) => void;
   onBack: () => void;
+  onOpenLibrary: () => void;
   onOpenFlyer: () => void;
   onClearFlyer: () => void;
   inviteUserName: string | null;
   inviteNames: string[];
   invitedCount: number;
+  network: PublicUser[] | null;
+  invitedIds: Set<string>;
+  onToggleInvited: (id: string) => void;
+  communityId: string | null;
+  communityName: string | null;
+  communityVisibility: "public" | "community_only";
+  onCommunityVisibilityChange: (v: "public" | "community_only") => void;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [dateMode, setDateMode] = useState<IdeaDateMode>(form.isFlexibleDate ? "anytime" : "specific");
@@ -1616,12 +1531,50 @@ function IdeaForm({
         </div>
       )}
 
+      {communityId ? (
+        <div className="create-plan-invite-banner" role="note">
+          Posting to{" "}
+          <strong>{communityName ?? "your community"}</strong>
+          {" "}members ·{" "}
+          {communityVisibility === "community_only"
+            ? "Only members can see this"
+            : "Also shows on the main feed"}
+        </div>
+      ) : null}
+
       <form
         id="idea-form"
         onSubmit={submit}
         className="idea-form"
         style={keyboardInset > 0 ? { paddingBottom: keyboardInset } : undefined}
       >
+        {communityId ? (
+          <div className="create-community-tag">
+            <div className="seg-toggle" role="group" aria-label="Community visibility">
+              <button
+                type="button"
+                className={`seg-toggle-btn ${communityVisibility === "public" ? "is-active" : ""}`}
+                onClick={() => onCommunityVisibilityChange("public")}
+                aria-pressed={communityVisibility === "public"}
+              >
+                Public
+              </button>
+              <button
+                type="button"
+                className={`seg-toggle-btn ${communityVisibility === "community_only" ? "is-active" : ""}`}
+                onClick={() => onCommunityVisibilityChange("community_only")}
+                aria-pressed={communityVisibility === "community_only"}
+              >
+                Community only
+              </button>
+            </div>
+            <p className="create-community-tag-hint">
+              {communityVisibility === "public"
+                ? "Shows on the main feed with a community tag, and on the community's events board."
+                : "Only community members can see this — it won't appear on the main feed."}
+            </p>
+          </div>
+        ) : null}
         <p className="idea-inspiration-label">Need some inspiration?</p>
 
         <div className="idea-textarea-card">
@@ -1641,8 +1594,11 @@ function IdeaForm({
           <div className="idea-photo-preview">
             <img src={form.flyerDataUrl} alt="" />
             <div className="idea-photo-preview-actions">
+              <button type="button" className="cover-chip" onClick={onOpenLibrary}>
+                Library
+              </button>
               <button type="button" className="cover-chip" onClick={onOpenFlyer}>
-                Change
+                Upload
               </button>
               <button type="button" className="cover-chip" onClick={onClearFlyer}>
                 Remove
@@ -1650,29 +1606,63 @@ function IdeaForm({
             </div>
           </div>
         ) : (
-          <button type="button" className="idea-photo-upload" onClick={onOpenFlyer}>
-            <ImagePlus size={15} strokeWidth={1.8} aria-hidden="true" />
-            <span>Add a photo</span>
-          </button>
+          <div className="idea-photo-actions">
+            <button type="button" className="idea-photo-upload" onClick={onOpenLibrary}>
+              <ImagePlus size={15} strokeWidth={1.8} aria-hidden="true" />
+              <span>Choose from library</span>
+            </button>
+            <button type="button" className="idea-photo-upload" onClick={onOpenFlyer}>
+              <span>Upload your own</span>
+            </button>
+          </div>
         )}
 
-        <div className={`idea-accordion ${detailsOpen ? "is-open" : ""}`}>
+        <p className="form-eyebrow">Settings</p>
+        <div className="settings-card">
+          <div className="settings-row">
+            <span className="settings-row-label">Visibility</span>
+            <div className="vis-pill-toggle" role="group" aria-label="Visibility">
+              <button
+                type="button"
+                className={`vis-pill ${form.visibility === "everyone" ? "is-active" : ""}`}
+                onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
+                aria-pressed={form.visibility === "everyone"}
+              >
+                <Globe size={12} strokeWidth={1.8} aria-hidden="true" />
+                Everyone
+              </button>
+              <button
+                type="button"
+                className={`vis-pill ${form.visibility === "network" ? "is-active" : ""}`}
+                onClick={() => setForm((f) => ({ ...f, visibility: "network" }))}
+                aria-pressed={form.visibility === "network"}
+              >
+                <Users size={12} strokeWidth={1.8} aria-hidden="true" />
+                Your network
+              </button>
+            </div>
+          </div>
+
+          {form.visibility === "network" && (
+            <div className="settings-handpick">
+              <NetworkHandPick
+                network={network}
+                invitedIds={invitedIds}
+                onToggle={onToggleInvited}
+              />
+            </div>
+          )}
+
           <button
             type="button"
-            className="idea-accordion-trigger"
-            aria-expanded={detailsOpen}
+            className="settings-options-toggle"
             onClick={() => setDetailsOpen((v) => !v)}
+            aria-expanded={detailsOpen}
           >
-            <span>
-              Additional Details <span className="idea-accordion-optional">(Optional)</span>
-            </span>
-            <ChevronDown
-              size={14}
-              strokeWidth={2}
-              className={`idea-accordion-chevron ${detailsOpen ? "is-open" : ""}`}
-              aria-hidden="true"
-            />
+            <span className="settings-row-label">Additional details</span>
+            <ChevronIcon open={detailsOpen} />
           </button>
+
           {detailsOpen && (
             <div className="idea-accordion-panel" ref={detailsRef}>
               <div className="idea-detail-row">
@@ -1796,34 +1786,6 @@ function IdeaForm({
                 </div>
               </div>
 
-              <div className="idea-detail-row">
-                <span className="idea-detail-well" style={{ background: "#C8DDC8", color: "#3A6A3A" }} aria-hidden="true">
-                  <Globe size={14} strokeWidth={1.8} />
-                </span>
-                <div className="idea-detail-body">
-                  <div className="vis-pill-toggle" role="group" aria-label="Who can see this">
-                    <button
-                      type="button"
-                      className={`vis-pill ${form.visibility === "everyone" ? "is-active" : ""}`}
-                      onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
-                      aria-pressed={form.visibility === "everyone"}
-                    >
-                      <Globe size={12} strokeWidth={1.8} aria-hidden="true" />
-                      Everyone
-                    </button>
-                    <button
-                      type="button"
-                      className={`vis-pill ${form.visibility === "network" ? "is-active" : ""}`}
-                      onClick={() => setForm((f) => ({ ...f, visibility: "network" }))}
-                      aria-pressed={form.visibility === "network"}
-                    >
-                      <Users size={12} strokeWidth={1.8} aria-hidden="true" />
-                      Your network
-                    </button>
-                  </div>
-                </div>
-              </div>
-
               <div className="idea-detail-row idea-detail-row--top">
                 <span className="idea-detail-well" style={{ background: "#F5E4C8", color: "#B8864A" }} aria-hidden="true">
                   <Pin size={14} strokeWidth={1.8} />
@@ -1878,7 +1840,7 @@ function IdeaForm({
 
         <button
           type="submit"
-          className={`btn btn-primary btn-block idea-primary-cta ${detailsOpen ? "idea-primary-cta--spaced" : ""}`}
+          className="btn btn-primary btn-block idea-primary-cta"
           disabled={submitting}
         >
           {submitting ? "Posting…" : "Put it out there"}
@@ -1963,7 +1925,7 @@ function FlexToggle({
   label,
 }: {
   active: boolean;
-  onClick: () => void;
+  onClick: (e: { preventDefault(): void }) => void;
   label: string;
 }) {
   return (

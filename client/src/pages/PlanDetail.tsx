@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { ImagePlus } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { CoverLibraryModal } from "../components/CoverLibraryModal";
 import { GetThereSheet } from "../components/GetThereSheet";
 import { InviteSheet } from "../components/InviteSheet";
 import { LocationAutocomplete } from "../components/LocationAutocomplete";
@@ -11,8 +13,11 @@ import { ShareSheet } from "../components/ShareSheet";
 import { useAuth } from "../context/AuthContext";
 import { planHasEnded } from "../lib/planTime";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
+import { fileToResizedDataUrl } from "../lib/imageResize";
 import { formatPlaceAddress, formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
 import { hrefForBack, type NavFromState } from "../lib/navState";
+import { pickPhotoNative } from "../lib/photoPicker";
+import { isNative } from "../lib/platform";
 import { type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
 
 /** Same "set parts + · flexible" convention as the feed card — never show a
@@ -41,7 +46,9 @@ export function PlanDetailPage() {
   const [lockDate, setLockDate] = useState("");
   const [lockTime, setLockTime] = useState("19:00");
   const [lockFlexTime, setLockFlexTime] = useState(false);
+  const [lockFlyer, setLockFlyer] = useState<string | null>(null);
   const [lockBusy, setLockBusy] = useState(false);
+  const [showLockCoverLib, setShowLockCoverLib] = useState(false);
   const [showAllGoing, setShowAllGoing] = useState(false);
   const [showAllInterested, setShowAllInterested] = useState(false);
   const [confirmGrabs, setConfirmGrabs] = useState(false);
@@ -51,6 +58,7 @@ export function PlanDetailPage() {
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const lockFormRef = useRef<HTMLDivElement | null>(null);
+  const lockFlyerRef = useRef<HTMLInputElement | null>(null);
   const coverPool = useCardImages();
 
   const load = async () => {
@@ -85,7 +93,8 @@ export function PlanDetailPage() {
     // the field reads correctly if the host un-flexes it.
     setLockTime(plan.time && !plan.isFlexibleTime ? plan.time : "");
     setLockFlexTime(plan.isFlexibleTime);
-  }, [plan?.id, plan?.date, plan?.lockedAt, plan?.isFlexibleTime, plan?.isFlexibleLocation]);
+    setLockFlyer(plan.flyerDataUrl ?? null);
+  }, [plan?.id, plan?.date, plan?.lockedAt, plan?.isFlexibleTime, plan?.isFlexibleLocation, plan?.flyerDataUrl]);
 
   if (!plan || !user) {
     return <LoadingScreen tagline="Loading plan" />;
@@ -187,6 +196,19 @@ export function PlanDetailPage() {
     }
   }
 
+  async function openLockFlyerPicker() {
+    if (isNative()) {
+      try {
+        const dataUrl = await pickPhotoNative({ maxPx: 1024, quality: 0.85 });
+        if (dataUrl) setLockFlyer(dataUrl);
+      } catch {
+        /* user canceled */
+      }
+      return;
+    }
+    lockFlyerRef.current?.click();
+  }
+
   async function lockIn() {
     if (!lockVenue.trim() || !lockDate) return;
     setLockBusy(true);
@@ -203,6 +225,8 @@ export function PlanDetailPage() {
           date: lockDate,
           time: lockFlexTime ? "" : lockTime || "19:00",
           isFlexibleTime: lockFlexTime,
+          // Explicit null clears; a chosen upload/library URL persists.
+          flyerDataUrl: lockFlyer,
         }),
       });
       // Reload rather than trust the response shape — the group chat also
@@ -214,9 +238,11 @@ export function PlanDetailPage() {
     }
   }
 
-  // Uploaded flyer/photo, or a stable stock cover from the admin library —
-  // same treatment as the feed card so the hero matches its thumbnail.
-  const coverSrc = plan.flyerDataUrl ?? pickCoverImage(coverPool, plan.id);
+  // Ideas stay image-free until the host picks one at lock-in — never invent
+  // a stock cover for looking_for. Standard plans still use the library pool.
+  const coverSrc =
+    plan.flyerDataUrl ??
+    (plan.planKind === "looking_for" ? null : pickCoverImage(coverPool, plan.id));
   const prettyAddress = formatPlaceAddress(plan.location.address);
   const showAddressLine = prettyAddress && prettyAddress !== plan.location.name;
   const mapsQuery = encodeURIComponent(
@@ -414,6 +440,52 @@ export function PlanDetailPage() {
               )}
               <FlexChip active={lockFlexTime} onClick={() => setLockFlexTime((v) => !v)} />
             </div>
+            <label className="form-question">Cover image</label>
+            {lockFlyer ? (
+              <div className="cover-picker cover-picker--filled lock-cover-picker">
+                <img src={lockFlyer} alt="" className="cover-picker-img" />
+                <div className="cover-picker-overlay">
+                  <button type="button" className="cover-chip" onClick={() => setShowLockCoverLib(true)}>
+                    Library
+                  </button>
+                  <button type="button" className="cover-chip" onClick={() => void openLockFlyerPicker()}>
+                    Upload
+                  </button>
+                  <button type="button" className="cover-chip" onClick={() => setLockFlyer(null)}>
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="cover-picker lock-cover-picker">
+                <span className="cover-picker-title">Add a cover image</span>
+                <span className="cover-picker-sub">Optional — upload or pick from the library</span>
+                <div className="cover-picker-buttons">
+                  <button type="button" className="cover-btn" onClick={() => setShowLockCoverLib(true)}>
+                    <ImagePlus size={16} strokeWidth={1.8} aria-hidden="true" />
+                    Library
+                  </button>
+                  <button type="button" className="cover-btn" onClick={() => void openLockFlyerPicker()}>
+                    Upload
+                  </button>
+                </div>
+              </div>
+            )}
+            <input
+              ref={lockFlyerRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) {
+                  void fileToResizedDataUrl(f)
+                    .then((dataUrl) => setLockFlyer(dataUrl))
+                    .catch(() => undefined);
+                }
+                if (lockFlyerRef.current) lockFlyerRef.current.value = "";
+              }}
+            />
             <button type="button" className="btn-primary btn-block" disabled={lockBusy || !lockVenue.trim() || !lockDate} onClick={() => void lockIn()}>
               {lockBusy ? "Saving…" : "Lock it in"}
             </button>
@@ -549,47 +621,17 @@ export function PlanDetailPage() {
             <Link to={`/plans/${plan.id}/edit`} className="btn-secondary plan-host-action-btn">
               Edit plan
             </Link>
-            {confirmCancel ? (
-              <div className="plan-grabs-confirm" role="group" aria-label="Confirm cancel plan">
-                <p className="plan-grabs-confirm-copy">
-                  Cancel &ldquo;{plan.title}&rdquo;? Everyone who RSVP&apos;d will be notified.
-                </p>
-                {cancelError && <p className="luma-inline-error">{cancelError}</p>}
-                <div className="plan-grabs-confirm-actions">
-                  <button
-                    type="button"
-                    className="btn-secondary plan-host-action-btn"
-                    disabled={cancelBusy}
-                    onClick={() => {
-                      setConfirmCancel(false);
-                      setCancelError(null);
-                    }}
-                  >
-                    Keep plan
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-primary plan-host-action-btn plan-host-action-btn--danger"
-                    disabled={cancelBusy}
-                    onClick={() => void cancelPlan()}
-                  >
-                    {cancelBusy ? "Cancelling…" : "Cancel plan"}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="btn-secondary plan-host-action-btn plan-host-action-btn--danger"
-                onClick={() => {
-                  setConfirmCancel(true);
-                  setCancelError(null);
-                  setConfirmGrabs(false);
-                }}
-              >
-                Cancel plan
-              </button>
-            )}
+            <button
+              type="button"
+              className="btn-secondary plan-host-action-btn plan-host-action-btn--danger"
+              onClick={() => {
+                setConfirmCancel(true);
+                setCancelError(null);
+                setConfirmGrabs(false);
+              }}
+            >
+              Cancel plan
+            </button>
             {!plan.upForGrabsAt && (
               confirmGrabs ? (
                 <div className="plan-grabs-confirm" role="group" aria-label="Confirm put up for grabs">
@@ -603,7 +645,9 @@ export function PlanDetailPage() {
                       type="button"
                       className="btn-secondary plan-host-action-btn"
                       disabled={grabsBusy}
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                         setConfirmGrabs(false);
                         setGrabsError(null);
                       }}
@@ -614,7 +658,11 @@ export function PlanDetailPage() {
                       type="button"
                       className="btn-primary plan-host-action-btn"
                       disabled={grabsBusy}
-                      onClick={() => void putUpForGrabs()}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        void putUpForGrabs();
+                      }}
                     >
                       {grabsBusy ? "Saving…" : "Put up for grabs"}
                     </button>
@@ -646,7 +694,7 @@ export function PlanDetailPage() {
         <div className="who-row">
           <h3 className="who-block-heading">Going · {plan.participants.going.length}</h3>
           {plan.participants.going.length === 0 ? (
-            <p className="subtle" style={{ margin: 0 }}>Be the first to say "In."</p>
+            <p className="subtle" style={{ margin: 0 }}>Be the first to say "I'm In."</p>
           ) : (
             <ParticipantsRow
               people={plan.participants.going}
@@ -719,6 +767,62 @@ export function PlanDetailPage() {
       {showGetThere && <GetThereSheet plan={plan} onClose={() => setShowGetThere(false)} />}
       {showInvite && (
         <InviteSheet planId={plan.id} planTitle={plan.title} onClose={() => setShowInvite(false)} />
+      )}
+      {showLockCoverLib && (
+        <CoverLibraryModal
+          onPick={(url) => {
+            setLockFlyer(url);
+            setShowLockCoverLib(false);
+          }}
+          onClose={() => setShowLockCoverLib(false)}
+        />
+      )}
+
+      {confirmCancel && (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cancel-plan-title"
+          onClick={() => {
+            if (!cancelBusy) {
+              setConfirmCancel(false);
+              setCancelError(null);
+            }
+          }}
+        >
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <h4 id="cancel-plan-title" style={{ marginTop: 0 }}>
+              Cancel this plan?
+            </h4>
+            <p style={{ marginTop: 0 }}>
+              Cancel &ldquo;{plan.title}&rdquo;? Everyone who RSVP&apos;d will be notified.
+            </p>
+            {cancelError && <p className="error-text">{cancelError}</p>}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                className="btn-link"
+                disabled={cancelBusy}
+                onClick={() => {
+                  setConfirmCancel(false);
+                  setCancelError(null);
+                }}
+              >
+                Keep plan
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={cancelBusy}
+                onClick={() => void cancelPlan()}
+                style={{ background: "var(--danger)" }}
+              >
+                {cancelBusy ? "Cancelling…" : "Cancel plan"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );

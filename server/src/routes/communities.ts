@@ -295,14 +295,18 @@ communitiesRouter.patch("/:id", requireAuth, async (req, res) => {
   ) {
     patch.category = req.body.category as CommunityCategory;
   }
-  if (typeof req.body?.coverImage === "string") {
+  if ("coverImage" in (req.body ?? {})) {
     const c = req.body.coverImage;
-    patch.coverImage =
-      c.startsWith("data:image/") && c.length < 1_600_000
-        ? c
-        : c.startsWith("http")
-          ? c.slice(0, 2048)
-          : community.coverImage ?? null;
+    if (c === null || c === "") {
+      patch.coverImage = null;
+    } else if (typeof c === "string") {
+      patch.coverImage =
+        c.startsWith("data:image/") && c.length < 1_600_000
+          ? c
+          : c.startsWith("http")
+            ? c.slice(0, 2048)
+            : community.coverImage ?? null;
+    }
   }
   if ("screeningQuestion" in (req.body ?? {})) {
     const s = req.body.screeningQuestion;
@@ -362,14 +366,22 @@ communitiesRouter.post("/:id/join", requireAuth, async (req, res) => {
       status: "pending",
       screeningAnswer: answer,
     });
-    await emit({
-      userId: community.organizerId,
-      kind: "communityJoinRequest",
-      body: `${me?.firstName || "Someone"} asked to join ${community.name}`,
-      communityId: community.id,
-      profileUserId: userId,
-      dedupKey: `communityJoinRequest:${community.id}:${userId}`,
-    });
+    // Notify the organizer (in-app + push). Never fail the join if notify hiccups.
+    try {
+      await emit({
+        userId: community.organizerId,
+        kind: "communityJoinRequest",
+        body: `${me?.firstName || "Someone"} asked to join ${community.name}`,
+        communityId: community.id,
+        profileUserId: userId,
+        dedupKey: `communityJoinRequest:${community.id}:${userId}`,
+      });
+    } catch (err) {
+      console.error(
+        "[communities] join-request notify failed",
+        err instanceof Error ? err.message : err,
+      );
+    }
     store.log("community_join_requested", { communityId: community.id, userId });
   } else {
     store.upsertCommunityMembership({
@@ -388,8 +400,8 @@ communitiesRouter.post("/:id/join", requireAuth, async (req, res) => {
   res.json(await toCommunityDTO(store.findCommunityById(community.id)!, userId));
 });
 
-// POST /api/communities/:id/leave — members can leave anytime; the organizer
-// cannot leave in V1 (transfer is V2 — they must contact COMMONS).
+// POST /api/communities/:id/leave — members can leave anytime. Organizers must
+// transfer ownership first (POST …/transfer-organizer) or delete the community.
 communitiesRouter.post("/:id/leave", requireAuth, async (req, res) => {
   const userId = String(req.userId);
   const community = store.findCommunityById(String(req.params.id));
@@ -398,12 +410,128 @@ communitiesRouter.post("/:id/leave", requireAuth, async (req, res) => {
     return;
   }
   if (community.organizerId === userId) {
-    res.status(400).json({ error: "Organizers can't leave in V1 — contact COMMONS to transfer." });
+    res.status(400).json({
+      error: "Transfer the community to another member, or delete it, before leaving.",
+    });
     return;
   }
   store.removeCommunityMembership(community.id, userId);
   store.log("community_left", { communityId: community.id, userId });
   res.json(await toCommunityDTO(store.findCommunityById(community.id)!, userId));
+});
+
+// POST /api/communities/:id/transfer-organizer — organizer hands ownership to an
+// active member, then leaves (same shape as plan host transfer).
+communitiesRouter.post("/:id/transfer-organizer", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const community = store.findCommunityById(String(req.params.id));
+  if (!community) {
+    res.status(404).json({ error: "Community not found" });
+    return;
+  }
+  const viewerIsAdmin = await isCommonsAdmin(userId);
+  if (community.organizerId !== userId && !viewerIsAdmin) {
+    res.status(403).json({ error: "Only the organizer can transfer this community" });
+    return;
+  }
+  const newOrganizerId = String(req.body?.newOrganizerId ?? "");
+  if (!newOrganizerId || newOrganizerId === community.organizerId) {
+    res.status(400).json({ error: "Pick another active member to take over" });
+    return;
+  }
+  const targetMembership = store.findCommunityMembership(community.id, newOrganizerId);
+  if (!targetMembership || targetMembership.status !== "active") {
+    res.status(400).json({ error: "New organizer must be an active member first" });
+    return;
+  }
+  const newOrganizer = await findUserById(newOrganizerId);
+  if (!newOrganizer) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  const previousOrganizerId = community.organizerId;
+  store.transferCommunityOrganizer(community.id, newOrganizerId);
+  // Outgoing organizer leaves after handoff. A COMMONS admin transferring on
+  // someone else's behalf demotes the old organizer to member instead.
+  if (previousOrganizerId === userId) {
+    store.removeCommunityMembership(community.id, userId);
+  }
+
+  if (community.chatEnabled) {
+    store.ensureCommunityConversation(community.id, [newOrganizerId]);
+  }
+
+  store.log("community_organizer_transferred", {
+    communityId: community.id,
+    from: previousOrganizerId,
+    to: newOrganizerId,
+    by: userId,
+  });
+  await emit({
+    userId: newOrganizerId,
+    kind: "communityRequestApproved",
+    body: `You're now the organizer of ${community.name}`,
+    communityId: community.id,
+    dedupKey: `communityOrganizerTransfer:${community.id}:${newOrganizerId}`,
+  });
+
+  const updated = store.findCommunityById(community.id)!;
+  res.json({ ok: true, newOrganizerId, community: await toCommunityDTO(updated, userId) });
+});
+
+// DELETE /api/communities/:id — organizer (or admin) permanently deletes the
+// community. Cascades memberships, bulletin, chat; cancels linked plans.
+communitiesRouter.delete("/:id", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const community = store.findCommunityById(String(req.params.id));
+  if (!community) {
+    res.status(404).json({ error: "Community not found" });
+    return;
+  }
+  const viewerIsAdmin = await isCommonsAdmin(userId);
+  if (community.organizerId !== userId && !viewerIsAdmin) {
+    res.status(403).json({ error: "Only the organizer can delete this community" });
+    return;
+  }
+
+  const name = community.name;
+  const communityId = community.id;
+  const result = store.deleteCommunity(communityId);
+  if (!result) {
+    res.status(404).json({ error: "Community not found" });
+    return;
+  }
+
+  for (const planId of result.cancelledPlanIds) {
+    const plan = store.findPlanById(planId);
+    if (!plan) continue;
+    const participants = store.listParticipationsForPlan(planId);
+    const recipientIds = Array.from(
+      new Set(
+        participants
+          .filter((p) => p.state === "going" || p.state === "interested")
+          .map((p) => p.userId)
+          .filter((id) => id !== userId),
+      ),
+    );
+    for (const uid of recipientIds) {
+      await emit({
+        userId: uid,
+        kind: "planCancellation",
+        body: `"${plan.title}" was cancelled — ${name} was deleted`,
+        planId: plan.id,
+        dedupKey: `planCancellation:${plan.id}:${uid}`,
+      });
+    }
+  }
+
+  store.log("community_deleted", {
+    communityId,
+    by: userId,
+    cancelledPlans: result.cancelledPlanIds.length,
+  });
+  res.json({ ok: true });
 });
 
 // GET /api/communities/:id/members — active members always; pending requests

@@ -325,8 +325,32 @@ export const mongoMirror = {
       .catch((err) => fail(`deleteCommunityMembersByUser ${userId}`, err));
     track(p);
   },
+  deleteCommunityMembersByCommunity(communityId: string): void {
+    if (!isMongoConnected()) return;
+    const p = CommunityMemberModel.deleteMany({ communityId })
+      .exec()
+      .catch((err) => fail(`deleteCommunityMembersByCommunity ${communityId}`, err));
+    track(p);
+  },
   upsertCommunityPost(p: CommunityPostRecord): void {
     upsert(CommunityPostModel as never, p, `upsertCommunityPost ${p.id}`);
+  },
+  deleteCommunityPostsByCommunity(communityId: string): void {
+    if (!isMongoConnected()) return;
+    const p = CommunityPostModel.deleteMany({ communityId })
+      .exec()
+      .catch((err) => fail(`deleteCommunityPostsByCommunity ${communityId}`, err));
+    track(p);
+  },
+  deleteConversation(id: string): void {
+    removeById(ConversationModel as never, id, `deleteConversation ${id}`);
+  },
+  deleteMessagesByConversation(conversationId: string): void {
+    if (!isMongoConnected()) return;
+    const p = MessageModel.deleteMany({ conversationId })
+      .exec()
+      .catch((err) => fail(`deleteMessagesByConversation ${conversationId}`, err));
+    track(p);
   },
 
   // Interest Forums

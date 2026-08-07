@@ -48,8 +48,6 @@ export interface UserRecord {
   networkIds?: string[];
   /** UserIds who have requested to connect with this user (awaiting accept). */
   incomingNetworkRequests?: string[];
-  /** Plans the user saved/pinned — surfaced on the My Plans page. */
-  savedPlanIds?: string[];
   /** Plan ids where the user dismissed the post-event network prompt. */
   dismissedNetworkPromptPlanIds?: string[];
   /** Social links — only surfaced to viewers who share a past plan or DM. */
@@ -246,6 +244,8 @@ export interface MessageRecord {
   reactions?: Record<string, string[]>;
   /** Present only on `poll` messages. */
   poll?: PollData;
+  /** Optional image attached to a user message (data URL or https). */
+  imageUrl?: string | null;
 }
 
 export interface PlanSuggestionRecord {
@@ -793,8 +793,9 @@ export const store = {
     mongoMirror.deleteDevicesByUser(userId);
 
     // Drop the user's community memberships and recount those communities.
-    // Communities they organized are left in place (organizer transfer is V2);
-    // their bulletin posts are preserved — the UI tolerates a missing author.
+    // Communities they organized are left in place (transfer/delete are
+    // organizer actions on the community itself); bulletin posts are
+    // preserved — the UI tolerates a missing author.
     const affectedCommunityIds = new Set(
       snapshot.communityMembers.filter((m) => m.userId === userId).map((m) => m.communityId),
     );
@@ -1037,6 +1038,11 @@ export const store = {
     const plan = snapshot.plans.find((p) => p.id === id);
     if (!plan) return undefined;
     Object.assign(plan, patch);
+    // Explicit undefined means "clear" — Object.assign leaves the key as
+    // undefined, which JSON/Mongo would otherwise omit and leave stale.
+    if ("flyerDataUrl" in patch && patch.flyerDataUrl === undefined) {
+      delete plan.flyerDataUrl;
+    }
     persist();
     mongoMirror.upsertPlan(plan);
     return plan;
@@ -1243,7 +1249,12 @@ export const store = {
   findMessageById(messageId: string): MessageRecord | undefined {
     return snapshot.messages.find((m) => m.id === messageId);
   },
-  createMessage(conversationId: string, senderId: string, body: string): MessageRecord {
+  createMessage(
+    conversationId: string,
+    senderId: string,
+    body: string,
+    imageUrl?: string | null,
+  ): MessageRecord {
     const message: MessageRecord = {
       id: randomUUID(),
       conversationId,
@@ -1252,6 +1263,7 @@ export const store = {
       createdAt: new Date().toISOString(),
       readBy: [senderId],
       kind: "user",
+      ...(imageUrl ? { imageUrl } : {}),
     };
     snapshot.messages.push(message);
     const conv = snapshot.conversations.find((c) => c.id === conversationId);
@@ -1763,6 +1775,89 @@ export const store = {
     persist();
     mongoMirror.upsertCommunity(community);
     return community;
+  },
+
+  /**
+   * Hand organizer to an active member. Demotes the previous organizer's
+   * membership to `member` (caller removes it separately when leaving).
+   */
+  transferCommunityOrganizer(
+    communityId: string,
+    newOrganizerId: string,
+  ): CommunityRecord | undefined {
+    const community = snapshot.communities.find((c) => c.id === communityId);
+    if (!community) return undefined;
+    const previousOrganizerId = community.organizerId;
+    if (previousOrganizerId === newOrganizerId) return community;
+
+    community.organizerId = newOrganizerId;
+    mongoMirror.upsertCommunity(community);
+
+    const incoming = this.findCommunityMembership(communityId, newOrganizerId);
+    if (incoming) {
+      incoming.role = "organizer";
+      incoming.status = "active";
+      mongoMirror.upsertCommunityMember(incoming);
+    } else {
+      this.upsertCommunityMembership({
+        communityId,
+        userId: newOrganizerId,
+        role: "organizer",
+        status: "active",
+      });
+    }
+
+    const outgoing = this.findCommunityMembership(communityId, previousOrganizerId);
+    if (outgoing && outgoing.userId !== newOrganizerId) {
+      outgoing.role = "member";
+      mongoMirror.upsertCommunityMember(outgoing);
+    }
+
+    persist();
+    return community;
+  },
+
+  /**
+   * Hard-delete a community and its memberships, bulletin posts, and group
+   * chat. Cancels any still-active plans tagged with this communityId.
+   * Returns cancelled plan ids so the route can notify participants.
+   */
+  deleteCommunity(communityId: string): { cancelledPlanIds: string[] } | undefined {
+    const community = snapshot.communities.find((c) => c.id === communityId);
+    if (!community) return undefined;
+
+    const now = new Date().toISOString();
+    const cancelledPlanIds: string[] = [];
+    for (const plan of snapshot.plans) {
+      if (plan.communityId === communityId && !plan.cancelledAt) {
+        plan.cancelledAt = now;
+        cancelledPlanIds.push(plan.id);
+        mongoMirror.upsertPlan(plan);
+      }
+    }
+
+    snapshot.communityMembers = snapshot.communityMembers.filter(
+      (m) => m.communityId !== communityId,
+    );
+    mongoMirror.deleteCommunityMembersByCommunity(communityId);
+
+    snapshot.communityPosts = snapshot.communityPosts.filter(
+      (p) => p.communityId !== communityId,
+    );
+    mongoMirror.deleteCommunityPostsByCommunity(communityId);
+
+    const conv = this.findCommunityConversation(communityId);
+    if (conv) {
+      snapshot.messages = snapshot.messages.filter((m) => m.conversationId !== conv.id);
+      snapshot.conversations = snapshot.conversations.filter((c) => c.id !== conv.id);
+      mongoMirror.deleteMessagesByConversation(conv.id);
+      mongoMirror.deleteConversation(conv.id);
+    }
+
+    snapshot.communities = snapshot.communities.filter((c) => c.id !== communityId);
+    mongoMirror.deleteCommunity(communityId);
+    persist();
+    return { cancelledPlanIds };
   },
 
   // ---- Community members ----

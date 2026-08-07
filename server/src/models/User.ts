@@ -30,7 +30,6 @@ const UserSchema = new mongoose.Schema<UserRecord>(
     createdAt: { type: String, required: true },
     networkIds: { type: [String], default: undefined },
     incomingNetworkRequests: { type: [String], default: undefined },
-    savedPlanIds: { type: [String], default: undefined },
     dismissedNetworkPromptPlanIds: { type: [String], default: undefined },
     socialLinks: { type: { instagram: { type: String }, tiktok: { type: String } }, default: undefined },
     guidelinesAcknowledgedAt: { type: String, default: null },

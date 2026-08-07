@@ -615,7 +615,7 @@ function PutUpForGrabsControl({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function confirm() {
+  async function confirmPutUpForGrabs() {
     setBusy(true);
     setError(null);
     try {
@@ -649,10 +649,29 @@ function PutUpForGrabsControl({
       </p>
       {error && <p className="luma-inline-error">{error}</p>}
       <div className="plan-grabs-confirm-actions">
-        <button type="button" className="btn-secondary" disabled={busy} onClick={() => setOpen(false)}>
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={busy}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setOpen(false);
+            setError(null);
+          }}
+        >
           Keep hosting
         </button>
-        <button type="button" className="btn-primary" disabled={busy} onClick={() => void confirm()}>
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={busy}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            void confirmPutUpForGrabs();
+          }}
+        >
           {busy ? "Saving…" : "Put up for grabs"}
         </button>
       </div>

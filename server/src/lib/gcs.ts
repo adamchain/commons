@@ -93,16 +93,21 @@ export function parseDataUrl(dataUrl: string): { buffer: Buffer; contentType: st
 }
 
 /**
- * Upload image bytes to the configured bucket under `card-images/` and return a
- * stable public URL. Throws if GCS isn't configured — callers should guard with
- * `isGcsConfigured()` first.
+ * Upload image bytes to the configured bucket and return a stable public URL.
+ * Throws if GCS isn't configured — callers should guard with `isGcsConfigured()`
+ * first. Defaults to `card-images/`; pass `folder` for chat uploads, etc.
  */
-export async function uploadCardImage(buffer: Buffer, contentType: string): Promise<string> {
+export async function uploadCardImage(
+  buffer: Buffer,
+  contentType: string,
+  folder = "card-images",
+): Promise<string> {
   const bucketName = gcsBucketName();
   if (!bucketName) throw new Error("GCS_BUCKET is not configured");
 
   const ext = EXT_BY_MIME[contentType] ?? "jpg";
-  const objectPath = `card-images/${randomUUID()}.${ext}`;
+  const safeFolder = folder.replace(/^\/+|\/+$/g, "") || "card-images";
+  const objectPath = `${safeFolder}/${randomUUID()}.${ext}`;
   const file = client().bucket(bucketName).file(objectPath);
   const downloadToken = randomUUID();
 

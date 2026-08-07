@@ -240,16 +240,29 @@
   gap: var(--s-3);
   flex-wrap: wrap;
 }
-/* Expanded screening ask breaks onto its own line rather than cramming the row. */
-.cmy-header-row > .cmy-screen { flex-basis: 100%; }
-.cmy-header-info { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+/* Expanded screening ask / pending note break onto their own line. */
+.cmy-header-row > .cmy-screen,
+.cmy-header-row > .cmy-pending-note {
+  flex: 1 1 100%;
+}
+.cmy-header-info { display: flex; align-items: center; gap: var(--s-2); min-width: 0; flex: 1; }
 .cmy-header-avatars { display: inline-flex; flex-shrink: 0; }
 .cmy-header-avatars > * + * { margin-left: -8px; }
 .cmy-header-avatars > * { box-shadow: 0 0 0 2px var(--surface, #fff); border-radius: 50%; }
 .cmy-header-meta { color: var(--text-muted); font-size: 0.85rem; }
 .cmy-meta { color: var(--text-muted); font-size: 0.9rem; display: flex; gap: var(--s-2); align-items: center; }
 .cmy-dot { color: var(--text-subtle); }
-.cmy-desc { color: var(--text-muted); font-size: 0.95rem; line-height: 1.5; margin: var(--s-1) 0 0; }
+.cmy-about {
+  margin-top: var(--s-1);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--hairline, rgba(0, 0, 0, 0.08));
+}
+.cmy-desc {
+  color: var(--ink-700, var(--ink));
+  font-size: 0.95rem;
+  line-height: 1.55;
+  margin: 0;
+}
 .cmy-chat-link {
   align-self: flex-start;
   display: inline-flex;
@@ -272,13 +285,36 @@
   padding: var(--s-1) var(--s-3);
   border-radius: var(--r-pill);
 }
+.cmy-status-pill {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--hairline, rgba(0, 0, 0, 0.1));
+  color: var(--ink-700, var(--ink));
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: var(--s-1) var(--s-3);
+  border-radius: var(--r-pill);
+}
 .cmy-join-col { flex-direction: column; align-items: flex-end; gap: var(--s-1); }
 .cmy-pending-note {
   margin: 0;
-  color: var(--text-muted);
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(196, 70, 70, 0.06);
+  border: 1px solid rgba(196, 70, 70, 0.14);
+  color: var(--ink-700, var(--ink));
+  font-size: 0.88rem;
+  line-height: 1.4;
+  text-align: left;
+}
+.cmy-join-toast {
+  margin: 0;
+  color: var(--community-pink);
   font-size: 0.8rem;
+  font-weight: 700;
   text-align: right;
-  max-width: 26ch;
 }
 .cmy-screen { display: flex; flex-direction: column; gap: var(--s-2); }
 .cmy-screen-q { font-weight: 600; color: var(--ink-800); margin: 0; }
@@ -448,6 +484,23 @@
   display: flex;
   gap: var(--s-1);
 }
+/* Solid chips so labels stay readable on dark (or busy) cover photos. */
+.cmy-cover-preview-actions .cmy-btn {
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink-900, #1a1a2e);
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+}
+.cmy-cover-preview-actions .cmy-btn:not(:disabled):hover {
+  background: #fff;
+  filter: none;
+}
+.cmy-cover-empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  align-items: stretch;
+}
 .cmy-cover-upload-btn {
   appearance: none;
   border: 1px dashed var(--hairline, rgba(0,0,0,0.2));
@@ -461,6 +514,7 @@
   width: 100%;
 }
 .cmy-cover-upload-btn:hover { background: var(--surface-hover); }
+.cmy-cover-upload-btn:disabled { opacity: 0.6; cursor: default; }
 .cmy-requests {
   background: var(--surface);
   border: 1px solid var(--community-pink-border);
@@ -469,6 +523,22 @@
   display: flex;
   flex-direction: column;
   gap: var(--s-3);
+}
+.cmy-requests--empty { gap: var(--s-1); }
+.cmy-requests-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4em;
+  height: 1.4em;
+  padding: 0 0.35em;
+  margin-left: var(--s-1);
+  border-radius: var(--r-pill);
+  background: var(--community-pink);
+  color: var(--paper-50);
+  font-size: 0.75rem;
+  font-weight: 700;
+  vertical-align: middle;
 }
 .cmy-request { display: flex; flex-direction: column; gap: var(--s-2); }
 .cmy-answer { margin: 0; color: var(--ink-700); font-size: 0.9rem; font-style: italic; }
@@ -541,3 +611,71 @@
   cursor: pointer;
 }
 .cmy-seg--active { background: var(--paper-50); color: var(--community-pink); box-shadow: var(--shadow-sm); }
+
+/* ---- Organizer leave / delete (settings danger zone) ---- */
+.cmy-btn--danger {
+  background: var(--danger);
+  color: var(--paper-50);
+}
+.cmy-btn--danger:not(:disabled):hover { filter: brightness(1.06); }
+.cmy-btn--danger-ghost {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+.cmy-btn--danger-ghost:not(:disabled):hover { background: color-mix(in srgb, var(--danger) 8%, transparent); }
+.cmy-danger-zone {
+  margin-top: var(--s-5);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--hairline, rgba(0, 0, 0, 0.12));
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.cmy-danger-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink-900);
+}
+.cmy-danger-copy {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+.cmy-danger-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  justify-content: flex-end;
+}
+.cmy-transfer-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+.cmy-transfer-pick {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  border: 1px solid var(--hairline, rgba(0, 0, 0, 0.12));
+  background: var(--surface);
+  color: var(--ink-900);
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  text-align: left;
+}
+.cmy-transfer-pick:not(:disabled):hover {
+  background: var(--surface-hover, var(--paper-100));
+  border-color: var(--accent);
+}

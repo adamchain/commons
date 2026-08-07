@@ -198,7 +198,11 @@ function hrefFor(n: NotificationDTO): string | null {
   if ((n.kind === "networkRequest" || n.kind === "networkAccepted") && n.profileUserId) {
     return `/profile/${n.profileUserId}`;
   }
-  // Community pings route to the community page (its Members tab holds requests).
+  // Join requests land in Settings so the organizer can approve/decline.
+  if (n.kind === "communityJoinRequest" && n.communityId) {
+    return `/communities/${n.communityId}?tab=settings`;
+  }
+  // Other community pings route to the community page.
   if (n.communityId) return `/communities/${n.communityId}`;
   if (n.planId) return `/plans/${n.planId}`;
   return null;
