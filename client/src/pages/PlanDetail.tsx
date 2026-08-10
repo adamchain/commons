@@ -70,9 +70,11 @@ export function PlanDetailPage() {
     void load();
   }, [id]);
 
-  // Deep-link from feed "X Going" into the guest list.
+  // Deep-link from feed "X Going" into the guest list — scroll + expand names.
   useEffect(() => {
     if (!plan || location.hash !== "#guests") return;
+    setShowAllGoing(true);
+    setShowAllInterested(true);
     const el = document.getElementById("guests");
     el?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [plan?.id, location.hash]);
@@ -830,8 +832,8 @@ export function PlanDetailPage() {
 
 /**
  * Avatar stack + count + inline View all toggle. Default shows up to 5
- * avatars; "View all" expands the row into a name list so users don't have
- * to leave the plan to see who's coming.
+ * avatars; tapping the count (or "View all") expands into a name list so
+ * users don't have to leave the plan to see who's coming.
  */
 function ParticipantsRow({
   people,
@@ -848,6 +850,7 @@ function ParticipantsRow({
 }) {
   const profileFrom: NavFromState = { from: "plan", planId };
   const visible = expanded ? people : people.slice(0, 5);
+  const canExpand = people.length > 0;
   return (
     <>
       <div className="who-row-body">
@@ -873,7 +876,18 @@ function ParticipantsRow({
             <span className="avatar-stack-more">+{people.length - 5}</span>
           )}
         </div>
-        <span className="who-row-count">{countLabel}</span>
+        {canExpand ? (
+          <button
+            type="button"
+            className="who-row-count who-row-count--link"
+            onClick={onToggle}
+            aria-expanded={expanded}
+          >
+            {countLabel}
+          </button>
+        ) : (
+          <span className="who-row-count">{countLabel}</span>
+        )}
         {people.length > 5 && (
           <button type="button" className="who-row-view-all" onClick={onToggle}>
             {expanded ? "Hide" : "View all"}

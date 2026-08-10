@@ -508,7 +508,7 @@ export interface CommunityDTO {
   bulletinRequiresApproval: boolean;
   /** Who can see inside (bulletin/events/members) — discovery info is always public. */
   visibility: CommunityAccessLevel;
-  /** Only exposed to the organizer/admin (others get null). */
+  /** Only exposed to the real organizer (others get null). */
   screeningQuestion: string | null;
   /** True when a screening question is set (all viewers, so Join can branch). */
   hasScreening: boolean;
@@ -521,9 +521,9 @@ export interface CommunityDTO {
   canPostBulletin: boolean;
   /** Viewer may post a plan tagged to this community. */
   canPostPlan: boolean;
-  /** Count of pending join requests — only populated for the organizer/admin (0 otherwise). */
+  /** Count of pending join requests — organizer only (0 otherwise). */
   pendingRequestCount: number;
-  /** Count of bulletin posts awaiting approval — organizer/admin only (0 otherwise). */
+  /** Count of bulletin posts awaiting approval — organizer only (0 otherwise). */
   pendingBulletinCount: number;
 }
 
@@ -531,7 +531,7 @@ export interface CommunityMemberDTO {
   user: PublicUser;
   role: CommunityMemberRole;
   status: CommunityMemberStatus;
-  /** Screening answer — only populated for the organizer/admin viewing requests. */
+  /** Screening answer — only populated for the organizer viewing requests. */
   screeningAnswer: string | null;
   joinedAt: string;
 }

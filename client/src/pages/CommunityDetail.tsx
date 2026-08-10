@@ -199,7 +199,7 @@ export function CommunityDetailPage() {
         )
       )}
       {tab === "members" && (canSeeInside ? (
-        <MembersTab community={community} canManage={canManage} onCountChange={load} />
+        <MembersTab community={community} onCountChange={load} />
       ) : (
         <LockedPanel community={community} onChange={setCommunity} reload={load} />
       ))}
@@ -216,38 +216,50 @@ export function CommunityDetailPage() {
   );
 }
 
-/** Approve/decline queue — shared by Members + Settings. */
+/** Approve/decline queue — shared by Members + Settings. Organizer-only. */
 function JoinRequestsPanel({
   communityId,
+  canManage,
   onChange,
 }: {
   communityId: string;
+  canManage: boolean;
   onChange: () => Promise<void>;
 }) {
   const [pending, setPending] = useState<CommunityMemberDTO[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
+    if (!canManage) {
+      setPending([]);
+      setLoaded(true);
+      return;
+    }
     const r = await api<{ pending: CommunityMemberDTO[] }>(`/api/communities/${communityId}/members`);
     setPending(r.pending ?? []);
     setLoaded(true);
-  }, [communityId]);
+  }, [canManage, communityId]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   async function approve(userId: string) {
+    if (!canManage) return;
     await api(`/api/communities/${communityId}/members/${userId}/approve`, { method: "POST" });
     await load();
     await onChange();
   }
   async function decline(userId: string) {
+    if (!canManage) return;
     await api(`/api/communities/${communityId}/members/${userId}/decline`, { method: "POST" });
     await load();
     await onChange();
   }
 
+  // Same gate as Bulletin pending queue — never show manage UI to non-organizers
+  // (including pending join requesters / COMMONS admins who aren't the organizer).
+  if (!canManage) return null;
   if (!loaded) return null;
   if (pending.length === 0) {
     return (
@@ -737,13 +749,13 @@ function EventsTab({
 
 function MembersTab({
   community,
-  canManage,
   onCountChange,
 }: {
   community: CommunityDTO;
-  canManage: boolean;
   onCountChange: () => Promise<void>;
 }) {
+  // Real organizer only (same as P0 non-member-permissions fix — never admin).
+  const canManage = community.isOrganizer;
   const [members, setMembers] = useState<CommunityMemberDTO[]>([]);
   const [addQuery, setAddQuery] = useState("");
   const [addResults, setAddResults] = useState<PersonSearchResultDTO[]>([]);
@@ -779,6 +791,7 @@ function MembersTab({
   }, [addQuery, canManage, members]);
 
   async function addMember(userId: string) {
+    if (!canManage) return;
     setAddBusy(true);
     setAddErr(null);
     try {
@@ -813,6 +826,7 @@ function MembersTab({
   }
 
   async function remove(userId: string) {
+    if (!canManage) return;
     await api(`/api/communities/${community.id}/members/${userId}`, { method: "DELETE" });
     await load();
     await onCountChange();
@@ -858,7 +872,7 @@ function MembersTab({
       )}
 
       {canManage && (community.hasScreening || community.pendingRequestCount > 0) && (
-        <JoinRequestsPanel communityId={community.id} onChange={onCountChange} />
+        <JoinRequestsPanel communityId={community.id} canManage={canManage} onChange={onCountChange} />
       )}
 
       <h3 className="cmy-subhead">{members.length} {members.length === 1 ? "member" : "members"}</h3>
@@ -871,7 +885,7 @@ function MembersTab({
             </Link>
             {m.role === "organizer" && <span className="cmy-org-badge">Organizer</span>}
             {canManage && m.role !== "organizer" && (
-              <button type="button" className="cmy-icon-btn cmy-remove" onClick={() => remove(m.user.id)} title="Remove">
+              <button type="button" className="cmy-icon-btn cmy-remove" onClick={() => void remove(m.user.id)} title="Remove">
                 Remove
               </button>
             )}
@@ -998,10 +1012,14 @@ function SettingsTab({
     }
   }
 
+  // Organizer-only — Settings tab is already gated, but mirror canManage into
+  // the panel so Approve/Decline never render without an organizer check.
+  const canManage = community.isOrganizer;
+
   return (
     <section className="cmy-tabpanel cmy-settings">
-      {(community.hasScreening || community.pendingRequestCount > 0) && (
-        <JoinRequestsPanel communityId={community.id} onChange={onRequestsChange} />
+      {canManage && (community.hasScreening || community.pendingRequestCount > 0) && (
+        <JoinRequestsPanel communityId={community.id} canManage={canManage} onChange={onRequestsChange} />
       )}
       <div className="cmy-cover-upload">
         <span className="cmy-field-label">Cover image</span>
