@@ -11,6 +11,12 @@ import { userToPublic, planSummary } from "./plans.js";
 import { emit } from "../lib/notify.js";
 import { isAdminPhone } from "../lib/adminPhones.js";
 import {
+  canViewCommunityBoard,
+  communityMembershipBlockReason,
+  isActiveCommunityMember,
+  isCommunityOrganizer,
+} from "../lib/communityAccess.js";
+import {
   ALL_COMMUNITY_CATEGORIES,
   type CommunityCardDTO,
   type CommunityCategory,
@@ -23,7 +29,7 @@ import {
 
 export const communitiesRouter = Router();
 
-/** COMMONS admins can act as organizer on any community. */
+/** COMMONS admins — ops via /api/admin; not treated as community organizers. */
 async function isCommonsAdmin(userId: string): Promise<boolean> {
   const u = await findUserById(userId);
   return !!u && isAdminPhone(u.phoneNumber);
@@ -39,12 +45,11 @@ function publicFor(uid: string, users: Map<string, Awaited<ReturnType<typeof fin
 async function toCommunityDTO(
   community: CommunityRecord,
   viewerId: string,
-  opts?: { viewerIsAdmin?: boolean },
 ): Promise<CommunityDTO> {
   const organizer = await findUserById(community.organizerId);
   const membership = store.findCommunityMembership(community.id, viewerId);
-  const viewerIsAdmin = opts?.viewerIsAdmin ?? (await isCommonsAdmin(viewerId));
-  const isOrganizer = community.organizerId === viewerId || viewerIsAdmin;
+  // Real organizer only — COMMONS admins must Join like any other member.
+  const isOrganizer = isCommunityOrganizer(community, viewerId);
   const isActiveMember = membership?.status === "active";
   const canPostBulletin =
     (community.bulletinEnabled ?? true) &&
@@ -134,29 +139,20 @@ function memberDTO(
   };
 }
 
-/** Discovery info (name, cover, description, member count) stays public, but
- *  bulletin/events/members/chat actions require an active membership (or being
- *  the organizer / COMMONS admin). */
-function canSeeInside(community: CommunityRecord, viewerId: string, isOrganizer: boolean): boolean {
-  if (isOrganizer) return true;
-  return store.findCommunityMembership(community.id, viewerId)?.status === "active";
-}
-
 /** Shared guard for mutating endpoints that require a live (or in-review) community.
  *  Organizers may act while their community is pending review; everyone else gets
  *  a clear error instead of a silent 404. */
-async function requireCommunityForMutation(
+function requireCommunityForMutation(
   communityId: string,
   viewerId: string,
   res: import("express").Response,
-): Promise<{ community: CommunityRecord; isOrganizer: boolean } | null> {
+): { community: CommunityRecord; isOrganizer: boolean } | null {
   const community = store.findCommunityById(communityId);
   if (!community) {
     res.status(404).json({ error: "Community not found" });
     return null;
   }
-  const viewerIsAdmin = await isCommonsAdmin(viewerId);
-  const isOrganizer = community.organizerId === viewerId || viewerIsAdmin;
+  const isOrganizer = isCommunityOrganizer(community, viewerId);
   if (community.creationStatus === "pending") {
     if (!isOrganizer) {
       res.status(403).json({ error: "This community is pending review" });
@@ -259,13 +255,13 @@ communitiesRouter.get("/:id", requireAuth, async (req, res) => {
   const viewerIsAdmin = await isCommonsAdmin(viewerId);
   if (
     community.creationStatus !== "approved" &&
-    community.organizerId !== viewerId &&
+    !isCommunityOrganizer(community, viewerId) &&
     !viewerIsAdmin
   ) {
     res.status(404).json({ error: "Community not found" });
     return;
   }
-  res.json(await toCommunityDTO(community, viewerId, { viewerIsAdmin }));
+  res.json(await toCommunityDTO(community, viewerId));
 });
 
 // PATCH /api/communities/:id — organizer settings (name/description/cover/category,
@@ -277,8 +273,9 @@ communitiesRouter.patch("/:id", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Community not found" });
     return;
   }
-  const viewerIsAdmin = await isCommonsAdmin(viewerId);
-  if (community.organizerId !== viewerId && !viewerIsAdmin) {
+  // Settings are organizer-only. COMMONS admins are not treated as organizers
+  // here — they must Join (or be the real organizer) like any other member.
+  if (!isCommunityOrganizer(community, viewerId)) {
     res.status(403).json({ error: "Only the organizer can edit this community" });
     return;
   }
@@ -335,7 +332,7 @@ communitiesRouter.patch("/:id", requireAuth, async (req, res) => {
     patch.visibility = req.body.visibility;
   }
   const updated = store.updateCommunity(community.id, patch) ?? community;
-  res.json(await toCommunityDTO(updated, viewerId, { viewerIsAdmin }));
+  res.json(await toCommunityDTO(updated, viewerId));
 });
 
 // POST /api/communities/:id/join — instant join, or request-to-join if a
@@ -535,7 +532,7 @@ communitiesRouter.delete("/:id", requireAuth, async (req, res) => {
 });
 
 // GET /api/communities/:id/members — active members always; pending requests
-// (with screening answers) only when the viewer is the organizer/admin.
+// (with screening answers) only when the viewer is the organizer.
 communitiesRouter.get("/:id/members", requireAuth, async (req, res) => {
   const viewerId = String(req.userId);
   const community = store.findCommunityById(String(req.params.id));
@@ -543,9 +540,8 @@ communitiesRouter.get("/:id/members", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Community not found" });
     return;
   }
-  const viewerIsAdmin = await isCommonsAdmin(viewerId);
-  const isOrganizer = community.organizerId === viewerId || viewerIsAdmin;
-  if (!canSeeInside(community, viewerId, isOrganizer)) {
+  const isOrganizer = isCommunityOrganizer(community, viewerId);
+  if (!canViewCommunityBoard(community, viewerId)) {
     res.status(403).json({ error: "Join the community to see its members" });
     return;
   }
@@ -575,7 +571,7 @@ communitiesRouter.post("/:id/members/:userId/approve", requireAuth, async (req, 
     res.status(404).json({ error: "Community not found" });
     return;
   }
-  if (community.organizerId !== viewerId && !(await isCommonsAdmin(viewerId))) {
+  if (!isCommunityOrganizer(community, viewerId)) {
     res.status(403).json({ error: "Only the organizer can approve members" });
     return;
   }
@@ -608,7 +604,7 @@ communitiesRouter.post("/:id/members/:userId/decline", requireAuth, async (req, 
     res.status(404).json({ error: "Community not found" });
     return;
   }
-  if (community.organizerId !== viewerId && !(await isCommonsAdmin(viewerId))) {
+  if (!isCommunityOrganizer(community, viewerId)) {
     res.status(403).json({ error: "Only the organizer can decline members" });
     return;
   }
@@ -633,7 +629,7 @@ communitiesRouter.post("/:id/members/:userId/decline", requireAuth, async (req, 
 // POST /api/communities/:id/members — organizer adds a member directly (no screening).
 communitiesRouter.post("/:id/members", requireAuth, async (req, res) => {
   const viewerId = String(req.userId);
-  const ctx = await requireCommunityForMutation(String(req.params.id), viewerId, res);
+  const ctx = requireCommunityForMutation(String(req.params.id), viewerId, res);
   if (!ctx) return;
   const { community, isOrganizer } = ctx;
   if (!isOrganizer) {
@@ -688,7 +684,7 @@ communitiesRouter.delete("/:id/members/:userId", requireAuth, async (req, res) =
     res.status(404).json({ error: "Community not found" });
     return;
   }
-  if (community.organizerId !== viewerId && !(await isCommonsAdmin(viewerId))) {
+  if (!isCommunityOrganizer(community, viewerId)) {
     res.status(403).json({ error: "Only the organizer can remove members" });
     return;
   }
@@ -714,9 +710,8 @@ communitiesRouter.get("/:id/posts", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Bulletin is turned off for this community" });
     return;
   }
-  const viewerIsOrganizer =
-    community.organizerId === viewerId || (await isCommonsAdmin(viewerId));
-  if (!canSeeInside(community, viewerId, viewerIsOrganizer)) {
+  const viewerIsOrganizer = isCommunityOrganizer(community, viewerId);
+  if (!canViewCommunityBoard(community, viewerId)) {
     res.status(403).json({ error: "Join the community to see the bulletin" });
     return;
   }
@@ -741,19 +736,18 @@ communitiesRouter.get("/:id/posts", requireAuth, async (req, res) => {
 // POST /api/communities/:id/posts — post to the bulletin (per bulletin_permission).
 communitiesRouter.post("/:id/posts", requireAuth, async (req, res) => {
   const viewerId = String(req.userId);
-  const ctx = await requireCommunityForMutation(String(req.params.id), viewerId, res);
+  const ctx = requireCommunityForMutation(String(req.params.id), viewerId, res);
   if (!ctx) return;
   const { community } = ctx;
   if (!(community.bulletinEnabled ?? true)) {
     res.status(403).json({ error: "Bulletin is turned off for this community" });
     return;
   }
-  const viewerIsOrganizer =
-    community.organizerId === viewerId || (await isCommonsAdmin(viewerId));
-  const membership = store.findCommunityMembership(community.id, viewerId);
-  const isActive = membership?.status === "active";
-  if (!viewerIsOrganizer && !isActive) {
-    res.status(403).json({ error: "Join the community to post here" });
+  const viewerIsOrganizer = isCommunityOrganizer(community, viewerId);
+  const isActive = isActiveCommunityMember(community.id, viewerId);
+  const blocked = communityMembershipBlockReason(community, viewerId);
+  if (blocked) {
+    res.status(403).json({ error: blocked });
     return;
   }
   const mayPost =
@@ -799,7 +793,7 @@ communitiesRouter.post("/:id/posts/:postId/approve", requireAuth, async (req, re
     res.status(404).json({ error: "Community not found" });
     return;
   }
-  if (community.organizerId !== viewerId && !(await isCommonsAdmin(viewerId))) {
+  if (!isCommunityOrganizer(community, viewerId)) {
     res.status(403).json({ error: "Only the organizer can approve posts" });
     return;
   }
@@ -821,7 +815,7 @@ communitiesRouter.post("/:id/posts/:postId/decline", requireAuth, async (req, re
     res.status(404).json({ error: "Community not found" });
     return;
   }
-  if (community.organizerId !== viewerId && !(await isCommonsAdmin(viewerId))) {
+  if (!isCommunityOrganizer(community, viewerId)) {
     res.status(403).json({ error: "Only the organizer can decline posts" });
     return;
   }
@@ -847,7 +841,7 @@ communitiesRouter.post("/:id/posts/:postId/pin", requireAuth, async (req, res) =
     res.status(403).json({ error: "Bulletin is turned off for this community" });
     return;
   }
-  if (community.organizerId !== viewerId && !(await isCommonsAdmin(viewerId))) {
+  if (!isCommunityOrganizer(community, viewerId)) {
     res.status(403).json({ error: "Only the organizer can pin posts" });
     return;
   }
@@ -877,8 +871,7 @@ communitiesRouter.delete("/:id/posts/:postId", requireAuth, async (req, res) => 
     res.status(404).json({ error: "Post not found" });
     return;
   }
-  const viewerIsOrganizer =
-    community.organizerId === viewerId || (await isCommonsAdmin(viewerId));
+  const viewerIsOrganizer = isCommunityOrganizer(community, viewerId);
   if (!viewerIsOrganizer && post.authorId !== viewerId) {
     res.status(403).json({ error: "You can only delete your own posts" });
     return;
@@ -896,10 +889,9 @@ communitiesRouter.get("/:id/events", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Community not found" });
     return;
   }
-  const membership = store.findCommunityMembership(community.id, viewerId);
-  const isMember = membership?.status === "active";
-  const isOrganizer = community.organizerId === viewerId || (await isCommonsAdmin(viewerId));
-  if (!canSeeInside(community, viewerId, isOrganizer)) {
+  const isMember = isActiveCommunityMember(community.id, viewerId);
+  const isOrganizer = isCommunityOrganizer(community, viewerId);
+  if (!canViewCommunityBoard(community, viewerId)) {
     res.status(403).json({ error: "Join the community to see its events" });
     return;
   }
@@ -928,10 +920,9 @@ communitiesRouter.get("/:id/conversation", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Chat is turned off for this community" });
     return;
   }
-  const membership = store.findCommunityMembership(community.id, viewerId);
-  const isOrganizer = community.organizerId === viewerId || (await isCommonsAdmin(viewerId));
-  if (membership?.status !== "active" && !isOrganizer) {
-    res.status(403).json({ error: "Join the community to access chat" });
+  const blocked = communityMembershipBlockReason(community, viewerId, "access chat");
+  if (blocked) {
+    res.status(403).json({ error: blocked });
     return;
   }
   const activeIds = store.listActiveCommunityMembers(community.id).map((m) => m.userId);
@@ -953,7 +944,7 @@ communitiesRouter.get("/:id/conversation", requireAuth, async (req, res) => {
     lastMessageAt: conv.lastMessageAt,
     unreadCount: messages.filter((m) => !m.readBy.includes(viewerId)).length,
     muted: store.isConversationMuted(viewerId, conv.id),
-    isHost: hostId === viewerId || (await isCommonsAdmin(viewerId)),
+    isHost: hostId === viewerId,
     hostId,
   });
 });

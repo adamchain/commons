@@ -16,7 +16,6 @@ import {
 } from "../types/shared.js";
 import { onPlanCreatedVenueNudge, notifyInterestedPlanLocked } from "../lib/nudges.js";
 import { emit } from "../lib/notify.js";
-import { isAdminPhone } from "../lib/adminPhones.js";
 import { planHasEnded, plansOverlap, FLEXIBLE_DATE_PLACEHOLDER } from "../lib/planTime.js";
 import { coverUrlFor } from "./share.js";
 import type { PublicPlanDTO } from "../types/shared.js";
@@ -42,9 +41,20 @@ function normalizeFlyerDataUrl(raw: unknown): string | undefined {
 }
 
 function userHoods(me: UserRecord): string[] {
-  if (me.neighborhoodIds?.length) return me.neighborhoodIds;
-  if (me.neighborhoodId) return [me.neighborhoodId];
-  return [];
+  const raw = me.neighborhoodIds?.length
+    ? me.neighborhoodIds
+    : me.neighborhoodId
+      ? [me.neighborhoodId]
+      : [];
+  // Drop unknown / legacy ObjectId refs so an orphaned profile field can't
+  // empty the feed or block posting.
+  return [
+    ...new Set(
+      raw
+        .map((id) => store.resolveNeighborhoodId(id))
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
 }
 
 function combinedNeighborhoodScope(me: UserRecord): string[] | null {
@@ -54,7 +64,9 @@ function combinedNeighborhoodScope(me: UserRecord): string[] | null {
   for (const id of hoods) {
     store.neighborhoodScope(id).forEach((x) => set.add(x));
   }
-  return [...set];
+  // Empty array is truthy — treat "no valid scope" like no hoods so the feed
+  // falls back to city-wide instead of matching nothing.
+  return set.size > 0 ? [...set] : null;
 }
 
 export function planVisibleToViewer(plan: PlanRecord, me: UserRecord): boolean {
@@ -298,10 +310,17 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   const isFlexibleLocation = Boolean(req.body?.isFlexibleLocation);
   const description = req.body?.description ? String(req.body.description).trim() : undefined;
   const hostEmoji = String(req.body?.hostEmoji ?? "").trim() || "✨";
-  // Neighborhood is optional at signup — prefer body, then profile, then
-  // nearest hood to the venue coords. Empty string is allowed (flexible /
-  // unknown); never block posting for skipping onboarding location.
-  let neighborhoodId = String(req.body?.neighborhoodId ?? userHoods(me)[0] ?? "").trim();
+  // Prefer body, then profile, then nearest hood to venue coords. Never block
+  // posting on a missing/invalid profile neighborhood (Flexible location and
+  // typed venues must still work for accounts that skipped or have orphan ids).
+  const bodyHoodRaw =
+    req.body?.neighborhoodId === undefined || req.body?.neighborhoodId === null
+      ? ""
+      : String(req.body.neighborhoodId).trim();
+  let neighborhoodId =
+    store.resolveNeighborhoodId(bodyHoodRaw) ??
+    userHoods(me)[0] ??
+    "";
   const planKind = (req.body?.planKind === "looking_for" ? "looking_for" : "standard") as PlanKind;
   // "Do it again": when set, carry the previous event's crew + group chat into
   // this new plan.
@@ -350,12 +369,13 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     res.status(400).json({ error: "Pick a time or turn on flexible." });
     return;
   }
-  if (neighborhoodId && !store.findNeighborhoodById(neighborhoodId)) {
-    res.status(400).json({ error: "Unknown neighborhood" });
-    return;
-  }
   if (!neighborhoodId && typeof lat === "number" && typeof lng === "number") {
     neighborhoodId = store.nearestNeighborhoodId(lat, lng) ?? "";
+  }
+  // Last resort: ignore unknown ids rather than 400 — Flexible / typed venue
+  // posts must not depend on a broken profile neighborhood field.
+  if (neighborhoodId && !store.findNeighborhoodById(neighborhoodId)) {
+    neighborhoodId = "";
   }
   const resolvedLocationName = isFlexibleLocation
     ? locationName || "Flexible location"
@@ -374,9 +394,7 @@ plansRouter.post("/", requireAuth, async (req, res) => {
       res.status(400).json({ error: "Community not found" });
       return;
     }
-    const meForAdmin = await findUserById(userId);
-    const isOrganizer =
-      community.organizerId === userId || (!!meForAdmin && isAdminPhone(meForAdmin.phoneNumber));
+    const isOrganizer = community.organizerId === userId;
     if (community.creationStatus === "pending") {
       if (!isOrganizer) {
         res.status(403).json({ error: "This community is pending review" });
@@ -609,11 +627,14 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
   }
   if (req.body?.neighborhoodId !== undefined) {
     const n = String(req.body.neighborhoodId).trim();
-    if (n && !store.findNeighborhoodById(n)) {
-      res.status(400).json({ error: "Unknown neighborhood" });
-      return;
+    if (n) {
+      const resolved = store.resolveNeighborhoodId(n);
+      if (!resolved) {
+        res.status(400).json({ error: "Unknown neighborhood" });
+        return;
+      }
+      patch.neighborhoodId = resolved;
     }
-    if (n) patch.neighborhoodId = n;
   }
   if (req.body?.location && typeof req.body.location === "object") {
     const loc = req.body.location as Record<string, unknown>;

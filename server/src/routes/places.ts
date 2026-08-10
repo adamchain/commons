@@ -62,11 +62,18 @@ placesRouter.get("/autocomplete", requireAuth, async (req, res) => {
       .map((s) => s.placePrediction)
       .filter((p): p is NonNullable<typeof p> => Boolean(p))
       .slice(0, 8)
-      .map((p) => ({
-        placeId: p.placeId,
-        name: p.structuredFormat?.mainText?.text ?? p.text?.text?.split(",")[0]?.trim() ?? "",
-        address: p.text?.text ?? "",
-      }));
+      .map((p) => {
+        const address = p.text?.text ?? "";
+        const name =
+          p.structuredFormat?.mainText?.text ??
+          address.split(",")[0]?.trim() ??
+          "";
+        // Prefer bare placeId; fall back to resource name ("places/…").
+        const rawId = p.placeId || "";
+        const placeId = rawId.replace(/^places\//, "");
+        return { placeId, name, address };
+      })
+      .filter((p) => p.placeId && p.name);
     res.json({ predictions });
   } catch (e) {
     console.error("[places] autocomplete fetch", e);
@@ -283,7 +290,10 @@ placesRouter.get("/photo", requireAuth, async (req, res) => {
 /** Place Details (Places API New). Same response shape as before. */
 placesRouter.get("/details", requireAuth, async (req, res) => {
   const key = googleKey();
-  const placeId = String(req.query.placeId ?? "").trim();
+  // Autocomplete may hand back either a bare Place ID or a resource name
+  // ("places/ChIJ…"). Details always wants the bare id in the path segment.
+  const rawPlaceId = String(req.query.placeId ?? "").trim();
+  const placeId = rawPlaceId.replace(/^places\//, "");
   if (!key) {
     res.status(404).json({ error: "Place not found" });
     return;

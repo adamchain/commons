@@ -921,6 +921,43 @@ export const store = {
   findNeighborhoodById(id: string): NeighborhoodRecord | undefined {
     return snapshot.neighborhoods.find((n) => n.id === id);
   },
+  /**
+   * Resolve a neighborhood reference to the canonical UUID `id`.
+   * Accepts the UUID itself, or a leftover Mongo `_id` string from older
+   * writes that stored ObjectId instead of our pinned neighborhood UUID.
+   */
+  resolveNeighborhoodId(raw: string | null | undefined): string | undefined {
+    if (raw == null) return undefined;
+    const trimmed = String(raw).trim();
+    if (!trimmed) return undefined;
+    if (this.findNeighborhoodById(trimmed)) return trimmed;
+    for (const n of snapshot.neighborhoods) {
+      const oid = (n as { _id?: { toString(): string } | string })._id;
+      if (oid != null && String(oid) === trimmed) return n.id;
+    }
+    return undefined;
+  },
+  /** Upsert one neighborhood by UUID id (does not wipe the collection). */
+  ensureNeighborhood(record: NeighborhoodRecord): void {
+    const clean: NeighborhoodRecord = {
+      id: record.id,
+      name: record.name,
+      metro: record.metro,
+      adjacent: [...record.adjacent],
+      lat: record.lat,
+      lng: record.lng,
+    };
+    const idx = snapshot.neighborhoods.findIndex((n) => n.id === clean.id);
+    if (idx >= 0) {
+      // Object.assign keeps any hydrated Mongo `_id` so legacy ObjectId
+      // neighborhood refs on users can still be remapped at runtime.
+      Object.assign(snapshot.neighborhoods[idx]!, clean);
+    } else {
+      snapshot.neighborhoods.push({ ...clean });
+    }
+    persist();
+    mongoMirror.upsertNeighborhood(clean);
+  },
   /** Nearest hood with coords — used when a plan has a venue but no explicit neighborhood. */
   nearestNeighborhoodId(lat: number, lng: number): string | undefined {
     let bestId: string | undefined;
@@ -939,7 +976,8 @@ export const store = {
   },
   // returns the user's neighborhood + adjacent neighborhood ids
   neighborhoodScope(neighborhoodId: string): string[] {
-    const root = this.findNeighborhoodById(neighborhoodId);
+    const resolved = this.resolveNeighborhoodId(neighborhoodId) ?? neighborhoodId;
+    const root = this.findNeighborhoodById(resolved);
     if (!root) return [];
     return [root.id, ...root.adjacent];
   },

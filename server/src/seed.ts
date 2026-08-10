@@ -448,32 +448,85 @@ function includeSeedDemoData(): boolean {
   return process.env.NODE_ENV !== "production";
 }
 
-export async function seedIfEmpty(): Promise<void> {
-  // Seed neighborhoods only when the store is empty (preserves existing data on restart).
+/** Upsert the full pinned Philly list (adds missing hoods; refreshes adjacency). */
+function ensurePhillyNeighborhoods(): Map<string, string> {
   const neighborhoodIdByKey = new Map<string, string>();
-  if (store.listNeighborhoods().length === 0) {
-    const recordsByKey = new Map<string, ReturnType<typeof seedNeighborhood>>();
-    for (const n of PHILLY_NEIGHBORHOODS) {
-      const record = seedNeighborhood(n);
-      neighborhoodIdByKey.set(n.key, record.id);
-      recordsByKey.set(n.key, record);
-    }
-    for (const n of PHILLY_NEIGHBORHOODS) {
-      const record = recordsByKey.get(n.key);
-      if (!record) continue;
-      record.adjacent = n.adjacentKeys
-        .map((k) => neighborhoodIdByKey.get(k))
-        .filter((id): id is string => Boolean(id));
-    }
+  const recordsByKey = new Map<string, ReturnType<typeof seedNeighborhood>>();
+  for (const n of PHILLY_NEIGHBORHOODS) {
+    const record = seedNeighborhood(n);
+    neighborhoodIdByKey.set(n.key, record.id);
+    recordsByKey.set(n.key, record);
+  }
+  for (const n of PHILLY_NEIGHBORHOODS) {
+    const record = recordsByKey.get(n.key);
+    if (!record) continue;
+    record.adjacent = n.adjacentKeys
+      .map((k) => neighborhoodIdByKey.get(k))
+      .filter((id): id is string => Boolean(id));
+  }
+
+  const before = store.listNeighborhoods().length;
+  if (before === 0) {
+    // Fresh DB — replaceAll is fine (nothing to preserve).
     store.seedNeighborhoods(Array.from(recordsByKey.values()));
   } else {
-    // Map existing neighborhoods back to keys by name so demo seeding works on restart.
-    const nameToKey = new Map(PHILLY_NEIGHBORHOODS.map((n) => [n.name, n.key]));
-    for (const record of store.listNeighborhoods()) {
-      const key = nameToKey.get(record.name);
-      if (key) neighborhoodIdByKey.set(key, record.id);
+    // Prod may have been seeded with a partial list; upsert missing / refresh edges
+    // without wiping Mongo `_id`s (legacy user rows may still reference them).
+    for (const record of recordsByKey.values()) {
+      store.ensureNeighborhood(record);
     }
   }
+  const after = store.listNeighborhoods().length;
+  if (after !== before) {
+    console.log(`[seed] neighborhoods ${before} → ${after}`);
+  }
+  return neighborhoodIdByKey;
+}
+
+/**
+ * Remap legacy Mongo ObjectId neighborhood refs to pinned UUIDs, and clear
+ * ids that don't resolve to any hood. Runs on every boot so orphaned profile
+ * fields can't keep blocking post/feed for real accounts.
+ */
+function repairUserNeighborhoodIds(): void {
+  let repaired = 0;
+  for (const user of store.listUsers()) {
+    const raw = user.neighborhoodIds?.length
+      ? user.neighborhoodIds
+      : user.neighborhoodId
+        ? [user.neighborhoodId]
+        : [];
+    const resolved = [
+      ...new Set(
+        raw
+          .map((id) => store.resolveNeighborhoodId(id))
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const primary = resolved[0] ?? null;
+    const samePrimary = (user.neighborhoodId ?? null) === primary;
+    const sameList =
+      (user.neighborhoodIds?.length ?? 0) === resolved.length &&
+      resolved.every((id, i) => user.neighborhoodIds?.[i] === id);
+    if (samePrimary && sameList) continue;
+    store.updateUser(user.id, {
+      neighborhoodId: primary,
+      neighborhoodIds: resolved,
+    });
+    repaired += 1;
+    console.log(
+      `[seed] repaired neighborhood refs for ${user.phoneNumber}` +
+        (primary ? ` → ${primary}` : " → (cleared)"),
+    );
+  }
+  if (repaired > 0) {
+    console.log(`[seed] repaired neighborhood refs on ${repaired} user(s)`);
+  }
+}
+
+export async function seedIfEmpty(): Promise<void> {
+  const neighborhoodIdByKey = ensurePhillyNeighborhoods();
+  repairUserNeighborhoodIds();
 
   if (!includeSeedDemoData()) {
     console.log("[seed] skipped demo users/plans (production). Only Verify sign-ups create accounts. Set SEED_DEMO_ACCOUNTS=1 to seed.");

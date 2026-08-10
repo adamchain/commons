@@ -632,7 +632,7 @@ export interface CommunityDTO {
   createdAt: string;
   /** The viewer's membership, or null if they're a visitor. */
   myMembership: CommunityMembershipView | null;
-  /** True when the viewer created it (or is a COMMONS admin). */
+  /** True when the viewer is this community's organizer (not COMMONS admin). */
   isOrganizer: boolean;
   /** Viewer may post to the bulletin (permission + active membership). */
   canPostBulletin: boolean;

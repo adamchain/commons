@@ -257,12 +257,38 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
   if (req.body?.bio === null || req.body?.bio === "") patch.bio = "";
   if (typeof req.body?.ageRange === "string") patch.ageRange = req.body.ageRange;
   if (req.body?.ageConfirmed === true) patch.ageConfirmedAt = new Date().toISOString();
-  if (typeof req.body?.neighborhoodId === "string") patch.neighborhoodId = req.body.neighborhoodId;
   if (Array.isArray(req.body?.neighborhoodIds)) {
-    patch.neighborhoodIds = (req.body.neighborhoodIds as unknown[]).map(String).filter(Boolean);
-    if (patch.neighborhoodIds.length > 0 && !patch.neighborhoodId) {
-      patch.neighborhoodId = patch.neighborhoodIds[0]!;
+    const raw = (req.body.neighborhoodIds as unknown[]).map(String).filter(Boolean);
+    const resolved = [
+      ...new Set(
+        raw
+          .map((id) => store.resolveNeighborhoodId(id))
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    if (raw.length > 0 && resolved.length === 0) {
+      res.status(400).json({ error: "Unknown neighborhood" });
+      return;
     }
+    if (resolved.length === 0) {
+      res.status(400).json({ error: "Pick at least one neighborhood" });
+      return;
+    }
+    patch.neighborhoodIds = resolved;
+    patch.neighborhoodId = resolved[0]!;
+  } else if (typeof req.body?.neighborhoodId === "string") {
+    const raw = req.body.neighborhoodId.trim();
+    if (!raw) {
+      res.status(400).json({ error: "Pick at least one neighborhood" });
+      return;
+    }
+    const resolved = store.resolveNeighborhoodId(raw);
+    if (!resolved) {
+      res.status(400).json({ error: "Unknown neighborhood" });
+      return;
+    }
+    patch.neighborhoodId = resolved;
+    patch.neighborhoodIds = [resolved];
   }
   if (Array.isArray(req.body?.interests)) patch.interests = req.body.interests;
   if (typeof req.body?.avatarSeed === "string") patch.avatarSeed = req.body.avatarSeed;

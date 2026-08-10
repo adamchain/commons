@@ -425,7 +425,6 @@ export function OnboardingPage() {
           });
           setStep("interests");
         }}
-        onSkip={() => setStep("interests")}
         // Location is the first step after the access-code gate, so "back" has
         // nowhere else sensible to land — re-showing the gate (already passed,
         // just re-confirms) beats no back button at all.
@@ -766,13 +765,11 @@ function LocationStep({
   coords,
   onCoords,
   onSave,
-  onSkip,
   onBack,
 }: {
   coords: { lat: number; lng: number } | null;
   onCoords: (c: { lat: number; lng: number } | null) => void;
   onSave: (neighborhoodIds: string[]) => Promise<void>;
-  onSkip: () => void;
   onBack?: () => void;
 }) {
   const [neighborhoods, setNeighborhoods] = useState<NeighborhoodDTO[]>([]);
@@ -895,9 +892,6 @@ function LocationStep({
         }}
       >
         {selected.size > 0 ? `Continue · ${selected.size} picked` : "Continue"}
-      </button>
-      <button className="btn-link" type="button" disabled={busy} onClick={onSkip}>
-        Skip for now
       </button>
     </OnboardingShell>
   );

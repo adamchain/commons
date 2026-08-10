@@ -87,11 +87,17 @@ export function CommunityDetailPage() {
 
   const catLabel = COMMUNITY_CATEGORY_LABELS[community.category];
   const isActiveMember = community.myMembership?.status === "active";
+  // isOrganizer is the real community organizer only (never a COMMONS admin).
   const showChatTab = community.chatEnabled && (isActiveMember || community.isOrganizer);
-  // Bulletin, events, members, and posting require active membership (organizer counts).
-  const canSeeInside = isActiveMember || community.isOrganizer;
-  const canPostBulletin = community.canPostBulletin && canSeeInside;
-  const canPostPlan = community.canPostPlan && canSeeInside;
+  // Board view is open for instant-join / "Everyone" communities. Locked for
+  // request-to-join (screening) or visibility=members_only. Posting / chat /
+  // manage still require membership regardless.
+  const boardRestricted =
+    community.hasScreening || community.visibility === "members_only";
+  const canSeeInside = !boardRestricted || isActiveMember || community.isOrganizer;
+  const canPostBulletin = community.canPostBulletin && (isActiveMember || community.isOrganizer);
+  const canPostPlan = community.canPostPlan && (isActiveMember || community.isOrganizer);
+  const canManage = community.isOrganizer;
 
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy">
@@ -167,14 +173,16 @@ export function CommunityDetailPage() {
           </TabButton>
         )}
         <TabButton id="members" tab={tab} setTab={setTab} badge={community.pendingRequestCount || undefined}>Members</TabButton>
-        {community.isOrganizer && (
+        {canManage && (
           <TabButton id="settings" tab={tab} setTab={setTab} badge={community.pendingRequestCount || undefined}>
             Settings
           </TabButton>
         )}
       </nav>
 
-      {tab === "bulletin" && community.bulletinEnabled && (canSeeInside ? <BulletinTab community={community} canPost={canPostBulletin} onPendingChange={load} /> : <LockedPanel />)}
+      {tab === "bulletin" && community.bulletinEnabled && (canSeeInside ? <BulletinTab community={community} canPost={canPostBulletin} onPendingChange={load} /> : (
+        <LockedPanel community={community} onChange={setCommunity} reload={load} />
+      ))}
       {tab === "events" && (
         canSeeInside ? (
           <EventsTab
@@ -187,11 +195,15 @@ export function CommunityDetailPage() {
             }
           />
         ) : (
-          <LockedPanel />
+          <LockedPanel community={community} onChange={setCommunity} reload={load} />
         )
       )}
-      {tab === "members" && (canSeeInside ? <MembersTab community={community} onCountChange={load} /> : <LockedPanel />)}
-      {tab === "settings" && community.isOrganizer && canSeeInside && (
+      {tab === "members" && (canSeeInside ? (
+        <MembersTab community={community} canManage={canManage} onCountChange={load} />
+      ) : (
+        <LockedPanel community={community} onChange={setCommunity} reload={load} />
+      ))}
+      {tab === "settings" && canManage && (
         <SettingsTab
           community={community}
           onSaved={setCommunity}
@@ -314,12 +326,23 @@ function TabButton({
   );
 }
 
-function LockedPanel() {
+function LockedPanel({
+  community,
+  onChange,
+  reload,
+}: {
+  community: CommunityDTO;
+  onChange: (c: CommunityDTO) => void;
+  reload: () => Promise<void>;
+}) {
   return (
     <section className="cmy-tabpanel">
       <div className="cmy-locked">
         <span className="cmy-locked-icon" aria-hidden="true">🔒</span>
         <p className="cmy-locked-text">Join to see what’s happening inside.</p>
+        <div className="cmy-locked-join">
+          <JoinControl community={community} onChange={onChange} reload={reload} />
+        </div>
       </div>
     </section>
   );
@@ -712,7 +735,15 @@ function EventsTab({
   );
 }
 
-function MembersTab({ community, onCountChange }: { community: CommunityDTO; onCountChange: () => Promise<void> }) {
+function MembersTab({
+  community,
+  canManage,
+  onCountChange,
+}: {
+  community: CommunityDTO;
+  canManage: boolean;
+  onCountChange: () => Promise<void>;
+}) {
   const [members, setMembers] = useState<CommunityMemberDTO[]>([]);
   const [addQuery, setAddQuery] = useState("");
   const [addResults, setAddResults] = useState<PersonSearchResultDTO[]>([]);
@@ -731,7 +762,7 @@ function MembersTab({ community, onCountChange }: { community: CommunityDTO; onC
   }, [load]);
 
   useEffect(() => {
-    if (!community.isOrganizer || !addQuery.trim()) {
+    if (!canManage || !addQuery.trim()) {
       setAddResults([]);
       return;
     }
@@ -745,7 +776,7 @@ function MembersTab({ community, onCountChange }: { community: CommunityDTO; onC
     return () => {
       if (addDebounce.current) clearTimeout(addDebounce.current);
     };
-  }, [addQuery, community.isOrganizer, members]);
+  }, [addQuery, canManage, members]);
 
   async function addMember(userId: string) {
     setAddBusy(true);
@@ -789,7 +820,7 @@ function MembersTab({ community, onCountChange }: { community: CommunityDTO; onC
 
   return (
     <section className="cmy-tabpanel">
-      {community.isOrganizer && community.creationStatus === "approved" && (
+      {canManage && community.creationStatus === "approved" && (
         <div className="cmy-members-tools">
           <button type="button" className="cmy-btn cmy-btn--ghost cmy-btn--sm" onClick={() => void shareCommunity()}>
             Share community
@@ -798,7 +829,7 @@ function MembersTab({ community, onCountChange }: { community: CommunityDTO; onC
         </div>
       )}
 
-      {community.isOrganizer && (
+      {canManage && (
         <div className="cmy-add-member">
           {addErr && <p className="cmy-err">{addErr}</p>}
           <label className="cmy-field">
@@ -826,7 +857,7 @@ function MembersTab({ community, onCountChange }: { community: CommunityDTO; onC
         </div>
       )}
 
-      {community.isOrganizer && (community.hasScreening || community.pendingRequestCount > 0) && (
+      {canManage && (community.hasScreening || community.pendingRequestCount > 0) && (
         <JoinRequestsPanel communityId={community.id} onChange={onCountChange} />
       )}
 
@@ -839,7 +870,7 @@ function MembersTab({ community, onCountChange }: { community: CommunityDTO; onC
               <span className="cmy-member-name">{m.user.firstName} {m.user.lastName ?? ""}</span>
             </Link>
             {m.role === "organizer" && <span className="cmy-org-badge">Organizer</span>}
-            {community.isOrganizer && m.role !== "organizer" && (
+            {canManage && m.role !== "organizer" && (
               <button type="button" className="cmy-icon-btn cmy-remove" onClick={() => remove(m.user.id)} title="Remove">
                 Remove
               </button>

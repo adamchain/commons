@@ -3993,6 +3993,14 @@ h1, h2, h3, h4, h5, h6 {
   border: none;
 }
 
+.profile-edit-hoods {
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
 .profile-edit-panel {
   margin-top: 24px;
   padding: 18px;

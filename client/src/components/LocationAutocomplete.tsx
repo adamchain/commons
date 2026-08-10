@@ -126,28 +126,30 @@ export function LocationAutocomplete({
   };
 
   const pick = async (suggestion: LocationSuggestion) => {
-    if (suggestion.placeId) {
-      try {
-        const d = await api<{ name: string; address: string; lat?: number; lng?: number }>(
-          `/api/places/details?placeId=${encodeURIComponent(suggestion.placeId)}`,
-        );
-        setQuery(d.name || suggestion.name);
-        onChange({
-          name: d.name || suggestion.name,
-          address: d.address || suggestion.address,
-          lat: d.lat,
-          lng: d.lng,
-        });
-      } catch {
-        setQuery(suggestion.name);
-        onChange({ name: suggestion.name, address: suggestion.address });
-      }
-    } else {
-      setQuery(suggestion.name);
-      onChange({ name: suggestion.name, address: suggestion.address });
-    }
+    // Bind immediately so the parent location field is set before any Details
+    // round-trip — otherwise submit can still see an empty/unbound location.
+    const fallbackName =
+      (suggestion.name && suggestion.name.trim()) ||
+      (suggestion.address && suggestion.address.split(",")[0]?.trim()) ||
+      query.trim();
+    const fallbackAddress = (suggestion.address && suggestion.address.trim()) || fallbackName;
+    setQuery(fallbackName);
+    onChange({ name: fallbackName, address: fallbackAddress });
     setOpen(false);
     setSuggestions([]);
+
+    if (!suggestion.placeId) return;
+    try {
+      const d = await api<{ name: string; address: string; lat?: number; lng?: number }>(
+        `/api/places/details?placeId=${encodeURIComponent(suggestion.placeId)}`,
+      );
+      const name = (d.name && d.name.trim()) || fallbackName;
+      const address = (d.address && d.address.trim()) || fallbackAddress;
+      setQuery(name);
+      onChange({ name, address, lat: d.lat, lng: d.lng });
+    } catch {
+      /* already bound above */
+    }
   };
 
   return (

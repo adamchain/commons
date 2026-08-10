@@ -5,7 +5,7 @@ import type { ConversationRecord } from "../store.js";
 import { findUserById, findUsersByIds } from "../userRepo.js";
 import { userToPublic } from "./plans.js";
 import { emit } from "../lib/notify.js";
-import { isAdminPhone } from "../lib/adminPhones.js";
+import { communityMembershipBlockReason } from "../lib/communityAccess.js";
 import { isGcsConfigured, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
 import type { ConversationDTO, ConversationSummaryDTO, MessageDTO, PollDTO } from "../types/shared.js";
 
@@ -44,22 +44,18 @@ export const chatRouter = Router();
 // For community group chats, being present in `participantIds` is not enough to
 // keep writing — a user can be in the roster yet no longer be an active member
 // (pending, removed, or a drift between roster and membership). Re-verify active
-// membership (or organizer / admin) before any write. Plan chats have no
+// membership (or the real organizer) before any write. Plan chats have no
 // community and pass straight through. Returns a 403 message when blocked, else
-// null. Mirrors the gate in communities.ts (bulletin) and plans.ts (plan posts).
-async function communityPostBlockReason(
+// null. Mirrors communities.ts (bulletin) and plans.ts (plan posts).
+function communityPostBlockReason(
   conv: ConversationRecord,
   userId: string,
-): Promise<string | null> {
+): string | null {
   if (!conv.communityId) return null;
-  const community = store.findCommunityById(conv.communityId);
-  if (!community) return "Community not found";
-  const membership = store.findCommunityMembership(conv.communityId, userId);
-  if (membership?.status === "active") return null;
-  if (community.organizerId === userId) return null;
-  const me = await findUserById(userId);
-  if (me && isAdminPhone(me.phoneNumber)) return null;
-  return "Join the community to post here";
+  return communityMembershipBlockReason(
+    store.findCommunityById(conv.communityId),
+    userId,
+  );
 }
 
 // GET /api/conversations — unified inbox: group chats for every plan the user
@@ -252,7 +248,7 @@ chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => 
     res.status(403).json({ error: "Not a participant" });
     return;
   }
-  const blocked = await communityPostBlockReason(conv, userId);
+  const blocked = communityPostBlockReason(conv, userId);
   if (blocked) {
     res.status(403).json({ error: blocked });
     return;
@@ -314,7 +310,7 @@ chatRouter.post("/conversations/:id/polls", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Not a participant" });
     return;
   }
-  const blocked = await communityPostBlockReason(conv, userId);
+  const blocked = communityPostBlockReason(conv, userId);
   if (blocked) {
     res.status(403).json({ error: blocked });
     return;
@@ -356,7 +352,7 @@ chatRouter.post("/conversations/:id/messages/:msgId/vote", requireAuth, async (r
     res.status(403).json({ error: "Not a participant" });
     return;
   }
-  const blocked = await communityPostBlockReason(conv, userId);
+  const blocked = communityPostBlockReason(conv, userId);
   if (blocked) {
     res.status(403).json({ error: blocked });
     return;
@@ -489,7 +485,7 @@ chatRouter.post("/conversations/:id/messages/:msgId/react", requireAuth, async (
     res.status(403).json({ error: "Not a participant" });
     return;
   }
-  const blocked = await communityPostBlockReason(conv, userId);
+  const blocked = communityPostBlockReason(conv, userId);
   if (blocked) {
     res.status(403).json({ error: blocked });
     return;

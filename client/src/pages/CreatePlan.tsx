@@ -440,7 +440,10 @@ export function CreatePlanPage() {
         method: "POST",
         body: JSON.stringify({
           title: form.title.trim(),
-          neighborhoodId: form.neighborhoodId,
+          // Only send a profile/default hood when set — Flexible location and
+          // typed venues must not hard-depend on an unset/orphan profile field.
+          // Server resolves legacy ids and infers from venue coords when needed.
+          neighborhoodId: form.neighborhoodId || undefined,
           location: {
             name: form.locationName.trim(),
             address: form.locationAddress.trim() || form.locationName.trim(),
@@ -2119,29 +2122,45 @@ function PlacePicker({
 
   const choose = (p: PlaceHit) => {
     skipNextSearch.current = true;
-    // Autocomplete hits often lack lat/lng — resolve via Place Details when needed.
+    // Bind immediately so validation / submit see a real location even if
+    // Place Details is slow or fails. Autocomplete hits often lack lat/lng —
+    // enrich from Details after the field is already set.
+    const fallbackName =
+      (p.name && p.name.trim()) ||
+      (p.address && p.address.split(",")[0]?.trim()) ||
+      value.trim();
+    const fallbackAddress = (p.address && p.address.trim()) || fallbackName;
+    onSelect({
+      name: fallbackName,
+      address: fallbackAddress,
+      lat: p.lat,
+      lng: p.lng,
+      placeId: p.placeId,
+    });
+    setResults([]);
+    setSearched(false);
+    setFocused(false);
+
     if (p.placeId && !p.placeId.startsWith("osm-") && (p.lat == null || p.lng == null)) {
       void api<{ name: string; address: string; lat?: number; lng?: number }>(
         `/api/places/details?placeId=${encodeURIComponent(p.placeId)}`,
       )
         .then((d) => {
+          // First onSelect already consumed skipNextSearch — set it again so
+          // the enrichment update doesn't kick off another autocomplete search.
+          skipNextSearch.current = true;
           onSelect({
-            name: d.name || p.name,
-            address: d.address || p.address,
+            name: (d.name && d.name.trim()) || fallbackName,
+            address: (d.address && d.address.trim()) || fallbackAddress,
             lat: d.lat,
             lng: d.lng,
             placeId: p.placeId,
           });
         })
         .catch(() => {
-          onSelect({ name: p.name, address: p.address, placeId: p.placeId });
+          /* already bound above */
         });
-    } else {
-      onSelect({ name: p.name, address: p.address, lat: p.lat, lng: p.lng, placeId: p.placeId });
     }
-    setResults([]);
-    setSearched(false);
-    setFocused(false);
   };
 
   const hasPickedAddress = Boolean(address && address !== value);
