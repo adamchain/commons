@@ -123,8 +123,13 @@ export async function hydrateSnapshotFromMongo(): Promise<void> {
     // Ensure one forum row per InterestTag even if Mongo was empty / partial.
     store.ensureForumsForInterests();
 
+    // Communities now go live on create. Promote any legacy `pending` rows so
+    // stuck submissions aren't trapped behind an unprocessed review queue.
+    const promoted = store.promotePendingCommunities();
+
     console.log(
-      `[hydrate] loaded from Mongo: ${users.length} users, ${neighborhoods.length} hoods, ${plans.length} plans, ${participations.length} rsvps, ${conversations.length} convos, ${messages.length} msgs, ${interestForums.length} forums, ${forumPosts.length} forumPosts`,
+      `[hydrate] loaded from Mongo: ${users.length} users, ${neighborhoods.length} hoods, ${plans.length} plans, ${participations.length} rsvps, ${conversations.length} convos, ${messages.length} msgs, ${interestForums.length} forums, ${forumPosts.length} forumPosts` +
+        (promoted ? `, promoted ${promoted} pending communities` : ""),
     );
   } catch (err) {
     console.error("[hydrate] failed to load from Mongo — running with stale snapshot", err);

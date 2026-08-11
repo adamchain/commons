@@ -126,6 +126,9 @@ async function bootstrap(): Promise<void> {
   // Idempotent — fills any missing InterestTag forum rows after hydrate (or
   // when Mongo is offline and the snapshot came from data.json).
   store.ensureForumsForInterests();
+  // Hydrate already promotes when Mongo loads; this covers the data.json path.
+  const promoted = store.promotePendingCommunities();
+  if (promoted) console.log(`[boot] promoted ${promoted} pending communities to live`);
   await seedIfEmpty();
   startNudgeSchedulers();
 

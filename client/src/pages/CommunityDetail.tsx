@@ -108,7 +108,7 @@ export function CommunityDetailPage() {
       )}
       {community.creationStatus === "rejected" && (
         <div className="cmy-review-banner cmy-review-banner--warn">
-          This community wasn’t approved. You can edit it and resubmit.
+          This community was taken offline. Edit any setting to republish it.
         </div>
       )}
 

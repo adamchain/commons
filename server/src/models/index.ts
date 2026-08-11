@@ -276,7 +276,7 @@ const CommunitySchema = new Schema<CommunityRecord>(
     },
     organizerId: { type: String, required: true },
     memberCount: { type: Number, default: 1 },
-    creationStatus: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
+    creationStatus: { type: String, enum: ["pending", "approved", "rejected"], default: "approved" },
     isFounding: { type: Boolean, default: false },
     bulletinPermission: { type: String, enum: ["organizer_only", "members"], default: "members" },
     planPostingPermission: { type: String, enum: ["organizer_only", "members"], default: "members" },

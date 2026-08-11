@@ -150,10 +150,10 @@ export function CreateCommunityPage() {
 
         {err && <p className="cmy-err">{err}</p>}
         <p className="cmy-hint cmy-create-note">
-          Submitted communities are reviewed by COMMONS, usually within 24–48 hours, before going live.
+          Your community goes live right away. Others can find it in Explore and join.
         </p>
         <button type="button" className="cmy-btn cmy-btn--primary cmy-btn--block" disabled={!canSubmit} onClick={submit}>
-          Submit for review
+          Create community
         </button>
       </div>
     </main>

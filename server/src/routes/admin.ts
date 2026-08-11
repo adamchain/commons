@@ -475,7 +475,7 @@ adminRouter.post("/communities/:id/approve", (req, res) => {
   res.json({ ok: true, community: updated });
 });
 
-// POST /api/admin/communities/:id/reject { note? } — creator may edit + resubmit.
+// POST /api/admin/communities/:id/reject { note? } — takes offline; organizer edit republishes.
 adminRouter.post("/communities/:id/reject", (req, res) => {
   const community = store.findCommunityById(String(req.params.id));
   if (!community) {

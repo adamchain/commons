@@ -167,6 +167,27 @@ function requireCommunityForMutation(
   return { community, isOrganizer };
 }
 
+/** Board/detail reads: live communities for everyone; pending/rejected only for organizer. */
+function requireCommunityForRead(
+  communityId: string,
+  viewerId: string,
+  res: import("express").Response,
+): CommunityRecord | null {
+  const community = store.findCommunityById(communityId);
+  if (!community) {
+    res.status(404).json({ error: "Community not found" });
+    return null;
+  }
+  if (
+    community.creationStatus !== "approved" &&
+    !isCommunityOrganizer(community, viewerId)
+  ) {
+    res.status(404).json({ error: "Community not found" });
+    return null;
+  }
+  return community;
+}
+
 function parsePermission(
   raw: unknown,
   fallback: CommunityPostingPermission,
@@ -204,7 +225,7 @@ communitiesRouter.get("/mine", requireAuth, (req, res) => {
   res.json({ communities: cards });
 });
 
-// POST /api/communities — submit a new community for review (creation_status = pending).
+// POST /api/communities — create a community (goes live immediately).
 communitiesRouter.post("/", requireAuth, async (req, res) => {
   const userId = String(req.userId);
   const name = String(req.body?.name ?? "").trim().slice(0, 80);
@@ -238,8 +259,9 @@ communitiesRouter.post("/", requireAuth, async (req, res) => {
     category,
     organizerId: userId,
     screeningQuestion,
+    creationStatus: "approved",
   });
-  store.log("community_submitted", { communityId: community.id, organizerId: userId });
+  store.log("community_created", { communityId: community.id, organizerId: userId });
   res.status(201).json(await toCommunityDTO(community, userId));
 });
 
@@ -330,6 +352,13 @@ communitiesRouter.patch("/:id", requireAuth, async (req, res) => {
   }
   if (req.body?.visibility === "everyone" || req.body?.visibility === "members_only") {
     patch.visibility = req.body.visibility;
+  }
+  // Rejected → edit republishes immediately (admin can reject again if needed).
+  if (community.creationStatus === "rejected" && Object.keys(patch).length > 0) {
+    patch.creationStatus = "approved";
+    patch.rejectionNote = null;
+    patch.reviewedAt = new Date().toISOString();
+    patch.reviewedBy = null;
   }
   const updated = store.updateCommunity(community.id, patch) ?? community;
   res.json(await toCommunityDTO(updated, viewerId));
@@ -535,11 +564,8 @@ communitiesRouter.delete("/:id", requireAuth, async (req, res) => {
 // (with screening answers) only when the viewer is the organizer.
 communitiesRouter.get("/:id/members", requireAuth, async (req, res) => {
   const viewerId = String(req.userId);
-  const community = store.findCommunityById(String(req.params.id));
-  if (!community) {
-    res.status(404).json({ error: "Community not found" });
-    return;
-  }
+  const community = requireCommunityForRead(String(req.params.id), viewerId, res);
+  if (!community) return;
   const isOrganizer = isCommunityOrganizer(community, viewerId);
   if (!canViewCommunityBoard(community, viewerId)) {
     res.status(403).json({ error: "Join the community to see its members" });
@@ -701,11 +727,8 @@ communitiesRouter.delete("/:id/members/:userId", requireAuth, async (req, res) =
 // GET /api/communities/:id/posts — bulletin (pinned first, then reverse-chron).
 communitiesRouter.get("/:id/posts", requireAuth, async (req, res) => {
   const viewerId = String(req.userId);
-  const community = store.findCommunityById(String(req.params.id));
-  if (!community) {
-    res.status(404).json({ error: "Community not found" });
-    return;
-  }
+  const community = requireCommunityForRead(String(req.params.id), viewerId, res);
+  if (!community) return;
   if (!(community.bulletinEnabled ?? true)) {
     res.status(403).json({ error: "Bulletin is turned off for this community" });
     return;
@@ -884,11 +907,8 @@ communitiesRouter.delete("/:id/posts/:postId", requireAuth, async (req, res) => 
 // community_only plans are only returned to active members / the organizer.
 communitiesRouter.get("/:id/events", requireAuth, async (req, res) => {
   const viewerId = String(req.userId);
-  const community = store.findCommunityById(String(req.params.id));
-  if (!community) {
-    res.status(404).json({ error: "Community not found" });
-    return;
-  }
+  const community = requireCommunityForRead(String(req.params.id), viewerId, res);
+  if (!community) return;
   const isMember = isActiveCommunityMember(community.id, viewerId);
   const isOrganizer = isCommunityOrganizer(community, viewerId);
   if (!canViewCommunityBoard(community, viewerId)) {
@@ -911,11 +931,8 @@ communitiesRouter.get("/:id/events", requireAuth, async (req, res) => {
 // chat for the community. Active members only; requires chat_enabled.
 communitiesRouter.get("/:id/conversation", requireAuth, async (req, res) => {
   const viewerId = String(req.userId);
-  const community = store.findCommunityById(String(req.params.id));
-  if (!community) {
-    res.status(404).json({ error: "Community not found" });
-    return;
-  }
+  const community = requireCommunityForRead(String(req.params.id), viewerId, res);
+  if (!community) return;
   if (!community.chatEnabled) {
     res.status(403).json({ error: "Chat is turned off for this community" });
     return;

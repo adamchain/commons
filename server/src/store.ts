@@ -351,7 +351,7 @@ export interface InviteCodeRecord {
 /**
  * A community — a named group with a bulletin, events board, member list, and
  * optional group chat. Owned by the organizer's normal user account. Goes live
- * only after COMMONS admin approval (`creationStatus = approved`). V1 fields
+ * once live (`creationStatus = approved`). V1 fields
  * only; V2 additions (monetization_*, verified) are additive later.
  */
 export interface CommunityRecord {
@@ -1755,6 +1755,20 @@ export const store = {
       .filter((c) => c.creationStatus === "pending")
       .sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
   },
+  /** Promote legacy pending communities to live (review queue no longer gates go-live). */
+  promotePendingCommunities(): number {
+    const now = new Date().toISOString();
+    let promoted = 0;
+    for (const community of this.listPendingCommunities()) {
+      this.updateCommunity(community.id, {
+        creationStatus: "approved",
+        reviewedAt: community.reviewedAt ?? now,
+        rejectionNote: null,
+      });
+      promoted += 1;
+    }
+    return promoted;
+  },
   findCommunityById(id: string): CommunityRecord | undefined {
     return snapshot.communities.find((c) => c.id === id);
   },
@@ -1762,8 +1776,9 @@ export const store = {
     return snapshot.communities.filter((c) => c.organizerId === organizerId);
   },
   /**
-   * Create a community (default `pending`) and seed the organizer's active
-   * membership in one shot. `member_count` starts at 1 (the organizer).
+   * Create a community (default `approved` — live immediately) and seed the
+   * organizer's active membership in one shot. `member_count` starts at 1.
+   * Pass `creationStatus: "pending"` only for explicit review-queue cases.
    */
   createCommunity(input: {
     name: string;
@@ -1779,7 +1794,8 @@ export const store = {
     reviewedBy?: string | null;
   }): CommunityRecord {
     const now = new Date().toISOString();
-    const approved = input.creationStatus === "approved";
+    const creationStatus: CommunityCreationStatus = input.creationStatus ?? "approved";
+    const approved = creationStatus === "approved";
     const community: CommunityRecord = {
       id: randomUUID(),
       name: input.name,
@@ -1788,7 +1804,7 @@ export const store = {
       category: input.category,
       organizerId: input.organizerId,
       memberCount: 1,
-      creationStatus: input.creationStatus ?? "pending",
+      creationStatus,
       isFounding: input.isFounding ?? false,
       bulletinPermission: input.bulletinPermission ?? "members",
       planPostingPermission: input.planPostingPermission ?? "members",
