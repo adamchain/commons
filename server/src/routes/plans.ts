@@ -17,6 +17,7 @@ import {
 import { onPlanCreatedVenueNudge, notifyInterestedPlanLocked } from "../lib/nudges.js";
 import { emit } from "../lib/notify.js";
 import { planHasEnded, plansOverlap, FLEXIBLE_DATE_PLACEHOLDER } from "../lib/planTime.js";
+import { communityCreationBlockReason } from "../lib/communityAccess.js";
 import { coverUrlFor } from "./share.js";
 import type { PublicPlanDTO } from "../types/shared.js";
 
@@ -395,13 +396,11 @@ plansRouter.post("/", requireAuth, async (req, res) => {
       return;
     }
     const isOrganizer = community.organizerId === userId;
-    if (community.creationStatus === "pending") {
-      if (!isOrganizer) {
-        res.status(403).json({ error: "This community is pending review" });
-        return;
-      }
-    } else if (community.creationStatus !== "approved") {
-      res.status(400).json({ error: "Community not found" });
+    const creationBlocked = communityCreationBlockReason(community, userId);
+    if (creationBlocked) {
+      res.status(creationBlocked === "This community is pending review" ? 403 : 400).json({
+        error: creationBlocked,
+      });
       return;
     }
     const membership = store.findCommunityMembership(communityId, userId);

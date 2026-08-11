@@ -5,7 +5,10 @@ import type { ConversationRecord } from "../store.js";
 import { findUserById, findUsersByIds } from "../userRepo.js";
 import { userToPublic } from "./plans.js";
 import { emit } from "../lib/notify.js";
-import { communityMembershipBlockReason } from "../lib/communityAccess.js";
+import {
+  communityCreationBlockReason,
+  communityMembershipBlockReason,
+} from "../lib/communityAccess.js";
 import { isGcsConfigured, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
 import type { ConversationDTO, ConversationSummaryDTO, MessageDTO, PollDTO } from "../types/shared.js";
 
@@ -43,19 +46,19 @@ export const chatRouter = Router();
 
 // For community group chats, being present in `participantIds` is not enough to
 // keep writing — a user can be in the roster yet no longer be an active member
-// (pending, removed, or a drift between roster and membership). Re-verify active
-// membership (or the real organizer) before any write. Plan chats have no
-// community and pass straight through. Returns a 403 message when blocked, else
-// null. Mirrors communities.ts (bulletin) and plans.ts (plan posts).
+// (pending, removed, or a drift between roster and membership). Also apply the
+// same pending-review gate as bulletin: organizers may write while pending;
+// other members cannot. Plan chats have no community and pass straight through.
+// Returns a 403 message when blocked, else null.
 function communityPostBlockReason(
   conv: ConversationRecord,
   userId: string,
 ): string | null {
   if (!conv.communityId) return null;
-  return communityMembershipBlockReason(
-    store.findCommunityById(conv.communityId),
-    userId,
-  );
+  const community = store.findCommunityById(conv.communityId);
+  const creationBlocked = communityCreationBlockReason(community, userId);
+  if (creationBlocked) return creationBlocked;
+  return communityMembershipBlockReason(community, userId);
 }
 
 // GET /api/conversations — unified inbox: group chats for every plan the user

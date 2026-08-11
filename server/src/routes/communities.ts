@@ -12,6 +12,7 @@ import { emit } from "../lib/notify.js";
 import { isAdminPhone } from "../lib/adminPhones.js";
 import {
   canViewCommunityBoard,
+  communityCreationBlockReason,
   communityMembershipBlockReason,
   isActiveCommunityMember,
   isCommunityOrganizer,
@@ -141,7 +142,7 @@ function memberDTO(
 
 /** Shared guard for mutating endpoints that require a live (or in-review) community.
  *  Organizers may act while their community is pending review; everyone else gets
- *  a clear error instead of a silent 404. */
+ *  a clear error instead of a silent 404. Same rule as community chat writes. */
 function requireCommunityForMutation(
   communityId: string,
   viewerId: string,
@@ -153,15 +154,9 @@ function requireCommunityForMutation(
     return null;
   }
   const isOrganizer = isCommunityOrganizer(community, viewerId);
-  if (community.creationStatus === "pending") {
-    if (!isOrganizer) {
-      res.status(403).json({ error: "This community is pending review" });
-      return null;
-    }
-    return { community, isOrganizer };
-  }
-  if (community.creationStatus !== "approved") {
-    res.status(404).json({ error: "Community not found" });
+  const blocked = communityCreationBlockReason(community, viewerId);
+  if (blocked) {
+    res.status(blocked === "This community is pending review" ? 403 : 404).json({ error: blocked });
     return null;
   }
   return { community, isOrganizer };

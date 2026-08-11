@@ -56,3 +56,26 @@ export function communityMembershipBlockReason(
   if (canAccessCommunityInside(community, userId)) return null;
   return `Join the community to ${action}`;
 }
+
+/**
+ * Pending-review / offline gate shared by bulletin, chat, and plan tagging.
+ * Organizers may act while their community is pending review; everyone else
+ * gets a clear error. Rejected/offline communities block all member writes.
+ * Returns an error string, or null if creation status allows the write.
+ */
+export function communityCreationBlockReason(
+  community: Pick<CommunityRecord, "organizerId" | "creationStatus"> | null | undefined,
+  userId: string,
+): string | null {
+  if (!community) return "Community not found";
+  if (community.creationStatus === "pending") {
+    if (!isCommunityOrganizer(community, userId)) {
+      return "This community is pending review";
+    }
+    return null;
+  }
+  if (community.creationStatus !== "approved") {
+    return "Community not found";
+  }
+  return null;
+}
