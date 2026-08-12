@@ -10,7 +10,11 @@ export function sentenceCaseTitle(raw: string): string {
 
 export function formatPlanDate(iso: string, opts?: { isFlexibleDate?: boolean }): string {
   if (opts?.isFlexibleDate || iso.startsWith("2099-12-31")) return "Anytime";
-  const d = new Date(iso);
+  // Parse the YYYY-MM-DD portion as a *local* date. `new Date("2026-08-13")`
+  // parses as UTC midnight, which lands on the previous day for US timezones —
+  // making tomorrow's plan show "Today". Build from local getters instead.
+  const [y, m, day] = iso.slice(0, 10).split("-").map(Number);
+  const d = new Date(y, m - 1, day);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const target = new Date(d);
