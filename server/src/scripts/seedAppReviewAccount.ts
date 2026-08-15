@@ -62,7 +62,7 @@ async function main(): Promise<void> {
   
   if (!user) {
     console.log("📝 Creating new test user account...");
-    user = await createUser(TEST_PHONE, { accountSource: "app-review-test" });
+    user = await createUser(TEST_PHONE, { accountSource: "seed" });
   } else {
     console.log("📝 Updating existing test user account...");
   }
@@ -76,15 +76,15 @@ async function main(): Promise<void> {
 
   // Update user with complete profile
   await updateUser(user.id, {
-    accountSource: "app-review-test",
+    accountSource: "seed",
     firstName: "App",
     lastName: "Reviewer",
     bio: "Apple App Review test account with demo data showcasing all Commons features.",
-    ageRange: "25-34",
+    ageRange: "25_35",
     ageConfirmedAt: new Date().toISOString(),
     neighborhoodId: primaryNeighborhood,
     neighborhoodIds,
-    interests: ["coffee", "events", "food", "outdoors", "music", "art"],
+    interests: ["coffee", "events", "food", "walks", "music", "creative"],
     avatarSeed: "app-reviewer-seed",
     avatarStyle: "avataaars",
     onboardingComplete: true,
@@ -104,9 +104,9 @@ async function main(): Promise<void> {
     "coffee",
     "events",
     "food",
-    "outdoors",
+    "walks",
     "music",
-    "art",
+    "creative",
   ]);
 
   // Get existing plans in the test user's neighborhoods
@@ -115,20 +115,27 @@ async function main(): Promise<void> {
     neighborhoodIds.includes(p.neighborhoodId ?? "")
   );
 
-  // Make test user "going" to a few upcoming plans
+  // Make test user "going" to a few upcoming plans by adding to goingIds
+  const now = new Date();
   const upcomingPlans = relevantPlans
     .filter((p) => {
-      const start = new Date(p.startAt);
-      return start > new Date();
+      const planDate = new Date(p.date + " " + p.time);
+      return planDate > now;
     })
     .slice(0, 3);
 
   for (const plan of upcomingPlans) {
-    store.updatePlanRsvp(plan.id, user.id, "going");
+    // Add user to going list if not already there
+    const goingIds = store.findPlanById(plan.id)?.goingIds || [];
+    if (!goingIds.includes(user.id)) {
+      store.updatePlan(plan.id, {
+        goingIds: [...goingIds, user.id],
+      });
+    }
   }
 
   if (upcomingPlans.length > 0) {
-    console.log(`✅ RSVPed to ${upcomingPlans.length} upcoming plans`);
+    console.log(`✅ Added to ${upcomingPlans.length} upcoming plans`);
   }
 
   // Get other users in same neighborhoods for network connections
@@ -138,7 +145,7 @@ async function main(): Promise<void> {
       u.id !== user.id &&
       u.neighborhoodId &&
       neighborhoodIds.includes(u.neighborhoodId) &&
-      u.accountSource !== "app-review-test" // Don't connect to self
+      u.accountSource !== "seed" // Don't connect to other test accounts
   );
 
   // Add up to 5 network connections
@@ -154,7 +161,9 @@ async function main(): Promise<void> {
 
   // Summary stats
   const memberships = store.listCommunityMembershipsForUser(user.id);
-  const forums = store.listForumMemberships(user.id);
+  const forums = store.listForums().filter((f) => 
+    store.findForumMembership(user.id, f.interestTag)
+  );
   
   console.log("");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
