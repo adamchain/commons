@@ -115,7 +115,7 @@ async function main(): Promise<void> {
     neighborhoodIds.includes(p.neighborhoodId ?? "")
   );
 
-  // Make test user "going" to a few upcoming plans by adding to goingIds
+  // Make test user "going" to a few upcoming plans using participation records
   const now = new Date();
   const upcomingPlans = relevantPlans
     .filter((p) => {
@@ -125,13 +125,8 @@ async function main(): Promise<void> {
     .slice(0, 3);
 
   for (const plan of upcomingPlans) {
-    // Add user to going list if not already there
-    const goingIds = store.findPlanById(plan.id)?.goingIds || [];
-    if (!goingIds.includes(user.id)) {
-      store.updatePlan(plan.id, {
-        goingIds: [...goingIds, user.id],
-      });
-    }
+    // Add participation record with state "going"
+    store.upsertParticipation(plan.id, user.id, "going");
   }
 
   if (upcomingPlans.length > 0) {
