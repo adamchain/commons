@@ -59,7 +59,13 @@ export function NotificationsPage() {
 
   const sorted = useMemo(() => {
     if (!items) return [];
-    return [...items].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    // Keep "needs a new host" pings easy to find — unread up-for-grabs float first.
+    return [...items].sort((a, b) => {
+      const aGrab = a.kind === "planUpForGrabs" && a.readAt === null ? 1 : 0;
+      const bGrab = b.kind === "planUpForGrabs" && b.readAt === null ? 1 : 0;
+      if (aGrab !== bGrab) return bGrab - aGrab;
+      return b.createdAt.localeCompare(a.createdAt);
+    });
   }, [items]);
 
   const unreadCount = useMemo(
@@ -155,6 +161,7 @@ export function NotificationsPage() {
 
 function NotifRow({ item, onDismiss }: { item: NotificationDTO; onDismiss: () => void }) {
   const href = hrefFor(item);
+  const isGrabs = item.kind === "planUpForGrabs";
   const inner = (
     <>
       <span className="notif-row-icon" aria-hidden="true">
@@ -162,6 +169,7 @@ function NotifRow({ item, onDismiss }: { item: NotificationDTO; onDismiss: () =>
       </span>
       <div className="notif-row-body">
         <div className="notif-row-title">{item.body}</div>
+        {isGrabs && <span className="notif-row-cta">Take over hosting</span>}
         <div className="notif-row-sub">{formatRelative(item.createdAt)}</div>
       </div>
       {item.readAt === null && <span className="notif-row-unread" aria-label="Unread" />}
@@ -182,12 +190,12 @@ function NotifRow({ item, onDismiss }: { item: NotificationDTO; onDismiss: () =>
   if (href) {
     const linkState: NavFromState = { from: "notifications" };
     return (
-      <Link to={href} state={linkState} className="notif-row">
+      <Link to={href} state={linkState} className={`notif-row${isGrabs ? " notif-row--grabs" : ""}`}>
         {inner}
       </Link>
     );
   }
-  return <div className="notif-row">{inner}</div>;
+  return <div className={`notif-row${isGrabs ? " notif-row--grabs" : ""}`}>{inner}</div>;
 }
 
 function hrefFor(n: NotificationDTO): string | null {
@@ -241,9 +249,9 @@ function iconFor(kind: NotificationKind): ReactNode {
     case "planInvite":
       return <Mail {...props} />;
     case "planUpForGrabs":
-      return <Hand {...props} />;
+      return <Hand {...props} color="var(--red)" />;
     case "networkRequest":
-      return <Hand {...props} />;
+      return <UserPlus {...props} />;
     case "networkAccepted":
       return <Handshake {...props} />;
     case "communityJoinRequest":

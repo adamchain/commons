@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ImagePlus } from "lucide-react";
+import { ImagePlus, Hand } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
@@ -590,16 +590,15 @@ export function PlanDetailPage() {
         )}
 
         {!isPast && plan.upForGrabsAt && !plan.cancelledAt && (
-          <div className="coordination-banner" role="note">
-            <strong>This plan needs a new host.</strong>{" "}
+          <div className="coordination-banner coordination-banner--grabs" role="note">
+            <strong>This plan needs a new host</strong>
             {isHosting
               ? "You put it up for grabs — someone who's in can take over."
-              : "The original host can't make it."}
+              : "The original host can't make it. Take it over to keep the plan alive."}
             {!isHosting && (plan.myState === "going" || plan.myState === "interested") && (
               <button
                 type="button"
-                className="btn-primary btn-block"
-                style={{ marginTop: 10 }}
+                className="btn-primary btn-block coordination-banner-grabs-cta"
                 onClick={() => void claimHost()}
               >
                 Take over hosting
@@ -683,6 +682,7 @@ export function PlanDetailPage() {
                     setConfirmCancel(false);
                   }}
                 >
+                  <Hand size={14} strokeWidth={1.8} aria-hidden="true" />
                   Put it up for grabs
                 </button>
               )

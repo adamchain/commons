@@ -1324,7 +1324,7 @@ plansRouter.post("/:id/up-for-grabs", requireAuth, async (req, res) => {
     await emit({
       userId: p.userId,
       kind: "planUpForGrabs",
-      body: `"${plan.title}" needs a new host — take it over?`,
+      body: `"${plan.title}" needs a new host — tap to take over hosting`,
       planId: plan.id,
       dedupKey: `upForGrabs:${plan.id}:${p.userId}`,
     });

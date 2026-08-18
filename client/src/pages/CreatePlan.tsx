@@ -965,7 +965,7 @@ export function CreatePlanPage() {
                   autoFocusOnMount
                   value={form.locationName}
                   address={form.locationAddress}
-                  placeholder="Search a venue, or type your own — e.g. Somewhere in Fishtown"
+                  placeholder="Search a venue or type your own"
                   onChange={(name) =>
                     setForm((f) => ({
                       ...f,
@@ -2168,7 +2168,7 @@ function PlacePicker({
         <input
           ref={inputRef}
           type="text"
-          placeholder={placeholder ?? "Search a venue, or type your own"}
+          placeholder={placeholder ?? "Search a venue or type your own"}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onFocus={(e) => {

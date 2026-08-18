@@ -172,7 +172,7 @@ export function LocationAutocomplete({
   return (
     <div className="location-autocomplete" ref={containerRef}>
       <input
-        placeholder="Drinker's Pub, La Colombe, Lloyd Hall…"
+        placeholder="Venue name — e.g. La Colombe"
         value={query}
         onChange={(e) => handleInput(e.target.value)}
         onFocus={() => {

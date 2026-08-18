@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Hand } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { NumberPicker } from "../components/NumberPicker";
@@ -659,6 +659,7 @@ function PutUpForGrabsControl({
         className="edit-plan-grabs-btn"
         onClick={() => setOpen(true)}
       >
+        <Hand size={14} strokeWidth={1.8} aria-hidden="true" />
         Put it up for grabs
       </button>
     );

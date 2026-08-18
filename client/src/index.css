@@ -6290,6 +6290,27 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-muted);
 }
 
+.coordination-banner--grabs {
+  border-color: var(--red);
+  background: #fff;
+  border-left-width: 3px;
+  color: var(--ink);
+}
+.coordination-banner--grabs strong {
+  color: var(--red);
+  display: block;
+  margin-bottom: 4px;
+  font-size: var(--text-body);
+}
+.coordination-banner-grabs-cta {
+  margin-top: 10px;
+  min-height: 40px;
+  padding: 0 16px;
+  font-size: var(--text-body);
+  font-weight: 600;
+  border-radius: 22px;
+}
+
 .coordination-banner p {
   margin: 0;
 }
@@ -7951,6 +7972,33 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text);
   transition: background 120ms ease;
 }
+.notif-row--grabs {
+  border-color: rgba(var(--accent-rgb), 0.35);
+  border-left: 3px solid var(--red);
+  background: #fff;
+}
+.notif-row--grabs .notif-row-icon {
+  color: var(--red);
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgba(var(--accent-rgb), 0.1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.notif-row-cta {
+  display: inline-flex;
+  margin-top: 6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--red);
+  color: var(--red);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
 .notif-row-dismiss {
   appearance: none;
   background: transparent;
@@ -8037,39 +8085,56 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   justify-content: center;
 }
-/* Quieter secondary action under Edit/Cancel — smaller, left-aligned. */
+/* Quieter secondary action under Edit/Cancel — compact text-style control. */
 .plan-host-action-btn--grabs {
   justify-self: start;
   width: auto;
   max-width: 100%;
-  padding: 6px 10px;
-  font-size: var(--text-caption);
+  gap: 6px;
+  padding: 4px 2px;
+  font-size: var(--text-body-small);
   font-weight: 600;
   color: var(--text-muted);
-  border-color: var(--border);
+  border: none;
   background: transparent;
+  box-shadow: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--border-strong, var(--tan-mid));
 }
 .plan-host-action-btn--grabs:hover {
-  color: var(--text);
-  background: var(--surface-2);
+  color: var(--ink);
+  background: transparent;
+  text-decoration-color: var(--ink);
+}
+.plan-host-action-btn--grabs svg {
+  flex-shrink: 0;
 }
 .edit-plan-grabs-btn {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  margin-top: 12px;
-  padding: 6px 10px;
-  font-size: var(--text-caption);
+  justify-content: flex-start;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 4px 2px;
+  font-size: var(--text-body-small);
   font-weight: 600;
   color: var(--text-muted);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border: none;
+  border-radius: 0;
   background: transparent;
   cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--border-strong, var(--tan-mid));
 }
 .edit-plan-grabs-btn:hover {
-  color: var(--text);
-  background: var(--surface-2);
+  color: var(--ink);
+  background: transparent;
+  text-decoration-color: var(--ink);
+}
+.edit-plan-grabs-btn svg {
+  flex-shrink: 0;
 }
 .plan-host-action-btn--danger {
   color: var(--danger);
