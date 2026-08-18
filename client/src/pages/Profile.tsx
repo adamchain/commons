@@ -359,8 +359,8 @@ export function ProfilePage() {
               <h3 className="profile-other-section-label">Communities</h3>
               <div className="profile-other-communities">
                 {communities.map((c) => {
-                  const vis = COMMUNITY_VISUAL[c.category];
-                  const Icon = vis.Icon;
+                  const vis = COMMUNITY_VISUAL[c.category] || COMMUNITY_VISUAL.other;
+                  const Icon = vis?.Icon;
                   return (
                     <Link key={c.id} to={`/communities/${c.id}`} className="profile-other-community-row">
                       <span
@@ -489,8 +489,8 @@ export function ProfilePage() {
           <h3 className="profile-section-label">Communities</h3>
           <div className="profile-communities-list">
             {communities.map((c) => {
-              const vis = COMMUNITY_VISUAL[c.category];
-              const Icon = vis.Icon;
+              const vis = COMMUNITY_VISUAL[c.category] || COMMUNITY_VISUAL.other;
+              const Icon = vis?.Icon;
               return (
                 <Link key={c.id} to={`/communities/${c.id}`} className="profile-community-row">
                   <span
