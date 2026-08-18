@@ -3289,8 +3289,8 @@ h1, h2, h3, h4, h5, h6 {
 /* iOS Safari treats unsized inline SVGs as 0×0 — desktop still paints them.
    Same pattern as .plan-meta-icon svg on this page. */
 .chat-entry-icon svg {
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   display: block;
   flex-shrink: 0;
 }
