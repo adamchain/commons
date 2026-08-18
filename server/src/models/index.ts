@@ -271,7 +271,8 @@ const CommunitySchema = new Schema<CommunityRecord>(
     coverImage: { type: String, default: null },
     category: {
       type: String,
-      enum: ["run_club", "book_club", "fitness", "food_drink", "arts", "social", "wellness", "other"],
+      // Master InterestTag taxonomy — shared with interests + plan tags.
+      enum: ALL_INTERESTS,
       required: true,
     },
     organizerId: { type: String, required: true },

@@ -266,7 +266,7 @@ export function PlanCard({
                         openPlan("#guests");
                       }}
                     >
-                      {goingCount} Going
+                      {goingCount} <span className="plan-card-going-label">Going</span>
                     </button>
                   )}
                   {showGoingLabel && showInterestedLabel && (
@@ -428,7 +428,7 @@ function QuickJoin({
   }
 
   const label = goingActive
-    ? "I'm In ✓"
+    ? "I'm in."
     : interestedActive
       ? "Interested ✓"
       : isLooking
@@ -458,7 +458,7 @@ function QuickJoin({
           >
             <div className="sheet" onClick={(e) => e.stopPropagation()}>
               <div className="sheet-handle" />
-              <div className="sheet-title">{goingActive ? "I'm In" : "Interested"}</div>
+              <div className="sheet-title">{goingActive ? "I'm in." : "Interested"}</div>
               {goingActive && (
                 <button type="button" className="sheet-link" onClick={() => void setState("interested")}>
                   Switch to Interested
@@ -466,7 +466,7 @@ function QuickJoin({
               )}
               {interestedActive && !isLooking && !isFull && (
                 <button type="button" className="sheet-link" onClick={() => void setState("going")}>
-                  Switch to I'm In
+                  Switch to I&apos;m in.
                 </button>
               )}
               <button

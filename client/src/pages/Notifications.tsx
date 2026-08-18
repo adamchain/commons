@@ -240,6 +240,8 @@ function iconFor(kind: NotificationKind): ReactNode {
       return <RefreshCw {...props} />;
     case "planInvite":
       return <Mail {...props} />;
+    case "planUpForGrabs":
+      return <Hand {...props} />;
     case "networkRequest":
       return <Hand {...props} />;
     case "networkAccepted":

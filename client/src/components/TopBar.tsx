@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Bell, User } from "lucide-react";
+import { Bell } from "lucide-react";
 import wordmark from "../assets/wordmark.png";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
 import type { NotificationDTO } from "../types/shared";
 
 /**
- * AppHeader — wordmark left, Bell + User right.
+ * AppHeader — wordmark left, Bell right (Profile lives in bottom nav).
  * Padding 16h / 14 top / 10 bottom; icons 18px stroke 1.6 muted; gap 14px.
  * Hairline rule below (margin 0 20px).
  */
@@ -57,8 +57,6 @@ export function TopBar() {
 
   if (hide) return null;
 
-  const profileTo = user ? `/profile/${user.id}` : "/onboarding";
-
   return (
     <header className="top-bar" aria-label="Top navigation">
       <Link
@@ -82,9 +80,6 @@ export function TopBar() {
         >
           <Bell size={18} strokeWidth={1.6} />
           {hasUnread && <span className="top-bar-bell-dot" aria-hidden="true" />}
-        </Link>
-        <Link to={profileTo} className="top-bar-icon-btn" aria-label="Your profile">
-          <User size={18} strokeWidth={1.6} />
         </Link>
       </div>
       <div className="top-bar-rule" aria-hidden="true" />

@@ -16,7 +16,7 @@ const STEPS: Step[] = [
   {
     id: "post",
     title: "Post a plan or float an idea",
-    body: "Tap + anytime — lock in a plan, or put something lighter out there.",
+    body: "Tap + anytime, lock in a plan, or just drop an idea",
     slot: 2,
   },
   {
@@ -28,7 +28,7 @@ const STEPS: Step[] = [
   {
     id: "chats",
     title: "Talk to the city by interest",
-    body: "Chats hold your plan threads and interest forums — low-commitment talk.",
+    body: "Chats hold your plan threads and interest forums — coordinate the details or connect with the city.",
     slot: 3,
   },
 ];

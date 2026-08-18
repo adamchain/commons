@@ -10,8 +10,9 @@ import { WeekStrip } from "../components/WeekStrip";
 import { useAuth } from "../context/AuthContext";
 import { planHasEnded } from "../lib/planTime";
 import { consumeFeedScroll } from "../lib/navState";
+import { useNeighborhoods } from "../lib/useNeighborhoods";
 import { FORUM_INTERESTS, INTEREST_LABELS } from "../types/shared";
-import type { AgeRange, InterestTag, MeDTO, NeighborhoodDTO, NetworkPromptDTO, PlanDTO } from "../types/shared";
+import type { AgeRange, InterestTag, MeDTO, NetworkPromptDTO, PlanDTO } from "../types/shared";
 
 // F.2 — shown once on the first Home load, pointing new users at a forum
 // matching one of their picked interests. Dismissible; never reappears once
@@ -59,7 +60,8 @@ function loadPersistedFilters(): PersistedFilters {
 export function FeedPage() {
   const [plans, setPlans] = useState<PlanDTO[]>([]);
   const [feedReady, setFeedReady] = useState(false);
-  const [neighborhoods, setNeighborhoods] = useState<NeighborhoodDTO[]>([]);
+  const neighborhoodMap = useNeighborhoods();
+  const neighborhoods = useMemo(() => Object.values(neighborhoodMap), [neighborhoodMap]);
   const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState<InterestTag | null>(() => loadPersistedFilters().selectedTag);
   const [selectedHoodId, setSelectedHoodId] = useState<string | null>(() => loadPersistedFilters().selectedHoodId);
@@ -189,7 +191,6 @@ export function FeedPage() {
 
   useEffect(() => {
     void fetchPlans();
-    void api<NeighborhoodDTO[]>("/api/neighborhoods").then(setNeighborhoods).catch(() => undefined);
   }, [fetchPlans]);
 
   // Tapping Home while already on the feed snaps to top and re-pulls plans.
@@ -298,15 +299,23 @@ export function FeedPage() {
     }
   }, [feedReady, highlightId, location.key]);
 
+  // Fetch once on mount / when the nudge pref (or user) changes — not when
+  // plans reload, which was re-hitting network-prompt on every feed refresh.
   useEffect(() => {
     if (user?.notificationPrefs && user.notificationPrefs.postPlanNetworkNudge === false) {
       setNetworkPrompt(null);
       return;
     }
-    void api<{ prompt: NetworkPromptDTO | null }>("/api/auth/network-prompt")
-      .then((r) => setNetworkPrompt(r.prompt))
-      .catch(() => setNetworkPrompt(null));
-  }, [plans, user?.notificationPrefs?.postPlanNetworkNudge]);
+    const ac = new AbortController();
+    void api<{ prompt: NetworkPromptDTO | null }>("/api/auth/network-prompt", { signal: ac.signal })
+      .then((r) => {
+        if (!ac.signal.aborted) setNetworkPrompt(r.prompt);
+      })
+      .catch(() => {
+        if (!ac.signal.aborted) setNetworkPrompt(null);
+      });
+    return () => ac.abort();
+  }, [user?.id, user?.notificationPrefs?.postPlanNetworkNudge]);
 
   // Persist the sheet filters whenever they change (day selection stays
   // transient — it's tied to the week strip, not a saved preference).

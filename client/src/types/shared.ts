@@ -506,6 +506,7 @@ export type NotificationKind =
   | "planTimeProposed"
   | "planTimeChanged"
   | "planInvite"
+  | "planUpForGrabs"
   | "networkRequest"
   | "networkAccepted"
   | "communityJoinRequest"
@@ -557,37 +558,32 @@ export const NOTIFICATION_LABELS: Record<keyof NotificationPrefs, string> = {
 // optional group chat. Created by an organizer, approved by COMMONS admin before
 // going live, joined by members. All V1 communities are public.
 
-export type CommunityCategory =
-  | "run_club"
-  | "book_club"
-  | "fitness"
-  | "food_drink"
-  | "arts"
-  | "social"
-  | "wellness"
-  | "other";
+// Communities share the master InterestTag taxonomy — a community tagged
+// "Food" is the same value as the interest / plan tag. Aliases kept so
+// existing community call sites don't have to rename.
+export type CommunityCategory = InterestTag;
 
-export const COMMUNITY_CATEGORY_LABELS: Record<CommunityCategory, string> = {
-  run_club: "Run Club",
-  book_club: "Book Club",
-  fitness: "Fitness",
-  food_drink: "Food & Drink",
-  arts: "Arts",
-  social: "Social",
-  wellness: "Wellness",
-  other: "Other",
+export const COMMUNITY_CATEGORY_LABELS: Record<CommunityCategory, string> = INTEREST_LABELS;
+
+export const ALL_COMMUNITY_CATEGORIES: CommunityCategory[] = ALL_INTERESTS;
+
+/** Pre-unification community category slugs → nearest InterestTag. */
+export const LEGACY_COMMUNITY_CATEGORY_MAP: Record<string, InterestTag> = {
+  run_club: "walks",
+  book_club: "books",
+  fitness: "workouts",
+  food_drink: "food",
+  arts: "creative",
+  social: "events",
+  wellness: "wellness",
+  other: "events",
 };
 
-export const ALL_COMMUNITY_CATEGORIES: CommunityCategory[] = [
-  "run_club",
-  "book_club",
-  "fitness",
-  "food_drink",
-  "arts",
-  "social",
-  "wellness",
-  "other",
-];
+/** Normalize a stored/posted category to a current InterestTag. */
+export function normalizeCommunityCategory(raw: string): InterestTag {
+  if (ALL_INTERESTS.includes(raw as InterestTag)) return raw as InterestTag;
+  return LEGACY_COMMUNITY_CATEGORY_MAP[raw] ?? "events";
+}
 
 export type CommunityCreationStatus = "pending" | "approved" | "rejected";
 /** Who may post to a given surface — organizer-controlled toggle. */

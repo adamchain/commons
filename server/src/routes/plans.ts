@@ -1323,7 +1323,7 @@ plansRouter.post("/:id/up-for-grabs", requireAuth, async (req, res) => {
     if (p.state !== "going" && p.state !== "interested") continue;
     await emit({
       userId: p.userId,
-      kind: "planInvite",
+      kind: "planUpForGrabs",
       body: `"${plan.title}" needs a new host — take it over?`,
       planId: plan.id,
       dedupKey: `upForGrabs:${plan.id}:${p.userId}`,

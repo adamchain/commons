@@ -32,6 +32,8 @@ const PREF_KEY: Record<NotificationKind, keyof NotificationPrefs> = {
   planTimeChanged: "planCancellation",
   // Invites ride on the "someone joined" toggle — both are person-to-plan pings.
   planInvite: "someoneJoinedYourPlan",
+  // Hosting handoff — same urgency as plan changes / cancellation.
+  planUpForGrabs: "planCancellation",
   // Network social pings ride on the post-plan network nudge toggle.
   networkRequest: "postPlanNetworkNudge",
   networkAccepted: "postPlanNetworkNudge",

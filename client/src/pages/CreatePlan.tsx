@@ -345,7 +345,7 @@ export function CreatePlanPage() {
           isFlexibleLocation: false,
           vibes: vibeIds.length ? vibeIds : f.vibes,
           description: prev.description ?? "",
-          visibility: prev.visibility,
+          visibility: inviteUserId || inviteUserIds.length > 0 ? "network" : prev.visibility,
           capacityOn: prev.capacity !== null,
           capacity: prev.capacity !== null ? String(prev.capacity) : f.capacity,
           joinType: prev.joinType,
@@ -357,7 +357,7 @@ export function CreatePlanPage() {
     return () => {
       alive = false;
     };
-  }, [hostAgainFrom, fromPlanId]);
+  }, [hostAgainFrom, fromPlanId, inviteUserId, inviteUserIds]);
 
   const resolvedTags = useMemo<InterestTag[]>(() => {
     const set = new Set<InterestTag>();
@@ -1121,16 +1121,10 @@ export function CreatePlanPage() {
               <div className="form-row-flex">
                 <div className="form-row-flex-main">
                   <label className="form-question">Capacity</label>
-                  {!form.capacityOn ? (
+                  {!form.capacityOn && (
                     <p className="form-help" style={{ marginTop: 4 }}>
                       Open — no cap on who can join
                     </p>
-                  ) : (
-                    <NumberPicker
-                      value={Number(form.capacity) || 0}
-                      onChange={(n) => setForm((f) => ({ ...f, capacity: String(n) }))}
-                      ariaLabel="Number of spots"
-                    />
                   )}
                 </div>
                 <FlexToggle
@@ -1142,6 +1136,13 @@ export function CreatePlanPage() {
                   label="Set limit"
                 />
               </div>
+              {form.capacityOn && (
+                <NumberPicker
+                  value={Number(form.capacity) || 0}
+                  onChange={(n) => setForm((f) => ({ ...f, capacity: String(n) }))}
+                  ariaLabel="Number of spots"
+                />
+              )}
               {attemptedSubmit && capacityError && (
                 <p className="luma-inline-error">{capacityError}</p>
               )}
@@ -1834,14 +1835,6 @@ function IdeaForm({
             </button>
           </div>
         )}
-
-        <button
-          type="submit"
-          className="btn btn-primary btn-block idea-primary-cta"
-          disabled={submitting}
-        >
-          {submitting ? "Posting…" : "Put it out there"}
-        </button>
       </form>
     </main>
   );

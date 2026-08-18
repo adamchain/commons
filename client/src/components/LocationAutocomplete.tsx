@@ -24,6 +24,25 @@ function buildNominatimSuggestion(result: NominatimResult): LocationSuggestion {
   return { name, address: result.display_name };
 }
 
+/** Drop duplicate venue rows (same placeId, or same name+address). */
+function dedupeSuggestions(items: LocationSuggestion[]): LocationSuggestion[] {
+  const seen = new Set<string>();
+  const out: LocationSuggestion[] = [];
+  for (const s of items) {
+    const idKey = s.placeId?.trim();
+    const nameKey = `${(s.name || "").trim().toLowerCase()}|${(s.address || "").trim().toLowerCase()}`;
+    const key = idKey ? `id:${idKey}` : `name:${nameKey}`;
+    if (seen.has(key)) continue;
+    // Also collapse same display name when placeIds differ but labels match.
+    const bareName = (s.name || "").trim().toLowerCase();
+    if (bareName && seen.has(`bare:${bareName}`)) continue;
+    seen.add(key);
+    if (bareName) seen.add(`bare:${bareName}`);
+    out.push(s);
+  }
+  return out;
+}
+
 export function LocationAutocomplete({
   name,
   address,
@@ -74,13 +93,11 @@ export function LocationAutocomplete({
           { signal: controller.signal },
         );
         if (g.predictions?.length) {
-          setSuggestions(
-            g.predictions.map((p) => ({
-              name: p.name,
-              address: p.address,
-              placeId: p.placeId,
-            })),
-          );
+          setSuggestions(dedupeSuggestions(g.predictions.map((p) => ({
+            name: p.name,
+            address: p.address,
+            placeId: p.placeId,
+          }))));
           setLoading(false);
           return;
         }
@@ -106,7 +123,7 @@ export function LocationAutocomplete({
       })
         .then((res) => (res.ok ? (res.json() as Promise<NominatimResult[]>) : Promise.reject()))
         .then((results) => {
-          setSuggestions(results.map(buildNominatimSuggestion));
+          setSuggestions(dedupeSuggestions(results.map(buildNominatimSuggestion)));
           setLoading(false);
         })
         .catch((err: unknown) => {

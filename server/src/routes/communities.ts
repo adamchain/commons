@@ -19,6 +19,7 @@ import {
 } from "../lib/communityAccess.js";
 import {
   ALL_COMMUNITY_CATEGORIES,
+  normalizeCommunityCategory,
   type CommunityCardDTO,
   type CommunityCategory,
   type CommunityDTO,
@@ -62,7 +63,7 @@ async function toCommunityDTO(
     name: community.name,
     description: community.description,
     coverImage: community.coverImage ?? null,
-    category: community.category,
+    category: normalizeCommunityCategory(String(community.category ?? "")),
     organizer: organizer
       ? userToPublic(organizer)
       : { id: community.organizerId, firstName: "Organizer", neighborhoodId: null, avatarSeed: community.organizerId, avatarStyle: "avataaars" },
@@ -95,7 +96,7 @@ function toCommunityCard(community: CommunityRecord, viewerId: string): Communit
     id: community.id,
     name: community.name,
     coverImage: community.coverImage ?? null,
-    category: community.category,
+    category: normalizeCommunityCategory(String(community.category ?? "")),
     memberCount: community.memberCount,
     isFounding: community.isFounding,
     myRole: membership?.status === "active" ? membership.role : null,
@@ -226,9 +227,7 @@ communitiesRouter.post("/", requireAuth, async (req, res) => {
   const name = String(req.body?.name ?? "").trim().slice(0, 80);
   const description = String(req.body?.description ?? "").trim().slice(0, 2000);
   const rawCategory = String(req.body?.category ?? "");
-  const category = (ALL_COMMUNITY_CATEGORIES.includes(rawCategory as CommunityCategory)
-    ? rawCategory
-    : "other") as CommunityCategory;
+  const category = normalizeCommunityCategory(rawCategory);
   const rawCover = typeof req.body?.coverImage === "string" ? req.body.coverImage : "";
   const coverImage =
     rawCover.startsWith("data:image/") && rawCover.length < 1_600_000

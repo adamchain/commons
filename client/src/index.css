@@ -414,7 +414,7 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 18px 18px 16px;
+  padding: 13px 16px 15px;
   box-shadow: var(--shadow-card);
   transition: border-color 120ms ease, background-color 120ms ease;
   height: 100%;
@@ -436,10 +436,10 @@ h1, h2, h3, h4, h5, h6 {
 .plan-card-title {
   font-family: var(--font-ui);
   font-size: var(--text-card-large);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.01em;
   margin: 0;
-  line-height: 1.15;
+  line-height: 1.25;
 }
 
 .badge {
@@ -465,7 +465,7 @@ h1, h2, h3, h4, h5, h6 {
 .plan-card-meta {
   display: grid;
   gap: 6px;
-  font-size: var(--text-body);
+  font-size: var(--text-body-small);
   color: var(--text-muted);
 }
 
@@ -889,16 +889,34 @@ h1, h2, h3, h4, h5, h6 {
 .who-row-name-list {
   list-style: none;
   padding: 0;
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px 12px;
+  flex-direction: column;
+  gap: 8px;
 }
 .who-row-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   color: var(--text);
   font-size: var(--text-body);
   font-weight: 500;
   text-decoration: none;
+}
+.who-row-name-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.who-row-name-primary {
+  font-weight: 600;
+  color: var(--ink);
+}
+.who-row-name-sub {
+  font-size: var(--text-body-small);
+  color: var(--text-muted);
+  font-weight: 400;
 }
 .who-row-name:hover { color: var(--accent); }
 .avatar-stack--md > * + * {
@@ -997,9 +1015,9 @@ h1, h2, h3, h4, h5, h6 {
   top: calc(14px + env(safe-area-inset-top, 0px));
   left: 16px;
   z-index: 22;
-  width: 34px;
-  height: 34px;
-  border-radius: 17px;
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
   background: rgba(255, 255, 255, 0.18);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -1024,7 +1042,7 @@ h1, h2, h3, h4, h5, h6 {
   color: rgba(255, 255, 255, 0.65);
   font-weight: 600;
   letter-spacing: 0.6px;
-  text-transform: none; /* no caps — final pass */
+  text-transform: uppercase;
   margin-bottom: 5px;
 }
 
@@ -1650,12 +1668,14 @@ h1, h2, h3, h4, h5, h6 {
 .place-picker-field input {
   flex: 1;
   width: auto;
+  min-width: 0;
   border: none;
   background: transparent;
   outline: none;
-  padding: 13px 0;
+  padding: 13px 4px;
   font-size: var(--text-body);
   color: var(--text);
+  text-overflow: ellipsis;
 }
 .place-picker-clear {
   background: none;
@@ -1887,10 +1907,28 @@ h1, h2, h3, h4, h5, h6 {
   font-size: var(--text-body);
   color: var(--text-muted);
 }
-/* Keep the label/help + control on one line like the Visibility row. */
+/* Keep the label/help + control on one line like the Visibility row.
+   On phone width the NumberPicker chips wrap under "Set limit" instead of
+   colliding with it. */
 .create-more .form-row-flex {
-  align-items: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
   margin-bottom: 0;
+  gap: 8px 10px;
+}
+.create-more .form-row-flex-main {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+.create-more .form-row-flex .flex-toggle-btn {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+.create-more .form-row-flex-main .number-picker-scroll,
+.create-more .form-row-flex-main .number-picker-custom {
+  width: 100%;
+  max-width: 100%;
+  margin-top: 8px;
 }
 /* "Set cap" matches the compact muted "Flexible" pill used elsewhere. */
 .create-more .flex-toggle-btn {
@@ -2755,10 +2793,12 @@ h1, h2, h3, h4, h5, h6 {
   list-style: none;
   margin: 0;
   padding: 0;
-  /* No inner scroll box — every neighborhood is visible/accessible; the page
-     scrolls naturally if the list is long. */
   border: 1px solid var(--border);
   border-radius: 12px;
+  max-height: 280px;
+  min-height: 280px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .neighborhood-row {
   width: 100%;
@@ -2947,9 +2987,9 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--ink);
 }
 .interest-tile.is-picked {
-  background: var(--tan);
+  background: var(--card, #fff);
   color: var(--ink);
-  border: 1.5px solid var(--ink);
+  border: 1.5px solid var(--red);
   box-shadow: none;
 }
 .interest-tile:disabled { opacity: 0.35; cursor: not-allowed; }
@@ -3058,6 +3098,8 @@ h1, h2, h3, h4, h5, h6 {
 .plan-meta-label {
   font-size: var(--text-body-small);
   color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 .plan-meta-value {
   font-size: var(--text-card);
@@ -3125,8 +3167,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 .plan-card-going-count {
   font-size: var(--text-body-small);
-  font-weight: 600;
-  color: var(--accent);
+  font-weight: 700;
+  color: var(--red, var(--accent));
+}
+.plan-card-going-label {
+  font-weight: 500;
+  color: var(--text-muted);
 }
 .plan-card-attendees .plan-card-going-sep {
   color: var(--text-muted);
@@ -3242,8 +3288,17 @@ h1, h2, h3, h4, h5, h6 {
 .chat-entry-text {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 10px;
   font-size: var(--text-card);
   font-weight: 600;
+}
+.chat-entry-count {
+  font-size: var(--text-body-small);
+  font-weight: 500;
+  color: var(--text-muted);
 }
 /* Prominent variant — surfaced up top once you've committed. Reads as a clean
    card row (icon chip · label · chevron), per Plan Detail handoff. */
@@ -3566,10 +3621,10 @@ h1, h2, h3, h4, h5, h6 {
   min-width: 0;
 }
 .profile-name {
-  font-size: var(--text-screen-title);
-  font-weight: 700;
-  letter-spacing: -0.5px;
-  line-height: 1;
+  font-size: var(--text-page);
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  line-height: 1.1;
 }
 .profile-meta-line {
   display: inline-flex;
@@ -3823,14 +3878,16 @@ h1, h2, h3, h4, h5, h6 {
   gap: 8px;
   margin: 0;
   padding: 0 20px 14px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 .feed-toolbar .segmented-feed-view {
   margin: 0;
   flex: 1;
   display: flex;
+  flex-direction: row;
   gap: 6px;
   min-width: 0;
+  flex-wrap: nowrap;
 }
 .feed-divider {
   height: 1px;
@@ -5359,10 +5416,11 @@ h1, h2, h3, h4, h5, h6 {
   overflow: hidden;
 }
 
-/* Looking For / ideas — red outline on white (never a pink tint fill). */
+/* Looking For / ideas — white card with red left accent (no pink tint). */
 .plan-card--looking > .plan-card {
-  background: var(--card);
-  border: 1.5px solid var(--red);
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--red);
   border-radius: 20px;
   box-shadow: var(--shadow);
   padding: 14px 16px;
@@ -5375,7 +5433,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 /* Network + Looking For — idea outline stays red; network scope is secondary. */
 .plan-card--network.plan-card--looking > .plan-card {
-  border: 1.5px solid var(--red);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--red);
 }
 
 .plan-card-kind-pill {
@@ -5837,10 +5896,10 @@ h1, h2, h3, h4, h5, h6 {
 .plan-card-title {
   font-family: var(--font-ui);
   font-size: var(--text-card-large);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.01em;
   margin: 0 0 8px;
-  line-height: 1.15;
+  line-height: 1.25;
 }
 
 .plan-card-posted-by {
@@ -6862,6 +6921,12 @@ h1, h2, h3, h4, h5, h6 {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+/* "Going" stays muted gray even when the count itself is the accent link. */
+.plan-card-going-count--link .plan-card-going-label {
+  color: var(--text-muted);
+  font-weight: 500;
+  text-decoration: none;
+}
 .plan-card-going-count--link:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -7666,6 +7731,24 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Invite sheet */
+/* Real bottom sheet: header/actions/send stay put; people list scrolls. */
+.invite-sheet.filter-sheet {
+  display: flex;
+  flex-direction: column;
+  max-height: min(80vh, 100dvh);
+  overflow: hidden;
+}
+.invite-sheet .filter-sheet-header,
+.invite-sheet-actions,
+.invite-sheet-footer {
+  flex-shrink: 0;
+}
+.invite-sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
 /* Share actions stack full-width so "Text the link" and "Copy link" each get a
    clean, tappable row instead of being crammed side-by-side. */
 .invite-sheet-actions {
@@ -7679,6 +7762,10 @@ h1, h2, h3, h4, h5, h6 {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   margin-top: 6px;
+  max-height: min(42vh, 360px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
 }
 
 .invite-person {
@@ -7743,8 +7830,10 @@ h1, h2, h3, h4, h5, h6 {
   background: transparent;
   border: none;
   color: var(--muted);
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
@@ -7752,6 +7841,7 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   justify-content: center;
   padding: 0;
+  margin: -4px -8px 0 0;
 }
 .notif-close:hover {
   color: var(--ink);
@@ -7934,17 +8024,52 @@ h1, h2, h3, h4, h5, h6 {
 .plan-host-action-btn--full,
 .plan-host-actions .plan-grabs-confirm,
 .plan-host-actions .plan-transfer-link,
-.plan-host-actions .plan-transfer-picker {
+.plan-host-actions .plan-transfer-picker,
+.plan-host-actions .plan-host-action-btn--grabs {
   grid-column: 1 / -1;
 }
 .plan-host-action-btn {
   text-align: center;
-  padding: 12px 16px;
+  padding: 8px 12px;
   font-weight: 600;
-  font-size: var(--text-body);
+  font-size: var(--text-body-small);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+/* Quieter secondary action under Edit/Cancel — smaller, left-aligned. */
+.plan-host-action-btn--grabs {
+  justify-self: start;
+  width: auto;
+  max-width: 100%;
+  padding: 6px 10px;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  color: var(--text-muted);
+  border-color: var(--border);
+  background: transparent;
+}
+.plan-host-action-btn--grabs:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+.edit-plan-grabs-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 12px;
+  padding: 6px 10px;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: transparent;
+  cursor: pointer;
+}
+.edit-plan-grabs-btn:hover {
+  color: var(--text);
+  background: var(--surface-2);
 }
 .plan-host-action-btn--danger {
   color: var(--danger);
@@ -8796,7 +8921,7 @@ h1, h2, h3, h4, h5, h6 {
   flex-direction: column;
   border: 1.5px solid var(--red);
   border-radius: 10px;
-  background: var(--card);
+  background: var(--paper-50, #faf8f5);
   overflow: hidden;
 }
 .chat-pinned-polls-toggle {
@@ -9368,7 +9493,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: var(--text-body);
   font-weight: 600;
   color: var(--text);
-  padding: 6px 0;
+  padding: 6px 4px 6px 10px;
 }
 .luma-input:focus {
   outline: none;
@@ -9415,10 +9540,13 @@ h1, h2, h3, h4, h5, h6 {
 .location-row .place-picker-field {
   border: none;
   background: transparent;
-  padding-left: 0;
+  padding-left: 2px;
 }
 .location-row .place-picker-field:focus-within {
   border: none;
+}
+.location-row .place-picker-field input {
+  padding-left: 8px;
 }
 .location-row .place-picker-field input:focus {
   border: none;
@@ -9799,6 +9927,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 .xpl-section-head .ui-label {
   margin-bottom: 6px;
+}
+.xpl-coming-soon {
+  color: var(--red);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin-left: 6px;
 }
 .xpl-section-title {
   font-size: var(--text-screen-title);
@@ -11734,6 +11868,13 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.forum-composer-actions .btn-primary {
+  padding: 10px 18px;
+  font-size: var(--text-body);
+  font-weight: 600;
+  min-height: 40px;
 }
 
 .forum-post-list {

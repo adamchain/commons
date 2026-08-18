@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
@@ -35,33 +35,43 @@ export function CommunityDetailPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [community, setCommunity] = useState<CommunityDTO | null>(null);
-  const [previewMembers, setPreviewMembers] = useState<CommunityMemberDTO[]>([]);
+  // One shared members payload for header preview, Members tab, join
+  // requests, and organizer transfer — avoids 2–3× /members on load.
+  const [members, setMembers] = useState<CommunityMemberDTO[]>([]);
+  const [pendingMembers, setPendingMembers] = useState<CommunityMemberDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [tab, setTab] = useState<Tab>(() => tabFromParam(searchParams.get("tab")) ?? "bulletin");
+
+  const loadMembers = useCallback(async () => {
+    try {
+      const m = await api<{ members: CommunityMemberDTO[]; pending?: CommunityMemberDTO[] }>(
+        `/api/communities/${id}/members`,
+      );
+      setMembers(m.members);
+      setPendingMembers(m.pending ?? []);
+    } catch {
+      setMembers([]);
+      setPendingMembers([]);
+    }
+  }, [id]);
 
   const load = useCallback(async () => {
     try {
       const c = await api<CommunityDTO>(`/api/communities/${id}`);
       setCommunity(c);
       setTab((prev) => (prev === "bulletin" && !c.bulletinEnabled ? "events" : prev));
-      try {
-        const m = await api<{ members: CommunityMemberDTO[] }>(`/api/communities/${id}/members`);
-        setPreviewMembers(m.members.slice(0, 3));
-      } catch {
-        setPreviewMembers([]);
-      }
+      await loadMembers();
     } catch {
       setNotFound(true);
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, loadMembers]);
 
   useEffect(() => {
     void load();
   }, [load]);
-
   // If the organizer turns the bulletin off while you're on that tab, land on Events.
   useEffect(() => {
     if (community && !community.bulletinEnabled && tab === "bulletin") {
@@ -131,9 +141,9 @@ export function CommunityDetailPage() {
         <div className="cmy-header-body">
           <div className="cmy-header-row">
             <div className="cmy-header-info">
-              {previewMembers.length > 0 && (
+              {members.length > 0 && (
                 <span className="cmy-header-avatars">
-                  {previewMembers.map((m) => (
+                  {members.slice(0, 3).map((m) => (
                     <Avatar
                       key={m.user.id}
                       seed={m.user.avatarSeed}
@@ -199,13 +209,20 @@ export function CommunityDetailPage() {
         )
       )}
       {tab === "members" && (canSeeInside ? (
-        <MembersTab community={community} onCountChange={load} />
+        <MembersTab
+          community={community}
+          members={members}
+          pendingMembers={pendingMembers}
+          onCountChange={load}
+        />
       ) : (
         <LockedPanel community={community} onChange={setCommunity} reload={load} />
       ))}
       {tab === "settings" && canManage && (
         <SettingsTab
           community={community}
+          members={members}
+          pendingMembers={pendingMembers}
           onSaved={setCommunity}
           onRequestsChange={load}
           onLeft={() => navigate("/communities")}
@@ -220,47 +237,28 @@ export function CommunityDetailPage() {
 function JoinRequestsPanel({
   communityId,
   canManage,
+  pending,
   onChange,
 }: {
   communityId: string;
   canManage: boolean;
+  pending: CommunityMemberDTO[];
   onChange: () => Promise<void>;
 }) {
-  const [pending, setPending] = useState<CommunityMemberDTO[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  const load = useCallback(async () => {
-    if (!canManage) {
-      setPending([]);
-      setLoaded(true);
-      return;
-    }
-    const r = await api<{ pending: CommunityMemberDTO[] }>(`/api/communities/${communityId}/members`);
-    setPending(r.pending ?? []);
-    setLoaded(true);
-  }, [canManage, communityId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
   async function approve(userId: string) {
     if (!canManage) return;
     await api(`/api/communities/${communityId}/members/${userId}/approve`, { method: "POST" });
-    await load();
     await onChange();
   }
   async function decline(userId: string) {
     if (!canManage) return;
     await api(`/api/communities/${communityId}/members/${userId}/decline`, { method: "POST" });
-    await load();
     await onChange();
   }
 
   // Same gate as Bulletin pending queue — never show manage UI to non-organizers
   // (including pending join requesters / COMMONS admins who aren't the organizer).
   if (!canManage) return null;
-  if (!loaded) return null;
   if (pending.length === 0) {
     return (
       <div className="cmy-requests cmy-requests--empty">
@@ -749,29 +747,23 @@ function EventsTab({
 
 function MembersTab({
   community,
+  members,
+  pendingMembers,
   onCountChange,
 }: {
   community: CommunityDTO;
+  members: CommunityMemberDTO[];
+  pendingMembers: CommunityMemberDTO[];
   onCountChange: () => Promise<void>;
 }) {
   // Real organizer only (same as P0 non-member-permissions fix — never admin).
   const canManage = community.isOrganizer;
-  const [members, setMembers] = useState<CommunityMemberDTO[]>([]);
   const [addQuery, setAddQuery] = useState("");
   const [addResults, setAddResults] = useState<PersonSearchResultDTO[]>([]);
   const [addBusy, setAddBusy] = useState(false);
   const [addErr, setAddErr] = useState<string | null>(null);
   const [shareMsg, setShareMsg] = useState<string | null>(null);
   const addDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const load = useCallback(async () => {
-    const r = await api<{ members: CommunityMemberDTO[] }>(`/api/communities/${community.id}/members`);
-    setMembers(r.members);
-  }, [community.id]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   useEffect(() => {
     if (!canManage || !addQuery.trim()) {
@@ -801,7 +793,6 @@ function MembersTab({
       });
       setAddQuery("");
       setAddResults([]);
-      await load();
       await onCountChange();
     } catch (e) {
       setAddErr(parseApiError(e));
@@ -828,7 +819,6 @@ function MembersTab({
   async function remove(userId: string) {
     if (!canManage) return;
     await api(`/api/communities/${community.id}/members/${userId}`, { method: "DELETE" });
-    await load();
     await onCountChange();
   }
 
@@ -872,7 +862,12 @@ function MembersTab({
       )}
 
       {canManage && (community.hasScreening || community.pendingRequestCount > 0) && (
-        <JoinRequestsPanel communityId={community.id} canManage={canManage} onChange={onCountChange} />
+        <JoinRequestsPanel
+          communityId={community.id}
+          canManage={canManage}
+          pending={pendingMembers}
+          onChange={onCountChange}
+        />
       )}
 
       <h3 className="cmy-subhead">{members.length} {members.length === 1 ? "member" : "members"}</h3>
@@ -898,12 +893,16 @@ function MembersTab({
 
 function SettingsTab({
   community,
+  members,
+  pendingMembers,
   onSaved,
   onRequestsChange,
   onLeft,
   onDeleted,
 }: {
   community: CommunityDTO;
+  members: CommunityMemberDTO[];
+  pendingMembers: CommunityMemberDTO[];
   onSaved: (c: CommunityDTO) => void;
   onRequestsChange: () => Promise<void>;
   onLeft: () => void;
@@ -926,6 +925,9 @@ function SettingsTab({
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [openRow, setOpenRow] = useState<
+    null | "name" | "category" | "about" | "screening" | "permissions" | "channels"
+  >(null);
 
   useEffect(() => {
     setName(community.name);
@@ -1019,7 +1021,12 @@ function SettingsTab({
   return (
     <section className="cmy-tabpanel cmy-settings">
       {canManage && (community.hasScreening || community.pendingRequestCount > 0) && (
-        <JoinRequestsPanel communityId={community.id} canManage={canManage} onChange={onRequestsChange} />
+        <JoinRequestsPanel
+          communityId={community.id}
+          canManage={canManage}
+          pending={pendingMembers}
+          onChange={onRequestsChange}
+        />
       )}
       <div className="cmy-cover-upload">
         <span className="cmy-field-label">Cover image</span>
@@ -1093,95 +1100,158 @@ function SettingsTab({
           onClose={() => setShowCoverLib(false)}
         />
       )}
-      <label className="cmy-field">
-        <span>Name</span>
-        <input className="cmy-input" value={name} onChange={(e) => setName(e.target.value)} />
-      </label>
-      <label className="cmy-field">
-        <span>Description</span>
-        <textarea className="cmy-textarea" rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />
-      </label>
-      <label className="cmy-field">
-        <span>Category</span>
-        <select className="cmy-input" value={category} onChange={(e) => setCategory(e.target.value as CommunityCategory)}>
-          {ALL_COMMUNITY_CATEGORIES.map((c) => (
-            <option key={c} value={c}>{COMMUNITY_CATEGORY_LABELS[c]}</option>
-          ))}
-        </select>
-      </label>
-      <label className="cmy-field">
-        <span>Screening question <em className="cmy-hint">(leave blank to let anyone join instantly)</em></span>
-        <textarea
-          className="cmy-textarea"
-          rows={3}
-          value={screening}
-          placeholder="e.g. What's your typical pace?"
-          onChange={(e) => setScreening(e.target.value)}
-        />
-      </label>
 
-      <div className="cmy-toggle-row">
-        <span>Bulletin</span>
-        <button
-          type="button"
-          className={`cmy-chip-toggle ${bulletinEnabled ? "is-active" : ""}`}
-          aria-pressed={bulletinEnabled}
-          onClick={() => setBulletinEnabled((v) => !v)}
+      <div className="cmy-settings-list">
+        <SettingsRow
+          id="name"
+          label="Name"
+          summary={name || "Untitled"}
+          open={openRow === "name"}
+          onToggle={() => setOpenRow((r) => (r === "name" ? null : "name"))}
         >
-          {bulletinEnabled ? "On" : "Off"}
-        </button>
-      </div>
-      {bulletinEnabled && (
-        <>
+          <input className="cmy-input" value={name} onChange={(e) => setName(e.target.value)} />
+        </SettingsRow>
+
+        <SettingsRow
+          id="category"
+          label="Category"
+          summary={COMMUNITY_CATEGORY_LABELS[category]}
+          open={openRow === "category"}
+          onToggle={() => setOpenRow((r) => (r === "category" ? null : "category"))}
+        >
+          <select
+            className="cmy-input"
+            value={category}
+            onChange={(e) => setCategory(e.target.value as CommunityCategory)}
+          >
+            {ALL_COMMUNITY_CATEGORIES.map((c) => (
+              <option key={c} value={c}>{COMMUNITY_CATEGORY_LABELS[c]}</option>
+            ))}
+          </select>
+        </SettingsRow>
+
+        <SettingsRow
+          id="about"
+          label="About"
+          summary={description.trim() ? description.trim().slice(0, 48) + (description.trim().length > 48 ? "…" : "") : "Add a description"}
+          open={openRow === "about"}
+          onToggle={() => setOpenRow((r) => (r === "about" ? null : "about"))}
+        >
+          <textarea
+            className="cmy-textarea"
+            rows={4}
+            value={description}
+            placeholder="What is this community about?"
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </SettingsRow>
+
+        <SettingsRow
+          id="screening"
+          label="Screening"
+          summary={screening.trim() ? "Question set" : "Anyone can join"}
+          open={openRow === "screening"}
+          onToggle={() => setOpenRow((r) => (r === "screening" ? null : "screening"))}
+        >
+          <p className="cmy-hint" style={{ margin: "0 0 8px" }}>
+            Leave blank to let anyone join instantly.
+          </p>
+          <textarea
+            className="cmy-textarea"
+            rows={3}
+            value={screening}
+            placeholder="e.g. What's your typical pace?"
+            onChange={(e) => setScreening(e.target.value)}
+          />
+        </SettingsRow>
+
+        <SettingsRow
+          id="permissions"
+          label="Permissions"
+          summary={
+            visibility === "everyone"
+              ? "Open · plans " + (planPostingPermission === "members" ? "anyone" : "organizer")
+              : "Members only · plans " + (planPostingPermission === "members" ? "anyone" : "organizer")
+          }
+          open={openRow === "permissions"}
+          onToggle={() => setOpenRow((r) => (r === "permissions" ? null : "permissions"))}
+        >
           <div className="cmy-field">
-            <span>Who can post to the bulletin?</span>
+            <span>Who can post plans?</span>
             <Segmented
-              value={bulletinPermission}
-              onChange={setBulletinPermission}
+              value={planPostingPermission}
+              onChange={setPlanPostingPermission}
               options={[["members", "All members"], ["organizer_only", "Organizer only"]]}
             />
           </div>
-          {bulletinPermission === "members" && (
-            <div className="cmy-toggle-row">
-              <span>Require approval for member posts</span>
-              <button
-                type="button"
-                className={`cmy-chip-toggle ${bulletinRequiresApproval ? "is-active" : ""}`}
-                aria-pressed={bulletinRequiresApproval}
-                onClick={() => setBulletinRequiresApproval((v) => !v)}
-              >
-                {bulletinRequiresApproval ? "On" : "Off"}
-              </button>
-            </div>
+          <div className="cmy-field" style={{ marginTop: 12 }}>
+            <span>Who can see inside <em className="cmy-hint">(name, cover, and description stay public)</em></span>
+            <Segmented
+              value={visibility}
+              onChange={setVisibility}
+              options={[["everyone", "Everyone"], ["members_only", "Members only"]]}
+            />
+          </div>
+          {bulletinEnabled && (
+            <>
+              <div className="cmy-field" style={{ marginTop: 12 }}>
+                <span>Who can post to the bulletin?</span>
+                <Segmented
+                  value={bulletinPermission}
+                  onChange={setBulletinPermission}
+                  options={[["members", "All members"], ["organizer_only", "Organizer only"]]}
+                />
+              </div>
+              {bulletinPermission === "members" && (
+                <div className="cmy-toggle-row" style={{ marginTop: 12 }}>
+                  <span>Require approval for member posts</span>
+                  <button
+                    type="button"
+                    className={`cmy-chip-toggle ${bulletinRequiresApproval ? "is-active" : ""}`}
+                    aria-pressed={bulletinRequiresApproval}
+                    onClick={() => setBulletinRequiresApproval((v) => !v)}
+                  >
+                    {bulletinRequiresApproval ? "On" : "Off"}
+                  </button>
+                </div>
+              )}
+            </>
           )}
-        </>
-      )}
-      <div className="cmy-field">
-        <span>Who can post plans?</span>
-        <Segmented
-          value={planPostingPermission}
-          onChange={setPlanPostingPermission}
-          options={[["members", "All members"], ["organizer_only", "Organizer only"]]}
-        />
-      </div>
-      <div className="cmy-field">
-        <span>Who can see inside <em className="cmy-hint">(name, cover, and description always stay public)</em></span>
-        <Segmented
-          value={visibility}
-          onChange={setVisibility}
-          options={[["everyone", "Everyone"], ["members_only", "Members only"]]}
-        />
-      </div>
-      <div className="cmy-toggle-row">
-        <span>Group chat</span>
-        <button
-          type="button"
-          className={`cmy-chip-toggle ${chatEnabled ? "is-active" : ""}`}
-          aria-pressed={chatEnabled}
-          onClick={() => setChatEnabled((v) => !v)}
+        </SettingsRow>
+
+        <SettingsRow
+          id="channels"
+          label="Chat & Bulletin"
+          summary={[
+            chatEnabled ? "Chat on" : "Chat off",
+            bulletinEnabled ? "Bulletin on" : "Bulletin off",
+          ].join(" · ")}
+          open={openRow === "channels"}
+          onToggle={() => setOpenRow((r) => (r === "channels" ? null : "channels"))}
         >
-          {chatEnabled ? "On" : "Off"}
-        </button>
+          <div className="cmy-toggle-row">
+            <span>Group chat</span>
+            <button
+              type="button"
+              className={`cmy-chip-toggle ${chatEnabled ? "is-active" : ""}`}
+              aria-pressed={chatEnabled}
+              onClick={() => setChatEnabled((v) => !v)}
+            >
+              {chatEnabled ? "On" : "Off"}
+            </button>
+          </div>
+          <div className="cmy-toggle-row" style={{ marginTop: 12 }}>
+            <span>Bulletin</span>
+            <button
+              type="button"
+              className={`cmy-chip-toggle ${bulletinEnabled ? "is-active" : ""}`}
+              aria-pressed={bulletinEnabled}
+              onClick={() => setBulletinEnabled((v) => !v)}
+            >
+              {bulletinEnabled ? "On" : "Off"}
+            </button>
+          </div>
+        </SettingsRow>
       </div>
 
       {err && <p className="cmy-err">{err}</p>}
@@ -1190,7 +1260,12 @@ function SettingsTab({
         Save changes
       </button>
 
-      <OrganizerExitControls community={community} onLeft={onLeft} onDeleted={onDeleted} />
+      <OrganizerExitControls
+        community={community}
+        members={members}
+        onLeft={onLeft}
+        onDeleted={onDeleted}
+      />
     </section>
   );
 }
@@ -1201,26 +1276,21 @@ function SettingsTab({
  */
 function OrganizerExitControls({
   community,
+  members: allMembers,
   onLeft,
   onDeleted,
 }: {
   community: CommunityDTO;
+  members: CommunityMemberDTO[];
   onLeft: () => void;
   onDeleted: () => void;
 }) {
-  const [members, setMembers] = useState<CommunityMemberDTO[]>([]);
+  const members = allMembers.filter((m) => m.role !== "organizer");
   const [transferOpen, setTransferOpen] = useState(false);
   const [pendingTransfer, setPendingTransfer] = useState<CommunityMemberDTO | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    void api<{ members: CommunityMemberDTO[] }>(`/api/communities/${community.id}/members`)
-      .then((r) => setMembers(r.members.filter((m) => m.role !== "organizer")))
-      .catch(() => setMembers([]));
-  }, [community.id]);
-
   async function transferTo(member: CommunityMemberDTO) {
     setBusy(true);
     setError(null);
@@ -1370,6 +1440,48 @@ function OrganizerExitControls({
       >
         Delete community
       </button>
+    </div>
+  );
+}
+
+function SettingsRow({
+  id,
+  label,
+  summary,
+  open,
+  onToggle,
+  children,
+}: {
+  id: string;
+  label: string;
+  summary: string;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  const panelId = `cmy-settings-panel-${id}`;
+  return (
+    <div className={`cmy-settings-row ${open ? "is-open" : ""}`}>
+      <button
+        type="button"
+        className="cmy-settings-row-trigger"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={onToggle}
+      >
+        <span className="cmy-settings-row-text">
+          <span className="cmy-settings-row-label">{label}</span>
+          <span className="cmy-settings-row-summary">{summary}</span>
+        </span>
+        <span className="cmy-settings-row-chevron" aria-hidden="true">
+          {open ? "▾" : "›"}
+        </span>
+      </button>
+      {open && (
+        <div className="cmy-settings-row-panel" id={panelId}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }

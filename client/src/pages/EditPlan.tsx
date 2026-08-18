@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { NumberPicker } from "../components/NumberPicker";
 import { ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
@@ -31,8 +32,8 @@ type LinkPreview = {
 
 // Pick the smallest set of fields the user is likely to touch — title,
 // description, vibes, capacity/joinType, visibility, flyer (image + link), and
-// neighborhood/location flex. Date/time live in a separate "propose change"
-// flow so participants get a chance to see a shift before it lands.
+// neighborhood/location flex. Date/time uses the same inline rows as New Plan;
+// applying still notifies participants before the change sticks.
 export function EditPlanPage() {
   const { id = "" } = useParams();
   const { user } = useAuth();
@@ -290,7 +291,7 @@ function EditForm({
       </header>
       <ScreenTitle
         title="Edit plan"
-        subtitle="Most edits save instantly · date and time changes go through a proposal"
+        subtitle="Edit details below — we'll ping people if the time moves"
       />
 
       <form onSubmit={(e) => void save(e)} className="form-card">
@@ -380,36 +381,48 @@ function EditForm({
           </div>
         </section>
 
-        <section className="form-section">
-          <label className="flex-toggle">
-            <input
-              type="checkbox"
-              checked={form.capacityOn}
-              onChange={(e) => setForm((f) => ({ ...f, capacityOn: e.target.checked }))}
-            />
-            Cap the spots
-          </label>
+        <section className="form-section create-more">
+          <div className="form-row-flex">
+            <div className="form-row-flex-main">
+              <label className="form-question">Capacity</label>
+              {form.capacityOn && (
+                <NumberPicker
+                  value={Number(form.capacity) || 0}
+                  onChange={(n) => setForm((f) => ({ ...f, capacity: String(n) }))}
+                  ariaLabel="Number of spots"
+                />
+              )}
+            </div>
+            <button
+              type="button"
+              className={`flex-toggle-btn ${form.capacityOn ? "is-active" : ""}`}
+              onClick={() => setForm((f) => ({ ...f, capacityOn: !f.capacityOn }))}
+              aria-pressed={form.capacityOn}
+              title="Set limit"
+            >
+              <span>Set limit</span>
+            </button>
+          </div>
           {form.capacityOn && (
             <>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={1}
-                value={form.capacity}
-                onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))}
-              />
-              <label className="form-question" style={{ marginTop: 8 }}>How do people get in?</label>
+              <label className="form-question" style={{ marginTop: 12 }}>
+                How do people get in?
+              </label>
               <div className="segmented">
                 <button
                   type="button"
                   className={form.joinType === "open" ? "is-active" : ""}
                   onClick={() => setForm((f) => ({ ...f, joinType: "open" as JoinType }))}
-                >First come</button>
+                >
+                  First come
+                </button>
                 <button
                   type="button"
                   className={form.joinType === "approve" ? "is-active" : ""}
                   onClick={() => setForm((f) => ({ ...f, joinType: "approve" as JoinType }))}
-                >Pick from applicants</button>
+                >
+                  Approve
+                </button>
               </div>
             </>
           )}
@@ -495,26 +508,29 @@ function EditForm({
         )}
       </form>
 
+      {/* Date/time — same luma-row layout as New Plan. Still notifies
+          participants and waits for Apply (backend), but reads as inline edit. */}
       <section className="form-card" style={{ marginTop: 16 }}>
-        <h2 className="who-block-heading" style={{ marginTop: 0 }}>Move date/time</h2>
-        <p className="form-help">
-          Current: <strong>{formatPlanDate(plan.date)} · {formatPlanTime(plan.time, plan.isFlexibleTime)}</strong>
-        </p>
+        <h2 className="who-block-heading" style={{ marginTop: 0 }}>When</h2>
 
         {plan.pendingTimeProposal ? (
           <div className="coordination-banner coordination-banner--expanded" role="note">
             <p>
-              You proposed moving to{" "}
-              <strong>{formatPlanDate(plan.pendingTimeProposal.date)} · {formatPlanTime(plan.pendingTimeProposal.time, plan.pendingTimeProposal.isFlexibleTime)}</strong>. Participants have been notified — apply when you're ready.
+              Pending update:{" "}
+              <strong>
+                {formatPlanDate(plan.pendingTimeProposal.date)} ·{" "}
+                {formatPlanTime(plan.pendingTimeProposal.time, plan.pendingTimeProposal.isFlexibleTime)}
+              </strong>
+              . People have been notified — apply when you&apos;re ready.
             </p>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button
                 type="button"
                 className="btn-primary"
                 disabled={proposeBusy}
                 onClick={() => void applyProposal()}
               >
-                {proposeBusy ? "Working…" : "Apply change"}
+                {proposeBusy ? "Working…" : "Apply new time"}
               </button>
               <button
                 type="button"
@@ -522,51 +538,63 @@ function EditForm({
                 disabled={proposeBusy}
                 onClick={() => void cancelProposal()}
               >
-                Cancel proposal
+                Keep current time
               </button>
             </div>
             {proposeErr && <p className="error-text">{proposeErr}</p>}
           </div>
         ) : (
           <>
-            <label className="form-question" htmlFor="propose-date">New date</label>
-            <input
-              id="propose-date"
-              type="date"
-              value={proposeDate}
-              onChange={(e) => setProposeDate(e.target.value)}
-            />
-            <label className="flex-toggle" style={{ marginTop: 8 }}>
-              <input
-                type="checkbox"
-                checked={proposeFlexTime}
-                onChange={(e) => setProposeFlexTime(e.target.checked)}
-              />
-              Flexible time
-            </label>
-            {!proposeFlexTime && (
-              <>
-                <label className="form-question" htmlFor="propose-time">New time</label>
-                <input
-                  id="propose-time"
-                  type="time"
-                  value={proposeTime}
-                  onChange={(e) => setProposeTime(e.target.value)}
-                />
-              </>
-            )}
+            <div className="luma-card">
+              <div className="luma-row">
+                <span className="luma-label">Date</span>
+                <div className="luma-value">
+                  <input
+                    id="propose-date"
+                    type="date"
+                    className="luma-input"
+                    value={proposeDate}
+                    onChange={(e) => setProposeDate(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="luma-row">
+                <span className="luma-label">Time</span>
+                <div className="luma-value">
+                  {!proposeFlexTime ? (
+                    <input
+                      id="propose-time"
+                      type="time"
+                      className="luma-input"
+                      value={proposeTime}
+                      onChange={(e) => setProposeTime(e.target.value)}
+                    />
+                  ) : (
+                    <span className="luma-flex-text">Flexible time</span>
+                  )}
+                  <button
+                    type="button"
+                    className={`flex-toggle-btn ${proposeFlexTime ? "is-active" : ""}`}
+                    aria-pressed={proposeFlexTime}
+                    onClick={() => setProposeFlexTime((v) => !v)}
+                  >
+                    Flexible
+                  </button>
+                </div>
+              </div>
+            </div>
             {proposeErr && <p className="error-text">{proposeErr}</p>}
             <button
               type="button"
-              className="btn-secondary btn-block"
+              className="btn-primary btn-block"
               style={{ marginTop: 12 }}
               disabled={proposeBusy}
               onClick={() => void proposeChange()}
             >
-              {proposeBusy ? "Working…" : "Propose change"}
+              {proposeBusy ? "Updating…" : "Update date & time"}
             </button>
             <p className="form-help" style={{ marginTop: 8 }}>
-              Participants get notified, but the plan stays put until you apply the change.
+              We&apos;ll notify people going. The plan keeps its current time until you apply.
             </p>
           </>
         )}
@@ -628,11 +656,10 @@ function PutUpForGrabsControl({
     return (
       <button
         type="button"
-        className="btn-secondary btn-block"
-        style={{ marginTop: 16 }}
+        className="edit-plan-grabs-btn"
         onClick={() => setOpen(true)}
       >
-        Can't make it — put up for grabs
+        Put it up for grabs
       </button>
     );
   }

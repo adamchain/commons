@@ -28,6 +28,8 @@
 	<string>Take photos to share in your plans and personalize your profile with the community.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Discover nearby plans and places happening in your neighborhood and local community.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Discover nearby plans and places happening in your neighborhood and local community.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Save photos you take in Commons directly to your photo library for safekeeping.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

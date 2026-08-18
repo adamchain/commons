@@ -297,7 +297,23 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
   if (req.body?.avatarPhotoDataUrl === null) patch.avatarPhotoDataUrl = null;
   if (typeof req.body?.avatarParams === "string") patch.avatarParams = req.body.avatarParams;
   if (req.body?.avatarParams === null) patch.avatarParams = null;
-  if (typeof req.body?.onboardingComplete === "boolean") patch.onboardingComplete = req.body.onboardingComplete;
+  if (typeof req.body?.onboardingComplete === "boolean") {
+    // Photo is required to finish onboarding — reject completion without one so
+    // Path B (cleared local data / partial profiles) can't skip the photo step.
+    const completing = req.body.onboardingComplete === true;
+    if (completing) {
+      const existing = await findUserById(userId);
+      const photo =
+        typeof patch.avatarPhotoDataUrl === "string"
+          ? patch.avatarPhotoDataUrl
+          : existing?.avatarPhotoDataUrl;
+      if (!String(photo ?? "").trim()) {
+        res.status(400).json({ error: "Add a photo to finish onboarding" });
+        return;
+      }
+    }
+    patch.onboardingComplete = req.body.onboardingComplete;
+  }
   if (req.body?.guidelinesAcknowledged === true) {
     patch.guidelinesAcknowledgedAt = new Date().toISOString();
   }

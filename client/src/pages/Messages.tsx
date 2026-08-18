@@ -105,7 +105,7 @@ export function MessagesPage() {
       {tab === "interests" ? (
         <>
           <p className="messages-tab-sub">
-            Citywide conversations by interest — no commitment, just talk.
+            A citywide forum for interests to connect around recommendations, questions, announcements or advice
           </p>
           {!forumsReady ? (
             <div className="feed-skeleton" aria-hidden="true">
@@ -191,7 +191,9 @@ export function MessagesPage() {
         </div>
       ) : (
         <>
-          <p className="messages-tab-sub">Group chats for plans you&apos;re in.</p>
+          <p className="messages-tab-sub">
+            Group chats for the plans you&apos;re in. Coordinate the details and stay connected
+          </p>
           <div className="messages-card">
             <div className="messages-list">
               {items.map((c) => {

@@ -179,7 +179,7 @@ export function ParticipationButtons({
               ? "This plan is full."
               : capacity !== null
                 ? `${goingCount}/${capacity} spots taken — first come, first serve.`
-                : "“I'm In” is committed. Interested is soft — both count and join the chat."}
+                : "“I'm in.” is committed. Interested is soft — both count and join the chat."}
         </p>
       )}
       {!loose && (
@@ -190,7 +190,7 @@ export function ParticipationButtons({
           disabled={pending || isFull || isApproveOnly}
         >
           {goingActive
-            ? "I'm In ✓"
+            ? "I'm in."
             : isFull
               ? "Full"
               : isApproveOnly
@@ -221,7 +221,7 @@ export function ParticipationButtons({
         <div className="sheet-backdrop" onClick={() => setShowGoingSheet(false)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
             <div className="sheet-handle" />
-            <div className="sheet-title">I'm In</div>
+            <div className="sheet-title">I'm in.</div>
             <button type="button" className="sheet-link" onClick={() => void switchToInterested()}>
               Switch to Interested
             </button>
@@ -242,7 +242,7 @@ export function ParticipationButtons({
             <div className="sheet-title">Interested</div>
             {!loose && !isApproveOnly && !isFull && (
               <button type="button" className="sheet-link" onClick={() => void switchToGoing()}>
-                Switch to I'm In
+                Switch to I&apos;m in.
               </button>
             )}
             <button

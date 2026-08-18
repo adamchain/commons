@@ -5,6 +5,7 @@ import { isAdminPhone } from "../lib/adminPhones.js";
 import { isGcsConfigured, listDefaultImages, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
 import { store } from "../store.js";
 import { listAllUsers, findUserById } from "../userRepo.js";
+import { normalizeCommunityCategory } from "../types/shared.js";
 
 const adminRouter = Router();
 
@@ -444,7 +445,7 @@ adminRouter.get("/communities", async (req, res) => {
         id: c.id,
         name: c.name,
         description: c.description,
-        category: c.category,
+        category: normalizeCommunityCategory(String(c.category ?? "")),
         organizer: organizer
           ? { id: organizer.id, firstName: organizer.firstName, lastName: organizer.lastName ?? "" }
           : { id: c.organizerId, firstName: "Unknown", lastName: "" },
@@ -501,7 +502,7 @@ adminRouter.post("/communities/:id/reject", (req, res) => {
 adminRouter.post("/communities/founding", async (req, res) => {
   const name = String(req.body?.name ?? "").trim().slice(0, 80);
   const description = String(req.body?.description ?? "").trim().slice(0, 2000);
-  const category = String(req.body?.category ?? "other");
+  const category = normalizeCommunityCategory(String(req.body?.category ?? ""));
   const organizerLookup = String(req.body?.organizer ?? "").trim();
   if (!name || !description || !organizerLookup) {
     res.status(400).json({ error: "name, description, and organizer are required" });
@@ -522,7 +523,7 @@ adminRouter.post("/communities/founding", async (req, res) => {
   const community = store.createCommunity({
     name,
     description,
-    category: category as never,
+    category,
     organizerId: organizer.id,
     isFounding: true,
     creationStatus: "approved",

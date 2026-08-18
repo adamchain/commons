@@ -20,7 +20,7 @@ import type {
   PlanKind,
   PlanVisibility,
 } from "./types/shared.js";
-import { ALL_INTERESTS } from "./types/shared.js";
+import { ALL_INTERESTS, normalizeCommunityCategory } from "./types/shared.js";
 
 export interface UserRecord {
   id: string;
@@ -431,6 +431,7 @@ export interface NotificationRecord {
     | "planTimeProposed"
     | "planTimeChanged"
     | "planInvite"
+    | "planUpForGrabs"
     | "networkRequest"
     | "networkAccepted"
     | "communityJoinRequest"
@@ -1769,6 +1770,20 @@ export const store = {
     }
     return promoted;
   },
+  /**
+   * Rewrite legacy 8-option community categories (run_club, book_club, …) to
+   * the master InterestTag taxonomy. Idempotent — returns how many rows changed.
+   */
+  migrateCommunityCategories(): number {
+    let migrated = 0;
+    for (const community of snapshot.communities) {
+      const next = normalizeCommunityCategory(String(community.category ?? ""));
+      if (community.category === next) continue;
+      this.updateCommunity(community.id, { category: next });
+      migrated += 1;
+    }
+    return migrated;
+  },
   findCommunityById(id: string): CommunityRecord | undefined {
     return snapshot.communities.find((c) => c.id === id);
   },
@@ -1801,7 +1816,7 @@ export const store = {
       name: input.name,
       description: input.description,
       coverImage: input.coverImage ?? null,
-      category: input.category,
+      category: normalizeCommunityCategory(String(input.category ?? "")),
       organizerId: input.organizerId,
       memberCount: 1,
       creationStatus,

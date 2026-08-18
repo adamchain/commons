@@ -304,9 +304,9 @@ export function OnboardingPage() {
           {busy ? "Sending…" : "Get started"}
         </button>
         <p className="onboarding-fineprint">
-          {smsConfigured === false
+          {authMode === "dev" && import.meta.env.DEV
             ? "Local dev: the server prints the code in its terminal — check the API console."
-            : smsConfigured === true
+            : smsConfigured === true || authMode === "verify"
               ? "You'll get a text with your verification code (Twilio Verify). Message rates may apply."
               : "We'll text you a code to verify your number."}
         </p>
@@ -327,7 +327,7 @@ export function OnboardingPage() {
           onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
         />
         {error && <div className="onboarding-error">{error}</div>}
-        {smsConfigured === false && (
+        {authMode === "dev" && import.meta.env.DEV && (
           <p className="onboarding-fineprint">Use the code from the server terminal (local dev).</p>
         )}
         <button
@@ -440,7 +440,6 @@ export function OnboardingPage() {
           await patchMe({ interests });
           setStep("profile");
         }}
-        onSkip={() => setStep("profile")}
         onBack={() => setStep("location")}
       />
     );
@@ -604,6 +603,10 @@ function DownloadAppStep({ redirectTo, onContinue }: { redirectTo: string; onCon
   );
 }
 
+function hasOnboardingPhoto(user: MeDTO): boolean {
+  return Boolean(user.avatarPhotoDataUrl?.trim());
+}
+
 function pickInitial(user: MeDTO | null, gatePassed: boolean): Step {
   if (!user) return "phone";
   if (user.onboardingComplete) return "phone";
@@ -615,7 +618,9 @@ function pickInitial(user: MeDTO | null, gatePassed: boolean): Step {
     user.neighborhoodIds?.length ? user.neighborhoodIds : user.neighborhoodId ? [user.neighborhoodId] : [];
   if (hoods.length === 0) return "location";
   if (user.interests.length < 1) return "interests";
-  if (!user.firstName.trim()) return "profile";
+  // Photo is required — don't let Path B (cleared local data / partial server
+  // profile) jump past "Put a face to your name" just because firstName exists.
+  if (!user.firstName.trim() || !hasOnboardingPhoto(user)) return "profile";
   if (!user.ageConfirmedAt) return "age";
   // Terms, Privacy, and community-guidelines consent are all captured on the one
   // combined "legal" step, so any missing consent flag routes back to it.
@@ -1115,7 +1120,7 @@ function LegalDocModal({
   );
 }
 
-function InterestsStep({ me, onSave, onSkip, onBack }: { me: MeDTO; onSave: (interests: InterestTag[]) => Promise<void>; onSkip: () => void; onBack?: () => void }) {
+function InterestsStep({ me, onSave, onBack }: { me: MeDTO; onSave: (interests: InterestTag[]) => Promise<void>; onBack?: () => void }) {
   const [picked, setPicked] = useState<InterestTag[]>(me.interests);
   const [busy, setBusy] = useState(false);
 
@@ -1159,9 +1164,6 @@ function InterestsStep({ me, onSave, onSkip, onBack }: { me: MeDTO; onSave: (int
         onClick={async () => { setBusy(true); await onSave(picked); }}
       >
         Next · {picked.length} picked
-      </button>
-      <button className="btn-link" type="button" disabled={busy} onClick={onSkip}>
-        Skip for now
       </button>
     </OnboardingShell>
   );
@@ -1237,8 +1239,10 @@ function ProfileStep({
             seed={me.avatarSeed}
             style={me.avatarStyle}
             photoDataUrl={photo ?? undefined}
-            params={avatarParams ?? (firstName.trim() ? undefined : FEMININE_AVATAR_PARAMS)}
-            name={firstName.trim() || undefined}
+            // Keep the illustrated placeholder until a real photo is chosen.
+            // Passing `name` without a photo flips Avatar to blank initials and
+            // made Finish look broken for accounts that already had a default.
+            params={photo ? avatarParams ?? undefined : avatarParams ?? FEMININE_AVATAR_PARAMS}
             size="xl"
           />
           <span className="profile-avatar-camera" aria-hidden="true">

@@ -123,68 +123,72 @@ export function InviteSheet({
           </button>
         </div>
 
-        <div className="filter-sheet-group">
-          <div className="filter-sheet-group-label">From your network</div>
-          {network === null && <p className="form-help">Loading…</p>}
-          {network !== null && network.length === 0 && (
-            <p className="form-help">
-              You haven't added anyone yet — text the link to invite.
+        <div className="invite-sheet-body">
+          <div className="filter-sheet-group">
+            <div className="filter-sheet-group-label">From your network</div>
+            {network === null && <p className="form-help">Loading…</p>}
+            {network !== null && network.length === 0 && (
+              <p className="form-help">
+                You haven't added anyone yet — text the link to invite.
+              </p>
+            )}
+            {network !== null && network.length > 0 && (
+              <div className="invite-people-list">
+                {network.map((u) => {
+                  const isPicked = picked.has(u.id);
+                  return (
+                    <button
+                      key={u.id}
+                      type="button"
+                      className={`invite-person ${isPicked ? "is-picked" : ""}`}
+                      onClick={() => togglePick(u.id)}
+                      aria-pressed={isPicked}
+                    >
+                      <Avatar
+                        seed={u.avatarSeed}
+                        style={u.avatarStyle}
+                        photoDataUrl={u.avatarPhotoDataUrl}
+                        params={u.avatarParams}
+                        name={u.firstName}
+                        size="sm"
+                      />
+                      <span className="invite-person-name">{u.firstName}</span>
+                      {isPicked && <span className="invite-person-check">✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {sent > 0 && (
+            <p className="form-help" style={{ marginTop: 10, color: "var(--accent)" }}>
+              Sent {sent} invite{sent === 1 ? "" : "s"}. They'll get a notification.
             </p>
           )}
-          {network !== null && network.length > 0 && (
-            <div className="invite-people-list">
-              {network.map((u) => {
-                const isPicked = picked.has(u.id);
-                return (
-                  <button
-                    key={u.id}
-                    type="button"
-                    className={`invite-person ${isPicked ? "is-picked" : ""}`}
-                    onClick={() => togglePick(u.id)}
-                    aria-pressed={isPicked}
-                  >
-                    <Avatar
-                      seed={u.avatarSeed}
-                      style={u.avatarStyle}
-                      photoDataUrl={u.avatarPhotoDataUrl}
-                      params={u.avatarParams}
-                      name={u.firstName}
-                      size="sm"
-                    />
-                    <span className="invite-person-name">{u.firstName}</span>
-                    {isPicked && <span className="invite-person-check">✓</span>}
-                  </button>
-                );
-              })}
-            </div>
+          {hiddenWarn && (
+            <p className="form-help" style={{ marginTop: 6 }}>
+              Heads up: this plan is limited to your network, so anyone you invited who
+              hasn't added you won't see it until they do.
+            </p>
           )}
         </div>
 
-        {sent > 0 && (
-          <p className="form-help" style={{ marginTop: 10, color: "var(--accent)" }}>
-            Sent {sent} invite{sent === 1 ? "" : "s"}. They'll get a notification.
-          </p>
-        )}
-        {hiddenWarn && (
-          <p className="form-help" style={{ marginTop: 6 }}>
-            Heads up: this plan is limited to your network, so anyone you invited who
-            hasn't added you won't see it until they do.
-          </p>
-        )}
-
-        <button
-          type="button"
-          className="btn-primary btn-block"
-          style={{ marginTop: 14 }}
-          disabled={busy || picked.size === 0}
-          onClick={() => void sendInvites()}
-        >
-          {busy
-            ? "Sending…"
-            : picked.size > 0
-              ? `Send to ${picked.size} ${picked.size === 1 ? "person" : "people"}`
-              : "Pick people above"}
-        </button>
+        <div className="invite-sheet-footer">
+          <button
+            type="button"
+            className="btn-primary btn-block"
+            style={{ marginTop: 14 }}
+            disabled={busy || picked.size === 0}
+            onClick={() => void sendInvites()}
+          >
+            {busy
+              ? "Sending…"
+              : picked.size > 0
+                ? `Send to ${picked.size} ${picked.size === 1 ? "person" : "people"}`
+                : "Pick people above"}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,24 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
-  Activity,
   ArrowLeft,
   Ban,
-  BookOpen,
   Camera,
   Check,
   ChevronRight,
   Flag,
-  Leaf,
   MapPin,
   MessageCircle,
   MoreHorizontal,
-  Palette,
   Share2,
   UserPlus,
   Users,
-  UtensilsCrossed,
-  type LucideIcon,
 } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
@@ -30,23 +24,11 @@ import {
   COMMUNITY_CATEGORY_LABELS,
   INTEREST_LABELS,
   type CommunityCardDTO,
-  type CommunityCategory,
   type InterestTag,
   type MeDTO,
   type PlanDTO,
   type PublicUser,
 } from "../types/shared";
-
-const COMMUNITY_VISUAL: Record<CommunityCategory, { Icon: LucideIcon; iconColor: string; tint: string }> = {
-  run_club: { Icon: Activity, iconColor: "#5B8FBF", tint: "#C8DCF0" },
-  book_club: { Icon: BookOpen, iconColor: "#7A5BA0", tint: "#D8D0F0" },
-  fitness: { Icon: Activity, iconColor: "#5B8FBF", tint: "#C8DCF0" },
-  food_drink: { Icon: UtensilsCrossed, iconColor: "#8A6A2A", tint: "#F5DDBB" },
-  arts: { Icon: Palette, iconColor: "#A05B5B", tint: "#F0D8D8" },
-  social: { Icon: Users, iconColor: "#A05B5B", tint: "#F0D8D8" },
-  wellness: { Icon: Leaf, iconColor: "#7A8F6A", tint: "#D4E0CC" },
-  other: { Icon: Users, iconColor: "#8A8A9A", tint: "#EDE5D8" },
-};
 
 interface ProfilePayload {
   user: PublicUser;
@@ -359,8 +341,8 @@ export function ProfilePage() {
               <h3 className="profile-other-section-label">Communities</h3>
               <div className="profile-other-communities">
                 {communities.map((c) => {
-                  const vis = COMMUNITY_VISUAL[c.category] || COMMUNITY_VISUAL.other;
-                  const Icon = vis?.Icon;
+                  const vis = interestVisual(c.category);
+                  const Icon = vis.Icon;
                   return (
                     <Link key={c.id} to={`/communities/${c.id}`} className="profile-other-community-row">
                       <span
@@ -489,8 +471,8 @@ export function ProfilePage() {
           <h3 className="profile-section-label">Communities</h3>
           <div className="profile-communities-list">
             {communities.map((c) => {
-              const vis = COMMUNITY_VISUAL[c.category] || COMMUNITY_VISUAL.other;
-              const Icon = vis?.Icon;
+              const vis = interestVisual(c.category);
+              const Icon = vis.Icon;
               return (
                 <Link key={c.id} to={`/communities/${c.id}`} className="profile-community-row">
                   <span

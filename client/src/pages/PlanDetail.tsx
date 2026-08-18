@@ -518,7 +518,10 @@ export function PlanDetailPage() {
           >
             <span className="chat-entry-icon" aria-hidden="true"><ChatBubbleIcon /></span>
             <span className="chat-entry-text">
-              Group chat ({plan.participants.going.length + plan.participants.interested.length})
+              Open group chat
+              <span className="chat-entry-count">
+                {plan.participants.going.length + plan.participants.interested.length} in the thread
+              </span>
             </span>
             <span className="chat-entry-arrow">›</span>
           </Link>
@@ -673,14 +676,14 @@ export function PlanDetailPage() {
               ) : (
                 <button
                   type="button"
-                  className="btn-secondary plan-host-action-btn plan-host-action-btn--full"
+                  className="btn-secondary plan-host-action-btn plan-host-action-btn--grabs"
                   onClick={() => {
                     setConfirmGrabs(true);
                     setGrabsError(null);
                     setConfirmCancel(false);
                   }}
                 >
-                  Can't make it — put up for grabs
+                  Put it up for grabs
                 </button>
               )
             )}
@@ -696,7 +699,7 @@ export function PlanDetailPage() {
         <div className="who-row">
           <h3 className="who-block-heading">Going · {plan.participants.going.length}</h3>
           {plan.participants.going.length === 0 ? (
-            <p className="subtle" style={{ margin: 0 }}>Be the first to say "I'm In."</p>
+            <p className="subtle" style={{ margin: 0 }}>Be the first to say &ldquo;I&apos;m in.&rdquo;</p>
           ) : (
             <ParticipantsRow
               people={plan.participants.going}
@@ -899,7 +902,19 @@ function ParticipantsRow({
           {people.map((person) => (
             <li key={person.id}>
               <Link to={`/profile/${person.id}`} state={profileFrom} className="who-row-name">
-                {person.firstName}
+                <Avatar
+                  seed={person.avatarSeed}
+                  style={person.avatarStyle}
+                  photoDataUrl={person.avatarPhotoDataUrl}
+                  params={person.avatarParams}
+                  size="sm"
+                />
+                <span className="who-row-name-text">
+                  <span className="who-row-name-primary">{person.firstName}</span>
+                  {person.lastName ? (
+                    <span className="who-row-name-sub">{person.lastName}</span>
+                  ) : null}
+                </span>
               </Link>
             </li>
           ))}

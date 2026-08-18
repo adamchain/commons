@@ -17,7 +17,7 @@ export function CreateCommunityPage() {
   const coverRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState<CommunityCategory>("social");
+  const [category, setCategory] = useState<CommunityCategory>("events");
   const [screening, setScreening] = useState("");
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [coverBusy, setCoverBusy] = useState(false);

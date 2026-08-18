@@ -57,7 +57,7 @@ const COMMUNITY = {
   description:
     "Easy weekly miles around Center City, all paces welcome. We meet Saturday " +
     "mornings at the Square and grab coffee after. Newcomers always welcome.",
-  category: "run_club" as CommunityCategory,
+  category: "walks" as CommunityCategory,
 };
 
 // A couple of bulletin posts. `organizerOnly` posts are authored by index 0.

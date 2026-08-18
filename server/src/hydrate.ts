@@ -123,12 +123,17 @@ export async function hydrateSnapshotFromMongo(): Promise<void> {
     // Ensure one forum row per InterestTag even if Mongo was empty / partial.
     store.ensureForumsForInterests();
 
+    // Unify legacy 8-option community categories with InterestTag *before*
+    // any other community writes (promote/update upserts must pass the new enum).
+    const categoryMigrated = store.migrateCommunityCategories();
+
     // Communities now go live on create. Promote any legacy `pending` rows so
     // stuck submissions aren't trapped behind an unprocessed review queue.
     const promoted = store.promotePendingCommunities();
 
     console.log(
       `[hydrate] loaded from Mongo: ${users.length} users, ${neighborhoods.length} hoods, ${plans.length} plans, ${participations.length} rsvps, ${conversations.length} convos, ${messages.length} msgs, ${interestForums.length} forums, ${forumPosts.length} forumPosts` +
+        (categoryMigrated ? `, migrated ${categoryMigrated} community categories` : "") +
         (promoted ? `, promoted ${promoted} pending communities` : ""),
     );
   } catch (err) {

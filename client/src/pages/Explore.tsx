@@ -125,14 +125,15 @@ export function ExplorePage() {
       <section className="xpl-places" aria-label="Places">
         <div className="xpl-section-head">
           <div className="xpl-section-head-text">
-            <Label>Places</Label>
+            <Label>
+              Places <span className="xpl-coming-soon">COMING SOON</span>
+            </Label>
             <h2 className="xpl-section-title">
               Browse spots.
               <br />
               Make plans there.
             </h2>
           </div>
-          <span className="xpl-soon-badge">Soon</span>
         </div>
 
         <div className="xpl-cat-pills" role="tablist" aria-label="Place categories">

@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/http";
 import { invalidateCardImages } from "../lib/cardImages";
-import { INTEREST_LABELS, type InterestTag } from "../types/shared";
+import {
+  ALL_COMMUNITY_CATEGORIES,
+  COMMUNITY_CATEGORY_LABELS,
+  INTEREST_LABELS,
+  type InterestTag,
+} from "../types/shared";
 import "./Admin.css";
 
 type AdminSummary = {
@@ -513,7 +518,7 @@ function CommunitiesReview() {
   const [rows, setRows] = useState<AdminCommunityRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [founding, setFounding] = useState({ name: "", description: "", category: "run_club", organizer: "" });
+  const [founding, setFounding] = useState({ name: "", description: "", category: "events", organizer: "" });
   const [foundingBusy, setFoundingBusy] = useState(false);
   const [foundingMsg, setFoundingMsg] = useState<string | null>(null);
 
@@ -559,7 +564,7 @@ function CommunitiesReview() {
         method: "POST",
         body: JSON.stringify(founding),
       });
-      setFounding({ name: "", description: "", category: "run_club", organizer: "" });
+      setFounding({ name: "", description: "", category: "events", organizer: "" });
       setFoundingMsg("Founding community created and approved.");
       await load();
     } catch (e) {
@@ -643,13 +648,11 @@ function CommunitiesReview() {
             value={founding.category}
             onChange={(e) => setFounding((f) => ({ ...f, category: e.target.value }))}
           >
-            {["run_club", "book_club", "fitness", "food_drink", "arts", "social", "wellness", "other"].map(
-              (c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ),
-            )}
+            {ALL_COMMUNITY_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {COMMUNITY_CATEGORY_LABELS[c]}
+              </option>
+            ))}
           </select>
           <input
             placeholder="Organizer user id or E.164 phone"

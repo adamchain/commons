@@ -58,10 +58,11 @@ placesRouter.get("/autocomplete", requireAuth, async (req, res) => {
       res.status(502).json({ error: "Places lookup failed", predictions: [] });
       return;
     }
+    const seenIds = new Set<string>();
+    const seenNames = new Set<string>();
     const predictions = (data.suggestions ?? [])
       .map((s) => s.placePrediction)
       .filter((p): p is NonNullable<typeof p> => Boolean(p))
-      .slice(0, 8)
       .map((p) => {
         const address = p.text?.text ?? "";
         const name =
@@ -73,7 +74,15 @@ placesRouter.get("/autocomplete", requireAuth, async (req, res) => {
         const placeId = rawId.replace(/^places\//, "");
         return { placeId, name, address };
       })
-      .filter((p) => p.placeId && p.name);
+      .filter((p) => p.placeId && p.name)
+      .filter((p) => {
+        const nameKey = p.name.trim().toLowerCase();
+        if (seenIds.has(p.placeId) || seenNames.has(nameKey)) return false;
+        seenIds.add(p.placeId);
+        seenNames.add(nameKey);
+        return true;
+      })
+      .slice(0, 8);
     res.json({ predictions });
   } catch (e) {
     console.error("[places] autocomplete fetch", e);
