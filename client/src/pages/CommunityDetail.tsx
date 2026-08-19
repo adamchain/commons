@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { CommunityCover } from "../components/CommunityCover";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
 import { PlanCard } from "../components/PlanCard";
 import {
@@ -125,11 +126,13 @@ export function CommunityDetailPage() {
       {/* Header — category + name overlay the cover photo; a single compressed
           row below carries member avatars, the meta line, and the Join pill. */}
       <header className="cmy-header">
-        <div
-          className="cmy-cover"
-          style={community.coverImage ? { backgroundImage: `url(${community.coverImage})` } : undefined}
-          data-cat={community.category}
-        >
+        <div className="cmy-cover">
+          <CommunityCover
+            coverImage={community.coverImage}
+            category={community.category}
+            className="cmy-cover-fill"
+            iconSize={44}
+          />
           <div className="cmy-cover-overlay">
             <span className="cmy-cover-tag">{catLabel}</span>
             <div className="cmy-cover-title-row">

@@ -2,6 +2,8 @@ import { useEffect, useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { MapPin, Search } from "lucide-react";
 import { api } from "../api/http";
+import { Avatar } from "../components/Avatar";
+import { CommunityCover } from "../components/CommunityCover";
 import { Label } from "../components/ui";
 import { COMMUNITY_CATEGORY_LABELS, type CommunityCardDTO, type CommunityDTO } from "../types/shared";
 
@@ -84,11 +86,17 @@ export function ExplorePage() {
                 <Link to={`/communities/${c.id}`} className="xpl-comm-row">
                   <span className="xpl-comm-num">{String(i + 1).padStart(2, "0")}</span>
                   <div className="xpl-comm-thumb">
-                    {c.coverImage ? (
-                      <img src={c.coverImage} alt="" loading="lazy" />
-                    ) : (
-                      <div className="xpl-comm-thumb-fallback" aria-hidden="true" />
-                    )}
+                    <CommunityCover coverImage={c.coverImage} category={c.category} iconSize={18} />
+                    <span className="xpl-comm-avatar">
+                      <Avatar
+                        seed={c.organizer.avatarSeed}
+                        style={c.organizer.avatarStyle}
+                        photoDataUrl={c.organizer.avatarPhotoDataUrl}
+                        params={c.organizer.avatarParams}
+                        name={c.organizer.firstName}
+                        size="xs"
+                      />
+                    </span>
                   </div>
                   <div className="xpl-comm-info">
                     <div className="xpl-comm-name">
@@ -186,11 +194,13 @@ function CommunityJoinCta({
   const [busy, setBusy] = useState(false);
   const status = community.myMembershipStatus;
 
-  if (status === "active") return null;
+  if (status === "active") {
+    return <span className="xpl-comm-joined">Joined</span>;
+  }
   if (status === "pending") {
     return (
       <span className="xpl-comm-join xpl-comm-join--pending" onClick={(e) => e.preventDefault()}>
-        Pending
+        Requested
       </span>
     );
   }
@@ -224,7 +234,7 @@ function CommunityJoinCta({
 
   return (
     <button type="button" className="xpl-comm-join" disabled={busy} onClick={handleClick}>
-      {busy ? "…" : community.hasScreening ? "Request" : "Join"}
+      {busy ? "…" : community.hasScreening ? "Request →" : "Join →"}
     </button>
   );
 }

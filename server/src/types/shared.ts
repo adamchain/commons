@@ -554,6 +554,8 @@ export interface CommunityCardDTO {
   category: CommunityCategory;
   memberCount: number;
   isFounding: boolean;
+  /** Organizer identity — avatar on list/explore cards. */
+  organizer: PublicUser;
   /** The viewer's role, when they belong — drives the "Organizer" label on profile. */
   myRole: CommunityMemberRole | null;
   /** The viewer's membership status, or null if they're a visitor — drives the Explore rail join CTA. */

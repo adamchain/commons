@@ -90,7 +90,18 @@ async function toCommunityDTO(
   };
 }
 
-function toCommunityCard(community: CommunityRecord, viewerId: string): CommunityCardDTO {
+function organizerPublic(uid: string, users: Awaited<ReturnType<typeof findUsersByIds>>): PublicUser {
+  const u = users.get(uid);
+  return u
+    ? userToPublic(u)
+    : { id: uid, firstName: "Organizer", neighborhoodId: null, avatarSeed: uid, avatarStyle: "avataaars" };
+}
+
+function toCommunityCard(
+  community: CommunityRecord,
+  viewerId: string,
+  users: Awaited<ReturnType<typeof findUsersByIds>>,
+): CommunityCardDTO {
   const membership = store.findCommunityMembership(community.id, viewerId);
   return {
     id: community.id,
@@ -99,10 +110,19 @@ function toCommunityCard(community: CommunityRecord, viewerId: string): Communit
     category: normalizeCommunityCategory(String(community.category ?? "")),
     memberCount: community.memberCount,
     isFounding: community.isFounding,
+    organizer: organizerPublic(community.organizerId, users),
     myRole: membership?.status === "active" ? membership.role : null,
     myMembershipStatus: membership?.status ?? null,
     hasScreening: !!community.screeningQuestion,
   };
+}
+
+async function toCommunityCards(
+  communities: CommunityRecord[],
+  viewerId: string,
+): Promise<CommunityCardDTO[]> {
+  const users = await findUsersByIds(communities.map((c) => c.organizerId));
+  return communities.map((c) => toCommunityCard(c, viewerId, users));
 }
 
 function postDTO(
@@ -192,23 +212,20 @@ function parsePermission(
 }
 
 // GET /api/communities — approved communities as cards (Explore rail + browse).
-communitiesRouter.get("/", requireAuth, (req, res) => {
+communitiesRouter.get("/", requireAuth, async (req, res) => {
   const viewerId = String(req.userId);
-  const cards = store
-    .listApprovedCommunities()
-    .sort((a, b) => {
-      if (a.isFounding !== b.isFounding) return a.isFounding ? -1 : 1;
-      return b.memberCount - a.memberCount;
-    })
-    .map((c) => toCommunityCard(c, viewerId));
-  res.json({ communities: cards });
+  const list = store.listApprovedCommunities().sort((a, b) => {
+    if (a.isFounding !== b.isFounding) return a.isFounding ? -1 : 1;
+    return b.memberCount - a.memberCount;
+  });
+  res.json({ communities: await toCommunityCards(list, viewerId) });
 });
 
 // GET /api/communities/mine — communities the viewer belongs to / organizes.
-communitiesRouter.get("/mine", requireAuth, (req, res) => {
+communitiesRouter.get("/mine", requireAuth, async (req, res) => {
   const viewerId = String(req.userId);
   const memberships = store.listCommunityMembershipsForUser(viewerId);
-  const cards: CommunityCardDTO[] = [];
+  const list: CommunityRecord[] = [];
   for (const m of memberships) {
     const community = store.findCommunityById(m.communityId);
     if (!community) continue;
@@ -216,9 +233,9 @@ communitiesRouter.get("/mine", requireAuth, (req, res) => {
     // so a creator sees their in-review community from their profile.
     if (community.creationStatus === "rejected") continue;
     if (community.creationStatus === "pending" && community.organizerId !== viewerId) continue;
-    cards.push(toCommunityCard(community, viewerId));
+    list.push(community);
   }
-  res.json({ communities: cards });
+  res.json({ communities: await toCommunityCards(list, viewerId) });
 });
 
 // POST /api/communities — create a community (goes live immediately).

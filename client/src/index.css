@@ -10145,23 +10145,27 @@ h1, h2, h3, h4, h5, h6 {
   flex-shrink: 0;
 }
 .xpl-comm-thumb {
+  position: relative;
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  overflow: hidden;
+  overflow: visible;
   background: var(--tan);
   flex-shrink: 0;
 }
-.xpl-comm-thumb img {
+.xpl-comm-thumb .cmy-cover-media {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  display: block;
+  border-radius: 12px;
 }
-.xpl-comm-thumb-fallback {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, var(--red) 0%, #2b2b3a 100%);
+.xpl-comm-avatar {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--bg);
+  line-height: 0;
+  z-index: 1;
 }
 .xpl-comm-info {
   flex: 1;
@@ -10194,21 +10198,29 @@ h1, h2, h3, h4, h5, h6 {
 }
 .xpl-comm-join {
   flex-shrink: 0;
-  padding: 5px 12px;
-  border-radius: 999px;
-  font-size: var(--text-body-small);
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: var(--text-body);
   font-weight: 700;
-  background: var(--red);
-  color: #fff;
-  border: 1px solid var(--red);
+  color: var(--red);
   cursor: pointer;
   white-space: nowrap;
 }
 .xpl-comm-join--pending {
-  background: transparent;
   color: var(--muted);
-  border-color: var(--tan-mid);
+  font-weight: 600;
   cursor: default;
+}
+.xpl-comm-joined {
+  flex-shrink: 0;
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--faint);
+  background: var(--tan);
+  border-radius: 22px;
+  padding: 4px 10px;
 }
 .xpl-comm-empty {
   display: flex;
