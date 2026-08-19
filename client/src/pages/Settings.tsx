@@ -168,7 +168,7 @@ function LegalSheet({ slug, onClose }: { slug: "terms" | "privacy"; onClose: () 
             Close
           </button>
         </div>
-        <LegalContent doc={doc} />
+        <LegalContent doc={doc} hideTitle />
       </div>
     </div>
   );

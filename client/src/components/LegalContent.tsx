@@ -5,12 +5,22 @@ import type { LegalDocument } from "../content/legal";
  * "last updated" line, intro, and numbered sections. No scroll/consent logic —
  * that lives in the consumers (the in-app reader page and the onboarding
  * consent gate), so this stays reusable in both places.
+ *
+ * Titles in `legal.ts` already include the "COMMONS —" prefix. Modals that
+ * already show `doc.title` in their chrome pass `hideTitle` so it isn't
+ * printed twice.
  */
-export function LegalContent({ doc }: { doc: LegalDocument }) {
+export function LegalContent({
+  doc,
+  hideTitle = false,
+}: {
+  doc: LegalDocument;
+  hideTitle?: boolean;
+}) {
   return (
     <article className="legal-doc">
       <header className="legal-doc-head">
-        <h1 className="legal-doc-title">COMMONS — {doc.title}</h1>
+        {!hideTitle && <h1 className="legal-doc-title">{doc.title}</h1>}
         <p className="legal-doc-updated">Last updated: {doc.updated}</p>
       </header>
 

@@ -1101,7 +1101,7 @@ function LegalDocModal({
           </button>
         </div>
         <div className="legal-modal-panel" ref={panelRef} onScroll={markIfAtBottom}>
-          <LegalContent doc={doc} />
+          <LegalContent doc={doc} hideTitle />
           {!atBottom && <div className="legal-consent-scrollhint">Scroll to continue ↓</div>}
         </div>
         <button
