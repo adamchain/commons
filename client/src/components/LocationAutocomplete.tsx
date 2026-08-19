@@ -47,10 +47,12 @@ export function LocationAutocomplete({
   name,
   address,
   onChange,
+  placeholder = "Venue name — e.g. La Colombe",
 }: {
   name: string;
   address: string;
   onChange: (next: LocationValue) => void;
+  placeholder?: string;
 }) {
   const [query, setQuery] = useState(name);
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
@@ -172,7 +174,7 @@ export function LocationAutocomplete({
   return (
     <div className="location-autocomplete" ref={containerRef}>
       <input
-        placeholder="Venue name — e.g. La Colombe"
+        placeholder={placeholder}
         value={query}
         onChange={(e) => handleInput(e.target.value)}
         onFocus={() => {

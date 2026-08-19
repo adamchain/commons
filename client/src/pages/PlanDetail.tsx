@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ImagePlus, Hand } from "lucide-react";
+import { ArrowLeft, Camera, Hand, ImagePlus } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
@@ -49,6 +49,7 @@ export function PlanDetailPage() {
   const [lockFlyer, setLockFlyer] = useState<string | null>(null);
   const [lockBusy, setLockBusy] = useState(false);
   const [showLockCoverLib, setShowLockCoverLib] = useState(false);
+  const [lockCoverOpen, setLockCoverOpen] = useState(false);
   const [showAllGoing, setShowAllGoing] = useState(false);
   const [showAllInterested, setShowAllInterested] = useState(false);
   const [confirmGrabs, setConfirmGrabs] = useState(false);
@@ -136,12 +137,8 @@ export function PlanDetailPage() {
   // Other interested folks coordinate via the group chat until the host
   // commits to a venue + day.
   const canLock = !plan.lockedAt && isHosting;
-  // Prompt fires when the thread has at least 2 people committing (interested
-  // or going). The host sees the actionable lock-in form; non-hosts see a
-  // softer nudge so they know the group can self-organize.
-  const groupSize = plan.participants.interested.length + plan.participants.going.length;
-  const groupAtThreshold = isLookingFor && !plan.lockedAt && groupSize >= 2;
-  const showGroupPrompt = groupAtThreshold && isHosting;
+  const lockingIn =
+    !isPast && canLock && (plan.isFlexibleTime || plan.isFlexibleLocation || isLookingFor);
   const canChat =
     isHosting || plan.myState === "going" || plan.myState === "interested";
 
@@ -255,6 +252,226 @@ export function PlanDetailPage() {
       ? `https://www.google.com/maps/search/?api=1&query=${plan.location.lat},${plan.location.lng}`
       : `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
 
+  const lockDisabled = lockBusy || !lockVenue.trim();
+  const lockHint = !lockVenue.trim() ? "Add a venue to continue" : null;
+
+  const guestsBlock = (
+    <PlanGuests
+      plan={plan}
+      userId={user.id}
+      isHosting={isHosting}
+      showAllGoing={showAllGoing}
+      showAllInterested={showAllInterested}
+      onToggleGoing={() => setShowAllGoing((v) => !v)}
+      onToggleInterested={() => setShowAllInterested((v) => !v)}
+      onApproved={() => void load()}
+    />
+  );
+
+  const lockFlyerInput = (
+    <input
+      ref={lockFlyerRef}
+      type="file"
+      accept="image/*"
+      style={{ display: "none" }}
+      onChange={(e) => {
+        const f = e.target.files?.[0];
+        if (f) {
+          void fileToResizedDataUrl(f)
+            .then((dataUrl) => {
+              setLockFlyer(dataUrl);
+              setLockCoverOpen(true);
+            })
+            .catch(() => undefined);
+        }
+        if (lockFlyerRef.current) lockFlyerRef.current.value = "";
+      }}
+    />
+  );
+
+  function goBackFromPlan() {
+    if (location.hash === "#guests") {
+      navigate(location.pathname, { replace: true, state: navFrom });
+      return;
+    }
+    navigate(backHref);
+  }
+
+  if (lockingIn) {
+    return (
+      <main className="app-shell app-shell--wide app-shell--with-nav plan-detail-page plan-detail-page--lock-in">
+        <header className="lock-in-top">
+          <button type="button" className="lock-in-back" onClick={goBackFromPlan}>
+            <ArrowLeft size={18} strokeWidth={1.8} aria-hidden="true" />
+            Back
+          </button>
+          <h1 className="lock-in-title">{sentenceCaseTitle(plan.title)}</h1>
+          <button
+            type="button"
+            className="lock-in-started"
+            onClick={() =>
+              navigate(`/profile/${plan.creator.id}`, { state: { from: "plan", planId: plan.id } })
+            }
+          >
+            <Avatar
+              seed={plan.creator.avatarSeed}
+              style={plan.creator.avatarStyle}
+              photoDataUrl={plan.creator.avatarPhotoDataUrl}
+              params={plan.creator.avatarParams}
+              size="sm"
+            />
+            <span>
+              Started by <strong>{isHosting ? "you" : plan.creator.firstName}</strong>
+            </span>
+          </button>
+          {plan.description && (
+            <p className="lock-in-quote">&ldquo;{plan.description}&rdquo;</p>
+          )}
+        </header>
+
+        <div className="plan-detail-body plan-detail-body--lock-in">
+          <div ref={lockFormRef} className="plan-meta-card plan-meta-card--edit">
+            <div className="plan-meta-row plan-meta-row--edit">
+              <span className="plan-meta-icon" aria-hidden="true"><PinIcon /></span>
+              <div className="plan-meta-text">
+                <span className="plan-meta-label">Venue</span>
+                <LocationAutocomplete
+                  name={lockVenue}
+                  address={lockVenueAddr}
+                  placeholder="Add a venue"
+                  onChange={(v) => {
+                    setLockVenue(v.name);
+                    setLockVenueAddr(v.address);
+                    setLockLat(v.lat);
+                    setLockLng(v.lng);
+                  }}
+                />
+              </div>
+            </div>
+            <div className="plan-meta-row plan-meta-row--edit">
+              <span className="plan-meta-icon" aria-hidden="true"><CalendarIcon /></span>
+              <label className="plan-meta-text" htmlFor="lock-date">
+                <span className="plan-meta-label">Day</span>
+                <span className={`plan-meta-value ${!lockDate ? "is-placeholder" : ""}`}>
+                  {lockDate ? formatPlanDate(lockDate) : "Pick a day"}
+                </span>
+                <input
+                  id="lock-date"
+                  className="plan-meta-native-input"
+                  type="date"
+                  value={lockDate}
+                  min={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setLockDate(e.target.value)}
+                />
+              </label>
+            </div>
+            <div className="plan-meta-row plan-meta-row--edit">
+              <span className="plan-meta-icon" aria-hidden="true"><ClockIcon /></span>
+              <div className="plan-meta-text plan-meta-text--time">
+                <span className="plan-meta-label">Time</span>
+                <div className="plan-meta-time-row">
+                  {lockFlexTime ? (
+                    <span className="plan-meta-value is-placeholder">Flexible time</span>
+                  ) : (
+                    <input
+                      id="lock-time"
+                      className="plan-meta-time-input"
+                      type="time"
+                      value={lockTime}
+                      onChange={(e) => setLockTime(e.target.value)}
+                    />
+                  )}
+                  <FlexChip active={lockFlexTime} onClick={() => setLockFlexTime((v) => !v)} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {guestsBlock}
+
+          {canChat && (
+            <Link
+              to={`/plans/${plan.id}/chat`}
+              state={{ from: "plan", planId: plan.id }}
+              className="chat-entry chat-entry--prominent plan-detail-card"
+            >
+              <span className="chat-entry-icon" aria-hidden="true"><ChatBubbleIcon /></span>
+              <span className="chat-entry-text">
+                Open group chat
+                <span className="chat-entry-count">
+                  {plan.participants.going.length + plan.participants.interested.length} in the thread
+                </span>
+              </span>
+              <span className="chat-entry-arrow">›</span>
+            </Link>
+          )}
+
+          {lockFlyer || lockCoverOpen ? (
+            lockFlyer ? (
+              <div className="cover-picker cover-picker--filled lock-cover-picker">
+                <img src={lockFlyer} alt="" className="cover-picker-img" />
+                <div className="cover-picker-overlay">
+                  <button type="button" className="cover-chip" onClick={() => setShowLockCoverLib(true)}>
+                    Library
+                  </button>
+                  <button type="button" className="cover-chip" onClick={() => void openLockFlyerPicker()}>
+                    Upload
+                  </button>
+                  <button type="button" className="cover-chip" onClick={() => { setLockFlyer(null); setLockCoverOpen(false); }}>
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="cover-picker lock-cover-picker">
+                <span className="cover-picker-title">Add a cover photo</span>
+                <span className="cover-picker-sub">Optional — library or upload</span>
+                <div className="cover-picker-buttons">
+                  <button type="button" className="cover-btn" onClick={() => setShowLockCoverLib(true)}>
+                    <ImagePlus size={16} strokeWidth={1.8} aria-hidden="true" />
+                    Library
+                  </button>
+                  <button type="button" className="cover-btn" onClick={() => void openLockFlyerPicker()}>
+                    Upload
+                  </button>
+                </div>
+              </div>
+            )
+          ) : (
+            <button type="button" className="lock-cover-row" onClick={() => setLockCoverOpen(true)}>
+              <Camera size={16} strokeWidth={1.8} aria-hidden="true" />
+              Add a cover photo (optional)
+            </button>
+          )}
+          {lockFlyerInput}
+        </div>
+
+        <div className="lock-in-cta-bar">
+          <button
+            type="button"
+            className="btn-primary btn-block"
+            disabled={lockDisabled}
+            onClick={() => void lockIn()}
+          >
+            {lockBusy ? "Saving…" : "Lock it in"}
+          </button>
+          {lockHint && <p className="lock-in-cta-hint">{lockHint}</p>}
+        </div>
+
+        {showLockCoverLib && (
+          <CoverLibraryModal
+            onPick={(url) => {
+              setLockFlyer(url);
+              setLockCoverOpen(true);
+              setShowLockCoverLib(false);
+            }}
+            onClose={() => setShowLockCoverLib(false)}
+          />
+        )}
+      </main>
+    );
+  }
+
   return (
     <main className="app-shell app-shell--wide app-shell--with-nav plan-detail-page">
       <div className="plan-detail-safe-scrim" aria-hidden="true" />
@@ -361,136 +578,6 @@ export function PlanDetailPage() {
               <ChatBubbleIcon />
               Open group chat
             </Link>
-          </div>
-        )}
-
-        {!isPast && showGroupPrompt && (
-          <div className="lock-prompt" role="note">
-            <p className="lock-prompt-headline">
-              Looks like you've got a group. Ready to lock it in?
-            </p>
-            <p className="lock-prompt-soft">
-              Plans work best when someone locks it in early.
-            </p>
-            <button
-              type="button"
-              className="btn-secondary btn-block lock-prompt-claim"
-              onClick={() => {
-                setTimeout(() => {
-                  lockFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-                }, 50);
-              }}
-            >
-              I'll take it from here
-            </button>
-          </div>
-        )}
-
-        {/* The "looks like you've got a group" nudge is intentionally
-            host-only (showGroupPrompt above). When viewing someone else's
-            idea you don't see it — they own the lock-in decision. */}
-
-        {!isPast && canLock && (plan.isFlexibleTime || plan.isFlexibleLocation || isLookingFor) && (
-          <div
-            ref={lockFormRef}
-            className="coordination-banner coordination-banner--expanded"
-            role="note"
-          >
-            <p>
-              {isLookingFor
-                ? "You can lock this in anytime — or wait to see who's interested."
-                : "Still working out the details? Fill in venue & time when you’re ready and lock it in."}
-            </p>
-            <label className="form-question">Venue</label>
-            <LocationAutocomplete
-              name={lockVenue}
-              address={lockVenueAddr}
-              onChange={(v) => {
-                setLockVenue(v.name);
-                setLockVenueAddr(v.address);
-                setLockLat(v.lat);
-                setLockLng(v.lng);
-              }}
-            />
-            <label className="form-question" htmlFor="lock-date">
-              Day
-            </label>
-            <div className="lock-time-row">
-              <input
-                id="lock-date"
-                className="onboarding-input"
-                type="date"
-                value={lockDate}
-                min={new Date().toISOString().slice(0, 10)}
-                onChange={(e) => setLockDate(e.target.value)}
-              />
-            </div>
-            <label className="form-question" htmlFor="lock-time">
-              Time
-            </label>
-            <div className="lock-time-row">
-              {!lockFlexTime ? (
-                <input
-                  id="lock-time"
-                  className="onboarding-input"
-                  type="time"
-                  value={lockTime}
-                  onChange={(e) => setLockTime(e.target.value)}
-                />
-              ) : (
-                <span className="lock-flex-text">Flexible time</span>
-              )}
-              <FlexChip active={lockFlexTime} onClick={() => setLockFlexTime((v) => !v)} />
-            </div>
-            <label className="form-question">Cover image</label>
-            {lockFlyer ? (
-              <div className="cover-picker cover-picker--filled lock-cover-picker">
-                <img src={lockFlyer} alt="" className="cover-picker-img" />
-                <div className="cover-picker-overlay">
-                  <button type="button" className="cover-chip" onClick={() => setShowLockCoverLib(true)}>
-                    Library
-                  </button>
-                  <button type="button" className="cover-chip" onClick={() => void openLockFlyerPicker()}>
-                    Upload
-                  </button>
-                  <button type="button" className="cover-chip" onClick={() => setLockFlyer(null)}>
-                    Remove
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="cover-picker lock-cover-picker">
-                <span className="cover-picker-title">Add a cover image</span>
-                <span className="cover-picker-sub">Optional — upload or pick from the library</span>
-                <div className="cover-picker-buttons">
-                  <button type="button" className="cover-btn" onClick={() => setShowLockCoverLib(true)}>
-                    <ImagePlus size={16} strokeWidth={1.8} aria-hidden="true" />
-                    Library
-                  </button>
-                  <button type="button" className="cover-btn" onClick={() => void openLockFlyerPicker()}>
-                    Upload
-                  </button>
-                </div>
-              </div>
-            )}
-            <input
-              ref={lockFlyerRef}
-              type="file"
-              accept="image/*"
-              style={{ display: "none" }}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) {
-                  void fileToResizedDataUrl(f)
-                    .then((dataUrl) => setLockFlyer(dataUrl))
-                    .catch(() => undefined);
-                }
-                if (lockFlyerRef.current) lockFlyerRef.current.value = "";
-              }}
-            />
-            <button type="button" className="btn-primary btn-block" disabled={lockBusy || !lockVenue.trim() || !lockDate} onClick={() => void lockIn()}>
-              {lockBusy ? "Saving…" : "Lock it in"}
-            </button>
           </div>
         )}
 
@@ -695,78 +782,9 @@ export function PlanDetailPage() {
         )}
       </div>
 
-      <section id="guests" className="who-block plan-detail-card" style={{ margin: "0 14px 32px" }}>
-        <div className="who-row">
-          <h3 className="who-block-heading">Going · {plan.participants.going.length}</h3>
-          {plan.participants.going.length === 0 ? (
-            <p className="subtle" style={{ margin: 0 }}>Be the first to say &ldquo;I&apos;m in.&rdquo;</p>
-          ) : (
-            <ParticipantsRow
-              people={plan.participants.going}
-              planId={plan.id}
-              expanded={showAllGoing}
-              onToggle={() => setShowAllGoing((v) => !v)}
-              countLabel={`${plan.participants.going.length} going`}
-            />
-          )}
-        </div>
-
-        {plan.participants.interested.length > 0 && (
-          <div className="who-row" style={{ marginTop: 14 }}>
-            <h3 className="who-block-heading">
-              {plan.joinType === "approve" && isHosting ? "Applications" : "Interested"} · {plan.participants.interested.length}
-            </h3>
-            {plan.joinType === "approve" && isHosting ? (
-              // Host approval flow keeps the per-person rows so the host can
-              // tap "Let them in" without leaving the page.
-              <div className="participant-list-interested">
-                {plan.participants.interested.map((person) => (
-                  <div key={person.id} className="participant-row participant-row--with-action">
-                    <Link
-                      to={`/profile/${person.id}`}
-                      state={{ from: "plan", planId: plan.id }}
-                      className="participant-row-link"
-                    >
-                      <Avatar seed={person.avatarSeed} style={person.avatarStyle} photoDataUrl={person.avatarPhotoDataUrl} params={person.avatarParams} size="sm" />
-                      <span className="participant-name">
-                        {person.firstName}
-                        {person.id === user.id && <span className="you-pill">You</span>}
-                      </span>
-                    </Link>
-                    {person.id !== user.id && (
-                      <button
-                        type="button"
-                        className="btn-secondary participant-approve-btn"
-                        onClick={async () => {
-                          try {
-                            await api(`/api/plans/${plan.id}/approve`, {
-                              method: "POST",
-                              body: JSON.stringify({ userId: person.id }),
-                            });
-                            await load();
-                          } catch {
-                            /* swallow */
-                          }
-                        }}
-                      >
-                        Let them in
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <ParticipantsRow
-                people={plan.participants.interested}
-                planId={plan.id}
-                expanded={showAllInterested}
-                onToggle={() => setShowAllInterested((v) => !v)}
-                countLabel={`${plan.participants.interested.length} interested`}
-              />
-            )}
-          </div>
-        )}
-      </section>
+      <div className="plan-guests-wrap">
+        {guestsBlock}
+      </div>
 
       {showShare && <ShareSheet plan={plan} isOwn={isHosting} onClose={() => setShowShare(false)} />}
       {showGetThere && <GetThereSheet plan={plan} onClose={() => setShowGetThere(false)} />}
@@ -945,6 +963,105 @@ function FlexIcon() {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M5 12h14" />
       <path d="m12 5 7 7-7 7" />
+    </svg>
+  );
+}
+
+function PlanGuests({
+  plan,
+  userId,
+  isHosting,
+  showAllGoing,
+  showAllInterested,
+  onToggleGoing,
+  onToggleInterested,
+  onApproved,
+}: {
+  plan: PlanDTO;
+  userId: string;
+  isHosting: boolean;
+  showAllGoing: boolean;
+  showAllInterested: boolean;
+  onToggleGoing: () => void;
+  onToggleInterested: () => void;
+  onApproved: () => void;
+}) {
+  return (
+    <section id="guests" className="who-block plan-detail-card">
+      <div className="who-row">
+        <h3 className="who-block-heading">Going · {plan.participants.going.length}</h3>
+        {plan.participants.going.length === 0 ? (
+          <p className="subtle" style={{ margin: 0 }}>Be the first to say &ldquo;I&apos;m in.&rdquo;</p>
+        ) : (
+          <ParticipantsRow
+            people={plan.participants.going}
+            planId={plan.id}
+            expanded={showAllGoing}
+            onToggle={onToggleGoing}
+            countLabel={`${plan.participants.going.length} going`}
+          />
+        )}
+      </div>
+
+      {plan.participants.interested.length > 0 && (
+        <div className="who-row" style={{ marginTop: 14 }}>
+          <h3 className="who-block-heading">
+            {plan.joinType === "approve" && isHosting ? "Applications" : "Interested"} · {plan.participants.interested.length}
+          </h3>
+          {plan.joinType === "approve" && isHosting ? (
+            <div className="participant-list-interested">
+              {plan.participants.interested.map((person) => (
+                <div key={person.id} className="participant-row participant-row--with-action">
+                  <Link
+                    to={`/profile/${person.id}`}
+                    state={{ from: "plan", planId: plan.id }}
+                    className="participant-row-link"
+                  >
+                    <Avatar seed={person.avatarSeed} style={person.avatarStyle} photoDataUrl={person.avatarPhotoDataUrl} params={person.avatarParams} size="sm" />
+                    <span className="participant-name">
+                      {person.firstName}
+                      {person.id === userId && <span className="you-pill">You</span>}
+                    </span>
+                  </Link>
+                  {person.id !== userId && (
+                    <button
+                      type="button"
+                      className="btn-secondary participant-approve-btn"
+                      onClick={() => {
+                        void api(`/api/plans/${plan.id}/approve`, {
+                          method: "POST",
+                          body: JSON.stringify({ userId: person.id }),
+                        })
+                          .then(() => onApproved())
+                          .catch(() => undefined);
+                      }}
+                    >
+                      Let them in
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <ParticipantsRow
+              people={plan.participants.interested}
+              planId={plan.id}
+              expanded={showAllInterested}
+              onToggle={onToggleInterested}
+              countLabel={`${plan.participants.interested.length} interested`}
+            />
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M8 3v4M16 3v4M3 9h18" />
     </svg>
   );
 }

@@ -31,6 +31,7 @@ export function TopBar() {
     pathname === "/explore" ||
     pathname.startsWith("/notifications") ||
     /^\/plans\/[^/]+(\/chat)?$/.test(pathname) ||
+    /^\/plans\/[^/]+\/edit$/.test(pathname) ||
     /^\/communities\/[^/]+\/chat$/.test(pathname) ||
     isOtherUserProfile;
 

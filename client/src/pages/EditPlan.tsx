@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Hand } from "lucide-react";
+import { ArrowLeft, Check, Hand } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { NumberPicker } from "../components/NumberPicker";
@@ -13,6 +12,7 @@ import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
 import { formatPlanDate, formatPlanTime } from "../lib/format";
 import {
+  INTEREST_LABELS,
   VIBE_OPTIONS,
   type InterestTag,
   type JoinType,
@@ -42,7 +42,6 @@ export function EditPlanPage() {
   const [neighborhoods, setNeighborhoods] = useState<NeighborhoodDTO[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [savedAt, setSavedAt] = useState<number | null>(null);
 
   useEffect(() => {
     void api<PlanDTO>(`/api/plans/${id}`)
@@ -70,7 +69,7 @@ export function EditPlanPage() {
     );
   }
 
-  return <EditForm plan={plan} setPlan={setPlan} neighborhoods={neighborhoods} saving={saving} setSaving={setSaving} savedAt={savedAt} setSavedAt={setSavedAt} />;
+  return <EditForm plan={plan} setPlan={setPlan} neighborhoods={neighborhoods} saving={saving} setSaving={setSaving} />;
 }
 
 function EditForm({
@@ -79,16 +78,12 @@ function EditForm({
   neighborhoods,
   saving,
   setSaving,
-  savedAt,
-  setSavedAt,
 }: {
   plan: PlanDTO;
   setPlan: (p: PlanDTO) => void;
   neighborhoods: NeighborhoodDTO[];
   saving: boolean;
   setSaving: (v: boolean) => void;
-  savedAt: number | null;
-  setSavedAt: (v: number | null) => void;
 }) {
   const navigate = useNavigate();
   const flyerRef = useRef<HTMLInputElement>(null);
@@ -113,6 +108,11 @@ function EditForm({
     flyerLinkPreview: (plan.flyerLinkPreview ?? null) as LinkPreview | null,
   });
   const [submitErr, setSubmitErr] = useState<string | null>(null);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [savedFlash, setSavedFlash] = useState<string | null>(null);
+  const skipInstant = useRef(true);
+  const instantTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Time-proposal state.
   const [proposeDate, setProposeDate] = useState(plan.date.slice(0, 10));
@@ -193,19 +193,16 @@ function EditForm({
     return Array.from(set);
   }, [form.vibes]);
 
-  async function save(event: FormEvent): Promise<void> {
-    event.preventDefault();
-    setSubmitErr(null);
-    if (!form.title.trim()) {
-      setSubmitErr("Title can't be empty.");
-      return;
-    }
+  function flashSaved(label = "Saved") {
+    setSavedFlash(label);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setSavedFlash(null), 1800);
+  }
+
+  async function saveInstant(): Promise<void> {
+    if (!form.title.trim()) return;
     const capacityNum = form.capacityOn ? Number(form.capacity) : null;
-    if (capacityNum !== null && (!Number.isFinite(capacityNum) || capacityNum < 1)) {
-      setSubmitErr("Spots must be a positive number, or leave open.");
-      return;
-    }
-    setSaving(true);
+    if (capacityNum !== null && (!Number.isFinite(capacityNum) || capacityNum < 1)) return;
     try {
       const updated = await api<PlanDTO>(`/api/plans/${plan.id}`, {
         method: "PATCH",
@@ -218,15 +215,58 @@ function EditForm({
           capacity: capacityNum,
           joinType: form.joinType,
           visibility: form.visibility,
+        }),
+      });
+      setPlan(updated);
+      flashSaved();
+      setSubmitErr(null);
+    } catch (err) {
+      setSubmitErr(err instanceof Error ? err.message : "Couldn't save.");
+    }
+  }
+
+  useEffect(() => {
+    if (skipInstant.current) {
+      skipInstant.current = false;
+      return;
+    }
+    if (instantTimer.current) clearTimeout(instantTimer.current);
+    instantTimer.current = setTimeout(() => {
+      void saveInstant();
+    }, 700);
+    return () => {
+      if (instantTimer.current) clearTimeout(instantTimer.current);
+    };
+    // Instant-save Basics, Where (neighborhood), and Who's Invited — not cover or date.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    form.title,
+    form.description,
+    form.vibes,
+    form.neighborhoodId,
+    form.isFlexibleLocation,
+    form.capacityOn,
+    form.capacity,
+    form.joinType,
+    form.visibility,
+  ]);
+
+  async function saveCover(): Promise<void> {
+    setSubmitErr(null);
+    setSaving(true);
+    try {
+      const updated = await api<PlanDTO>(`/api/plans/${plan.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
           flyerDataUrl: form.flyerDataUrl ?? null,
           flyerLinkUrl: form.flyerLinkUrl.trim() || null,
           flyerLinkPreview: form.flyerLinkPreview ?? null,
         }),
       });
       setPlan(updated);
-      setSavedAt(Date.now());
+      flashSaved("Cover photo saved");
     } catch (err) {
-      setSubmitErr(err instanceof Error ? err.message : "Couldn't save.");
+      setSubmitErr(err instanceof Error ? err.message : "Couldn't save cover photo.");
     } finally {
       setSaving(false);
     }
@@ -283,48 +323,72 @@ function EditForm({
   }
 
   return (
-    <main className="app-shell app-shell--mid">
-      <header className="app-header app-header--minimal app-header--sticky">
+    <main className="app-shell app-shell--mid edit-plan-page">
+      <header className="app-header app-header--minimal app-header--sticky edit-plan-top">
         <Link to={`/plans/${plan.id}`} className="detail-back">
           <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" /> Back to plan
         </Link>
+        {savedFlash && (
+          <span className="edit-saved-flash" role="status">
+            <Check size={14} strokeWidth={2.4} aria-hidden="true" />
+            {savedFlash}
+          </span>
+        )}
       </header>
       <ScreenTitle
         title="Edit plan"
-        subtitle="Edit details below — we'll ping people if the time moves"
+        subtitle="Most edits save as you go. Date and time go through a proposal."
       />
 
-      <form onSubmit={(e) => void save(e)} className="form-card">
-        <section className="form-section">
+      <div className="form-card">
+        <section className="edit-section">
+          <h2 className="edit-section-label">Basics</h2>
           <label className="form-question">Category</label>
-          <div className="vibe-grid">
-            {VIBE_OPTIONS.map((opt) => {
-              const selected = form.vibes.includes(opt.id);
-              const { Icon, iconColor, tint } = interestVisual(opt.tag);
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  className={`vibe-tile ${selected ? "is-selected" : ""}`}
-                  onClick={() => toggleVibe(opt.id)}
-                  aria-pressed={selected}
-                >
-                  {selected && <span className="vibe-tile-dot" aria-hidden="true" />}
-                  <span
-                    className="vibe-tile-icon"
-                    style={{ background: tint, color: iconColor }}
-                    aria-hidden="true"
-                  >
-                    <Icon size={18} strokeWidth={1.8} />
-                  </span>
-                  <span className="vibe-tile-label">{opt.label}</span>
-                </button>
-              );
-            })}
+          <div className="edit-cat-row">
+            {resolvedTags.length > 0 ? (
+              <div className="edit-cat-chips">
+                {resolvedTags.map((t) => (
+                  <span key={t} className="edit-cat-chip">{INTEREST_LABELS[t]}</span>
+                ))}
+              </div>
+            ) : (
+              <span className="form-help" style={{ margin: 0 }}>No categories yet</span>
+            )}
+            <button
+              type="button"
+              className="btn-link"
+              onClick={() => setCategoriesOpen((v) => !v)}
+            >
+              {categoriesOpen ? "Done" : "Edit"}
+            </button>
           </div>
-        </section>
-
-        <section className="form-section">
+          {categoriesOpen && (
+            <div className="vibe-grid" style={{ marginTop: 10 }}>
+              {VIBE_OPTIONS.map((opt) => {
+                const selected = form.vibes.includes(opt.id);
+                const { Icon, iconColor, tint } = interestVisual(opt.tag);
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className={`vibe-tile ${selected ? "is-selected" : ""}`}
+                    onClick={() => toggleVibe(opt.id)}
+                    aria-pressed={selected}
+                  >
+                    {selected && <span className="vibe-tile-dot" aria-hidden="true" />}
+                    <span
+                      className="vibe-tile-icon"
+                      style={{ background: tint, color: iconColor }}
+                      aria-hidden="true"
+                    >
+                      <Icon size={18} strokeWidth={1.8} />
+                    </span>
+                    <span className="vibe-tile-label">{opt.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <label className="form-question" htmlFor="title">Title</label>
           <input
             id="title"
@@ -339,7 +403,11 @@ function EditForm({
           />
         </section>
 
-        <section className="form-section">
+        <section className="edit-section edit-section--proposal">
+          <h2 className="edit-section-label">Where &amp; when</h2>
+          <p className="edit-section-note">
+            Neighborhood saves as you go. Changing the date or time notifies people going and doesn&apos;t apply until you confirm.
+          </p>
           <label className="form-question" htmlFor="neighborhood">Neighborhood</label>
           <select
             id="neighborhood"
@@ -359,9 +427,93 @@ function EditForm({
             />
             Flexible location
           </label>
+
+          {plan.pendingTimeProposal ? (
+            <div className="coordination-banner coordination-banner--expanded" role="note" style={{ marginTop: 14 }}>
+              <p>
+                Pending update:{" "}
+                <strong>
+                  {formatPlanDate(plan.pendingTimeProposal.date)} ·{" "}
+                  {formatPlanTime(plan.pendingTimeProposal.time, plan.pendingTimeProposal.isFlexibleTime)}
+                </strong>
+                . People have been notified — apply when you&apos;re ready.
+              </p>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={proposeBusy}
+                  onClick={() => void applyProposal()}
+                >
+                  {proposeBusy ? "Working…" : "Apply new time"}
+                </button>
+                <button
+                  type="button"
+                  className="btn-link"
+                  disabled={proposeBusy}
+                  onClick={() => void cancelProposal()}
+                >
+                  Keep current time
+                </button>
+              </div>
+              {proposeErr && <p className="error-text">{proposeErr}</p>}
+            </div>
+          ) : (
+            <>
+              <div className="luma-card" style={{ marginTop: 14 }}>
+                <div className="luma-row">
+                  <span className="luma-label">Date</span>
+                  <div className="luma-value">
+                    <input
+                      id="propose-date"
+                      type="date"
+                      className="luma-input"
+                      value={proposeDate}
+                      onChange={(e) => setProposeDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="luma-row">
+                  <span className="luma-label">Time</span>
+                  <div className="luma-value">
+                    {!proposeFlexTime ? (
+                      <input
+                        id="propose-time"
+                        type="time"
+                        className="luma-input"
+                        value={proposeTime}
+                        onChange={(e) => setProposeTime(e.target.value)}
+                      />
+                    ) : (
+                      <span className="luma-flex-text">Flexible time</span>
+                    )}
+                    <button
+                      type="button"
+                      className={`flex-toggle-btn ${proposeFlexTime ? "is-active" : ""}`}
+                      aria-pressed={proposeFlexTime}
+                      onClick={() => setProposeFlexTime((v) => !v)}
+                    >
+                      Flexible
+                    </button>
+                  </div>
+                </div>
+              </div>
+              {proposeErr && <p className="error-text">{proposeErr}</p>}
+              <button
+                type="button"
+                className="btn-primary btn-block"
+                style={{ marginTop: 12 }}
+                disabled={proposeBusy}
+                onClick={() => void proposeChange()}
+              >
+                {proposeBusy ? "Updating…" : "Propose new time"}
+              </button>
+            </>
+          )}
         </section>
 
-        <section className="form-section">
+        <section className="edit-section">
+          <h2 className="edit-section-label">Who&apos;s invited</h2>
           <label className="form-question">Who can see this?</label>
           <div className="visibility-options">
             <button
@@ -379,12 +531,9 @@ function EditForm({
               <span className="visibility-option-title">Your Network</span>
             </button>
           </div>
-        </section>
-
-        <section className="form-section create-more">
-          <div className="form-row-flex">
+          <div className="form-row-flex" style={{ marginTop: 12 }}>
             <div className="form-row-flex-main">
-              <label className="form-question">Capacity</label>
+              <label className="form-question">Cap the spots</label>
               {form.capacityOn && (
                 <NumberPicker
                   value={Number(form.capacity) || 0}
@@ -428,8 +577,8 @@ function EditForm({
           )}
         </section>
 
-        <section className="form-section">
-          <label className="form-question">Flyer</label>
+        <section className="edit-section">
+          <h2 className="edit-section-label">Cover photo</h2>
           <div className="flyer-uploader">
             {form.flyerDataUrl ? (
               <div className="flyer-preview">
@@ -445,7 +594,7 @@ function EditForm({
                 type="button"
                 className="btn-secondary btn-block"
                 onClick={() => void openFlyerPicker()}
-              >Upload flyer</button>
+              >Upload photo</button>
             )}
             <input
               ref={flyerRef}
@@ -459,7 +608,6 @@ function EditForm({
               }}
             />
           </div>
-
           <label className="form-question" htmlFor="flyer-link" style={{ marginTop: 12 }}>
             Or paste a link
           </label>
@@ -497,137 +645,39 @@ function EditForm({
               >Remove</button>
             </div>
           )}
+          {submitErr && <p className="error-text">{submitErr}</p>}
+          <button
+            type="button"
+            className="btn-secondary btn-block"
+            style={{ marginTop: 12 }}
+            disabled={saving}
+            onClick={() => void saveCover()}
+          >
+            {saving ? "Saving…" : "Save cover photo"}
+          </button>
         </section>
+      </div>
 
-        {submitErr && <p className="error-text">{submitErr}</p>}
-        <button type="submit" className="btn-primary btn-block" disabled={saving}>
-          {saving ? "Saving…" : "Save changes"}
-        </button>
-        {savedAt && !saving && (
-          <p className="form-help" style={{ marginTop: 8 }}>Saved.</p>
-        )}
-      </form>
-
-      {/* Date/time — same luma-row layout as New Plan. Still notifies
-          participants and waits for Apply (backend), but reads as inline edit. */}
-      <section className="form-card" style={{ marginTop: 16 }}>
-        <h2 className="who-block-heading" style={{ marginTop: 0 }}>When</h2>
-
-        {plan.pendingTimeProposal ? (
-          <div className="coordination-banner coordination-banner--expanded" role="note">
-            <p>
-              Pending update:{" "}
-              <strong>
-                {formatPlanDate(plan.pendingTimeProposal.date)} ·{" "}
-                {formatPlanTime(plan.pendingTimeProposal.time, plan.pendingTimeProposal.isFlexibleTime)}
-              </strong>
-              . People have been notified — apply when you&apos;re ready.
-            </p>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={proposeBusy}
-                onClick={() => void applyProposal()}
-              >
-                {proposeBusy ? "Working…" : "Apply new time"}
-              </button>
-              <button
-                type="button"
-                className="btn-link"
-                disabled={proposeBusy}
-                onClick={() => void cancelProposal()}
-              >
-                Keep current time
-              </button>
-            </div>
-            {proposeErr && <p className="error-text">{proposeErr}</p>}
-          </div>
-        ) : (
-          <>
-            <div className="luma-card">
-              <div className="luma-row">
-                <span className="luma-label">Date</span>
-                <div className="luma-value">
-                  <input
-                    id="propose-date"
-                    type="date"
-                    className="luma-input"
-                    value={proposeDate}
-                    onChange={(e) => setProposeDate(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="luma-row">
-                <span className="luma-label">Time</span>
-                <div className="luma-value">
-                  {!proposeFlexTime ? (
-                    <input
-                      id="propose-time"
-                      type="time"
-                      className="luma-input"
-                      value={proposeTime}
-                      onChange={(e) => setProposeTime(e.target.value)}
-                    />
-                  ) : (
-                    <span className="luma-flex-text">Flexible time</span>
-                  )}
-                  <button
-                    type="button"
-                    className={`flex-toggle-btn ${proposeFlexTime ? "is-active" : ""}`}
-                    aria-pressed={proposeFlexTime}
-                    onClick={() => setProposeFlexTime((v) => !v)}
-                  >
-                    Flexible
-                  </button>
-                </div>
-              </div>
-            </div>
-            {proposeErr && <p className="error-text">{proposeErr}</p>}
-            <button
-              type="button"
-              className="btn-primary btn-block"
-              style={{ marginTop: 12 }}
-              disabled={proposeBusy}
-              onClick={() => void proposeChange()}
-            >
-              {proposeBusy ? "Updating…" : "Update date & time"}
-            </button>
-            <p className="form-help" style={{ marginTop: 8 }}>
-              We&apos;ll notify people going. The plan keeps its current time until you apply.
-            </p>
-          </>
+      <section className="edit-plan-actions" aria-label="Plan actions">
+        <h2 className="edit-section-label">Plan actions</h2>
+        <p className="form-help" style={{ marginTop: 0 }}>
+          These aren&apos;t edits — they change who hosts or whether the plan stays on.
+        </p>
+        <PassItOnControl
+          plan={plan}
+          onTransferred={() => navigate(`/plans/${plan.id}`)}
+        />
+        {!plan.upForGrabsAt && !plan.cancelledAt && (
+          <PutUpForGrabsControl
+            plan={plan}
+            onDone={() => navigate(`/plans/${plan.id}`)}
+          />
         )}
       </section>
-
-      <PassItOnControl
-        plan={plan}
-        onTransferred={() => navigate(`/plans/${plan.id}`)}
-      />
-
-      {!plan.upForGrabsAt && !plan.cancelledAt && (
-        <PutUpForGrabsControl
-          plan={plan}
-          onDone={() => navigate(`/plans/${plan.id}`)}
-        />
-      )}
-
-      <button
-        type="button"
-        className="btn-secondary btn-block"
-        style={{ marginTop: 16 }}
-        onClick={() => navigate(`/plans/${plan.id}`)}
-      >
-        Done
-      </button>
     </main>
   );
 }
 
-/**
- * "Can't make it — put up for grabs" on Edit so the host doesn't depend on
- * plan-detail (native confirm often fails in Capacitor WebViews).
- */
 function PutUpForGrabsControl({
   plan,
   onDone,
@@ -660,7 +710,7 @@ function PutUpForGrabsControl({
         onClick={() => setOpen(true)}
       >
         <Hand size={14} strokeWidth={1.8} aria-hidden="true" />
-        Put it up for grabs
+        Can&apos;t make it — put up for grabs
       </button>
     );
   }
@@ -745,30 +795,27 @@ function PassItOnControl({
 
   if (pending) {
     return (
-      <section className="form-card" style={{ marginTop: 16 }}>
-        <div className="plan-grabs-confirm" role="group">
-          <p className="plan-grabs-confirm-copy">
-            Hand off hosting of &ldquo;{plan.title}&rdquo; to {pending.firstName}? You&apos;ll drop off the going list.
-          </p>
-          {error && <p className="luma-inline-error">{error}</p>}
-          <div className="plan-grabs-confirm-actions">
-            <button type="button" className="btn-secondary" disabled={busy} onClick={() => setPending(null)}>
-              Cancel
-            </button>
-            <button type="button" className="btn-primary" disabled={busy} onClick={() => void handOff(pending)}>
-              {busy ? "Handing off…" : `Hand off to ${pending.firstName}`}
-            </button>
-          </div>
+      <div className="plan-grabs-confirm" role="group">
+        <p className="plan-grabs-confirm-copy">
+          Hand off hosting of &ldquo;{plan.title}&rdquo; to {pending.firstName}? You&apos;ll drop off the going list.
+        </p>
+        {error && <p className="luma-inline-error">{error}</p>}
+        <div className="plan-grabs-confirm-actions">
+          <button type="button" className="btn-secondary" disabled={busy} onClick={() => setPending(null)}>
+            Cancel
+          </button>
+          <button type="button" className="btn-primary" disabled={busy} onClick={() => void handOff(pending)}>
+            {busy ? "Handing off…" : `Hand off to ${pending.firstName}`}
+          </button>
         </div>
-      </section>
+      </div>
     );
   }
 
   return (
-    <section className="form-card" style={{ marginTop: 16 }}>
-      <h2 className="who-block-heading" style={{ marginTop: 0 }}>Pass it on</h2>
+    <div>
       <p className="form-help" style={{ marginTop: 0 }}>
-        Hand off to someone who&apos;s going.
+        Pass it on — hand off to someone who&apos;s going.
       </p>
       {!open ? (
         <button
@@ -800,6 +847,6 @@ function PassItOnControl({
           ))}
         </div>
       )}
-    </section>
+    </div>
   );
 }
