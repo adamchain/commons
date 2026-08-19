@@ -2308,6 +2308,66 @@ h1, h2, h3, h4, h5, h6 {
 .onboarding-back:hover {
   color: var(--text);
 }
+.onboarding-back--on-photo {
+  z-index: 4;
+}
+
+/* Location permission — full-bleed Philly skyline + bottom sheet (Design-Final 1). */
+.onboarding-location-hero {
+  min-height: 100dvh;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: #111;
+  overflow: hidden;
+}
+.onboarding-location-hero-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 40%;
+}
+.onboarding-location-hero-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(26, 26, 46, 0.28) 0%,
+    rgba(26, 26, 46, 0.08) 38%,
+    rgba(26, 26, 46, 0.45) 68%,
+    rgba(26, 26, 46, 0.82) 100%
+  );
+}
+.onboarding-location-city {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 24px 18px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+}
+.onboarding-location-sheet {
+  position: relative;
+  z-index: 2;
+  background: var(--card);
+  border-radius: 28px 28px 0 0;
+  padding: 28px 24px calc(28px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: center;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18);
+}
 
 /* Age confirmation — chip toggle, same shape/behavior as the Flexible pill. */
 .age-era-grid {
@@ -2993,9 +3053,9 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--ink);
 }
 .interest-tile.is-picked {
-  background: var(--card, #fff);
+  background: var(--tan);
   color: var(--ink);
-  border: 1.5px solid var(--red);
+  border: 1.5px solid var(--ink);
   box-shadow: none;
 }
 .interest-tile:disabled { opacity: 0.35; cursor: not-allowed; }
@@ -3005,7 +3065,7 @@ h1, h2, h3, h4, h5, h6 {
   right: 7px;
   width: 7px;
   height: 7px;
-  border-radius: 4px;
+  border-radius: 50%;
   background: var(--red);
 }
 .interest-tile-icon {
@@ -6055,6 +6115,21 @@ h1, h2, h3, h4, h5, h6 {
 .profile-avatar-hint {
   font-size: var(--text-body);
   color: var(--text-muted);
+}
+.profile-avatar-empty {
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tan);
+  border: 1.5px dashed var(--ink);
+  color: var(--ink);
+}
+.profile-avatar-empty svg {
+  width: 36px;
+  height: 36px;
 }
 
 /* Crop + confirm modal */
@@ -12801,25 +12876,80 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ---- Profile other (SCREEN 14) ---- */
-.profile-other-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 0;
+/* Own chrome (back + •••) sits in the status-bar safe area — TopBar is hidden
+   on this route so those controls aren't covered by the wordmark / bell. */
+.app-shell.profile-other {
+  padding-top: 0;
 }
-.profile-other-more {
+@media (min-width: 720px) {
+  .app-shell.profile-other {
+    padding-top: 0;
+  }
+}
+@media (min-width: 1024px) {
+  .app-shell.profile-other {
+    padding-top: 0;
+  }
+}
+.profile-other-nav {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: minmax(72px, auto) 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  margin: 0 -15px 8px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 15px 10px;
+  background: var(--bg);
+}
+@media (min-width: 720px) {
+  .profile-other-nav {
+    margin-left: -32px;
+    margin-right: -32px;
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+}
+@media (min-width: 1024px) {
+  .profile-other-nav {
+    margin-left: -48px;
+    margin-right: -48px;
+    padding-left: 48px;
+    padding-right: 48px;
+  }
+}
+.profile-other-back {
+  justify-self: start;
+  min-height: 44px;
+  padding: 0 4px 0 0;
+  touch-action: manipulation;
+}
+.profile-other-nav-title {
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--ink);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profile-other-more,
+.profile-other-more-spacer {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   background: none;
   border: none;
   color: var(--ink);
   cursor: pointer;
   flex-shrink: 0;
+  justify-self: end;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 .profile-other-hero {
   padding: 4px 0 0;
@@ -13093,12 +13223,12 @@ h1, h2, h3, h4, h5, h6 {
   flex-shrink: 0;
 }
 
-/* Action sheet — above the fixed bottom nav (z-index 50), same as other sheets. */
+/* Action sheet — above the fixed bottom nav (z-index 50) and top bar (41). */
 .profile-action-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.32);
-  z-index: 100;
+  z-index: 200;
   display: flex;
   align-items: flex-end;
   justify-content: center;

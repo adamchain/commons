@@ -27,7 +27,7 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
   const allPlans = store.listPlansByCreator(targetId);
   // Compare YYYY-MM-DD strings — never `new Date("YYYY-MM-DD")` (UTC midnight
   // shifts the calendar day in US timezones and drops "today" from upcoming).
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = localIsoDate();
   const past = allPlans.filter((p) => p.date < todayIso);
 
   // Upcoming = hosting + I'm In or Interested (two-state participation).
@@ -48,7 +48,7 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
   );
 
   // "Message in current plan" CTA appears only when viewer + target share a current plan as participants.
-  const sharedPlanId = findSharedActivePlan(targetId, viewerId);
+  const sharedPlanId = findSharedActivePlan(targetId, viewerId, todayIso);
 
   // Plans joined as a non-creator (rough "joined" count for the stat strip).
   const joinedCount = store
@@ -79,10 +79,11 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
     .slice(0, 3)
     .map((u) => userToPublic(u));
 
-  // Network-only privacy: most of the profile is visible only after the viewer
-  // has added the target. Face + interests + first-name stay public.
+  // Plans stay private until the viewer is in-network or has already hung out
+  // (a shared plan whose calendar day has passed). Sharing an upcoming plan
+  // does not unlock the rest of their calendar. Face + interests stay public.
   const inEitherNetwork = inMyNetwork || targetNetwork.has(viewerId);
-  const sharedCompleted = hasSharedCompletedPlan(targetId, viewerId);
+  const sharedCompleted = hasSharedCompletedPlan(targetId, viewerId, todayIso);
   const showFullProfile = isSelf || inEitherNetwork || sharedCompleted;
   const socialLinks = target.socialLinks ?? null;
 
@@ -121,10 +122,18 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
   });
 });
 
-function hasSharedCompletedPlan(a: string, b: string): boolean {
-  const now = Date.now();
+/** Local calendar YYYY-MM-DD — `toISOString().slice(0, 10)` is UTC and flips after ~8pm ET. */
+function localIsoDate(d = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** True only after a shared plan's calendar day has passed — not merely because you joined an upcoming one. */
+function hasSharedCompletedPlan(a: string, b: string, todayIso: string): boolean {
   for (const p of store.listPlans()) {
-    if (new Date(p.date).getTime() >= now) continue;
+    if (p.date >= todayIso) continue;
     const aWent = store.findParticipation(p.id, a)?.state === "going" || p.creatorId === a;
     const bWent = store.findParticipation(p.id, b)?.state === "going" || p.creatorId === b;
     if (aWent && bWent) return true;
@@ -132,11 +141,9 @@ function hasSharedCompletedPlan(a: string, b: string): boolean {
   return false;
 }
 
-function findSharedActivePlan(a: string, b: string): string | null {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+function findSharedActivePlan(a: string, b: string, todayIso: string): string | null {
   for (const p of store.listPlans()) {
-    if (new Date(p.date).getTime() < today.getTime()) continue;
+    if (p.cancelledAt || p.date < todayIso) continue;
     const aIn = p.creatorId === a || store.findParticipation(p.id, a)?.state === "going";
     const bIn = p.creatorId === b || store.findParticipation(p.id, b)?.state === "going";
     if (aIn && bIn) return p.id;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -68,7 +68,7 @@ interface ProfilePayload {
   sharedPlanId: string | null;
   /** Null until viewer earns visibility (shared completed plan or in network). */
   socialLinks: { instagram?: string; tiktok?: string } | null;
-  /** True when upcoming/past plans are hidden until viewer adds this person. */
+  /** True when upcoming/past plans are hidden until the viewer is in-network or has a completed shared plan. */
   plansGated?: boolean;
   network: {
     inMyNetwork: boolean;
@@ -138,17 +138,12 @@ export function ProfilePage() {
     navigate("/");
   }
 
+  const otherShell = "app-shell app-shell--with-nav profile-shell profile-other";
+
   if (!profile) {
     return (
-      <main className="app-shell app-shell--with-nav app-shell--with-topbar profile-shell">
-        {!isSelf && (
-          <header className="app-header app-header--minimal profile-other-nav">
-            <button type="button" className="detail-back" onClick={goBack}>
-              <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
-              {backLabel}
-            </button>
-          </header>
-        )}
+      <main className={isSelf ? "app-shell app-shell--with-nav app-shell--with-topbar profile-shell" : otherShell}>
+        {!isSelf && <OtherProfileNav backLabel={backLabel} onBack={goBack} />}
         <div className="feed-skeleton" aria-hidden="true">
           <div className="feed-skeleton-card" />
         </div>
@@ -226,21 +221,13 @@ export function ProfilePage() {
     })();
 
     return (
-      <main className="app-shell app-shell--with-nav app-shell--with-topbar profile-shell profile-other">
-        <header className="app-header app-header--minimal profile-other-nav">
-          <button type="button" className="detail-back" onClick={goBack}>
-            <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
-            {backLabel}
-          </button>
-          <button
-            type="button"
-            className="profile-other-more"
-            aria-label="More options"
-            onClick={() => setActionSheetOpen(true)}
-          >
-            <MoreHorizontal size={18} strokeWidth={1.8} aria-hidden="true" />
-          </button>
-        </header>
+      <main className={otherShell}>
+        <OtherProfileNav
+          backLabel={backLabel}
+          onBack={goBack}
+          title={profile.user.firstName || displayName}
+          onMore={() => setActionSheetOpen(true)}
+        />
 
         <section className="profile-other-hero">
           <div className="profile-other-hero-row">
@@ -417,44 +404,15 @@ export function ProfilePage() {
           </>
         )}
 
-        {actionSheetOpen &&
-          createPortal(
-            <div
-              className="profile-action-overlay"
-              role="presentation"
-              onClick={() => setActionSheetOpen(false)}
-            >
-              <div
-                className="profile-action-sheet"
-                role="dialog"
-                aria-modal="true"
-                aria-label="Profile actions"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="profile-action-handle" aria-hidden="true" />
-                <button type="button" className="profile-action-row" onClick={() => void shareProfile()}>
-                  <Share2 size={16} strokeWidth={1.8} aria-hidden="true" />
-                  Share profile
-                </button>
-                <button type="button" className="profile-action-row is-danger" onClick={() => void reportProfile()}>
-                  <Flag size={16} strokeWidth={1.8} aria-hidden="true" />
-                  Report {firstName}
-                </button>
-                <button type="button" className="profile-action-row is-danger" onClick={() => void blockFromSheet()}>
-                  <Ban size={16} strokeWidth={1.8} aria-hidden="true" />
-                  Block {firstName}
-                </button>
-                <button
-                  type="button"
-                  className="profile-action-cancel"
-                  onClick={() => setActionSheetOpen(false)}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>,
-            document.body,
-          )}
+        {actionSheetOpen && (
+          <ProfileActionSheet
+            firstName={firstName}
+            onShare={() => void shareProfile()}
+            onReport={() => void reportProfile()}
+            onBlock={() => void blockFromSheet()}
+            onClose={() => setActionSheetOpen(false)}
+          />
+        )}
       </main>
     );
   }
@@ -575,6 +533,103 @@ export function ProfilePage() {
         </span>
       </a>
     </main>
+  );
+}
+
+function OtherProfileNav({
+  backLabel,
+  onBack,
+  onMore,
+  title,
+}: {
+  backLabel: string;
+  onBack: () => void;
+  onMore?: () => void;
+  title?: string;
+}) {
+  return (
+    <header className="profile-other-nav">
+      <button type="button" className="detail-back profile-other-back" onClick={onBack}>
+        <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
+        {backLabel}
+      </button>
+      {title ? <div className="profile-other-nav-title">{title}</div> : <span />}
+      {onMore ? (
+        <button
+          type="button"
+          className="profile-other-more"
+          aria-label="More options"
+          aria-haspopup="dialog"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onMore();
+          }}
+        >
+          <MoreHorizontal size={20} strokeWidth={1.8} aria-hidden="true" />
+        </button>
+      ) : (
+        <span className="profile-other-more-spacer" aria-hidden="true" />
+      )}
+    </header>
+  );
+}
+
+/** Bottom sheet portaled to body. Dismiss is armed after a tick so the opening tap can't close it immediately. */
+function ProfileActionSheet({
+  firstName,
+  onShare,
+  onReport,
+  onBlock,
+  onClose,
+}: {
+  firstName: string;
+  onShare: () => void;
+  onReport: () => void;
+  onBlock: () => void;
+  onClose: () => void;
+}) {
+  const dismissArmed = useRef(false);
+  useEffect(() => {
+    dismissArmed.current = false;
+    const id = window.setTimeout(() => {
+      dismissArmed.current = true;
+    }, 280);
+    return () => window.clearTimeout(id);
+  }, []);
+
+  function maybeDismiss() {
+    if (dismissArmed.current) onClose();
+  }
+
+  return createPortal(
+    <div className="profile-action-overlay" role="presentation" onClick={maybeDismiss}>
+      <div
+        className="profile-action-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Profile actions"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="profile-action-handle" aria-hidden="true" />
+        <button type="button" className="profile-action-row" onClick={onShare}>
+          <Share2 size={16} strokeWidth={1.8} aria-hidden="true" />
+          Share profile
+        </button>
+        <button type="button" className="profile-action-row is-danger" onClick={onReport}>
+          <Flag size={16} strokeWidth={1.8} aria-hidden="true" />
+          Report {firstName}
+        </button>
+        <button type="button" className="profile-action-row is-danger" onClick={onBlock}>
+          <Ban size={16} strokeWidth={1.8} aria-hidden="true" />
+          Block {firstName}
+        </button>
+        <button type="button" className="profile-action-cancel" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

@@ -6,9 +6,9 @@ import type { LegalDocument } from "../content/legal";
  * that lives in the consumers (the in-app reader page and the onboarding
  * consent gate), so this stays reusable in both places.
  *
- * Titles in `legal.ts` already include the "COMMONS —" prefix. Modals that
- * already show `doc.title` in their chrome pass `hideTitle` so it isn't
- * printed twice.
+ * Document titles in `legal.ts` are unprefixed ("Terms of Service"). This
+ * renderer adds the "COMMONS —" brand prefix. Modals that already show
+ * `doc.title` in their chrome pass `hideTitle` so it isn't printed twice.
  */
 export function LegalContent({
   doc,
@@ -17,10 +17,11 @@ export function LegalContent({
   doc: LegalDocument;
   hideTitle?: boolean;
 }) {
+  const heading = doc.title.startsWith("COMMONS") ? doc.title : `COMMONS — ${doc.title}`;
   return (
     <article className="legal-doc">
       <header className="legal-doc-head">
-        {!hideTitle && <h1 className="legal-doc-title">{doc.title}</h1>}
+        {!hideTitle && <h1 className="legal-doc-title">{heading}</h1>}
         <p className="legal-doc-updated">Last updated: {doc.updated}</p>
       </header>
 

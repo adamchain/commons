@@ -65,7 +65,7 @@ export function SettingsInterestsPage() {
       </header>
       <ScreenTitle title="Interests" subtitle="Pick what you're into. Your feed does the rest." />
 
-      <div className="vibe-grid settings-interests-grid">
+      <div className="interest-grid">
         {ALL_INTERESTS.map((t) => {
           const isPicked = picked.includes(t);
           const { Icon, iconColor, tint } = interestVisual(t);
@@ -73,19 +73,19 @@ export function SettingsInterestsPage() {
             <button
               key={t}
               type="button"
-              className={`vibe-tile ${isPicked ? "is-selected" : ""}`}
+              className={`interest-tile ${isPicked ? "is-picked" : ""}`}
               onClick={() => toggle(t)}
               aria-pressed={isPicked}
             >
-              {isPicked && <span className="vibe-tile-dot" aria-hidden="true" />}
+              {isPicked && <span className="interest-tile-dot" aria-hidden="true" />}
               <span
-                className="vibe-tile-icon"
+                className="interest-tile-icon"
                 style={{ background: tint, color: iconColor }}
                 aria-hidden="true"
               >
-                <Icon size={18} strokeWidth={1.8} />
+                <Icon size={20} strokeWidth={1.8} />
               </span>
-              <span className="vibe-tile-label">{INTEREST_LABELS[t]}</span>
+              <span className="interest-label">{INTEREST_LABELS[t]}</span>
             </button>
           );
         })}

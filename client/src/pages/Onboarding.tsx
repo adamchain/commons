@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import type { CSSProperties, ReactNode } from "react";
-import { Check, Coffee, Flame, Star, Wine, type LucideIcon } from "lucide-react";
+import { Check, Coffee, Flame, MapPin, Star, Wine, type LucideIcon } from "lucide-react";
 import { api } from "../api/http";
 import { formatPhoneInput, isValidPhoneInput } from "../lib/format";
 import { APP_STORE_URL } from "../lib/appStore";
@@ -514,13 +514,10 @@ export function OnboardingPage() {
     return (
       <WelcomeStep
         user={user}
+        redirectTo={redirectTo}
         onContinue={() => {
           markWelcomeSeen(user.id);
-          if (!isNative()) {
-            setStep("download");
-          } else {
-            navigate(redirectTo, { replace: true });
-          }
+          navigate(redirectTo, { replace: true });
         }}
       />
     );
@@ -533,14 +530,22 @@ export function OnboardingPage() {
 
 /**
  * F.1 — one-time warm interstitial shown right after onboarding completes,
- * before the member ever lands on the feed. Static: a headline, a "here's
- * what's happening" line naming their neighborhood, and — when available — a
- * single live stat about nearby plans. Dismisses straight to Home (or the
- * "get the app" nudge on web).
+ * before the member ever lands on the feed. Headline, a "here's what's
+ * happening" line naming their neighborhood, and — when available — a live
+ * nearby-plans stat. On web, the App Store nudge lives on this same screen.
  */
-function WelcomeStep({ user, onContinue }: { user: MeDTO; onContinue: () => void }) {
+function WelcomeStep({
+  user,
+  redirectTo,
+  onContinue,
+}: {
+  user: MeDTO;
+  redirectTo: string;
+  onContinue: () => void;
+}) {
   const [neighborhoodName, setNeighborhoodName] = useState<string | null>(null);
   const [stat, setStat] = useState<string | null>(null);
+  const goingToEvent = redirectTo.startsWith("/plans/");
 
   useEffect(() => {
     const id = user.neighborhoodIds?.[0] ?? user.neighborhoodId ?? null;
@@ -567,9 +572,24 @@ function WelcomeStep({ user, onContinue }: { user: MeDTO; onContinue: () => void
         </p>
         {stat && <span className="welcome-stat-chip">{stat}</span>}
       </div>
-      <button type="button" className="btn-primary btn-block" onClick={onContinue} style={{ marginTop: 20 }}>
-        Explore the app
-      </button>
+      {isNative() ? (
+        <button type="button" className="btn-primary btn-block" onClick={onContinue} style={{ marginTop: 20 }}>
+          Explore the app
+        </button>
+      ) : (
+        <div className="download-app" style={{ marginTop: 20 }}>
+          {APP_STORE_URL ? (
+            <a className="btn-primary btn-block" href={APP_STORE_URL} target="_blank" rel="noopener noreferrer">
+              Download for iPhone
+            </a>
+          ) : (
+            <div className="download-app-soon">iPhone app coming soon — we'll text you the link.</div>
+          )}
+          <button className="btn-link btn-block" type="button" onClick={onContinue}>
+            {goingToEvent ? "Continue to the event on web →" : "Continue on the web →"}
+          </button>
+        </div>
+      )}
     </OnboardingShell>
   );
 }
@@ -584,7 +604,7 @@ function DownloadAppStep({ redirectTo, onContinue }: { redirectTo: string; onCon
   const goingToEvent = redirectTo.startsWith("/plans/");
   return (
     <OnboardingShell
-      title="You're in."
+      title="Get the app."
       subtitle="Commons lives on your phone. Get the app for notifications when plans fill up, chat, and one-tap RSVPs."
     >
       <div className="download-app">
@@ -823,14 +843,34 @@ function LocationStep({
 
   if (permissionState === "idle") {
     return (
-      <OnboardingShell title="Share your location" subtitle="So we can show you what's happening nearby." onBack={onBack}>
-        <button className="btn-primary btn-block" onClick={shareLocation}>
-          Allow location access
-        </button>
-        <button className="btn-link" type="button" onClick={() => setPermissionState("denied")}>
-          Skip — I'll pick manually
-        </button>
-      </OnboardingShell>
+      <div className="onboarding-location-hero">
+        <img
+          src="/onboarding/philly-skyline.jpg"
+          alt=""
+          className="onboarding-location-hero-img"
+        />
+        <div className="onboarding-location-hero-gradient" aria-hidden="true" />
+        {onBack && (
+          <button type="button" className="onboarding-back onboarding-back--on-photo" onClick={onBack} aria-label="Back">
+            ← Back
+          </button>
+        )}
+        <p className="onboarding-location-city">
+          <MapPin size={12} strokeWidth={2.4} aria-hidden="true" />
+          Philadelphia
+        </p>
+        <div className="onboarding-location-sheet">
+          <img src={wordmark} alt="COMMONS" className="onboarding-brand-img" />
+          <h2 className="onboarding-title">Share your location</h2>
+          <p className="onboarding-subtitle">So we can show you what&apos;s happening nearby.</p>
+          <button className="btn-primary btn-block" onClick={shareLocation}>
+            Allow location access
+          </button>
+          <button className="btn-link" type="button" onClick={() => setPermissionState("denied")}>
+            Skip — I&apos;ll pick manually
+          </button>
+        </div>
+      </div>
     );
   }
   if (permissionState === "asking") {
@@ -1191,11 +1231,6 @@ function ProfileStep({
   const [avatarParams, setAvatarParams] = useState<string | null>(me.avatarParams ?? null);
   const [busy, setBusy] = useState(false);
 
-  // COMMONS is built for women, so the illustrated placeholder (shown before a
-  // photo is added and before a name is typed) should present as a woman:
-  // long hairstyles only, no facial hair.
-  const FEMININE_AVATAR_PARAMS =
-    "facialHairProbability=0&top=bob,bun,curly,curvy,longButNotTooLong,miaWallace,straight01,straight02,straightAndStrand,bigHair";
   // Raw, uncropped image waiting on the crop+confirm step. Nothing is committed
   // to `photo` until the user confirms the crop.
   const [cropSrc, setCropSrc] = useState<string | null>(null);
@@ -1235,19 +1270,24 @@ function ProfileStep({
           onClick={() => void openPhotoPicker()}
           aria-label={photo ? "Change photo" : "Add a photo"}
         >
-          <Avatar
-            seed={me.avatarSeed}
-            style={me.avatarStyle}
-            photoDataUrl={photo ?? undefined}
-            // Keep the illustrated placeholder until a real photo is chosen.
-            // Passing `name` without a photo flips Avatar to blank initials and
-            // made Finish look broken for accounts that already had a default.
-            params={photo ? avatarParams ?? undefined : avatarParams ?? FEMININE_AVATAR_PARAMS}
-            size="xl"
-          />
-          <span className="profile-avatar-camera" aria-hidden="true">
-            <CameraIcon />
-          </span>
+          {photo ? (
+            <>
+              <Avatar
+                seed={me.avatarSeed}
+                style={me.avatarStyle}
+                photoDataUrl={photo}
+                params={avatarParams ?? undefined}
+                size="xl"
+              />
+              <span className="profile-avatar-camera" aria-hidden="true">
+                <CameraIcon />
+              </span>
+            </>
+          ) : (
+            <span className="profile-avatar-empty" aria-hidden="true">
+              <CameraIcon />
+            </span>
+          )}
         </button>
         <span className="profile-avatar-hint">{photo ? "Tap to change photo" : "Tap to add a photo"}</span>
         {/* Hidden web file input — opened via the circle button above. */}
@@ -1297,7 +1337,7 @@ function ProfileStep({
         <p className="onboarding-fineprint">
           {!firstName.trim() || !lastName.trim()
             ? "Add your first and last name to continue."
-            : "Add a photo to continue."}
+            : "Add a photo to continue — a real picture, not a placeholder."}
         </p>
       )}
 

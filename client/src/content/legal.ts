@@ -27,7 +27,7 @@ export interface LegalDocument {
 
 export const PRIVACY_POLICY: LegalDocument = {
   slug: "privacy",
-  title: "COMMONS — Privacy Policy",
+  title: "Privacy Policy",
   updated: "July 2026",
   intro: [
     {
@@ -213,7 +213,7 @@ export const PRIVACY_POLICY: LegalDocument = {
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   slug: "terms",
-  title: "COMMONS — Terms of Service",
+  title: "Terms of Service",
   updated: "July 2026",
   intro: [],
   sections: [

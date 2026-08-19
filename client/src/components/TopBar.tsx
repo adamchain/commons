@@ -16,6 +16,11 @@ export function TopBar() {
   const { user } = useAuth();
   const [hasUnread, setHasUnread] = useState(false);
 
+  // Other-user profiles own their chrome (back + •••) — same as plan detail /
+  // chat — so the COMMONS wordmark and bell can't cover those controls.
+  const otherProfile = /^\/profile\/([^/]+)$/.exec(pathname);
+  const isOtherUserProfile = Boolean(otherProfile && user?.id && otherProfile[1] !== user.id);
+
   const hide =
     pathname.startsWith("/welcome") ||
     pathname.startsWith("/legal") ||
@@ -26,7 +31,8 @@ export function TopBar() {
     pathname === "/explore" ||
     pathname.startsWith("/notifications") ||
     /^\/plans\/[^/]+(\/chat)?$/.test(pathname) ||
-    /^\/communities\/[^/]+\/chat$/.test(pathname);
+    /^\/communities\/[^/]+\/chat$/.test(pathname) ||
+    isOtherUserProfile;
 
   useEffect(() => {
     if (!user || hide) {
