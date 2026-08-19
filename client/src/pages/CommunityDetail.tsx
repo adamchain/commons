@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
@@ -21,6 +21,7 @@ import {
 import { formatRelative } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
+import { hrefForBack, type NavFromState } from "../lib/navState";
 import { isNative } from "../lib/platform";
 import "./Communities.css";
 
@@ -34,6 +35,9 @@ function tabFromParam(raw: string | null): Tab | null {
 export function CommunityDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const navFrom = (location.state as NavFromState | null) ?? null;
+  const backHref = navFrom?.from ? hrefForBack(navFrom) : "/communities";
   const [searchParams] = useSearchParams();
   const [community, setCommunity] = useState<CommunityDTO | null>(null);
   // One shared members payload for header preview, Members tab, join
@@ -83,6 +87,9 @@ export function CommunityDetailPage() {
   if (loading) {
     return (
       <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy">
+        <button type="button" className="cmy-btn cmy-btn--ghost cmy-btn--sm" onClick={() => navigate(backHref)}>
+          ← Back
+        </button>
         <p className="cmy-muted">Loading…</p>
       </main>
     );
@@ -91,7 +98,7 @@ export function CommunityDetailPage() {
     return (
       <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy">
         <p className="cmy-muted">This community isn’t available.</p>
-        <Link to="/communities" className="cmy-btn cmy-btn--ghost">← All communities</Link>
+        <Link to={backHref} className="cmy-btn cmy-btn--ghost">← All communities</Link>
       </main>
     );
   }
@@ -133,6 +140,14 @@ export function CommunityDetailPage() {
             className="cmy-cover-fill"
             iconSize={44}
           />
+          <button
+            type="button"
+            className="cmy-detail-back"
+            aria-label="Back"
+            onClick={() => navigate(backHref)}
+          >
+            ←
+          </button>
           <div className="cmy-cover-overlay">
             <span className="cmy-cover-tag">{catLabel}</span>
             <div className="cmy-cover-title-row">
