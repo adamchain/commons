@@ -141,17 +141,13 @@ export function ParticipationButtons({
   };
 
   const dropOutFromGoing = async () => {
-    const confirmed = window.confirm("Drop out? You'll leave the plan and its group chat.");
-    if (!confirmed) return;
+    if (pending) return;
     setShowGoingSheet(false);
     await commit(null);
   };
 
   const dropOutFromInterested = async () => {
-    const confirmed = window.confirm(
-      "Drop Interested? You'll leave the count and the group chat.",
-    );
-    if (!confirmed) return;
+    if (pending) return;
     setShowInterestedSheet(false);
     await commit(null);
   };
@@ -225,7 +221,7 @@ export function ParticipationButtons({
             <button type="button" className="sheet-link" onClick={() => void switchToInterested()}>
               Switch to Interested
             </button>
-            <button type="button" className="sheet-link sheet-link--danger" onClick={() => void dropOutFromGoing()}>
+            <button type="button" className="sheet-link sheet-link--danger" disabled={pending} onClick={() => void dropOutFromGoing()}>
               Drop out
             </button>
             <button type="button" className="btn-link sheet-cancel" onClick={() => setShowGoingSheet(false)}>
@@ -248,6 +244,7 @@ export function ParticipationButtons({
             <button
               type="button"
               className="sheet-link sheet-link--danger"
+              disabled={pending}
               onClick={() => void dropOutFromInterested()}
             >
               Drop out

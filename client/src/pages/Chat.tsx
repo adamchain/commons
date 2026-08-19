@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -74,6 +74,9 @@ export function ChatPage() {
   const [leaveErr, setLeaveErr] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
+  // Own sends (and first paint) always pin to the newest message, even if the
+  // reader had scrolled up. Incoming messages from others still respect atBottom.
+  const forceScrollRef = useRef(true);
   const composerMenuRef = useRef<HTMLDivElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -109,22 +112,47 @@ export function ChatPage() {
     return () => clearInterval(interval);
   }, [conv]);
 
-  // Autoscroll on new messages — only when the reader is already near the bottom.
+  // Track whether the reader is near the bottom so incoming messages from
+  // others don't yank the view while they're catching up on older ones.
+  // Don't sample on attach — the list starts at scrollTop 0, which would
+  // mark us "not at bottom" before the pin-to-end layout effect runs.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const onScroll = () => {
       atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
     };
-    onScroll();
+    const pinIfFollowing = () => {
+      if (forceScrollRef.current || atBottomRef.current) {
+        el.scrollTop = el.scrollHeight;
+      }
+    };
     el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
+    // Keyboard / visual-viewport changes on iOS shrink the list after send
+    // and can leave the new bubble under the composer without a re-pin.
+    window.visualViewport?.addEventListener("resize", pinIfFollowing);
+    window.addEventListener("resize", pinIfFollowing);
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      window.visualViewport?.removeEventListener("resize", pinIfFollowing);
+      window.removeEventListener("resize", pinIfFollowing);
+    };
   }, [chatReady]);
 
-  useEffect(() => {
-    if (!atBottomRef.current || !scrollRef.current) return;
-    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages.length]);
+  const lastMessageId = messages[messages.length - 1]?.id;
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (!forceScrollRef.current && !atBottomRef.current) return;
+    const pin = () => {
+      el.scrollTop = el.scrollHeight;
+    };
+    pin();
+    requestAnimationFrame(pin);
+    atBottomRef.current = true;
+    forceScrollRef.current = false;
+  }, [lastMessageId, messages.length, chatReady]);
 
   useEffect(() => {
     if (!composerMenuOpen) return;
@@ -188,6 +216,7 @@ export function ChatPage() {
           ...(pendingImage ? { imageUrl: pendingImage } : {}),
         }),
       });
+      forceScrollRef.current = true;
       setMessages((prev) => [...prev, msg]);
       setBody("");
       setPendingImage(null);
@@ -290,6 +319,7 @@ export function ChatPage() {
         method: "POST",
         body: JSON.stringify({ question, options }),
       });
+      forceScrollRef.current = true;
       setMessages((prev) => [...prev, msg]);
       setPollModalOpen(false);
       setPollQuestion("");
