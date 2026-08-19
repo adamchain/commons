@@ -12801,40 +12801,28 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ---- Profile other (SCREEN 14) ---- */
-.profile-other {
-  padding-top: 0;
-}
 .profile-other-nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 0 0;
+  gap: 12px;
   margin-bottom: 0;
-}
-.profile-other-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: var(--text-body);
-  font-weight: 400;
-  color: var(--muted);
-  text-decoration: none;
-  background: none;
-  border: none;
-  padding: 0;
 }
 .profile-other-more {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   background: none;
   border: none;
-  color: var(--muted);
+  color: var(--ink);
   cursor: pointer;
+  flex-shrink: 0;
 }
 .profile-other-hero {
-  padding: 18px 0 0;
+  padding: 4px 0 0;
   margin-bottom: 0;
 }
 .profile-other-hero-row {
@@ -13105,12 +13093,12 @@ h1, h2, h3, h4, h5, h6 {
   flex-shrink: 0;
 }
 
-/* Action sheet */
+/* Action sheet — above the fixed bottom nav (z-index 50), same as other sheets. */
 .profile-action-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.32);
-  z-index: 50;
+  z-index: 100;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -13120,7 +13108,7 @@ h1, h2, h3, h4, h5, h6 {
   max-width: var(--max-shell);
   background: var(--card);
   border-radius: 24px 24px 0 0;
-  padding: 8px 0 32px;
+  padding: 8px 0 calc(32px + env(safe-area-inset-bottom, 0px));
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
 }
 .profile-action-handle {

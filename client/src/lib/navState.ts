@@ -12,6 +12,7 @@ export type NavFromState = {
     | "explore"
     | "profile"
     | "community"
+    | "network"
     | "settings-forums";
   planId?: string;
   /** Profile back targets — do not overload planId for this. */
@@ -44,6 +45,8 @@ export function hrefForBack(state: NavFromState | null | undefined): string {
       return "/explore";
     case "community":
       return state.communityId ? `/communities/${state.communityId}` : "/explore";
+    case "network":
+      return "/network";
     case "profile": {
       const uid = state.profileUserId ?? state.planId;
       return uid ? `/profile/${uid}` : "/";

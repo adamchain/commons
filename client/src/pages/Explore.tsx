@@ -83,7 +83,7 @@ export function ExplorePage() {
           <ul className="xpl-comm-list">
             {communities.map((c, i) => (
               <li key={c.id} className="xpl-comm-row-wrap">
-                <Link to={`/communities/${c.id}`} className="xpl-comm-row">
+                <Link to={`/communities/${c.id}`} state={{ from: "explore" }} className="xpl-comm-row">
                   <span className="xpl-comm-num">{String(i + 1).padStart(2, "0")}</span>
                   <div className="xpl-comm-thumb">
                     <CommunityCover coverImage={c.coverImage} category={c.category} iconSize={18} />
@@ -113,7 +113,7 @@ export function ExplorePage() {
                     onJoined={(updated) =>
                       setCommunities((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
                     }
-                    onRequest={() => navigate(`/communities/${c.id}`)}
+                    onRequest={() => navigate(`/communities/${c.id}`, { state: { from: "explore" } })}
                   />
                 </Link>
               </li>

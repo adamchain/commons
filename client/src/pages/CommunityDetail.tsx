@@ -294,7 +294,7 @@ function JoinRequestsPanel({
       <ul className="cmy-member-list">
         {pending.map((m) => (
           <li key={m.user.id} className="cmy-request">
-            <Link to={`/profile/${m.user.id}`} className="cmy-member-row cmy-member-link">
+            <Link to={`/profile/${m.user.id}`} state={{ from: "community", communityId }} className="cmy-member-row cmy-member-link">
               <Avatar
                 seed={m.user.avatarSeed}
                 style={m.user.avatarStyle}
@@ -892,7 +892,7 @@ function MembersTab({
       <ul className="cmy-member-list">
         {members.map((m) => (
           <li key={m.user.id} className="cmy-member-row">
-            <Link to={`/profile/${m.user.id}`} className="cmy-member-link-row">
+            <Link to={`/profile/${m.user.id}`} state={{ from: "community", communityId: community.id }} className="cmy-member-link-row">
               <Avatar seed={m.user.avatarSeed} style={m.user.avatarStyle} photoDataUrl={m.user.avatarPhotoDataUrl} params={m.user.avatarParams} size="sm" />
               <span className="cmy-member-name">{m.user.firstName} {m.user.lastName ?? ""}</span>
             </Link>

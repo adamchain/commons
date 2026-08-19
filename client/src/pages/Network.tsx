@@ -73,6 +73,7 @@ export function NetworkPage() {
             <Link
               key={u.id}
               to={`/profile/${u.id}`}
+              state={{ from: "network" }}
               className="profile-network-row"
               aria-label={`Open ${u.firstName}'s profile`}
             >

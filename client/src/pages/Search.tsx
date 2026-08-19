@@ -103,7 +103,7 @@ export function SearchPage() {
           <Label>Plans</Label>
           <div className="plan-grid">
             {results.plans.map((plan) => (
-              <PlanCard key={plan.id} plan={plan} onPlanRefresh={reloadResults} />
+              <PlanCard key={plan.id} plan={plan} onPlanRefresh={reloadResults} navFrom={{ from: "search" }} />
             ))}
           </div>
         </section>
@@ -122,7 +122,7 @@ function PersonRow({ result }: { result: PersonSearchResultDTO }) {
   ].filter(Boolean);
 
   return (
-    <Link to={`/profile/${user.id}`} className="search-person-row">
+    <Link to={`/profile/${user.id}`} state={{ from: "search" }} className="search-person-row">
       <Avatar
         seed={user.avatarSeed}
         style={user.avatarStyle}

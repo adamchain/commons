@@ -7,7 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
-import { AVATAR_PRESETS, type MeDTO, type NeighborhoodDTO } from "../types/shared";
+import { type MeDTO, type NeighborhoodDTO } from "../types/shared";
 
 export function EditProfilePage() {
   const { userId = "" } = useParams();
@@ -56,7 +56,6 @@ function EditProfileForm({
   const [bio, setBio] = useState(me.bio ?? "");
   const [photo, setPhoto] = useState<string | null>(me.avatarPhotoDataUrl ?? null);
   const [avatarParams, setAvatarParams] = useState<string | null>(me.avatarParams ?? null);
-  const [presetOpen, setPresetOpen] = useState(false);
   const [instagram, setInstagram] = useState(me.socialLinks?.instagram ?? "");
   const [tiktok, setTiktok] = useState(me.socialLinks?.tiktok ?? "");
   const [discoverable, setDiscoverable] = useState(me.discoverableBySearch);
@@ -100,10 +99,6 @@ function EditProfileForm({
     setPhoto(dataUrl);
     setAvatarParams(null);
   }
-  function pickPreset(params: string) {
-    setAvatarParams((cur) => (cur === params ? null : params));
-    if (avatarParams !== params) setPhoto(null);
-  }
 
   async function save() {
     if (selectedHoods.size === 0) {
@@ -140,8 +135,8 @@ function EditProfileForm({
 
   return (
     <section className="profile-edit-panel">
-      <label className="form-question">Profile image</label>
-      <p className="form-help">Upload a photo or pick a character below — one or the other.</p>
+      <label className="form-question">Profile photo</label>
+      <p className="form-help">A real photo — so people know who they&apos;re meeting.</p>
 
       <div className="profile-edit-photo-row">
         <Avatar
@@ -199,29 +194,6 @@ function EditProfileForm({
           />
         </div>
       </div>
-
-      <details
-        className="profile-preset-disclosure"
-        open={presetOpen}
-        onToggle={(e) => setPresetOpen((e.target as HTMLDetailsElement).open)}
-      >
-        <summary>Pick an avatar</summary>
-        <div className="profile-preset-grid" style={{ marginTop: 10 }}>
-          {AVATAR_PRESETS.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className={`profile-preset-pick ${avatarParams === p.params ? "is-selected" : ""}`}
-              onClick={() => pickPreset(p.params)}
-              aria-pressed={avatarParams === p.params}
-              aria-label={p.label}
-              title={p.label}
-            >
-              <Avatar seed={me.avatarSeed} style="avataaars" params={p.params} size="md" />
-            </button>
-          ))}
-        </div>
-      </details>
 
       <label className="form-question" htmlFor="profile-edit-name" style={{ marginTop: 14 }}>
         First name

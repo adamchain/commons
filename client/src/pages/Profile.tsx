@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -30,6 +31,33 @@ import {
   type PublicUser,
 } from "../types/shared";
 
+function profileBackLabel(state: NavFromState | null): string {
+  switch (state?.from) {
+    case "search":
+      return "Search";
+    case "explore":
+      return "Explore";
+    case "community":
+      return "Community";
+    case "plan":
+      return "Plan";
+    case "feed":
+      return "Home";
+    case "messages":
+      return "Messages";
+    case "notifications":
+      return "Notifications";
+    case "network":
+      return "Network";
+    case "my-plans":
+      return "Plans";
+    case "profile":
+      return "Profile";
+    default:
+      return "Back";
+  }
+}
+
 interface ProfilePayload {
   user: PublicUser;
   interests: InterestTag[];
@@ -57,6 +85,7 @@ export function ProfilePage() {
   const navigate = useNavigate();
   const navFrom = (location.state as NavFromState | null) ?? null;
   const backHref = hrefForBack(navFrom);
+  const backLabel = profileBackLabel(navFrom);
   const { user } = useAuth();
   const [profile, setProfile] = useState<ProfilePayload | null>(null);
   const [network, setNetwork] = useState<PublicUser[] | null>(null);
@@ -97,9 +126,29 @@ export function ProfilePage() {
       .catch(() => setNetwork([]));
   }, [isSelf, user?.networkUserIds?.length]);
 
+  function goBack() {
+    if (navFrom?.from) {
+      navigate(backHref);
+      return;
+    }
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/");
+  }
+
   if (!profile) {
     return (
       <main className="app-shell app-shell--with-nav app-shell--with-topbar profile-shell">
+        {!isSelf && (
+          <header className="app-header app-header--minimal profile-other-nav">
+            <button type="button" className="detail-back" onClick={goBack}>
+              <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
+              {backLabel}
+            </button>
+          </header>
+        )}
         <div className="feed-skeleton" aria-hidden="true">
           <div className="feed-skeleton-card" />
         </div>
@@ -178,11 +227,11 @@ export function ProfilePage() {
 
     return (
       <main className="app-shell app-shell--with-nav app-shell--with-topbar profile-shell profile-other">
-        <header className="profile-other-nav">
-          <Link to={backHref} className="profile-other-back">
-            <ArrowLeft size={14} strokeWidth={2} aria-hidden="true" />
-            Back
-          </Link>
+        <header className="app-header app-header--minimal profile-other-nav">
+          <button type="button" className="detail-back" onClick={goBack}>
+            <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
+            {backLabel}
+          </button>
           <button
             type="button"
             className="profile-other-more"
@@ -368,41 +417,44 @@ export function ProfilePage() {
           </>
         )}
 
-        {actionSheetOpen && (
-          <div
-            className="profile-action-overlay"
-            role="presentation"
-            onClick={() => setActionSheetOpen(false)}
-          >
+        {actionSheetOpen &&
+          createPortal(
             <div
-              className="profile-action-sheet"
-              role="dialog"
-              aria-label="Profile actions"
-              onClick={(e) => e.stopPropagation()}
+              className="profile-action-overlay"
+              role="presentation"
+              onClick={() => setActionSheetOpen(false)}
             >
-              <div className="profile-action-handle" aria-hidden="true" />
-              <button type="button" className="profile-action-row" onClick={() => void shareProfile()}>
-                <Share2 size={16} strokeWidth={1.8} aria-hidden="true" />
-                Share profile
-              </button>
-              <button type="button" className="profile-action-row is-danger" onClick={() => void reportProfile()}>
-                <Flag size={16} strokeWidth={1.8} aria-hidden="true" />
-                Report {firstName}
-              </button>
-              <button type="button" className="profile-action-row is-danger" onClick={() => void blockFromSheet()}>
-                <Ban size={16} strokeWidth={1.8} aria-hidden="true" />
-                Block {firstName}
-              </button>
-              <button
-                type="button"
-                className="profile-action-cancel"
-                onClick={() => setActionSheetOpen(false)}
+              <div
+                className="profile-action-sheet"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Profile actions"
+                onClick={(e) => e.stopPropagation()}
               >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
+                <div className="profile-action-handle" aria-hidden="true" />
+                <button type="button" className="profile-action-row" onClick={() => void shareProfile()}>
+                  <Share2 size={16} strokeWidth={1.8} aria-hidden="true" />
+                  Share profile
+                </button>
+                <button type="button" className="profile-action-row is-danger" onClick={() => void reportProfile()}>
+                  <Flag size={16} strokeWidth={1.8} aria-hidden="true" />
+                  Report {firstName}
+                </button>
+                <button type="button" className="profile-action-row is-danger" onClick={() => void blockFromSheet()}>
+                  <Ban size={16} strokeWidth={1.8} aria-hidden="true" />
+                  Block {firstName}
+                </button>
+                <button
+                  type="button"
+                  className="profile-action-cancel"
+                  onClick={() => setActionSheetOpen(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>,
+            document.body,
+          )}
       </main>
     );
   }
