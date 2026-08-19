@@ -18,75 +18,162 @@ function phillyCircle(radius = BIAS_RADIUS_M) {
   return { circle: { center: { latitude: PHILLY_LAT, longitude: PHILLY_LNG }, radius } };
 }
 
+interface PlacePrediction {
+  placeId: string;
+  name: string;
+  address: string;
+  neighborhood?: string;
+  lat?: number;
+  lng?: number;
+}
+
+function dedupePredictions(items: PlacePrediction[], limit = 8): PlacePrediction[] {
+  const seenIds = new Set<string>();
+  const seenNames = new Set<string>();
+  const out: PlacePrediction[] = [];
+  for (const p of items) {
+    if (!p.placeId || !p.name.trim()) continue;
+    const nameKey = p.name.trim().toLowerCase();
+    if (seenIds.has(p.placeId) || seenNames.has(nameKey)) continue;
+    seenIds.add(p.placeId);
+    seenNames.add(nameKey);
+    out.push(p);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+/** OpenStreetMap fallback so parks/landmarks still resolve when Google is empty or down. */
+async function nominatimSearch(q: string): Promise<PlacePrediction[]> {
+  if (q.trim().length < 2) return [];
+  const url =
+    `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6` +
+    `&countrycodes=us&viewbox=-75.60,40.20,-74.90,39.70&bounded=0` +
+    `&q=${encodeURIComponent(q)}`;
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 2500);
+  try {
+    const r = await fetch(url, {
+      signal: ac.signal,
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "Commons/1.0 (venue-search)",
+      },
+    });
+    if (!r.ok) return [];
+    const rows = (await r.json()) as Array<{
+      place_id?: number;
+      display_name: string;
+      name?: string;
+      lat?: string;
+      lon?: string;
+    }>;
+    return rows.map((row, i) => {
+      const name =
+        (row.name && row.name.trim()) ||
+        row.display_name.split(",")[0]?.trim() ||
+        row.display_name;
+      return {
+        placeId: `osm-${row.place_id ?? i}-${row.lat ?? ""}`,
+        name,
+        address: row.display_name,
+        lat: row.lat ? Number(row.lat) : undefined,
+        lng: row.lon ? Number(row.lon) : undefined,
+      };
+    });
+  } catch (e) {
+    console.error("[places] nominatim", e);
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function googleAutocomplete(input: string, key: string): Promise<PlacePrediction[]> {
+  const r = await fetch(`${PLACES_BASE}/places:autocomplete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Goog-Api-Key": key },
+    body: JSON.stringify({
+      input,
+      includedRegionCodes: ["us"],
+      locationBias: phillyCircle(),
+      languageCode: "en",
+    }),
+  });
+  const data = (await r.json()) as {
+    suggestions?: Array<{
+      placePrediction?: {
+        place?: string;
+        placeId?: string;
+        text?: { text?: string };
+        structuredFormat?: { mainText?: { text?: string }; secondaryText?: { text?: string } };
+      };
+    }>;
+    error?: { message?: string };
+  };
+  if (!r.ok) {
+    console.error("[places] autocomplete", data.error?.message ?? r.status);
+    return [];
+  }
+  return (data.suggestions ?? [])
+    .map((s) => s.placePrediction)
+    .filter((p): p is NonNullable<typeof p> => Boolean(p))
+    .map((p) => {
+      const fullText = p.text?.text ?? "";
+      const name =
+        p.structuredFormat?.mainText?.text ??
+        fullText.split(",")[0]?.trim() ??
+        "";
+      const address =
+        p.structuredFormat?.secondaryText?.text
+          ? `${name}, ${p.structuredFormat.secondaryText.text}`
+          : fullText;
+      const rawId = p.placeId || p.place || "";
+      const placeId = rawId.replace(/^places\//, "");
+      return { placeId, name, address };
+    });
+}
+
 /**
- * Autocomplete (Places API New). Returns { predictions: [{ placeId, name, address }] }
- * — the same shape the legacy endpoint returned, so the client is unchanged.
+ * Autocomplete (Places API New). Parks and landmarks often miss Autocomplete,
+ * so we fall through to Text Search, then OpenStreetMap — always 200 with
+ * `predictions` so the create-plan dropdown can show live suggestions.
  */
 placesRouter.get("/autocomplete", requireAuth, async (req, res) => {
-  const key = googleKey();
   const input = String(req.query.q ?? "").trim();
-  if (!key) {
-    res.json({ predictions: [] });
-    return;
-  }
   if (input.length < 2) {
     res.json({ predictions: [] });
     return;
   }
   try {
-    const r = await fetch(`${PLACES_BASE}/places:autocomplete`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": key },
-      body: JSON.stringify({
-        input,
-        includedRegionCodes: ["us"],
-        locationBias: phillyCircle(),
-      }),
-    });
-    const data = (await r.json()) as {
-      suggestions?: Array<{
-        placePrediction?: {
-          placeId: string;
-          text?: { text?: string };
-          structuredFormat?: { mainText?: { text?: string } };
-        };
-      }>;
-      error?: { message?: string };
-    };
-    if (!r.ok) {
-      console.error("[places] autocomplete", data.error?.message ?? r.status);
-      res.status(502).json({ error: "Places lookup failed", predictions: [] });
-      return;
+    const key = googleKey();
+    let predictions: PlacePrediction[] = [];
+    if (key) {
+      predictions = dedupePredictions(await googleAutocomplete(input, key));
+      const needle = input.toLowerCase();
+      const hasCloseHit = predictions.some((p) => {
+        const name = p.name.toLowerCase();
+        return name.includes(needle) || needle.includes(name);
+      });
+      // Autocomplete is prefix-oriented and weak on parks/squares. Text Search
+      // finds "Rittenhouse Square" even when Autocomplete returns nothing.
+      if (!hasCloseHit) {
+        const textHits = await googleTextSearch(input, key);
+        predictions = dedupePredictions([...textHits, ...predictions]);
+      }
     }
-    const seenIds = new Set<string>();
-    const seenNames = new Set<string>();
-    const predictions = (data.suggestions ?? [])
-      .map((s) => s.placePrediction)
-      .filter((p): p is NonNullable<typeof p> => Boolean(p))
-      .map((p) => {
-        const address = p.text?.text ?? "";
-        const name =
-          p.structuredFormat?.mainText?.text ??
-          address.split(",")[0]?.trim() ??
-          "";
-        // Prefer bare placeId; fall back to resource name ("places/…").
-        const rawId = p.placeId || "";
-        const placeId = rawId.replace(/^places\//, "");
-        return { placeId, name, address };
-      })
-      .filter((p) => p.placeId && p.name)
-      .filter((p) => {
-        const nameKey = p.name.trim().toLowerCase();
-        if (seenIds.has(p.placeId) || seenNames.has(nameKey)) return false;
-        seenIds.add(p.placeId);
-        seenNames.add(nameKey);
-        return true;
-      })
-      .slice(0, 8);
+    if (predictions.length === 0) {
+      predictions = dedupePredictions(await nominatimSearch(input));
+    }
     res.json({ predictions });
   } catch (e) {
     console.error("[places] autocomplete fetch", e);
-    res.status(502).json({ error: "Places lookup failed", predictions: [] });
+    try {
+      const fallback = dedupePredictions(await nominatimSearch(input));
+      res.json({ predictions: fallback });
+    } catch {
+      res.json({ predictions: [] });
+    }
   }
 });
 
@@ -123,54 +210,68 @@ const SEARCH_FIELD_MASK = [
   "places.addressComponents",
 ].join(",");
 
+function mapTextSearchPlace(p: NewPlace): PlacePrediction & {
+  photoRef?: string;
+  rating?: number;
+  ratings?: number;
+} {
+  return {
+    placeId: p.id,
+    name: p.displayName?.text ?? "",
+    address: p.formattedAddress ?? "",
+    neighborhood: neighborhoodOf(p),
+    lat: p.location?.latitude,
+    lng: p.location?.longitude,
+    photoRef: p.photos?.[0]?.name,
+    rating: p.rating,
+    ratings: p.userRatingCount,
+  };
+}
+
+async function googleTextSearch(query: string, key: string): Promise<ReturnType<typeof mapTextSearchPlace>[]> {
+  const r = await fetch(`${PLACES_BASE}/places:searchText`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": key,
+      "X-Goog-FieldMask": SEARCH_FIELD_MASK,
+    },
+    body: JSON.stringify({ textQuery: query, regionCode: "us", locationBias: phillyCircle() }),
+  });
+  const data = (await r.json()) as { places?: NewPlace[]; error?: { message?: string } };
+  if (!r.ok) {
+    console.error("[places] search", data.error?.message ?? r.status);
+    return [];
+  }
+  const raw = data.places ?? [];
+  const usOnly = raw.filter((p) => /,\s*USA$/.test(p.formattedAddress ?? ""));
+  return (usOnly.length ? usOnly : raw).slice(0, 12).map(mapTextSearchPlace);
+}
+
 /**
- * Text Search (Places API New) — Explore's location search box. Same response
- * shape as before. Foreign hits are dropped (US addresses end with "USA").
+ * Text Search (Places API New). Falls back to OpenStreetMap when Google is
+ * unset, empty, or down — same `results` shape as before.
  */
 placesRouter.get("/search", requireAuth, async (req, res) => {
-  const key = googleKey();
   const query = String(req.query.q ?? "").trim();
-  if (!key) {
-    res.json({ results: [] });
-    return;
-  }
   if (query.length < 2) {
     res.json({ results: [] });
     return;
   }
   try {
-    const r = await fetch(`${PLACES_BASE}/places:searchText`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": key,
-        "X-Goog-FieldMask": SEARCH_FIELD_MASK,
-      },
-      body: JSON.stringify({ textQuery: query, regionCode: "us", locationBias: phillyCircle() }),
-    });
-    const data = (await r.json()) as { places?: NewPlace[]; error?: { message?: string } };
-    if (!r.ok) {
-      console.error("[places] search", data.error?.message ?? r.status);
-      res.status(502).json({ error: "Places search failed", results: [] });
-      return;
+    const key = googleKey();
+    let results: PlacePrediction[] = [];
+    if (key) {
+      results = await googleTextSearch(query, key);
     }
-    const raw = data.places ?? [];
-    const usOnly = raw.filter((p) => /,\s*USA$/.test(p.formattedAddress ?? ""));
-    const results = (usOnly.length ? usOnly : raw).slice(0, 12).map((p) => ({
-      placeId: p.id,
-      name: p.displayName?.text ?? "",
-      address: p.formattedAddress ?? "",
-      neighborhood: neighborhoodOf(p),
-      lat: p.location?.latitude,
-      lng: p.location?.longitude,
-      photoRef: p.photos?.[0]?.name,
-      rating: p.rating,
-      ratings: p.userRatingCount,
-    }));
+    if (results.length === 0) {
+      results = await nominatimSearch(query);
+    }
     res.json({ results });
   } catch (e) {
     console.error("[places] search fetch", e);
-    res.status(502).json({ error: "Places search failed", results: [] });
+    const fallback = await nominatimSearch(query);
+    res.json({ results: fallback });
   }
 });
 

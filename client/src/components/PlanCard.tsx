@@ -21,14 +21,10 @@ import { useCardImages, pickCoverImage } from "../lib/cardImages";
 export function PlanCard({
   plan,
   onPlanRefresh,
-  highlight = false,
-  highlightFading = false,
   navFrom = { from: "feed" },
 }: {
   plan: PlanDTO;
   onPlanRefresh?: () => void;
-  highlight?: boolean;
-  highlightFading?: boolean;
   navFrom?: NavFromState;
 }) {
   const title = sentenceCaseTitle(plan.title);
@@ -100,9 +96,6 @@ export function PlanCard({
     : !hasEnded && interestedCount > 0;
   const showCountLabels = showWentLabel || showGoingLabel || showInterestedLabel;
 
-  // Host-only chip, few minutes after posting, never on past/cancelled.
-  const showBanner = highlight && isHosting && !hasEnded && !isCancelled;
-
   const openPlan = (hash?: string) => {
     if (navFrom.from === "feed") saveFeedScroll();
     cardNavigate(`/plans/${plan.id}${hash ?? ""}`, { state: navFrom });
@@ -118,7 +111,7 @@ export function PlanCard({
       data-plan-id={plan.id}
       className={`plan-card-outer ${
         isLooking ? "plan-card--looking" : "plan-card--confirmed"
-      } ${showBanner ? "plan-card--just-posted" : ""} ${hasEnded ? "plan-card--happened" : ""} ${isCancelled ? "plan-card--cancelled" : ""} ${plan.visibility === "network" ? "plan-card--network" : ""}`}
+      } ${hasEnded ? "plan-card--happened" : ""} ${isCancelled ? "plan-card--cancelled" : ""} ${plan.visibility === "network" ? "plan-card--network" : ""}`}
     >
       <Link
         to={`/plans/${plan.id}`}
@@ -175,11 +168,6 @@ export function PlanCard({
             <p className="plan-card-meta-line plan-card-meta-line--single">
               <span>{metaLine}</span>
             </p>
-            {showBanner && (
-              <span className={`plan-card-just-posted-chip ${highlightFading ? "is-fading" : ""}`}>
-                Just posted
-              </span>
-            )}
           </div>
           {plan.description && (
             <p className="plan-card-description">{plan.description}</p>

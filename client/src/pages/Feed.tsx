@@ -6,6 +6,7 @@ import { FilterSheet } from "../components/FilterSheet";
 import { InviteSheet } from "../components/InviteSheet";
 import { NetworkPromptModal } from "../components/NetworkPromptModal";
 import { PlanCard } from "../components/PlanCard";
+import { PostSuccessSheet } from "../components/PostSuccessSheet";
 import { WeekStrip } from "../components/WeekStrip";
 import { useAuth } from "../context/AuthContext";
 import { planHasEnded } from "../lib/planTime";
@@ -79,11 +80,8 @@ export function FeedPage() {
     showPostSuccess?: boolean;
   } | null;
   // justPostedId pins the freshly-created plan to the very top for the whole
-  // feed session; highlightId drives the transient "Just posted" banner/glow
-  // and fades on its own a few seconds later.
+  // feed session and scrolls it into view once.
   const [justPostedId] = useState<string | null>(navState?.justPostedId ?? null);
-  const [highlightId, setHighlightId] = useState<string | null>(navState?.justPostedId ?? null);
-  const [highlightFading, setHighlightFading] = useState(false);
   const [inviteForPlanId, setInviteForPlanId] = useState<string | null>(
     navState?.openInviteForPlanId ?? null,
   );
@@ -115,6 +113,7 @@ export function FeedPage() {
   const pullRef = useRef({ startY: 0, armed: false, distance: 0 });
   const contentRef = useRef<HTMLDivElement>(null);
   const indicatorRef = useRef<HTMLDivElement>(null);
+  const skipRestoreOnce = useRef(Boolean(navState?.justPostedId));
 
   const setPullVisual = useCallback((distance: number, spinning = false) => {
     const content = contentRef.current;
@@ -261,35 +260,19 @@ export function FeedPage() {
   }, [justPostedId, location.pathname, location.state, navigate]);
 
   useEffect(() => {
-    if (!highlightId || !feedReady) return;
-    const el = document.querySelector(`[data-plan-id="${highlightId}"]`);
+    if (!justPostedId || !feedReady) return;
+    const el = document.querySelector(`[data-plan-id="${justPostedId}"]`);
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
-    // Fade the "Just posted" chip a few minutes after posting — keep the plan
-    // pinned to the top of the feed (via justPostedId) but don't let the chip
-    // stick around forever. Flip a fading flag first so the opacity
-    // transition can play before the chip actually unmounts.
-    const fadeT = setTimeout(() => setHighlightFading(true), 3 * 60 * 1000);
-    const clearT = setTimeout(() => {
-      setHighlightId(null);
-      setHighlightFading(false);
-    }, 3 * 60 * 1000 + 600);
-    return () => {
-      clearTimeout(fadeT);
-      clearTimeout(clearT);
-    };
-  }, [highlightId, feedReady]);
-
-  useEffect(() => {
-    if (!postSuccessId) return;
-    const t = window.setTimeout(() => setPostSuccessId(null), 4000);
-    return () => window.clearTimeout(t);
-  }, [postSuccessId]);
+  }, [justPostedId, feedReady]);
 
   // Restore scroll position when returning from a plan detail view.
   useEffect(() => {
     if (!feedReady) return;
-    // Just-posted highlight owns scroll once — don't fight it.
-    if (highlightId) return;
+    // Just-posted scroll owns the viewport once — don't fight it.
+    if (skipRestoreOnce.current) {
+      skipRestoreOnce.current = false;
+      return;
+    }
     const y = consumeFeedScroll();
     if (y != null && y > 0) {
       // Double rAF waits for layout after skeleton → cards swap.
@@ -297,7 +280,7 @@ export function FeedPage() {
         requestAnimationFrame(() => window.scrollTo(0, y));
       });
     }
-  }, [feedReady, highlightId, location.key]);
+  }, [feedReady, justPostedId, location.key]);
 
   // Fetch once on mount / when the nudge pref (or user) changes — not when
   // plans reload, which was re-hitting network-prompt on every feed refresh.
@@ -506,8 +489,6 @@ export function FeedPage() {
                   key={plan.id}
                   plan={plan}
                   onPlanRefresh={refreshPlans}
-                  highlight={highlightId === plan.id}
-                  highlightFading={highlightId === plan.id && highlightFading}
                 />
               ))}
             </div>
@@ -516,9 +497,7 @@ export function FeedPage() {
       </div>
 
       {postSuccessId && (
-        <div className="feed-post-toast" role="status" aria-live="polite">
-          Your plan is live
-        </div>
+        <PostSuccessSheet onDone={() => setPostSuccessId(null)} />
       )}
 
       {inviteForPlanId && (

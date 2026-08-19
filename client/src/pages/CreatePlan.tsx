@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -966,6 +967,9 @@ export function CreatePlanPage() {
                   value={form.locationName}
                   address={form.locationAddress}
                   placeholder="Search a venue or type your own"
+                  onFieldFocus={(el) => {
+                    setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+                  }}
                   onChange={(name) =>
                     setForm((f) => ({
                       ...f,
@@ -1998,9 +2002,12 @@ function PlacePicker({
   const [focused, setFocused] = useState(false);
   const [searched, setSearched] = useState(false);
   const [errored, setErrored] = useState(false);
+  const [menuBox, setMenuBox] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blurRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fieldRef = useRef<HTMLDivElement>(null);
   // Seed true when a venue is already filled (e.g. prefilled from Explore) so
   // we don't auto-search and pop the dropdown on mount.
   const skipNextSearch = useRef(value.trim().length >= 2);
@@ -2017,100 +2024,73 @@ function PlacePicker({
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    abortRef.current?.abort();
     const q = value.trim();
     if (q.length < 2) {
       setResults([]);
       setSearched(false);
+      setLoading(false);
+      setErrored(false);
       return;
     }
+    setLoading(true);
+    setErrored(false);
     debounceRef.current = setTimeout(() => {
-      setLoading(true);
-      setErrored(false);
+      const controller = new AbortController();
+      abortRef.current = controller;
       void (async () => {
         try {
-          // Prefer Autocomplete (more reliable / cheaper than Text Search).
           const g = await api<{
-            predictions: Array<{ placeId: string; name: string; address: string }>;
-          }>(`/api/places/autocomplete?q=${encodeURIComponent(q)}`);
+            predictions: Array<{
+              placeId: string;
+              name: string;
+              address: string;
+              neighborhood?: string;
+              lat?: number;
+              lng?: number;
+            }>;
+          }>(`/api/places/autocomplete?q=${encodeURIComponent(q)}`, { signal: controller.signal });
+          if (controller.signal.aborted) return;
           if (g.predictions?.length) {
-            setResults(
-              g.predictions.map((p) => ({
-                placeId: p.placeId,
-                name: p.name,
-                address: p.address,
-              })),
-            );
+            setResults(g.predictions);
             setErrored(false);
             setSearched(true);
             setLoading(false);
             return;
           }
-        } catch {
-          /* fall through */
+        } catch (err) {
+          if ((err as { name?: string })?.name === "AbortError") return;
         }
 
         try {
           const r = await api<{ results: PlaceHit[] }>(
             `/api/places/search?q=${encodeURIComponent(q)}`,
+            { signal: controller.signal },
           );
-          if (r.results?.length) {
-            setResults(r.results);
-            setErrored(false);
-            setSearched(true);
-            setLoading(false);
-            return;
-          }
-        } catch {
-          /* fall through to OSM */
-        }
-
-        // OpenStreetMap fallback when Google isn't configured or returns empty.
-        if (q.length < 3) {
-          setResults([]);
-          setSearched(true);
-          setLoading(false);
-          return;
-        }
-        try {
-          const url =
-            `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6` +
-            `&countrycodes=us&viewbox=-75.60,40.20,-74.90,39.70&bounded=0` +
-            `&q=${encodeURIComponent(q)}`;
-          const res = await fetch(url, { headers: { Accept: "application/json" } });
-          if (!res.ok) throw new Error("nominatim");
-          const rows = (await res.json()) as Array<{
-            display_name: string;
-            name?: string;
-            lat?: string;
-            lon?: string;
-          }>;
-          setResults(
-            rows.map((row, i) => ({
-              placeId: `osm-${i}-${row.lat ?? ""}`,
-              name: (row.name && row.name.trim()) || row.display_name.split(",")[0]?.trim() || row.display_name,
-              address: row.display_name,
-              lat: row.lat ? Number(row.lat) : undefined,
-              lng: row.lon ? Number(row.lon) : undefined,
-            })),
-          );
+          if (controller.signal.aborted) return;
+          setResults(r.results ?? []);
           setErrored(false);
-        } catch {
+        } catch (err) {
+          if ((err as { name?: string })?.name === "AbortError") return;
           setResults([]);
           setErrored(true);
         } finally {
-          setSearched(true);
-          setLoading(false);
+          if (!controller.signal.aborted) {
+            setSearched(true);
+            setLoading(false);
+          }
         }
       })();
-    }, 300);
+    }, 220);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [value]);
 
-  // Clean up the blur timer on unmount.
+  // Clean up timers / in-flight search on unmount.
   useEffect(() => () => {
     if (blurRef.current) clearTimeout(blurRef.current);
+    abortRef.current?.abort();
   }, []);
 
   const choose = (p: PlaceHit) => {
@@ -2161,9 +2141,88 @@ function PlacePicker({
   // list stays put while you read it instead of flickering on every keystroke.
   const showDropdown = focused && value.trim().length >= 2;
 
+  const updateMenuBox = () => {
+    const el = fieldRef.current;
+    if (!el) return;
+    const fr = el.getBoundingClientRect();
+    const vv = window.visualViewport;
+    const viewBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+    const viewTop = vv ? vv.offsetTop : 0;
+    const spaceBelow = viewBottom - fr.bottom - 8;
+    const spaceAbove = fr.top - viewTop - 8;
+    const maxH = 280;
+    const placeBelow = spaceBelow >= 132 || spaceBelow >= spaceAbove;
+    const height = Math.min(maxH, Math.max(120, placeBelow ? spaceBelow : spaceAbove));
+    setMenuBox({
+      top: placeBelow ? fr.bottom + 4 : Math.max(viewTop + 8, fr.top - 4 - height),
+      left: fr.left,
+      width: fr.width,
+      maxHeight: height,
+    });
+  };
+
+  useLayoutEffect(() => {
+    if (!showDropdown) {
+      setMenuBox(null);
+      return;
+    }
+    updateMenuBox();
+    const onMove = () => updateMenuBox();
+    window.addEventListener("resize", onMove);
+    window.addEventListener("scroll", onMove, true);
+    window.visualViewport?.addEventListener("resize", onMove);
+    window.visualViewport?.addEventListener("scroll", onMove);
+    return () => {
+      window.removeEventListener("resize", onMove);
+      window.removeEventListener("scroll", onMove, true);
+      window.visualViewport?.removeEventListener("resize", onMove);
+      window.visualViewport?.removeEventListener("scroll", onMove);
+    };
+  }, [showDropdown, results.length, loading, value]);
+
+  const dropdown = showDropdown && menuBox ? (
+    <ul
+      className="place-picker-results is-portaled"
+      role="listbox"
+      style={{
+        top: menuBox.top,
+        left: menuBox.left,
+        width: menuBox.width,
+        maxHeight: menuBox.maxHeight,
+      }}
+    >
+      {loading && results.length === 0 && <li className="place-picker-empty">Searching…</li>}
+      {!loading && errored && (
+        <li className="place-picker-empty">
+          Venue search is unavailable — we'll use "{value.trim()}" as the venue.
+        </li>
+      )}
+      {!loading && !errored && searched && results.length === 0 && (
+        <li className="place-picker-empty">No matches — we'll use "{value.trim()}" as the venue.</li>
+      )}
+      {results.map((p) => (
+        <li key={p.placeId}>
+          <button
+            type="button"
+            className="place-picker-result"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              choose(p);
+            }}
+          >
+            <span className="place-picker-result-name">{p.name}</span>
+            {(p.neighborhood || p.address) && (
+              <span className="place-picker-result-addr">{p.neighborhood ?? p.address}</span>
+            )}
+          </button>
+        </li>
+      ))}
+    </ul>
+  ) : null;
+
   return (
     <div className="place-picker">
-      <div className="place-picker-field">
+      <div className="place-picker-field" ref={fieldRef}>
         <PinIcon />
         <input
           ref={inputRef}
@@ -2177,7 +2236,7 @@ function PlacePicker({
           }}
           onBlur={() => {
             // Delay so a result tap (mousedown) registers before we hide.
-            blurRef.current = setTimeout(() => setFocused(false), 150);
+            blurRef.current = setTimeout(() => setFocused(false), 180);
           }}
           autoComplete="off"
         />
@@ -2198,36 +2257,7 @@ function PlacePicker({
         )}
       </div>
       {hasPickedAddress && !showDropdown && <p className="place-picker-chosen">📍 {address}</p>}
-      {showDropdown && (
-        <ul className="place-picker-results" role="listbox">
-          {loading && results.length === 0 && <li className="place-picker-empty">Searching…</li>}
-          {!loading && errored && (
-            <li className="place-picker-empty">
-              Venue search is unavailable — we'll use "{value.trim()}" as the venue.
-            </li>
-          )}
-          {!loading && !errored && searched && results.length === 0 && (
-            <li className="place-picker-empty">No matches — we'll use "{value.trim()}" as the venue.</li>
-          )}
-          {results.map((p) => (
-            <li key={p.placeId}>
-              <button
-                type="button"
-                className="place-picker-result"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  choose(p);
-                }}
-              >
-                <span className="place-picker-result-name">{p.name}</span>
-                {(p.neighborhood || p.address) && (
-                  <span className="place-picker-result-addr">{p.neighborhood ?? p.address}</span>
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      {dropdown ? createPortal(dropdown, document.body) : null}
     </div>
   );
 }

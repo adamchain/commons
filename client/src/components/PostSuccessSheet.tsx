@@ -1,34 +1,49 @@
+import { useEffect, useEffectEvent } from "react";
+import { createPortal } from "react-dom";
+import { Check } from "lucide-react";
+
 /**
- * F.3 — shown right after a plan/idea posts successfully. Gives the host a
- * clear "you're live" moment plus a one-tap path into inviting people,
- * instead of dropping them straight into the invite sheet with no context.
+ * Centered celebratory card shown after a plan posts — combines the old
+ * "Just posted" chip and "Your plan is live" toast into one moment.
  */
 export function PostSuccessSheet({
-  onInvite,
   onDone,
+  autoDismissMs = 2800,
 }: {
-  onInvite: () => void;
   onDone: () => void;
+  autoDismissMs?: number;
 }) {
-  return (
-    <div className="filter-sheet-backdrop" onClick={onDone}>
+  const dismiss = useEffectEvent(onDone);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => dismiss(), autoDismissMs);
+    return () => window.clearTimeout(t);
+  }, [autoDismissMs]);
+
+  return createPortal(
+    <div
+      className="join-confirm-backdrop"
+      role="presentation"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onDone();
+      }}
+    >
       <div
-        className="filter-sheet post-success-sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Plan posted"
+        className="join-confirm-card join-confirm-card--celebrate post-live-card"
+        role="status"
+        aria-live="polite"
+        aria-label="Your plan is live. Just posted."
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="post-success-icon" aria-hidden="true">🎉</div>
-        <h2 className="post-success-title">Your plan is live!</h2>
-        <p className="post-success-sub">We&apos;ll tell you the second someone joins.</p>
-        <button type="button" className="btn-primary btn-block" onClick={onInvite}>
-          Invite someone
-        </button>
-        <button type="button" className="btn-link post-success-done" onClick={onDone}>
-          Done
-        </button>
+        <div className="join-confirm-icon" aria-hidden="true">
+          <Check size={22} strokeWidth={2.4} />
+        </div>
+        <h2 className="join-confirm-title">Your plan is live</h2>
+        <p className="post-live-kicker">Just posted</p>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

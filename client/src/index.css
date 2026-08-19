@@ -1707,6 +1707,12 @@ h1, h2, h3, h4, h5, h6 {
   max-height: 280px;
   overflow-y: auto;
 }
+.place-picker-results.is-portaled {
+  position: fixed;
+  right: auto;
+  margin: 0;
+  z-index: 130;
+}
 .place-picker-result {
   display: flex;
   flex-direction: column;
@@ -7325,6 +7331,16 @@ h1, h2, h3, h4, h5, h6 {
   width: 100%;
   text-align: center;
   margin-top: 10px;
+}
+.post-live-card .join-confirm-title {
+  color: var(--ink);
+}
+.post-live-kicker {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--red);
 }
 
 .filter-sheet-group {
