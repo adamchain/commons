@@ -90,12 +90,22 @@ function PlanRoute() {
   }, [bootSplashDone]);
   if (loading || !bootSplashDone) return <LoadingScreen simple tagline="A place for plans meant to be shared." />;
   if (user && user.onboardingComplete) return <PlanDetailPage />;
-  if (user && !user.onboardingComplete) return <Navigate to="/onboarding" replace />;
+  const inviteCode = new URLSearchParams(location.search).get("invite") ?? undefined;
+  // Mid-signup visitors keep a path back to this plan instead of dumping onto
+  // a generic onboarding screen with the shared event lost.
+  if (user && !user.onboardingComplete) {
+    return (
+      <Navigate
+        to="/onboarding"
+        state={{ redirect: location.pathname, inviteCode, eventRef: true }}
+        replace
+      />
+    );
+  }
   // Logged out: native users go to onboarding — carrying the invite code (if
   // any) and a redirect back to this plan so the deep link isn't a dead end.
   // Web visitors get the public page instead.
   if (isNative()) {
-    const inviteCode = new URLSearchParams(location.search).get("invite") ?? undefined;
     return (
       <Navigate
         to="/onboarding"

@@ -133,6 +133,84 @@ function countBadge(going: number, interested: number): string {
   return parts.join("  ·  ");
 }
 
+// Satori has no emoji glyphs in Inter/Montserrat — missing graphemes render as
+// the literal "NO GLYPH" placeholder (rotated) in the corner badge. Fetch the
+// matching Twemoji PNG so the share card always shows a real icon.
+const emojiImgCache = new Map<string, string | null>();
+const TRANSPARENT_PNG =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPj/HwADBwIAMCbHYQAAAABJRU5ErkJggg==";
+
+function twemojiCode(emoji: string): string {
+  return Array.from(emoji.trim() || "✨")
+    .map((ch) => ch.codePointAt(0)!)
+    .filter((cp) => cp !== 0xfe0f)
+    .map((cp) => cp.toString(16))
+    .join("-");
+}
+
+async function emojiDataUri(emoji: string): Promise<string | null> {
+  const key = emoji.trim() || "✨";
+  if (emojiImgCache.has(key)) return emojiImgCache.get(key) ?? null;
+  const url = `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/${twemojiCode(key)}.png`;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2500);
+    const r = await fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer));
+    if (!r.ok) {
+      emojiImgCache.set(key, null);
+      return null;
+    }
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.byteLength < 32 || buf.byteLength > 200_000) {
+      emojiImgCache.set(key, null);
+      return null;
+    }
+    const uri = `data:image/png;base64,${buf.toString("base64")}`;
+    emojiImgCache.set(key, uri);
+    return uri;
+  } catch {
+    emojiImgCache.set(key, null);
+    return null;
+  }
+}
+
+/** Circular Commons "C" mark — used when the vibe icon can't be fetched. */
+function commonsMark(): El {
+  return h(
+    "div",
+    {
+      display: "flex",
+      width: 72,
+      height: 72,
+      borderRadius: 999,
+      background: "rgba(255,255,255,0.96)",
+      alignItems: "center",
+      justifyContent: "center",
+      border: "2px solid rgba(255,255,255,0.55)",
+      boxShadow: "0 8px 20px rgba(0,0,0,0.28)",
+    },
+    [
+      h(
+        "div",
+        {
+          display: "flex",
+          width: 52,
+          height: 52,
+          borderRadius: 14,
+          background: BRAND,
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "Montserrat",
+          fontWeight: 800,
+          fontSize: 28,
+          color: "#fff",
+        },
+        "C",
+      ),
+    ],
+  );
+}
+
 // ---- satori element helpers (no JSX — the server isn't set up to compile it) --
 type El = { type: string; props: Record<string, unknown> };
 function h(type: string, style: Record<string, unknown>, children?: unknown): El {
@@ -144,7 +222,41 @@ function text(value: string, style: Record<string, unknown>): El {
 
 const BRAND = "#E8552F"; // Commons warm coral (from the app's accent)
 
-function buildTree(plan: PlanRecord, cover: string | null, counts: { going: number; interested: number }): El {
+function vibeBadge(iconSrc: string | null): El {
+  if (!iconSrc) return commonsMark();
+  return h(
+    "div",
+    {
+      display: "flex",
+      width: 72,
+      height: 72,
+      borderRadius: 999,
+      background: "rgba(255,255,255,0.96)",
+      alignItems: "center",
+      justifyContent: "center",
+      border: "2px solid rgba(255,255,255,0.55)",
+      boxShadow: "0 8px 20px rgba(0,0,0,0.28)",
+    },
+    [
+      {
+        type: "img",
+        props: {
+          src: iconSrc,
+          width: 40,
+          height: 40,
+          style: { width: 40, height: 40 },
+        },
+      },
+    ],
+  );
+}
+
+function buildTree(
+  plan: PlanRecord,
+  cover: string | null,
+  counts: { going: number; interested: number },
+  vibeIcon: string | null,
+): El {
   const host = store.findUserById(plan.creatorId);
   const hostName = host?.firstName ?? "A host";
   const dateLine = [formatDate(plan.date), formatTime(plan.time, plan.isFlexibleTime)].filter(Boolean).join("  ·  ");
@@ -180,7 +292,7 @@ function buildTree(plan: PlanRecord, cover: string | null, counts: { going: numb
     })
   );
 
-  // Top row: wordmark + host emoji chip.
+  // Top row: wordmark + circular vibe/brand mark (image, never emoji text).
   layers.push(
     h(
       "div",
@@ -204,11 +316,7 @@ function buildTree(plan: PlanRecord, cover: string | null, counts: { going: numb
             }),
           ]
         ),
-        text(plan.hostEmoji || "✨", {
-          fontSize: 40, width: 72, height: 72, borderRadius: 999,
-          background: "rgba(255,255,255,0.16)", alignItems: "center", justifyContent: "center",
-          border: "2px solid rgba(255,255,255,0.35)",
-        }),
+        vibeBadge(vibeIcon),
       ]
     )
   );
@@ -279,6 +387,7 @@ function cacheKey(plan: PlanRecord, going: number, interested: number): string {
     plan.time,
     plan.location?.name,
     plan.flyerDataUrl ? `f${plan.flyerDataUrl.length}` : plan.flyerLinkPreview?.image ?? "",
+    plan.hostEmoji ?? "",
     plan.cancelledAt ?? "",
   ].join("|");
   return `${plan.id}:${going}:${interested}:${fp}`;
@@ -291,10 +400,17 @@ async function renderPlanCard(plan: PlanRecord): Promise<Buffer> {
   if (hit) return hit;
 
   const cover = await coverDataUri(plan);
-  const svg = await satori(buildTree(plan, cover, counts) as never, {
+  const vibeIcon = await emojiDataUri(plan.hostEmoji || "✨");
+  const svg = await satori(buildTree(plan, cover, counts, vibeIcon) as never, {
     width: OG_WIDTH,
     height: OG_HEIGHT,
     fonts: loadFonts(),
+    // Any leftover emoji in the title/place must render as an image, never
+    // satori's "NO GLYPH" placeholder.
+    loadAdditionalAsset: async (code, segment) => {
+      if (code !== "emoji") return "";
+      return (await emojiDataUri(segment)) ?? TRANSPARENT_PNG;
+    },
   });
   const png = new Resvg(svg, { fitTo: { mode: "width", value: OG_WIDTH } }).render().asPng();
 

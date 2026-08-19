@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { api } from "../api/http";
+import { api, parseApiError } from "../api/http";
 import { formatPhoneInput, formatPlanDate, formatPlanTime } from "../lib/format";
 import { INTEREST_EMOJI, INTEREST_LABELS, type PublicPlanDTO } from "../types/shared";
 import { LoadingScreen } from "../components/LoadingScreen";
@@ -20,6 +20,7 @@ export function PublicEventPage() {
 
   const [plan, setPlan] = useState<PublicPlanDTO | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [coverFailed, setCoverFailed] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +29,7 @@ export function PublicEventPage() {
     let active = true;
     setPlan(null);
     setLoadError(false);
+    setCoverFailed(false);
     api<PublicPlanDTO>(`/api/plans/${id}/public`)
       .then((p) => active && setPlan(p))
       .catch(() => active && setLoadError(true));
@@ -58,7 +60,7 @@ export function PublicEventPage() {
         },
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Something went wrong");
+      setError(parseApiError(e));
       setBusy(false);
     }
   }
@@ -83,14 +85,24 @@ export function PublicEventPage() {
     plan.goingCount > 0 || plan.interestedCount > 0
       ? `${plan.goingCount} going · ${plan.interestedCount} interested`
       : "Be the first to join";
+  const showCover = Boolean(plan.coverImage) && !coverFailed;
 
   return (
     <div className="public-event">
       <div className="public-event-card">
-        <div className="public-event-hero">
-          {plan.coverImage && (
-            <img className="public-event-hero-img" src={plan.coverImage} alt={plan.title} />
+        <div className={`public-event-hero ${showCover ? "" : "public-event-hero--empty"}`}>
+          {showCover && (
+            <img
+              className="public-event-hero-img"
+              src={plan.coverImage}
+              alt=""
+              referrerPolicy="no-referrer"
+              onError={() => setCoverFailed(true)}
+            />
           )}
+          <span className="public-event-hero-badge" aria-hidden="true">
+            {plan.hostEmoji || "✨"}
+          </span>
         </div>
 
         <div className="public-event-body">
@@ -99,9 +111,7 @@ export function PublicEventPage() {
             <span className="public-event-invited">You're invited</span>
           </div>
 
-          <h1 className="public-event-title">
-            <span className="public-event-emoji">{plan.hostEmoji}</span> {plan.title}
-          </h1>
+          <h1 className="public-event-title">{plan.title}</h1>
           <div className="public-event-meta">{dateLine}</div>
           {plan.locationName && <div className="public-event-meta">📍 {plan.locationName}</div>}
           <div className="public-event-host">Hosted by {plan.hostFirstName}</div>
