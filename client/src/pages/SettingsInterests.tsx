@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
@@ -19,6 +19,11 @@ import {
 export function SettingsInterestsPage() {
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo =
+    typeof (location.state as { returnTo?: unknown } | null)?.returnTo === "string"
+      ? (location.state as { returnTo: string }).returnTo
+      : "/settings";
   const [picked, setPicked] = useState<InterestTag[]>(user?.interests ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +47,7 @@ export function SettingsInterestsPage() {
         body: JSON.stringify({ interests: picked }),
       });
       setUser(next);
-      navigate("/settings");
+      navigate(returnTo);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save.");
     } finally {
@@ -53,8 +58,9 @@ export function SettingsInterestsPage() {
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">
       <header className="app-header app-header--minimal">
-        <Link to="/settings" className="detail-back">
-          <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" /> Settings
+        <Link to={returnTo} className="detail-back">
+          <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />{" "}
+          {returnTo.startsWith("/messages") ? "Messages" : "Settings"}
         </Link>
       </header>
       <ScreenTitle title="Interests" subtitle="Pick what you're into. Your feed does the rest." />

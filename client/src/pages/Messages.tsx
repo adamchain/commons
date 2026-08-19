@@ -1,11 +1,17 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { BarChart2, MessageCircle } from "lucide-react";
 import { api, parseApiError } from "../api/http";
-import { EmptyCard, ScreenTitle } from "../components/ui";
+import { ScreenTitle } from "../components/ui";
 import { formatRelative, sentenceCaseTitle } from "../lib/format";
 import { interestVisual } from "../lib/interestIcons";
-import type { ConversationSummaryDTO, ForumSummaryDTO, InterestTag } from "../types/shared";
+import {
+  FORUM_INTERESTS,
+  INTEREST_LABELS,
+  type ConversationSummaryDTO,
+  type ForumSummaryDTO,
+  type InterestTag,
+} from "../types/shared";
 
 function previewLooksLikePoll(text: string | null | undefined): boolean {
   if (!text) return false;
@@ -28,11 +34,14 @@ function chatVisual(c: ConversationSummaryDTO) {
 }
 
 export function MessagesPage() {
+  const navigate = useNavigate();
   const [items, setItems] = useState<ConversationSummaryDTO[]>([]);
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<"plans" | "interests">("plans");
   const [forums, setForums] = useState<ForumSummaryDTO[]>([]);
   const [forumsReady, setForumsReady] = useState(false);
+  const [joiningTag, setJoiningTag] = useState<InterestTag | null>(null);
+  const [joinErr, setJoinErr] = useState<string | null>(null);
   const [dismissTarget, setDismissTarget] = useState<string | null>(null);
   const [dismissBusy, setDismissBusy] = useState(false);
   const [dismissErr, setDismissErr] = useState<string | null>(null);
@@ -77,6 +86,22 @@ export function MessagesPage() {
       .finally(() => setForumsReady(true));
   }, [tab, forumsReady]);
 
+  const joinedTags = new Set(forums.map((f) => f.interestTag));
+  const availableForums = FORUM_INTERESTS.filter((t) => !joinedTags.has(t));
+
+  async function joinForum(tag: InterestTag) {
+    if (joiningTag) return;
+    setJoiningTag(tag);
+    setJoinErr(null);
+    try {
+      await api(`/api/forums/${tag}/join`, { method: "POST" });
+      navigate(`/forums/${tag}`, { state: { from: "messages" } });
+    } catch (e) {
+      setJoinErr(e instanceof Error ? e.message : "Couldn't join that forum.");
+      setJoiningTag(null);
+    }
+  }
+
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar app-shell--messages-lock">
       <ScreenTitle title="Messages" />
@@ -112,65 +137,92 @@ export function MessagesPage() {
               <div className="feed-skeleton-card" />
               <div className="feed-skeleton-card" />
             </div>
-          ) : forums.length === 0 ? (
-            <EmptyCard
-              icon={<MessageCircle size={22} strokeWidth={1.6} color="var(--muted)" />}
-              title="No interest forums yet."
-              body="Join an interest to unlock its citywide forum — Coffee, Workouts, and more."
-              cta={{ to: "/settings/interests", label: "Join more interests →" }}
-            />
           ) : (
-            <div className="messages-card">
-              <div className="messages-list">
-                {forums.map((f) => {
-                  const { Icon, iconColor, tint } = interestVisual(f.interestTag);
-                  return (
-                    <Link
-                      key={f.interestTag}
-                      to={`/forums/${f.interestTag}`}
-                      state={{ from: "messages" }}
-                      className="messages-row"
-                    >
-                      <span
-                        className="messages-row-icon"
-                        style={{ background: tint, color: iconColor }}
-                        aria-hidden="true"
-                      >
-                        <Icon size={18} strokeWidth={1.8} />
-                      </span>
-                      <div className="messages-row-body">
-                        <div className="messages-row-top">
-                          <span className="messages-row-title">{f.label}</span>
-                          {f.hasUnread && (
-                            <span className="messages-row-unread-dot" aria-label="Unread" />
-                          )}
-                          {f.latestPost && (
-                            <span className="messages-row-time">
-                              {formatRelative(f.latestPost.createdAt)}
-                            </span>
-                          )}
-                        </div>
-                        <div className="messages-row-preview">
-                          {f.latestPost ? (
-                            <span>
-                              <span className="messages-row-author">{f.latestPost.authorName}</span>
-                              {`: ${f.latestPost.preview}`}
-                            </span>
-                          ) : (
-                            <span className="messages-row-preview--empty">
-                              No posts yet — be the first
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-              <Link to="/settings/interests" className="forum-join-more">
-                Join more interests →
-              </Link>
-            </div>
+            <>
+              {forums.length === 0 ? (
+                <p className="form-help" style={{ marginTop: 4 }}>
+                  Join an interest to unlock its citywide forum — Coffee, Workouts, and more.
+                </p>
+              ) : (
+                <div className="messages-card">
+                  <div className="messages-list">
+                    {forums.map((f) => {
+                      const { Icon, iconColor, tint } = interestVisual(f.interestTag);
+                      return (
+                        <Link
+                          key={f.interestTag}
+                          to={`/forums/${f.interestTag}`}
+                          state={{ from: "messages" }}
+                          className="messages-row"
+                        >
+                          <span
+                            className="messages-row-icon"
+                            style={{ background: tint, color: iconColor }}
+                            aria-hidden="true"
+                          >
+                            <Icon size={18} strokeWidth={1.8} />
+                          </span>
+                          <div className="messages-row-body">
+                            <div className="messages-row-top">
+                              <span className="messages-row-title">{f.label}</span>
+                              {f.hasUnread && (
+                                <span className="messages-row-unread-dot" aria-label="Unread" />
+                              )}
+                              {f.latestPost && (
+                                <span className="messages-row-time">
+                                  {formatRelative(f.latestPost.createdAt)}
+                                </span>
+                              )}
+                            </div>
+                            <div className="messages-row-preview">
+                              {f.latestPost ? (
+                                <span>
+                                  <span className="messages-row-author">{f.latestPost.authorName}</span>
+                                  {`: ${f.latestPost.preview}`}
+                                </span>
+                              ) : (
+                                <span className="messages-row-preview--empty">
+                                  No posts yet — be the first
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {availableForums.length > 0 && (
+                <div className="forum-join-more-block">
+                  <p className="form-eyebrow">{forums.length === 0 ? "Pick an interest" : "Join more forums"}</p>
+                  <div className="settings-interests-grid">
+                    {availableForums.map((t) => {
+                      const { Icon, iconColor, tint } = interestVisual(t);
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          className="settings-interest-pill settings-forum-join-pill"
+                          disabled={joiningTag === t}
+                          onClick={() => void joinForum(t)}
+                        >
+                          <span
+                            className="settings-forum-icon settings-forum-icon--sm"
+                            style={{ background: tint, color: iconColor }}
+                            aria-hidden="true"
+                          >
+                            <Icon size={14} strokeWidth={1.8} />
+                          </span>
+                          {INTEREST_LABELS[t]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {joinErr && <p className="error-text" style={{ marginTop: 12 }}>{joinErr}</p>}
+                </div>
+              )}
+            </>
           )}
         </>
       ) : !ready ? (
