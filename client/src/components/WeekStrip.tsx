@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PlanDTO } from "../types/shared";
 
 function startOfWeekMonday(d: Date): Date {
@@ -20,9 +20,14 @@ function isoDay(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+function prefersReducedMotion(): boolean {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 /**
- * Compact 7-day strip. Tap a day to filter the feed; tap again to clear.
- * Pure calendar — no "X people in your network" nudge copy.
+ * Compact day strip. Tap a day to filter the feed; tap again to clear.
+ * A visible All dates / Today control on the strip itself returns to the
+ * unfiltered feed and jumps the scroller back to today.
  */
 export function WeekStrip({
   plans,
@@ -67,28 +72,80 @@ export function WeekStrip({
     return map;
   }, [plans]);
 
+  const stripRef = useRef<HTMLElement>(null);
+  const todayBtnRef = useRef<HTMLButtonElement>(null);
+  const [todayInView, setTodayInView] = useState(true);
+
+  useEffect(() => {
+    const strip = stripRef.current;
+    const todayBtn = todayBtnRef.current;
+    if (!strip || !todayBtn) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry) setTodayInView(entry.isIntersecting);
+      },
+      { root: strip, threshold: 0.6 },
+    );
+    io.observe(todayBtn);
+    return () => io.disconnect();
+  }, []);
+
+  const jumpToToday = () => {
+    const strip = stripRef.current;
+    const todayBtn = todayBtnRef.current;
+    if (!strip || !todayBtn) return;
+    const delta = todayBtn.getBoundingClientRect().left - strip.getBoundingClientRect().left;
+    strip.scrollTo({
+      left: Math.max(0, strip.scrollLeft + delta),
+      behavior: prefersReducedMotion() ? "auto" : "smooth",
+    });
+  };
+
+  const showReset = selectedDayIso !== null || !todayInView;
+  const resetLabel = selectedDayIso ? "All dates" : "Today";
+
   return (
-    <section className="week-strip week-strip--scroll" aria-label="Calendar — scroll for more days">
-      {week.days.map(({ iso, label, date, monthLabel }) => {
-        const hasPlans = (byDay.get(iso) ?? 0) > 0;
-        const isToday = iso === week.todayIso;
-        const isSelected = iso === selectedDayIso;
-        return (
-          <button
-            key={iso}
-            type="button"
-            className={`week-strip-day ${hasPlans ? "has-plans" : ""} ${isToday ? "is-today" : ""} ${isSelected ? "is-selected" : ""}`}
-            title={date.toLocaleDateString()}
-            onClick={() => onSelectDay(isSelected ? null : iso)}
-            aria-pressed={isSelected}
-          >
-            {monthLabel && <span className="week-strip-month">{monthLabel}</span>}
-            <span className="week-strip-dow">{label}</span>
-            <span className="week-strip-num">{date.getDate()}</span>
-          </button>
-        );
-      })}
-    </section>
+    <div className="week-strip-wrap">
+      <section
+        ref={stripRef}
+        className="week-strip week-strip--scroll"
+        aria-label="Calendar — scroll for more days"
+      >
+        {week.days.map(({ iso, label, date, monthLabel }) => {
+          const hasPlans = (byDay.get(iso) ?? 0) > 0;
+          const isToday = iso === week.todayIso;
+          const isSelected = iso === selectedDayIso;
+          return (
+            <button
+              key={iso}
+              ref={isToday ? todayBtnRef : undefined}
+              type="button"
+              className={`week-strip-day ${hasPlans ? "has-plans" : ""} ${isToday ? "is-today" : ""} ${isSelected ? "is-selected" : ""}`}
+              title={date.toLocaleDateString()}
+              onClick={() => onSelectDay(isSelected ? null : iso)}
+              aria-pressed={isSelected}
+              aria-current={isToday ? "date" : undefined}
+            >
+              {monthLabel && <span className="week-strip-month">{monthLabel}</span>}
+              <span className="week-strip-dow">{label}</span>
+              <span className="week-strip-num">{date.getDate()}</span>
+            </button>
+          );
+        })}
+      </section>
+      {showReset && (
+        <button
+          type="button"
+          className="week-strip-reset"
+          onClick={() => {
+            if (selectedDayIso) onSelectDay(null);
+            jumpToToday();
+          }}
+          aria-label={selectedDayIso ? "Show all dates" : "Jump to today"}
+        >
+          {resetLabel}
+        </button>
+      )}
+    </div>
   );
 }
-
