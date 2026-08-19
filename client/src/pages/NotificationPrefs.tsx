@@ -15,8 +15,9 @@ import {
  * Toggles are grouped into PLANS / SOCIAL / WEEKLY DIGEST / HOW — same
  * pattern as Settings, so the visual language stays consistent.
  *
- * The HOW section is informational for now (push channel + email + sms);
- * server-side channel selection lives on a later track.
+ * HOW lists the channels that actually fire today: push for in-app prefs,
+ * SMS for time-sensitive plan reminders. Email isn't collected on accounts
+ * (phone-only auth), so it isn't offered here.
  */
 export function NotificationPrefsPage() {
   const { user, setUser } = useAuth();
@@ -126,11 +127,6 @@ export function NotificationPrefsPage() {
           icon="🔔"
           title="Push notifications"
           sub="On"
-        />
-        <InfoRow
-          icon="✉️"
-          title="Email"
-          sub="Add an email to receive digests"
         />
         <InfoRow
           icon="💬"
