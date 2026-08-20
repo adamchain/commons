@@ -81,7 +81,7 @@ export function ExplorePage() {
         </div>
         {communities.length > 0 ? (
           <ul className="xpl-comm-list">
-            {communities.map((c, i) => (
+            {communities.slice(0, 5).map((c, i) => (
               <li key={c.id} className="xpl-comm-row-wrap">
                 <Link to={`/communities/${c.id}`} state={{ from: "explore" }} className="xpl-comm-row">
                   <span className="xpl-comm-num">{String(i + 1).padStart(2, "0")}</span>

@@ -6,8 +6,10 @@ import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
 import { EmptyCard } from "../components/ui";
 import {
+  ALL_COMMUNITY_CATEGORIES,
   COMMUNITY_CATEGORY_LABELS,
   type CommunityCardDTO,
+  type CommunityCategory,
   type CommunityDTO,
   type PublicUser,
 } from "../types/shared";
@@ -18,6 +20,7 @@ export function CommunitiesPage() {
   const [mine, setMine] = useState<CommunityCardDTO[]>([]);
   const [all, setAll] = useState<CommunityCardDTO[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [category, setCategory] = useState<CommunityCategory | "all">("all");
 
   useEffect(() => {
     let live = true;
@@ -40,8 +43,13 @@ export function CommunitiesPage() {
   }, []);
 
   const mineIds = new Set(mine.map((c) => c.id));
-  const browse = all.filter((c) => !mineIds.has(c.id));
-  const [hero, ...restMine] = mine;
+  const matchesCat = (c: CommunityCardDTO) => category === "all" || c.category === category;
+  const mineFiltered = mine.filter(matchesCat);
+  const browse = all.filter((c) => !mineIds.has(c.id)).filter(matchesCat);
+  const [hero, ...restMine] = mineFiltered;
+  const catLabel = category === "all" ? null : COMMUNITY_CATEGORY_LABELS[category];
+  const showBrowseEmpty = loaded && browse.length === 0 && mineFiltered.length === 0;
+  const showBrowse = browse.length > 0 || showBrowseEmpty;
 
   function absorbJoin(updated: CommunityCardDTO) {
     setAll((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
@@ -67,6 +75,30 @@ export function CommunitiesPage() {
         </button>
       </header>
 
+      <div className="cmy-cat-pills" role="tablist" aria-label="Filter by category">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={category === "all"}
+          className={`cmy-cat-pill ${category === "all" ? "is-active" : ""}`}
+          onClick={() => setCategory("all")}
+        >
+          All
+        </button>
+        {ALL_COMMUNITY_CATEGORIES.map((cat) => (
+          <button
+            key={cat}
+            type="button"
+            role="tab"
+            aria-selected={category === cat}
+            className={`cmy-cat-pill ${category === cat ? "is-active" : ""}`}
+            onClick={() => setCategory(cat)}
+          >
+            {COMMUNITY_CATEGORY_LABELS[cat]}
+          </button>
+        ))}
+      </div>
+
       {hero && (
         <section className="cmy-list-section">
           <h2 className="cmy-list-section-title">Your communities</h2>
@@ -83,14 +115,25 @@ export function CommunitiesPage() {
         </section>
       )}
 
+      {showBrowse && (
       <section className="cmy-list-section">
-        <h2 className="cmy-list-section-title">Browse</h2>
-        {loaded && browse.length === 0 && (
+        <h2 className="cmy-list-section-title">
+          {catLabel ? `Browse · ${catLabel}` : "Browse"}
+        </h2>
+        {showBrowseEmpty && (
           <EmptyCard
             icon={<Users size={22} strokeWidth={1.6} color="#3A6A3A" />}
             tint="#C8DDC8"
-            title="No communities to browse yet."
-            body="Be the first to create a community — run clubs, book clubs, and the regulars."
+            title={
+              catLabel
+                ? `No ${catLabel.toLowerCase()} communities yet.`
+                : "No communities to browse yet."
+            }
+            body={
+              catLabel
+                ? "Try another category, or create one for this scene."
+                : "Be the first to create a community — run clubs, book clubs, and the regulars."
+            }
             cta={{ to: "/communities/new", label: "Create a community" }}
           />
         )}
@@ -104,6 +147,7 @@ export function CommunitiesPage() {
           </ul>
         )}
       </section>
+      )}
     </main>
   );
 }
