@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Check, Hand } from "lucide-react";
+import { ArrowLeft, Ban, Check, Hand } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { NumberPicker } from "../components/NumberPicker";
@@ -29,6 +29,15 @@ type LinkPreview = {
   image?: string;
   siteName?: string;
 };
+
+type InstantSection = "basics" | "where" | "who" | "cover";
+
+const EDIT_JUMP = [
+  { id: "edit-basics", label: "Basics" },
+  { id: "edit-when", label: "Where & When" },
+  { id: "edit-invited", label: "Who's Invited" },
+  { id: "edit-cover", label: "Cover Photo" },
+] as const;
 
 // Pick the smallest set of fields the user is likely to touch — title,
 // description, vibes, capacity/joinType, visibility, flyer (image + link), and
@@ -109,8 +118,9 @@ function EditForm({
   });
   const [submitErr, setSubmitErr] = useState<string | null>(null);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
-  const [savedFlash, setSavedFlash] = useState<string | null>(null);
+  const [savedFlash, setSavedFlash] = useState<{ section: InstantSection; label: string } | null>(null);
   const skipInstant = useRef(true);
+  const lastInstantGroup = useRef<Exclude<InstantSection, "cover">>("basics");
   const instantTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -176,12 +186,17 @@ function EditForm({
   }
 
   function toggleVibe(vid: VibeIcon): void {
+    lastInstantGroup.current = "basics";
     setForm((prev) => ({
       ...prev,
       vibes: prev.vibes.includes(vid)
         ? prev.vibes.filter((v) => v !== vid)
         : [...prev.vibes, vid],
     }));
+  }
+
+  function jumpTo(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   const resolvedTags = useMemo<InterestTag[]>(() => {
@@ -193,8 +208,8 @@ function EditForm({
     return Array.from(set);
   }, [form.vibes]);
 
-  function flashSaved(label = "Saved") {
-    setSavedFlash(label);
+  function flashSaved(section: InstantSection, label = "Saved") {
+    setSavedFlash({ section, label });
     if (flashTimer.current) clearTimeout(flashTimer.current);
     flashTimer.current = setTimeout(() => setSavedFlash(null), 1800);
   }
@@ -218,7 +233,7 @@ function EditForm({
         }),
       });
       setPlan(updated);
-      flashSaved();
+      flashSaved(lastInstantGroup.current);
       setSubmitErr(null);
     } catch (err) {
       setSubmitErr(err instanceof Error ? err.message : "Couldn't save.");
@@ -264,7 +279,7 @@ function EditForm({
         }),
       });
       setPlan(updated);
-      flashSaved("Cover photo saved");
+      flashSaved("cover", "Cover photo saved");
     } catch (err) {
       setSubmitErr(err instanceof Error ? err.message : "Couldn't save cover photo.");
     } finally {
@@ -322,6 +337,11 @@ function EditForm({
     }
   }
 
+  const timeUnchanged =
+    proposeDate === plan.date.slice(0, 10) &&
+    proposeFlexTime === plan.isFlexibleTime &&
+    (proposeFlexTime || proposeTime === (plan.time || "19:00"));
+
   return (
     <main className="app-shell app-shell--mid edit-plan-page">
       <header className="app-header app-header--minimal app-header--sticky edit-plan-top">
@@ -331,7 +351,7 @@ function EditForm({
         {savedFlash && (
           <span className="edit-saved-flash" role="status">
             <Check size={14} strokeWidth={2.4} aria-hidden="true" />
-            {savedFlash}
+            {savedFlash.label}
           </span>
         )}
       </header>
@@ -339,10 +359,17 @@ function EditForm({
         title="Edit plan"
         subtitle="Most edits save as you go. Date and time go through a proposal."
       />
+      <nav className="edit-jump" aria-label="Jump to section">
+        {EDIT_JUMP.map((s) => (
+          <button key={s.id} type="button" className="edit-jump-btn" onClick={() => jumpTo(s.id)}>
+            {s.label}
+          </button>
+        ))}
+      </nav>
 
       <div className="form-card">
         <section className="edit-section">
-          <h2 className="edit-section-label">Basics</h2>
+          <SectionHead id="edit-basics" label="Basics" saved={savedFlash?.section === "basics"} />
           <label className="form-question">Category</label>
           <div className="edit-cat-row">
             {resolvedTags.length > 0 ? (
@@ -393,26 +420,32 @@ function EditForm({
           <input
             id="title"
             value={form.title}
-            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+            onChange={(e) => {
+              lastInstantGroup.current = "basics";
+              setForm((f) => ({ ...f, title: e.target.value }));
+            }}
           />
           <label className="form-question" htmlFor="description">Details</label>
           <textarea
             id="description"
             value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+            onChange={(e) => {
+              lastInstantGroup.current = "basics";
+              setForm((f) => ({ ...f, description: e.target.value }));
+            }}
           />
         </section>
 
-        <section className="edit-section edit-section--proposal">
-          <h2 className="edit-section-label">Where &amp; when</h2>
-          <p className="edit-section-note">
-            Neighborhood saves as you go. Changing the date or time notifies people going and doesn&apos;t apply until you confirm.
-          </p>
+        <section className="edit-section">
+          <SectionHead id="edit-when" label="Where & when" saved={savedFlash?.section === "where"} />
           <label className="form-question" htmlFor="neighborhood">Neighborhood</label>
           <select
             id="neighborhood"
             value={form.neighborhoodId}
-            onChange={(e) => setForm((f) => ({ ...f, neighborhoodId: e.target.value }))}
+            onChange={(e) => {
+              lastInstantGroup.current = "where";
+              setForm((f) => ({ ...f, neighborhoodId: e.target.value }));
+            }}
           >
             <option value="">Whereabouts…</option>
             {neighborhoods.map((n) => (
@@ -423,110 +456,126 @@ function EditForm({
             <input
               type="checkbox"
               checked={form.isFlexibleLocation}
-              onChange={(e) => setForm((f) => ({ ...f, isFlexibleLocation: e.target.checked }))}
+              onChange={(e) => {
+                lastInstantGroup.current = "where";
+                setForm((f) => ({ ...f, isFlexibleLocation: e.target.checked }));
+              }}
             />
             Flexible location
           </label>
 
-          {plan.pendingTimeProposal ? (
-            <div className="coordination-banner coordination-banner--expanded" role="note" style={{ marginTop: 14 }}>
-              <p>
-                Pending update:{" "}
-                <strong>
-                  {formatPlanDate(plan.pendingTimeProposal.date)} ·{" "}
-                  {formatPlanTime(plan.pendingTimeProposal.time, plan.pendingTimeProposal.isFlexibleTime)}
-                </strong>
-                . People have been notified — apply when you&apos;re ready.
-              </p>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  disabled={proposeBusy}
-                  onClick={() => void applyProposal()}
-                >
-                  {proposeBusy ? "Working…" : "Apply new time"}
-                </button>
-                <button
-                  type="button"
-                  className="btn-link"
-                  disabled={proposeBusy}
-                  onClick={() => void cancelProposal()}
-                >
-                  Keep current time
-                </button>
-              </div>
-              {proposeErr && <p className="error-text">{proposeErr}</p>}
-            </div>
-          ) : (
-            <>
-              <div className="luma-card" style={{ marginTop: 14 }}>
-                <div className="luma-row">
-                  <span className="luma-label">Date</span>
-                  <div className="luma-value">
-                    <input
-                      id="propose-date"
-                      type="date"
-                      className="luma-input"
-                      value={proposeDate}
-                      onChange={(e) => setProposeDate(e.target.value)}
-                    />
-                  </div>
+          <div className="edit-proposal">
+            <p className="edit-proposal-note">
+              Changes here go through a proposal, not an instant save.
+            </p>
+            <p className="edit-proposal-current">
+              Current: {formatPlanDate(plan.date)} · {formatPlanTime(plan.time, plan.isFlexibleTime)}
+            </p>
+            {plan.pendingTimeProposal ? (
+              <div className="coordination-banner coordination-banner--expanded" role="note">
+                <p>
+                  Pending update:{" "}
+                  <strong>
+                    {formatPlanDate(plan.pendingTimeProposal.date)} ·{" "}
+                    {formatPlanTime(plan.pendingTimeProposal.time, plan.pendingTimeProposal.isFlexibleTime)}
+                  </strong>
+                  . People have been notified — apply when you&apos;re ready.
+                </p>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={proposeBusy}
+                    onClick={() => void applyProposal()}
+                  >
+                    {proposeBusy ? "Working…" : "Apply new time"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-link"
+                    disabled={proposeBusy}
+                    onClick={() => void cancelProposal()}
+                  >
+                    Keep current time
+                  </button>
                 </div>
-                <div className="luma-row">
-                  <span className="luma-label">Time</span>
-                  <div className="luma-value">
-                    {!proposeFlexTime ? (
+                {proposeErr && <p className="error-text">{proposeErr}</p>}
+              </div>
+            ) : (
+              <>
+                <div className="luma-card">
+                  <div className="luma-row">
+                    <span className="luma-label">Date</span>
+                    <div className="luma-value">
                       <input
-                        id="propose-time"
-                        type="time"
+                        id="propose-date"
+                        type="date"
                         className="luma-input"
-                        value={proposeTime}
-                        onChange={(e) => setProposeTime(e.target.value)}
+                        value={proposeDate}
+                        onChange={(e) => setProposeDate(e.target.value)}
                       />
-                    ) : (
-                      <span className="luma-flex-text">Flexible time</span>
-                    )}
-                    <button
-                      type="button"
-                      className={`flex-toggle-btn ${proposeFlexTime ? "is-active" : ""}`}
-                      aria-pressed={proposeFlexTime}
-                      onClick={() => setProposeFlexTime((v) => !v)}
-                    >
-                      Flexible
-                    </button>
+                    </div>
+                  </div>
+                  <div className="luma-row">
+                    <span className="luma-label">Time</span>
+                    <div className="luma-value">
+                      {!proposeFlexTime ? (
+                        <input
+                          id="propose-time"
+                          type="time"
+                          className="luma-input"
+                          value={proposeTime}
+                          onChange={(e) => setProposeTime(e.target.value)}
+                        />
+                      ) : (
+                        <span className="luma-flex-text">Flexible time</span>
+                      )}
+                      <button
+                        type="button"
+                        className={`flex-toggle-btn ${proposeFlexTime ? "is-active" : ""}`}
+                        aria-pressed={proposeFlexTime}
+                        onClick={() => setProposeFlexTime((v) => !v)}
+                      >
+                        Flexible
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-              {proposeErr && <p className="error-text">{proposeErr}</p>}
-              <button
-                type="button"
-                className="btn-primary btn-block"
-                style={{ marginTop: 12 }}
-                disabled={proposeBusy}
-                onClick={() => void proposeChange()}
-              >
-                {proposeBusy ? "Updating…" : "Propose new time"}
-              </button>
-            </>
-          )}
+                {proposeErr && <p className="error-text">{proposeErr}</p>}
+                <button
+                  type="button"
+                  className="btn-primary btn-block"
+                  disabled={proposeBusy || timeUnchanged}
+                  onClick={() => void proposeChange()}
+                >
+                  {proposeBusy ? "Updating…" : "Propose change"}
+                </button>
+              </>
+            )}
+          </div>
         </section>
 
         <section className="edit-section">
-          <h2 className="edit-section-label">Who&apos;s invited</h2>
+          <SectionHead id="edit-invited" label="Who's invited" saved={savedFlash?.section === "who"} />
           <label className="form-question">Who can see this?</label>
           <div className="visibility-options">
             <button
               type="button"
               className={`visibility-option ${form.visibility === "everyone" ? "is-active" : ""}`}
-              onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
+              onClick={() => {
+                lastInstantGroup.current = "who";
+                setForm((f) => ({ ...f, visibility: "everyone" }));
+              }}
             >
               <span className="visibility-option-title">Everyone on COMMONS</span>
             </button>
             <button
               type="button"
               className={`visibility-option ${form.visibility === "network" ? "is-active" : ""}`}
-              onClick={() => setForm((f) => ({ ...f, visibility: "network" as PlanVisibility }))}
+              onClick={() => {
+                lastInstantGroup.current = "who";
+                setForm((f) => ({ ...f, visibility: "network" as PlanVisibility }));
+              }}
             >
               <span className="visibility-option-title">Your Network</span>
             </button>
@@ -537,7 +586,10 @@ function EditForm({
               {form.capacityOn && (
                 <NumberPicker
                   value={Number(form.capacity) || 0}
-                  onChange={(n) => setForm((f) => ({ ...f, capacity: String(n) }))}
+                  onChange={(n) => {
+                    lastInstantGroup.current = "who";
+                    setForm((f) => ({ ...f, capacity: String(n) }));
+                  }}
                   ariaLabel="Number of spots"
                 />
               )}
@@ -545,7 +597,10 @@ function EditForm({
             <button
               type="button"
               className={`flex-toggle-btn ${form.capacityOn ? "is-active" : ""}`}
-              onClick={() => setForm((f) => ({ ...f, capacityOn: !f.capacityOn }))}
+              onClick={() => {
+                lastInstantGroup.current = "who";
+                setForm((f) => ({ ...f, capacityOn: !f.capacityOn }));
+              }}
               aria-pressed={form.capacityOn}
               title="Set limit"
             >
@@ -561,14 +616,20 @@ function EditForm({
                 <button
                   type="button"
                   className={form.joinType === "open" ? "is-active" : ""}
-                  onClick={() => setForm((f) => ({ ...f, joinType: "open" as JoinType }))}
+                  onClick={() => {
+                    lastInstantGroup.current = "who";
+                    setForm((f) => ({ ...f, joinType: "open" as JoinType }));
+                  }}
                 >
                   First come
                 </button>
                 <button
                   type="button"
                   className={form.joinType === "approve" ? "is-active" : ""}
-                  onClick={() => setForm((f) => ({ ...f, joinType: "approve" as JoinType }))}
+                  onClick={() => {
+                    lastInstantGroup.current = "who";
+                    setForm((f) => ({ ...f, joinType: "approve" as JoinType }));
+                  }}
                 >
                   Approve
                 </button>
@@ -578,7 +639,7 @@ function EditForm({
         </section>
 
         <section className="edit-section">
-          <h2 className="edit-section-label">Cover photo</h2>
+          <SectionHead id="edit-cover" label="Cover photo" saved={savedFlash?.section === "cover"} />
           <div className="flyer-uploader">
             {form.flyerDataUrl ? (
               <div className="flyer-preview">
@@ -663,18 +724,38 @@ function EditForm({
         <p className="form-help" style={{ marginTop: 0 }}>
           These aren&apos;t edits — they change who hosts or whether the plan stays on.
         </p>
-        <PassItOnControl
-          plan={plan}
-          onTransferred={() => navigate(`/plans/${plan.id}`)}
-        />
         {!plan.upForGrabsAt && !plan.cancelledAt && (
           <PutUpForGrabsControl
             plan={plan}
             onDone={() => navigate(`/plans/${plan.id}`)}
           />
         )}
+        {!plan.cancelledAt && (
+          <CancelPlanControl
+            plan={plan}
+            onDone={() => navigate(`/plans/${plan.id}`)}
+          />
+        )}
+        <PassItOnControl
+          plan={plan}
+          onTransferred={() => navigate(`/plans/${plan.id}`)}
+        />
       </section>
     </main>
+  );
+}
+
+function SectionHead({ id, label, saved }: { id: string; label: string; saved: boolean }) {
+  return (
+    <h2 id={id} className="edit-section-label">
+      {label}
+      {saved && (
+        <span className="edit-section-saved" role="status">
+          <Check size={12} strokeWidth={2.4} aria-hidden="true" />
+          Saved
+        </span>
+      )}
+    </h2>
   );
 }
 
@@ -747,6 +828,75 @@ function PutUpForGrabsControl({
           }}
         >
           {busy ? "Saving…" : "Put up for grabs"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CancelPlanControl({
+  plan,
+  onDone,
+}: {
+  plan: PlanDTO;
+  onDone: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function confirmCancel() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api(`/api/plans/${plan.id}/cancel`, { method: "POST" });
+      onDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't cancel this plan.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className="edit-plan-cancel-btn"
+        onClick={() => setOpen(true)}
+      >
+        <Ban size={14} strokeWidth={1.8} aria-hidden="true" />
+        Cancel plan
+      </button>
+    );
+  }
+
+  return (
+    <div className="plan-grabs-confirm" style={{ marginTop: 16 }} role="group">
+      <p className="plan-grabs-confirm-copy">
+        Cancel &ldquo;{plan.title}&rdquo;? Everyone who RSVP&apos;d will be notified.
+      </p>
+      {error && <p className="luma-inline-error">{error}</p>}
+      <div className="plan-grabs-confirm-actions">
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={busy}
+          onClick={() => {
+            setOpen(false);
+            setError(null);
+          }}
+        >
+          Keep plan
+        </button>
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={busy}
+          onClick={() => void confirmCancel()}
+          style={{ background: "var(--danger)" }}
+        >
+          {busy ? "Cancelling…" : "Cancel plan"}
         </button>
       </div>
     </div>

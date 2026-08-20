@@ -8454,6 +8454,9 @@ h1, h2, h3, h4, h5, h6 {
 .app-shell.edit-plan-page {
   padding-top: 0;
 }
+.edit-plan-page .form-card {
+  gap: 0;
+}
 .edit-plan-page .edit-plan-top {
   display: flex;
   align-items: center;
@@ -8473,6 +8476,26 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--ink);
   white-space: nowrap;
 }
+.edit-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -4px 0 16px;
+}
+.edit-jump-btn {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--muted);
+  font-size: var(--text-body-small);
+  font-weight: 600;
+  cursor: pointer;
+}
+.edit-jump-btn:hover {
+  color: var(--ink);
+  border-color: var(--tan-mid);
+}
 .edit-section {
   display: flex;
   flex-direction: column;
@@ -8480,6 +8503,7 @@ h1, h2, h3, h4, h5, h6 {
   padding-bottom: 22px;
   margin-bottom: 18px;
   border-bottom: 1px solid var(--border);
+  scroll-margin-top: 72px;
 }
 .edit-section:last-child {
   border-bottom: none;
@@ -8487,26 +8511,49 @@ h1, h2, h3, h4, h5, h6 {
   padding-bottom: 0;
 }
 .edit-section-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin: 0;
-  font-size: var(--text-body);
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
 }
-.edit-section--proposal {
+.edit-section-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+}
+.edit-proposal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 14px;
   background: var(--tan);
   border: 1px solid var(--tan-mid);
   border-radius: 16px;
-  padding: 14px 14px 16px;
-  margin-left: -4px;
-  margin-right: -4px;
 }
-.edit-section-note {
+.edit-proposal-note {
+  margin: 0;
+  font-size: var(--text-body-small);
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.45;
+}
+.edit-proposal-current {
   margin: 0;
   font-size: var(--text-body-small);
   color: var(--muted);
-  line-height: 1.45;
+  line-height: 1.4;
 }
 .edit-cat-row {
   display: flex;
@@ -8535,8 +8582,37 @@ h1, h2, h3, h4, h5, h6 {
   padding-top: 8px;
   border-top: 1px solid var(--border);
 }
-.edit-plan-actions .edit-plan-grabs-btn {
+.edit-plan-actions .edit-plan-grabs-btn,
+.edit-plan-actions .edit-plan-cancel-btn {
+  display: flex;
+  width: 100%;
   color: var(--red, #c13b3b);
+}
+.edit-plan-cancel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 4px 2px;
+  font-size: var(--text-body-small);
+  font-weight: 600;
+  color: var(--red, #c13b3b);
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--border-strong, var(--tan-mid));
+}
+.edit-plan-cancel-btn:hover {
+  color: var(--ink);
+  background: transparent;
+  text-decoration-color: var(--ink);
+}
+.edit-plan-cancel-btn svg {
+  flex-shrink: 0;
 }
 
 .plan-host-action-btn--danger {

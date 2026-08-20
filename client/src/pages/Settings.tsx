@@ -110,7 +110,7 @@ export function SettingsPage() {
         <SettingsRow
           icon={<InfoIcon />}
           title="About COMMONS"
-          sub="Version 0.4"
+          sub="Version 1.0"
         />
       </SettingsGroup>
 
