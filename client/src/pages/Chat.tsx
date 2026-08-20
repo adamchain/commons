@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -21,6 +21,7 @@ import { hrefForBack, type NavFromState } from "../lib/navState";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
 import { planHasEnded } from "../lib/planTime";
+import { useStickToBottom } from "../lib/useStickToBottom";
 import type { ConversationDTO, MessageDTO, PlanDTO, PublicUser } from "../types/shared";
 
 const POLL_MS = 4000;
@@ -72,14 +73,11 @@ export function ChatPage() {
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [leaveBusy, setLeaveBusy] = useState(false);
   const [leaveErr, setLeaveErr] = useState<string | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const atBottomRef = useRef(true);
-  // Own sends (and first paint) always pin to the newest message, even if the
-  // reader had scrolled up. Incoming messages from others still respect atBottom.
-  const forceScrollRef = useRef(true);
   const composerMenuRef = useRef<HTMLDivElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const lastMessageId = messages[messages.length - 1]?.id ?? "";
+  const { scrollRef, endRef, shellRef, stickOnSend } = useStickToBottom(chatReady, `${lastMessageId}:${messages.length}`);
 
   useEffect(() => {
     void (async () => {
@@ -111,48 +109,6 @@ export function ChatPage() {
     }, POLL_MS);
     return () => clearInterval(interval);
   }, [conv]);
-
-  // Track whether the reader is near the bottom so incoming messages from
-  // others don't yank the view while they're catching up on older ones.
-  // Don't sample on attach — the list starts at scrollTop 0, which would
-  // mark us "not at bottom" before the pin-to-end layout effect runs.
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const onScroll = () => {
-      atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
-    };
-    const pinIfFollowing = () => {
-      if (forceScrollRef.current || atBottomRef.current) {
-        el.scrollTop = el.scrollHeight;
-      }
-    };
-    el.addEventListener("scroll", onScroll, { passive: true });
-    // Keyboard / visual-viewport changes on iOS shrink the list after send
-    // and can leave the new bubble under the composer without a re-pin.
-    window.visualViewport?.addEventListener("resize", pinIfFollowing);
-    window.addEventListener("resize", pinIfFollowing);
-    return () => {
-      el.removeEventListener("scroll", onScroll);
-      window.visualViewport?.removeEventListener("resize", pinIfFollowing);
-      window.removeEventListener("resize", pinIfFollowing);
-    };
-  }, [chatReady]);
-
-  const lastMessageId = messages[messages.length - 1]?.id;
-
-  useLayoutEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    if (!forceScrollRef.current && !atBottomRef.current) return;
-    const pin = () => {
-      el.scrollTop = el.scrollHeight;
-    };
-    pin();
-    requestAnimationFrame(pin);
-    atBottomRef.current = true;
-    forceScrollRef.current = false;
-  }, [lastMessageId, messages.length, chatReady]);
 
   useEffect(() => {
     if (!composerMenuOpen) return;
@@ -216,7 +172,7 @@ export function ChatPage() {
           ...(pendingImage ? { imageUrl: pendingImage } : {}),
         }),
       });
-      forceScrollRef.current = true;
+      stickOnSend();
       setMessages((prev) => [...prev, msg]);
       setBody("");
       setPendingImage(null);
@@ -319,7 +275,7 @@ export function ChatPage() {
         method: "POST",
         body: JSON.stringify({ question, options }),
       });
-      forceScrollRef.current = true;
+      stickOnSend();
       setMessages((prev) => [...prev, msg]);
       setPollModalOpen(false);
       setPollQuestion("");
@@ -399,7 +355,7 @@ export function ChatPage() {
   const replanHref = `/plans/new?fromPlanId=${planId}&title=${encodeURIComponent(plan.title)}&inviteUserIds=${encodeURIComponent(inviteIds)}&inviteNames=${encodeURIComponent(inviteNames)}`;
 
   return (
-    <main className="app-shell app-shell--chat">
+    <main ref={shellRef} className="app-shell app-shell--chat">
       <header className="app-header app-header--minimal chat-header-bar chat-header-bar--thread app-header--sticky">
         <Link to={backHref} className="detail-back chat-back-link">
           <ArrowLeft size={13} strokeWidth={2.2} aria-hidden="true" />
@@ -642,6 +598,7 @@ export function ChatPage() {
               );
             })
           )}
+          <div ref={endRef} className="chat-messages-end" aria-hidden="true" />
         </div>
 
         <form

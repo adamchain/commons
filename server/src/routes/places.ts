@@ -43,6 +43,30 @@ function dedupePredictions(items: PlacePrediction[], limit = 8): PlacePrediction
   return out;
 }
 
+/** True when the place name covers the typed query (all words, or substring). */
+function nameCoversQuery(name: string, query: string): boolean {
+  const n = name.trim().toLowerCase();
+  const q = query.trim().toLowerCase();
+  if (!n || !q) return false;
+  if (n.includes(q)) return true;
+  const words = q.split(/\s+/).filter((w) => w.length > 1);
+  return words.length > 0 && words.every((w) => n.includes(w));
+}
+
+/** Parks/squares first when the typed query is in the name — Autocomplete is prefix-oriented. */
+function rankPredictions(items: PlacePrediction[], query: string): PlacePrediction[] {
+  const q = query.trim().toLowerCase();
+  const score = (p: PlacePrediction) => {
+    const name = p.name.trim().toLowerCase();
+    if (name === q) return 0;
+    if (name.startsWith(q)) return 1;
+    if (name.includes(q)) return 2;
+    if (nameCoversQuery(name, q)) return 3;
+    return 4;
+  };
+  return [...items].sort((a, b) => score(a) - score(b));
+}
+
 /** OpenStreetMap fallback so parks/landmarks still resolve when Google is empty or down. */
 async function nominatimSearch(q: string): Promise<PlacePrediction[]> {
   if (q.trim().length < 2) return [];
@@ -149,21 +173,18 @@ placesRouter.get("/autocomplete", requireAuth, async (req, res) => {
     const key = googleKey();
     let predictions: PlacePrediction[] = [];
     if (key) {
-      predictions = dedupePredictions(await googleAutocomplete(input, key));
-      const needle = input.toLowerCase();
-      const hasCloseHit = predictions.some((p) => {
-        const name = p.name.toLowerCase();
-        return name.includes(needle) || needle.includes(name);
-      });
-      // Autocomplete is prefix-oriented and weak on parks/squares. Text Search
-      // finds "Rittenhouse Square" even when Autocomplete returns nothing.
-      if (!hasCloseHit) {
-        const textHits = await googleTextSearch(input, key);
-        predictions = dedupePredictions([...textHits, ...predictions]);
-      }
+      // Autocomplete is prefix-oriented and weak on parks/squares ("Rittenhouse
+      // Square" often loses to the neighborhood or a hotel). Always merge Text
+      // Search so a well-known venue name surfaces even when Autocomplete is
+      // empty or only has a looser partial hit.
+      const [autoHits, textHits] = await Promise.all([
+        googleAutocomplete(input, key),
+        googleTextSearch(input, key),
+      ]);
+      predictions = rankPredictions(dedupePredictions([...textHits, ...autoHits]), input);
     }
     if (predictions.length === 0) {
-      predictions = dedupePredictions(await nominatimSearch(input));
+      predictions = rankPredictions(dedupePredictions(await nominatimSearch(input)), input);
     }
     res.json({ predictions });
   } catch (e) {

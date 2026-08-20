@@ -2039,6 +2039,15 @@ function PlacePicker({
       const controller = new AbortController();
       abortRef.current = controller;
       void (async () => {
+        const coversQuery = (name: string) => {
+          const n = name.trim().toLowerCase();
+          const needle = q.toLowerCase();
+          if (!n) return false;
+          if (n.includes(needle)) return true;
+          const words = needle.split(/\s+/).filter((w) => w.length > 1);
+          return words.length > 0 && words.every((w) => n.includes(w));
+        };
+        let merged: PlaceHit[] = [];
         try {
           const g = await api<{
             predictions: Array<{
@@ -2051,8 +2060,9 @@ function PlacePicker({
             }>;
           }>(`/api/places/autocomplete?q=${encodeURIComponent(q)}`, { signal: controller.signal });
           if (controller.signal.aborted) return;
-          if (g.predictions?.length) {
-            setResults(g.predictions);
+          merged = g.predictions ?? [];
+          if (merged.length && merged.some((p) => coversQuery(p.name))) {
+            setResults(merged);
             setErrored(false);
             setSearched(true);
             setLoading(false);
@@ -2068,12 +2078,20 @@ function PlacePicker({
             { signal: controller.signal },
           );
           if (controller.signal.aborted) return;
-          setResults(r.results ?? []);
+          const extra = r.results ?? [];
+          const seen = new Set(merged.map((p) => p.placeId));
+          merged = [...merged, ...extra.filter((p) => p.placeId && !seen.has(p.placeId))];
+          setResults(merged);
           setErrored(false);
         } catch (err) {
           if ((err as { name?: string })?.name === "AbortError") return;
-          setResults([]);
-          setErrored(true);
+          if (merged.length) {
+            setResults(merged);
+            setErrored(false);
+          } else {
+            setResults([]);
+            setErrored(true);
+          }
         } finally {
           if (!controller.signal.aborted) {
             setSearched(true);

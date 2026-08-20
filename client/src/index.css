@@ -3569,6 +3569,7 @@ h1, h2, h3, h4, h5, h6 {
 /* Public event landing (logged-out shared-link funnel) + download-app step */
 .public-event {
   min-height: 100dvh;
+  overflow-y: auto;
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -5078,6 +5079,7 @@ h1, h2, h3, h4, h5, h6 {
   border: none;
   border-top: 1px solid var(--border);
   border-radius: 0;
+  flex-shrink: 0;
   /* Pin the input to the bottom of the viewport so it's always visible without
      a little page scroll. Clears the iOS home indicator via the safe-area inset
      and sits above any messages that scroll behind it. */
@@ -11850,7 +11852,13 @@ h1, h2, h3, h4, h5, h6 {
   cursor: default;
 }
 .chat-messages {
-  padding-bottom: 72px;
+  padding-bottom: 24px;
+}
+.chat-messages-end {
+  width: 100%;
+  height: 1px;
+  flex-shrink: 0;
+  pointer-events: none;
 }
 .app-shell--messages-lock {
   height: 100dvh;

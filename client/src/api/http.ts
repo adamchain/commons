@@ -17,7 +17,15 @@ const API_BASE = resolveApiBase();
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
-  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  const method = (init?.method ?? "GET").toUpperCase();
+  // Only set JSON content-type when we actually send a body. A GET with
+  // `Content-Type: application/json` is a non-simple CORS request and can
+  // fail for logged-out visitors on the public event page.
+  if (init?.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  } else if (method !== "GET" && method !== "HEAD" && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
 
   // Native builds can't rely on cookies — attach the JWT as a Bearer token.
   // Web keeps cookie-based auth for backwards compatibility.

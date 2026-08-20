@@ -120,7 +120,7 @@ export function PublicEventPage() {
 
           {(() => {
             // Guard against legacy/unknown tags in older plan records.
-            const known = plan.tags.filter((t) => INTEREST_LABELS[t]).slice(0, 4);
+            const known = (plan.tags ?? []).filter((t) => INTEREST_LABELS[t]).slice(0, 4);
             if (known.length === 0) return null;
             return (
               <div className="public-event-tags">

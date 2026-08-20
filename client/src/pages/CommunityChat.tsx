@@ -9,6 +9,7 @@ import { sentenceCaseTitle } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
+import { useStickToBottom } from "../lib/useStickToBottom";
 import type { MessageDTO, PublicUser } from "../types/shared";
 
 const CHAT_IMAGE_MAX_PX = 1024;
@@ -58,10 +59,14 @@ export function CommunityChatPage() {
   const [chatReady, setChatReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsJoin, setNeedsJoin] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const composerMenuRef = useRef<HTMLDivElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const lastMessageId = messages[messages.length - 1]?.id ?? "";
+  const { scrollRef, endRef, shellRef, stickOnSend } = useStickToBottom(
+    chatReady && !needsJoin,
+    `${lastMessageId}:${messages.length}`,
+  );
 
   useEffect(() => {
     let alive = true;
@@ -108,12 +113,6 @@ export function CommunityChatPage() {
     }, POLL_MS);
     return () => clearInterval(interval);
   }, [conv]);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages.length]);
 
   useEffect(() => {
     if (!composerMenuOpen) return;
@@ -193,6 +192,7 @@ export function CommunityChatPage() {
           ...(pendingImage ? { imageUrl: pendingImage } : {}),
         }),
       });
+      stickOnSend();
       setMessages((prev) => [...prev, msg]);
       setBody("");
       setPendingImage(null);
@@ -310,6 +310,7 @@ export function CommunityChatPage() {
         method: "POST",
         body: JSON.stringify({ question, options }),
       });
+      stickOnSend();
       setMessages((prev) => [...prev, msg]);
       setPollModalOpen(false);
       setPollQuestion("");
@@ -381,7 +382,7 @@ export function CommunityChatPage() {
   const makePlanHref = `/plans/new?communityId=${encodeURIComponent(conv.communityId)}&communityName=${encodeURIComponent(conv.communityName)}`;
 
   return (
-    <main className="app-shell app-shell--chat">
+    <main ref={shellRef} className="app-shell app-shell--chat">
       <header className="app-header app-header--minimal chat-header-bar chat-header-bar--thread">
         <Link to={backTo} className="detail-back">{backLabel}</Link>
         <div className="chat-thread-title">{sentenceCaseTitle(conv.communityName)}</div>
@@ -593,6 +594,7 @@ export function CommunityChatPage() {
               );
             })
           )}
+          <div ref={endRef} className="chat-messages-end" aria-hidden="true" />
         </div>
 
         <form

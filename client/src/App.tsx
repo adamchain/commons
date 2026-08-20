@@ -79,16 +79,7 @@ function Protected({
 function PlanRoute() {
   const { user, loading } = useAuth();
   const location = useLocation();
-  const [bootSplashDone, setBootSplashDone] = useState(
-    () => Date.now() - APP_BOOT_AT >= MIN_BOOT_SPLASH_MS,
-  );
-  useEffect(() => {
-    if (bootSplashDone) return;
-    const remaining = MIN_BOOT_SPLASH_MS - (Date.now() - APP_BOOT_AT);
-    const t = setTimeout(() => setBootSplashDone(true), Math.max(0, remaining));
-    return () => clearTimeout(t);
-  }, [bootSplashDone]);
-  if (loading || !bootSplashDone) return <LoadingScreen simple tagline="A place for plans meant to be shared." />;
+  if (loading) return <LoadingScreen simple tagline="A place for plans meant to be shared." />;
   if (user && user.onboardingComplete) return <PlanDetailPage />;
   const inviteCode = new URLSearchParams(location.search).get("invite") ?? undefined;
   // Mid-signup visitors keep a path back to this plan instead of dumping onto
@@ -104,7 +95,8 @@ function PlanRoute() {
   }
   // Logged out: native users go to onboarding — carrying the invite code (if
   // any) and a redirect back to this plan so the deep link isn't a dead end.
-  // Web visitors get the public page instead.
+  // Web visitors get the public page instead. Don't hold them on the boot
+  // splash; the public landing should paint as soon as we know there's no session.
   if (isNative()) {
     return (
       <Navigate
