@@ -16,10 +16,11 @@ export function TopBar() {
   const { user } = useAuth();
   const [hasUnread, setHasUnread] = useState(false);
 
-  // Other-user profiles own their chrome (back + •••) — same as plan detail /
-  // chat — so the COMMONS wordmark and bell can't cover those controls.
+  // Other-user profiles own their chrome (back + •••). Hide even before `user`
+  // hydrates — otherwise the wordmark/bell cover those controls for a beat
+  // (and on some loads, for the whole visit).
   const otherProfile = /^\/profile\/([^/]+)$/.exec(pathname);
-  const isOtherUserProfile = Boolean(otherProfile && user?.id && otherProfile[1] !== user.id);
+  const isOtherUserProfile = Boolean(otherProfile && otherProfile[1] !== user?.id);
 
   const hide =
     pathname.startsWith("/welcome") ||

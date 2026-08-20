@@ -13128,45 +13128,45 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ---- Profile other (SCREEN 14) ---- */
-/* Own chrome (back + •••) sits in the status-bar safe area — TopBar is hidden
-   on this route so those controls aren't covered by the wordmark / bell. */
+/* Chrome is portaled + position:fixed (z-index 45, above TopBar 41) so the
+   wordmark/bell and overflow clipping on .profile-shell can't cover ← / •••.
+   Shell padding reserves the same height so hero content starts below it. */
 .app-shell.profile-other {
-  padding-top: 0;
+  padding-top: calc(64px + env(safe-area-inset-top, 0px));
 }
 @media (min-width: 720px) {
   .app-shell.profile-other {
-    padding-top: 0;
+    padding-top: calc(64px + env(safe-area-inset-top, 0px));
   }
 }
 @media (min-width: 1024px) {
   .app-shell.profile-other {
-    padding-top: 0;
+    padding-top: calc(64px + env(safe-area-inset-top, 0px));
   }
 }
 .profile-other-nav {
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 30;
+  left: 0;
+  right: 0;
+  z-index: 45;
   display: grid;
   grid-template-columns: minmax(72px, auto) 1fr 44px;
   align-items: center;
   gap: 8px;
-  margin: 0 -15px 8px;
+  margin: 0;
   padding: calc(10px + env(safe-area-inset-top, 0px)) 15px 10px;
   background: var(--bg);
+  pointer-events: auto;
 }
 @media (min-width: 720px) {
   .profile-other-nav {
-    margin-left: -32px;
-    margin-right: -32px;
     padding-left: 32px;
     padding-right: 32px;
   }
 }
 @media (min-width: 1024px) {
   .profile-other-nav {
-    margin-left: -48px;
-    margin-right: -48px;
     padding-left: 48px;
     padding-right: 48px;
   }
@@ -13174,8 +13174,12 @@ h1, h2, h3, h4, h5, h6 {
 .profile-other-back {
   justify-self: start;
   min-height: 44px;
+  min-width: 44px;
   padding: 0 4px 0 0;
   touch-action: manipulation;
+  position: relative;
+  z-index: 1;
+  color: var(--ink);
 }
 .profile-other-nav-title {
   font-size: var(--text-body);
@@ -13200,6 +13204,8 @@ h1, h2, h3, h4, h5, h6 {
   cursor: pointer;
   flex-shrink: 0;
   justify-self: end;
+  position: relative;
+  z-index: 1;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }

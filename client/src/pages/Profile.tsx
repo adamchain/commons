@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -306,7 +306,8 @@ export function ProfilePage() {
           <section className="profile-other-section">
             <h3 className="profile-other-section-label">Upcoming plans</h3>
             <p className="profile-social-locked">
-              Add to your network to see their plans — photo and interests stay public.
+              Add to your network to see their plans. Being on a plan together
+              doesn’t unlock the rest of their calendar — photo and interests stay public.
             </p>
           </section>
         ) : profile.upcoming.length > 0 ? (
@@ -547,7 +548,9 @@ function OtherProfileNav({
   onMore?: () => void;
   title?: string;
 }) {
-  return (
+  // Portaled + fixed so overflow clipping on `.profile-shell` / `.app-shell`
+  // and the global TopBar (z-index 41) can't cover ← or •••.
+  return createPortal(
     <header className="profile-other-nav">
       <button type="button" className="detail-back profile-other-back" onClick={onBack}>
         <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
@@ -571,11 +574,13 @@ function OtherProfileNav({
       ) : (
         <span className="profile-other-more-spacer" aria-hidden="true" />
       )}
-    </header>
+    </header>,
+    document.body,
   );
 }
 
-/** Bottom sheet portaled to body. Dismiss is armed after a tick so the opening tap can't close it immediately. */
+/** Bottom sheet portaled to body. Dismiss on a new pointerdown on the backdrop
+ *  — not click — so iOS's delayed click from the opening ••• tap can't close it. */
 function ProfileActionSheet({
   firstName,
   onShare,
@@ -589,27 +594,34 @@ function ProfileActionSheet({
   onBlock: () => void;
   onClose: () => void;
 }) {
-  const dismissArmed = useRef(false);
+  const ignoreUntil = useRef(0);
   useEffect(() => {
-    dismissArmed.current = false;
-    const id = window.setTimeout(() => {
-      dismissArmed.current = true;
-    }, 280);
-    return () => window.clearTimeout(id);
-  }, []);
+    ignoreUntil.current = Date.now() + 450;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
-  function maybeDismiss() {
-    if (dismissArmed.current) onClose();
+  function dismissBackdrop(e: ReactPointerEvent<HTMLDivElement>) {
+    if (e.target !== e.currentTarget) return;
+    if (Date.now() < ignoreUntil.current) return;
+    onClose();
   }
 
   return createPortal(
-    <div className="profile-action-overlay" role="presentation" onClick={maybeDismiss}>
+    <div
+      className="profile-action-overlay"
+      role="presentation"
+      onPointerDown={dismissBackdrop}
+    >
       <div
         className="profile-action-sheet"
         role="dialog"
         aria-modal="true"
         aria-label="Profile actions"
-        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
       >
         <div className="profile-action-handle" aria-hidden="true" />
         <button type="button" className="profile-action-row" onClick={onShare}>

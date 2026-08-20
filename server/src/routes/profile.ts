@@ -80,8 +80,10 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
     .map((u) => userToPublic(u));
 
   // Plans stay private until the viewer is in-network or has already hung out
-  // (a shared plan whose calendar day has passed). Sharing an upcoming plan
-  // does not unlock the rest of their calendar. Face + interests stay public.
+  // (a shared plan whose calendar day has passed). Joining an *upcoming* plan
+  // together does not unlock the rest of their calendar — that was a date-parse
+  // bug (`new Date("YYYY-MM-DD")` is UTC midnight and treats "today" as past).
+  // Face + interests stay public.
   const inEitherNetwork = inMyNetwork || targetNetwork.has(viewerId);
   const sharedCompleted = hasSharedCompletedPlan(targetId, viewerId, todayIso);
   const showFullProfile = isSelf || inEitherNetwork || sharedCompleted;
@@ -133,7 +135,8 @@ function localIsoDate(d = new Date()): string {
 /** True only after a shared plan's calendar day has passed — not merely because you joined an upcoming one. */
 function hasSharedCompletedPlan(a: string, b: string, todayIso: string): boolean {
   for (const p of store.listPlans()) {
-    if (p.date >= todayIso) continue;
+    const day = String(p.date).slice(0, 10);
+    if (day >= todayIso) continue;
     const aWent = store.findParticipation(p.id, a)?.state === "going" || p.creatorId === a;
     const bWent = store.findParticipation(p.id, b)?.state === "going" || p.creatorId === b;
     if (aWent && bWent) return true;
@@ -143,7 +146,9 @@ function hasSharedCompletedPlan(a: string, b: string, todayIso: string): boolean
 
 function findSharedActivePlan(a: string, b: string, todayIso: string): string | null {
   for (const p of store.listPlans()) {
-    if (p.cancelledAt || p.date < todayIso) continue;
+    if (p.cancelledAt) continue;
+    const day = String(p.date).slice(0, 10);
+    if (day < todayIso) continue;
     const aIn = p.creatorId === a || store.findParticipation(p.id, a)?.state === "going";
     const bIn = p.creatorId === b || store.findParticipation(p.id, b)?.state === "going";
     if (aIn && bIn) return p.id;
