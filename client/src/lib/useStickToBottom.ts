@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
 /**
- * Keep a chat transcript pinned to the newest message: own sends always
- * jump to the end; incoming messages only do if the reader is already near
- * the bottom. Survives iOS keyboard / visual-viewport resizes that would
- * otherwise leave the just-sent bubble below the fold.
+ * Keep a chat transcript pinned to the newest message. Own sends always jump
+ * to the end; incoming messages only do if the reader is already near the
+ * bottom. The shell is locked to the visual viewport so the iOS keyboard
+ * shrinks the list instead of covering the just-sent bubble.
  */
 export function useStickToBottom(active: boolean, stickKey: string | number) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -13,32 +13,34 @@ export function useStickToBottom(active: boolean, stickKey: string | number) {
   const atBottomRef = useRef(true);
   const forceRef = useRef(true);
   const pinningRef = useRef(false);
+  const pinTimersRef = useRef<number[]>([]);
 
   const pinToLatest = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
-    if (gap < 2 && !forceRef.current) {
-      atBottomRef.current = true;
-      return;
-    }
     pinningRef.current = true;
-    el.scrollTop = el.scrollHeight;
-    endRef.current?.scrollIntoView({ block: "end", inline: "nearest" });
+    // Never use scrollIntoView — it scrolls the window / wrong ancestors and
+    // leaves this overflow container sitting on older messages.
+    el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
     atBottomRef.current = true;
-    requestAnimationFrame(() => {
-      el.scrollTop = el.scrollHeight;
-      endRef.current?.scrollIntoView({ block: "end", inline: "nearest" });
-      requestAnimationFrame(() => {
-        pinningRef.current = false;
-        atBottomRef.current =
-          el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-      });
-    });
+    window.setTimeout(() => {
+      pinningRef.current = false;
+    }, 80);
   }, []);
 
   const stickOnSend = useCallback(() => {
     forceRef.current = true;
+    pinToLatest();
+    for (const t of pinTimersRef.current) window.clearTimeout(t);
+    pinTimersRef.current = [0, 50, 150, 320].map((ms) =>
+      window.setTimeout(pinToLatest, ms),
+    );
+  }, [pinToLatest]);
+
+  useEffect(() => {
+    return () => {
+      for (const t of pinTimersRef.current) window.clearTimeout(t);
+    };
   }, []);
 
   useEffect(() => {
@@ -49,8 +51,17 @@ export function useStickToBottom(active: boolean, stickKey: string | number) {
 
     const sync = () => {
       if (vv) {
+        // Pin to the unobscured visual viewport (keyboard-safe). Avoid
+        // transform — it creates a containing block that breaks overflow
+        // scrolling of the message list on iOS.
+        shell.style.position = "fixed";
+        shell.style.left = "0";
+        shell.style.right = "0";
+        shell.style.width = "100%";
+        shell.style.top = `${Math.round(vv.offsetTop)}px`;
         shell.style.height = `${Math.round(vv.height)}px`;
-        shell.style.transform = vv.offsetTop ? `translateY(${Math.round(vv.offsetTop)}px)` : "";
+        shell.style.maxHeight = `${Math.round(vv.height)}px`;
+        shell.style.margin = "0 auto";
       }
       if (forceRef.current || atBottomRef.current) pinToLatest();
     };
@@ -62,8 +73,14 @@ export function useStickToBottom(active: boolean, stickKey: string | number) {
       vv?.removeEventListener("resize", sync);
       vv?.removeEventListener("scroll", sync);
       window.removeEventListener("resize", sync);
+      shell.style.position = "";
+      shell.style.left = "";
+      shell.style.right = "";
+      shell.style.width = "";
+      shell.style.top = "";
       shell.style.height = "";
-      shell.style.transform = "";
+      shell.style.maxHeight = "";
+      shell.style.margin = "";
     };
   }, [active, pinToLatest]);
 

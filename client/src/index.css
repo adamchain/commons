@@ -33,7 +33,7 @@ body,
      their own overflow-x and are unaffected. */
   width: 100%;
   max-width: 100vw;
-  overflow-x: hidden;
+  overflow-x: clip;
   overscroll-behavior-x: none;
 }
 
@@ -120,7 +120,7 @@ label {
   /* Hard cap so any rogue child (long URL, wide image, accidental wide grid)
      can't push the layout past the screen and force a horizontal scroll. */
   width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* Ubiquitous min-width:0 for direct children inside the shell so flex/grid
@@ -4504,6 +4504,7 @@ h1, h2, h3, h4, h5, h6 {
   text-decoration: none;
   color: inherit;
   margin-bottom: 10px;
+  flex-shrink: 0;
   transition: background 120ms ease;
 }
 .chat-header-card:hover,
@@ -4618,11 +4619,14 @@ h1, h2, h3, h4, h5, h6 {
      actually scrolls internally; without it the list grows to fit every
      message and shoves the composer off the bottom of the viewport. */
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: scroll;
+  overflow-anchor: none;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 4px;
   padding: 4px 2px 8px;
+  -webkit-overflow-scrolling: touch;
 }
 .chat-day-divider {
   display: flex;

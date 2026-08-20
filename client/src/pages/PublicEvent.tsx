@@ -30,7 +30,7 @@ export function PublicEventPage() {
     setPlan(null);
     setLoadError(false);
     setCoverFailed(false);
-    api<PublicPlanDTO>(`/api/plans/${id}/public`)
+    api<PublicPlanDTO>(`/api/plans/${id}/public`, { credentials: "omit" })
       .then((p) => active && setPlan(p))
       .catch(() => active && setLoadError(true));
     return () => {

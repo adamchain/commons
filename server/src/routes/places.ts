@@ -183,8 +183,9 @@ placesRouter.get("/autocomplete", requireAuth, async (req, res) => {
       ]);
       predictions = rankPredictions(dedupePredictions([...textHits, ...autoHits]), input);
     }
-    if (predictions.length === 0) {
-      predictions = rankPredictions(dedupePredictions(await nominatimSearch(input)), input);
+    if (predictions.length === 0 || !predictions.some((p) => nameCoversQuery(p.name, input))) {
+      const osm = await nominatimSearch(input);
+      predictions = rankPredictions(dedupePredictions([...osm, ...predictions]), input);
     }
     res.json({ predictions });
   } catch (e) {
