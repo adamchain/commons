@@ -13621,3 +13621,20 @@ h1, h2, h3, h4, h5, h6 {
   cursor: pointer;
   text-align: center;
 }
+.profile-action-cancel:disabled,
+.profile-action-row:disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.profile-action-confirm-copy {
+  margin: 0;
+  padding: 0 24px 12px;
+  font-size: var(--text-body);
+  line-height: 1.45;
+  color: var(--muted);
+}
+.profile-action-confirm-error {
+  margin: 0 24px 8px;
+  font-size: var(--text-body-small);
+  color: var(--red);
+}

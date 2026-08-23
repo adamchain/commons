@@ -88,6 +88,7 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
   const sharedCompleted = hasSharedCompletedPlan(targetId, viewerId, todayIso);
   const showFullProfile = isSelf || inEitherNetwork || sharedCompleted;
   const socialLinks = target.socialLinks ?? null;
+  const sharedUpcoming = sharedPlanId ? upcoming.filter((p) => p.id === sharedPlanId) : [];
 
   res.json({
     user: userToPublic(target),
@@ -99,7 +100,7 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
     },
     upcoming: showFullProfile
       ? await Promise.all(upcoming.map((p) => planSummary(p, viewerId)))
-      : [],
+      : await Promise.all(sharedUpcoming.map((p) => planSummary(p, viewerId))),
     past: showFullProfile
       ? past
           .slice(-5)
@@ -136,7 +137,8 @@ function localIsoDate(d = new Date()): string {
 function hasSharedCompletedPlan(a: string, b: string, todayIso: string): boolean {
   for (const p of store.listPlans()) {
     const day = String(p.date).slice(0, 10);
-    if (day >= todayIso) continue;
+    // Ignore malformed dates so they can't compare as "in the past" and unlock the calendar.
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day >= todayIso) continue;
     const aWent = store.findParticipation(p.id, a)?.state === "going" || p.creatorId === a;
     const bWent = store.findParticipation(p.id, b)?.state === "going" || p.creatorId === b;
     if (aWent && bWent) return true;

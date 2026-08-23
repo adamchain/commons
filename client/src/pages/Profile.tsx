@@ -15,7 +15,7 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
-import { api } from "../api/http";
+import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime } from "../lib/format";
@@ -177,23 +177,10 @@ export function ProfilePage() {
   }
 
   async function blockFromSheet() {
-    setActionSheetOpen(false);
-    const name = firstName || "this person";
     const targetId = profile?.user.id;
     if (!targetId) return;
-    if (
-      !window.confirm(
-        `Block ${name}? They won't be able to see your plans or profile, and you won't see theirs.`,
-      )
-    ) {
-      return;
-    }
-    try {
-      await api(`/api/users/${targetId}/block`, { method: "POST" });
-      navigate("/", { replace: true });
-    } catch {
-      /* swallow */
-    }
+    await api(`/api/users/${targetId}/block`, { method: "POST" });
+    navigate("/", { replace: true });
   }
 
   if (!isSelf) {
@@ -306,9 +293,43 @@ export function ProfilePage() {
           <section className="profile-other-section">
             <h3 className="profile-other-section-label">Upcoming plans</h3>
             <p className="profile-social-locked">
-              Add to your network to see their plans. Being on a plan together
-              doesn’t unlock the rest of their calendar — photo and interests stay public.
+              Add them to your network to see their other plans. Plans you&apos;re
+              both going to stay visible here — sharing a plan doesn&apos;t unlock
+              the rest of their calendar.
             </p>
+            {profile.upcoming.length > 0 && (
+              <div className="profile-other-plans" style={{ marginTop: 12 }}>
+                {profile.upcoming.map((p) => {
+                  const vis = interestVisual(p.tags[0]);
+                  const Icon = vis.Icon;
+                  const going = p.participants.going.length;
+                  return (
+                    <Link
+                      key={p.id}
+                      to={`/plans/${p.id}`}
+                      state={{ from: "profile", profileUserId: userId }}
+                      className="profile-other-plan-card"
+                    >
+                      <span
+                        className="profile-other-plan-icon"
+                        style={{ background: vis.tint, color: vis.iconColor }}
+                        aria-hidden="true"
+                      >
+                        <Icon size={15} strokeWidth={1.8} />
+                      </span>
+                      <span className="profile-other-plan-text">
+                        <span className="profile-other-plan-title">{p.title}</span>
+                        <span className="profile-other-plan-meta">
+                          {formatPlanDate(p.date)}
+                          {p.time ? ` · ${formatPlanTime(p.time)}` : ""}
+                          {going > 0 ? ` · ${going} going` : ""}
+                        </span>
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </section>
         ) : profile.upcoming.length > 0 ? (
           <section className="profile-other-section">
@@ -410,7 +431,7 @@ export function ProfilePage() {
             firstName={firstName}
             onShare={() => void shareProfile()}
             onReport={() => void reportProfile()}
-            onBlock={() => void blockFromSheet()}
+            onBlock={blockFromSheet}
             onClose={() => setActionSheetOpen(false)}
           />
         )}
@@ -580,7 +601,9 @@ function OtherProfileNav({
 }
 
 /** Bottom sheet portaled to body. Dismiss on a new pointerdown on the backdrop
- *  — not click — so iOS's delayed click from the opening ••• tap can't close it. */
+ *  — not click — so iOS's delayed click from the opening ••• tap can't close it.
+ *  Block confirmation stays in this sheet: native `window.confirm` freezes the
+ *  iOS WebView for ~30s and never fires the request. */
 function ProfileActionSheet({
   firstName,
   onShare,
@@ -591,10 +614,13 @@ function ProfileActionSheet({
   firstName: string;
   onShare: () => void;
   onReport: () => void;
-  onBlock: () => void;
+  onBlock: () => Promise<void>;
   onClose: () => void;
 }) {
   const ignoreUntil = useRef(0);
+  const [confirmingBlock, setConfirmingBlock] = useState(false);
+  const [blocking, setBlocking] = useState(false);
+  const [blockError, setBlockError] = useState<string | null>(null);
   useEffect(() => {
     ignoreUntil.current = Date.now() + 450;
     const onKey = (e: KeyboardEvent) => {
@@ -607,7 +633,19 @@ function ProfileActionSheet({
   function dismissBackdrop(e: ReactPointerEvent<HTMLDivElement>) {
     if (e.target !== e.currentTarget) return;
     if (Date.now() < ignoreUntil.current) return;
+    if (blocking) return;
     onClose();
+  }
+
+  async function confirmBlock() {
+    setBlocking(true);
+    setBlockError(null);
+    try {
+      await onBlock();
+    } catch (err) {
+      setBlockError(parseApiError(err) || "Couldn't block. Try again.");
+      setBlocking(false);
+    }
   }
 
   return createPortal(
@@ -620,25 +658,61 @@ function ProfileActionSheet({
         className="profile-action-sheet"
         role="dialog"
         aria-modal="true"
-        aria-label="Profile actions"
+        aria-label={confirmingBlock ? `Block ${firstName}` : "Profile actions"}
         onPointerDown={(e) => e.stopPropagation()}
       >
         <div className="profile-action-handle" aria-hidden="true" />
-        <button type="button" className="profile-action-row" onClick={onShare}>
-          <Share2 size={16} strokeWidth={1.8} aria-hidden="true" />
-          Share profile
-        </button>
-        <button type="button" className="profile-action-row is-danger" onClick={onReport}>
-          <Flag size={16} strokeWidth={1.8} aria-hidden="true" />
-          Report {firstName}
-        </button>
-        <button type="button" className="profile-action-row is-danger" onClick={onBlock}>
-          <Ban size={16} strokeWidth={1.8} aria-hidden="true" />
-          Block {firstName}
-        </button>
-        <button type="button" className="profile-action-cancel" onClick={onClose}>
-          Cancel
-        </button>
+        {confirmingBlock ? (
+          <>
+            <p className="profile-action-confirm-copy">
+              Block {firstName}? They won&apos;t see your plans or profile, and you
+              won&apos;t see theirs.
+            </p>
+            {blockError && <p className="profile-action-confirm-error">{blockError}</p>}
+            <button
+              type="button"
+              className="profile-action-row is-danger"
+              disabled={blocking}
+              onClick={() => void confirmBlock()}
+            >
+              <Ban size={16} strokeWidth={1.8} aria-hidden="true" />
+              {blocking ? "Blocking…" : `Block ${firstName}`}
+            </button>
+            <button
+              type="button"
+              className="profile-action-cancel"
+              disabled={blocking}
+              onClick={() => {
+                setConfirmingBlock(false);
+                setBlockError(null);
+              }}
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="profile-action-row" onClick={onShare}>
+              <Share2 size={16} strokeWidth={1.8} aria-hidden="true" />
+              Share profile
+            </button>
+            <button type="button" className="profile-action-row is-danger" onClick={onReport}>
+              <Flag size={16} strokeWidth={1.8} aria-hidden="true" />
+              Report {firstName}
+            </button>
+            <button
+              type="button"
+              className="profile-action-row is-danger"
+              onClick={() => setConfirmingBlock(true)}
+            >
+              <Ban size={16} strokeWidth={1.8} aria-hidden="true" />
+              Block {firstName}
+            </button>
+            <button type="button" className="profile-action-cancel" onClick={onClose}>
+              Cancel
+            </button>
+          </>
+        )}
       </div>
     </div>,
     document.body,
