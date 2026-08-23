@@ -2368,6 +2368,10 @@ h1, h2, h3, h4, h5, h6 {
   text-align: center;
   box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18);
 }
+.onboarding-location-hero--welcome .onboarding-location-hero-img {
+  object-position: center 32%;
+  filter: saturate(0.88) contrast(1.06);
+}
 
 /* Age confirmation — chip toggle, same shape/behavior as the Flexible pill. */
 .age-era-grid {

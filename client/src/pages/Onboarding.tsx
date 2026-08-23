@@ -17,6 +17,7 @@ import { LoadingScreen } from "../components/LoadingScreen";
 import { LegalContent } from "../components/LegalContent";
 import { LEGAL_DOCS } from "../content/legal";
 import wordmark from "../assets/wordmark.png";
+import phillySkyline from "../assets/philly-skyline.jpg";
 import { interestVisual } from "../lib/interestIcons";
 import {
   ALL_INTERESTS,
@@ -563,34 +564,43 @@ function WelcomeStep({
   }, []);
 
   return (
-    <OnboardingShell title="" subtitle="">
-      <div className="welcome-hero">
-        <h2 className="welcome-headline">You&apos;re in.</h2>
-        <p className="welcome-body">
-          Welcome to COMMONS — a city full of women who actually do things
-          {neighborhoodName ? ` in ${neighborhoodName}` : ""}.
-        </p>
-        {stat && <span className="welcome-stat-chip">{stat}</span>}
-      </div>
-      {isNative() ? (
-        <button type="button" className="btn-primary btn-block" onClick={onContinue} style={{ marginTop: 20 }}>
-          Explore the app
-        </button>
-      ) : (
-        <div className="download-app" style={{ marginTop: 20 }}>
-          {APP_STORE_URL ? (
-            <a className="btn-primary btn-block" href={APP_STORE_URL} target="_blank" rel="noopener noreferrer">
-              Download for iPhone
-            </a>
-          ) : (
-            <div className="download-app-soon">iPhone app coming soon — we'll text you the link.</div>
-          )}
-          <button className="btn-link btn-block" type="button" onClick={onContinue}>
-            {goingToEvent ? "Continue to the event on web →" : "Continue on the web →"}
-          </button>
+    <div className="onboarding-location-hero onboarding-location-hero--welcome">
+      <img src={phillySkyline} alt="" className="onboarding-location-hero-img" />
+      <div className="onboarding-location-hero-gradient" aria-hidden="true" />
+      <p className="onboarding-location-city">
+        <MapPin size={12} strokeWidth={2.4} aria-hidden="true" />
+        Philadelphia
+      </p>
+      <div className="onboarding-location-sheet">
+        <img src={wordmark} alt="COMMONS" className="onboarding-brand-img" />
+        <div className="welcome-hero">
+          <h2 className="welcome-headline">You&apos;re in.</h2>
+          <p className="welcome-body">
+            Welcome to COMMONS — a city full of women who actually do things
+            {neighborhoodName ? ` in ${neighborhoodName}` : ""}.
+          </p>
+          {stat && <span className="welcome-stat-chip">{stat}</span>}
         </div>
-      )}
-    </OnboardingShell>
+        {isNative() ? (
+          <button type="button" className="btn-primary btn-block" onClick={onContinue}>
+            Explore the app
+          </button>
+        ) : (
+          <div className="download-app">
+            {APP_STORE_URL ? (
+              <a className="btn-primary btn-block" href={APP_STORE_URL} target="_blank" rel="noopener noreferrer">
+                Download for iPhone
+              </a>
+            ) : (
+              <div className="download-app-soon">iPhone app coming soon — we'll text you the link.</div>
+            )}
+            <button className="btn-link btn-block" type="button" onClick={onContinue}>
+              {goingToEvent ? "Continue to the event on web →" : "Continue on the web →"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -845,7 +855,7 @@ function LocationStep({
     return (
       <div className="onboarding-location-hero">
         <img
-          src="/onboarding/philly-skyline.jpg"
+          src={phillySkyline}
           alt=""
           className="onboarding-location-hero-img"
         />
