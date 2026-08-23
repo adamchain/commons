@@ -321,7 +321,7 @@ export function ProfilePage() {
                         <span className="profile-other-plan-title">{p.title}</span>
                         <span className="profile-other-plan-meta">
                           {formatPlanDate(p.date)}
-                          {p.time ? ` · ${formatPlanTime(p.time)}` : ""}
+                          {p.time ? ` · ${formatPlanTime(p.time, p.isFlexibleTime)}` : ""}
                           {going > 0 ? ` · ${going} going` : ""}
                         </span>
                       </span>
