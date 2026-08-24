@@ -401,7 +401,7 @@ export function PlanDetailPage() {
             >
               <span className="chat-entry-icon" aria-hidden="true"><ChatBubbleIcon /></span>
               <span className="chat-entry-text">
-                Open group chat
+                Chat
                 <span className="chat-entry-count">
                   {plan.participants.going.length + plan.participants.interested.length} in the thread
                 </span>
@@ -580,7 +580,7 @@ export function PlanDetailPage() {
               className="btn-secondary btn-block plan-past-action-btn"
             >
               <ChatBubbleIcon />
-              Open group chat
+              Chat
             </Link>
           </div>
         )}
@@ -609,7 +609,7 @@ export function PlanDetailPage() {
           >
             <span className="chat-entry-icon" aria-hidden="true"><ChatBubbleIcon /></span>
             <span className="chat-entry-text">
-              Open group chat
+              Chat
               <span className="chat-entry-count">
                 {plan.participants.going.length + plan.participants.interested.length} in the thread
               </span>

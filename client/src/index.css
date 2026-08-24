@@ -1070,6 +1070,38 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: var(--shadow-sm);
 }
 
+/* Plan detail type scale. Body, rows, and buttons share --text-body (13px).
+   Labels/meta sit at --text-body-small (12px). Only the hero / lock-in title
+   stays larger (--text-screen-title). The 16px card size on chat + date/location
+   was making this page look mixed. */
+.plan-detail-page {
+  font-size: var(--text-body);
+}
+.plan-detail-page .plan-meta-value,
+.plan-detail-page .chat-entry-text,
+.plan-detail-page .who-block-heading,
+.plan-detail-page .action-btn--stack,
+.plan-detail-page .action-btn-label,
+.plan-detail-page .btn-primary,
+.plan-detail-page .btn-secondary,
+.plan-detail-page .plan-host-action-btn,
+.plan-detail-page .cover-picker-title,
+.plan-detail-page .plan-meta-time-input,
+.plan-detail-page .plan-meta-card--edit .location-autocomplete input {
+  font-size: var(--text-body);
+}
+.plan-detail-page .plan-meta-label,
+.plan-detail-page .chat-entry-count,
+.plan-detail-page .plan-meta-sub,
+.plan-detail-page .plan-meta-maps,
+.plan-detail-page .roster-name,
+.plan-detail-page .plan-detail-hero-when {
+  font-size: var(--text-body-small);
+}
+.plan-detail-page .who-block {
+  margin-top: 0;
+}
+
 .plan-hero-cover {
   margin: 0;
   aspect-ratio: auto;
