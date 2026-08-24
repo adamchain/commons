@@ -4,6 +4,7 @@ import { Users } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
+import { JoinConfirmPopup } from "../components/JoinConfirmPopup";
 import { EmptyCard } from "../components/ui";
 import {
   ALL_COMMUNITY_CATEGORIES,
@@ -21,6 +22,7 @@ export function CommunitiesPage() {
   const [all, setAll] = useState<CommunityCardDTO[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [category, setCategory] = useState<CommunityCategory | "all">("all");
+  const [joinConfirm, setJoinConfirm] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -55,6 +57,7 @@ export function CommunitiesPage() {
     setAll((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
     if (updated.myMembershipStatus === "active") {
       setMine((prev) => (prev.some((p) => p.id === updated.id) ? prev : [...prev, updated]));
+      setJoinConfirm(true);
     }
   }
 
@@ -148,6 +151,7 @@ export function CommunitiesPage() {
         )}
       </section>
       )}
+      {joinConfirm && <JoinConfirmPopup kind="community" onClose={() => setJoinConfirm(false)} />}
     </main>
   );
 }

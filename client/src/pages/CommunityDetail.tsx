@@ -4,6 +4,7 @@ import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
+import { JoinConfirmPopup } from "../components/JoinConfirmPopup";
 import { PlanCard } from "../components/PlanCard";
 import {
   ALL_COMMUNITY_CATEGORIES,
@@ -47,6 +48,7 @@ export function CommunityDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [tab, setTab] = useState<Tab>(() => tabFromParam(searchParams.get("tab")) ?? "bulletin");
+  const [joinConfirm, setJoinConfirm] = useState(false);
 
   const loadMembers = useCallback(async () => {
     try {
@@ -177,7 +179,12 @@ export function CommunityDetailPage() {
                 {community.memberCount} {community.memberCount === 1 ? "member" : "members"} · Organized by {community.organizer.firstName}
               </span>
             </div>
-            <JoinControl community={community} onChange={setCommunity} reload={load} />
+            <JoinControl
+              community={community}
+              onChange={setCommunity}
+              reload={load}
+              onJoined={() => setJoinConfirm(true)}
+            />
           </div>
           {community.description && (
             <div className="cmy-about">
@@ -209,7 +216,12 @@ export function CommunityDetailPage() {
       </nav>
 
       {tab === "bulletin" && community.bulletinEnabled && (canSeeInside ? <BulletinTab community={community} canPost={canPostBulletin} onPendingChange={load} /> : (
-        <LockedPanel community={community} onChange={setCommunity} reload={load} />
+        <LockedPanel
+          community={community}
+          onChange={setCommunity}
+          reload={load}
+          onJoined={() => setJoinConfirm(true)}
+        />
       ))}
       {tab === "events" && (
         canSeeInside ? (
@@ -223,7 +235,12 @@ export function CommunityDetailPage() {
             }
           />
         ) : (
-          <LockedPanel community={community} onChange={setCommunity} reload={load} />
+          <LockedPanel
+            community={community}
+            onChange={setCommunity}
+            reload={load}
+            onJoined={() => setJoinConfirm(true)}
+          />
         )
       )}
       {tab === "members" && (canSeeInside ? (
@@ -234,7 +251,12 @@ export function CommunityDetailPage() {
           onCountChange={load}
         />
       ) : (
-        <LockedPanel community={community} onChange={setCommunity} reload={load} />
+        <LockedPanel
+          community={community}
+          onChange={setCommunity}
+          reload={load}
+          onJoined={() => setJoinConfirm(true)}
+        />
       ))}
       {tab === "settings" && canManage && (
         <SettingsTab
@@ -247,6 +269,7 @@ export function CommunityDetailPage() {
           onDeleted={() => navigate("/communities")}
         />
       )}
+      {joinConfirm && <JoinConfirmPopup kind="community" onClose={() => setJoinConfirm(false)} />}
     </main>
   );
 }
@@ -358,10 +381,12 @@ function LockedPanel({
   community,
   onChange,
   reload,
+  onJoined,
 }: {
   community: CommunityDTO;
   onChange: (c: CommunityDTO) => void;
   reload: () => Promise<void>;
+  onJoined: () => void;
 }) {
   return (
     <section className="cmy-tabpanel">
@@ -369,7 +394,7 @@ function LockedPanel({
         <span className="cmy-locked-icon" aria-hidden="true">🔒</span>
         <p className="cmy-locked-text">Join to see what’s happening inside.</p>
         <div className="cmy-locked-join">
-          <JoinControl community={community} onChange={onChange} reload={reload} />
+          <JoinControl community={community} onChange={onChange} reload={reload} onJoined={onJoined} />
         </div>
       </div>
     </section>
@@ -380,10 +405,12 @@ function JoinControl({
   community,
   onChange,
   reload,
+  onJoined,
 }: {
   community: CommunityDTO;
   onChange: (c: CommunityDTO) => void;
   reload: () => Promise<void>;
+  onJoined: () => void;
 }) {
   const [asking, setAsking] = useState(false);
   const [answer, setAnswer] = useState("");
@@ -391,7 +418,6 @@ function JoinControl({
   const [err, setErr] = useState<string | null>(null);
   /** Local success flag so we can show confirmation even before parent state settles. */
   const [requested, setRequested] = useState(community.myMembership?.status === "pending");
-  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     if (community.myMembership?.status === "pending") setRequested(true);
@@ -399,12 +425,6 @@ function JoinControl({
       setRequested(false);
     }
   }, [community.myMembership?.status]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const t = window.setTimeout(() => setToast(null), 2200);
-    return () => window.clearTimeout(t);
-  }, [toast]);
 
   async function doJoin(screeningAnswer?: string) {
     if (busy) return;
@@ -415,14 +435,12 @@ function JoinControl({
         method: "POST",
         body: JSON.stringify(screeningAnswer ? { screeningAnswer } : {}),
       });
+      if (updated.myMembership?.status === "active") onJoined();
       onChange(updated);
       setAsking(false);
       setAnswer("");
       if (updated.myMembership?.status === "pending") {
         setRequested(true);
-        setToast("Request sent");
-      } else if (updated.myMembership?.status === "active") {
-        setToast("You're in");
       }
     } catch (e) {
       setErr(cleanError(e));
@@ -454,19 +472,12 @@ function JoinControl({
 
   if (status === "active") {
     return (
-      <div className="cmy-join-row cmy-join-col">
-        <div className="cmy-join-row">
-          <span className="cmy-member-pill">Member ✓</span>
-          {!community.isOrganizer && (
-            <button type="button" className="cmy-btn cmy-btn--ghost" disabled={busy} onClick={() => void doLeave()}>
-              {busy ? "Leaving…" : "Leave"}
-            </button>
-          )}
-        </div>
-        {toast && (
-          <p className="cmy-join-toast" role="status" aria-live="polite">
-            {toast}
-          </p>
+      <div className="cmy-join-row">
+        <span className="cmy-member-pill">Member ✓</span>
+        {!community.isOrganizer && (
+          <button type="button" className="cmy-btn cmy-btn--ghost" disabled={busy} onClick={() => void doLeave()}>
+            {busy ? "Leaving…" : "Leave"}
+          </button>
         )}
       </div>
     );
@@ -519,7 +530,7 @@ function JoinControl({
   }
 
   return (
-    <div className="cmy-join-row cmy-join-col">
+    <div className="cmy-join-row">
       <button
         type="button"
         className="cmy-btn cmy-btn--primary"
@@ -535,11 +546,6 @@ function JoinControl({
             : "Join"}
       </button>
       {err && <p className="cmy-err">{err}</p>}
-      {toast && (
-        <p className="cmy-join-toast" role="status" aria-live="polite">
-          {toast}
-        </p>
-      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { Check } from "lucide-react";
 import type { ParticipationState } from "../types/shared";
 
-export type JoinConfirmKind = ParticipationState | "dropped";
+export type JoinConfirmKind = ParticipationState | "dropped" | "community";
 
 const COPY: Record<JoinConfirmKind, { title: string; sub: string; celebrate: boolean }> = {
   going: {
@@ -20,6 +20,11 @@ const COPY: Record<JoinConfirmKind, { title: string; sub: string; celebrate: boo
     title: "Dropped out",
     sub: "You're off the list.",
     celebrate: false,
+  },
+  community: {
+    title: "You're In",
+    sub: "Welcome — you're a member now.",
+    celebrate: true,
   },
 };
 
