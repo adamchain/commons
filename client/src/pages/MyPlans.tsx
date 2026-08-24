@@ -10,7 +10,7 @@ import { planHasEnded } from "../lib/planTime";
 import type { PlanDTO } from "../types/shared";
 
 /**
- * My Plans — Upcoming (hosting/going), Interested, and Past.
+ * Plans — Upcoming (hosting/going), Interested, and Past.
  */
 export function MyPlansPage() {
   const { user } = useAuth();
@@ -25,7 +25,7 @@ export function MyPlansPage() {
     void load();
   }, [user?.id]);
 
-  if (!plans || !user) return <LoadingScreen tagline="Your plans" />;
+  if (!plans || !user) return <LoadingScreen tagline="Plans" />;
 
   const isUpcoming = (p: PlanDTO) => !p.cancelledAt && !planHasEnded(p);
   const upcoming = plans
@@ -48,7 +48,7 @@ export function MyPlansPage() {
 
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar my-plans-page">
-      <ScreenTitle title="My Plans" />
+      <ScreenTitle title="Plans" />
 
       {empty && (
         <EmptyCard
