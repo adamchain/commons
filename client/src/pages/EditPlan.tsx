@@ -370,6 +370,7 @@ function EditForm({
       <div className="form-card">
         <section className="edit-section">
           <SectionHead id="edit-basics" label="Basics" saved={savedFlash?.section === "basics"} />
+          <p className="form-help" style={{ marginTop: 0 }}>Saves as you type.</p>
           <label className="form-question">Category</label>
           <div className="edit-cat-row">
             {resolvedTags.length > 0 ? (

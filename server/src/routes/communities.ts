@@ -10,6 +10,7 @@ import { findUserById, findUsersByIds } from "../userRepo.js";
 import { userToPublic, planSummary } from "./plans.js";
 import { emit } from "../lib/notify.js";
 import { isAdminPhone } from "../lib/adminPhones.js";
+import { isQaOrTestCommunityName } from "../lib/qaCommunities.js";
 import {
   canViewCommunityBoard,
   communityCreationBlockReason,
@@ -214,10 +215,13 @@ function parsePermission(
 // GET /api/communities — approved communities as cards (Explore rail + browse).
 communitiesRouter.get("/", requireAuth, async (req, res) => {
   const viewerId = String(req.userId);
-  const list = store.listApprovedCommunities().sort((a, b) => {
-    if (a.isFounding !== b.isFounding) return a.isFounding ? -1 : 1;
-    return b.memberCount - a.memberCount;
-  });
+  const list = store
+    .listApprovedCommunities()
+    .filter((c) => !isQaOrTestCommunityName(c.name))
+    .sort((a, b) => {
+      if (a.isFounding !== b.isFounding) return a.isFounding ? -1 : 1;
+      return b.memberCount - a.memberCount;
+    });
   res.json({ communities: await toCommunityCards(list, viewerId) });
 });
 

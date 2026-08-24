@@ -3,6 +3,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { Home, Search, Plus, MessageCircle, User } from "lucide-react";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
+import { needsOnboarding } from "../lib/onboarding";
 import type { ConversationSummaryDTO } from "../types/shared";
 
 /**
@@ -51,7 +52,8 @@ export function BottomNav() {
     pathname === "/plans/new" ||
     pathname.match(/^\/plans\/[^/]+\/chat$/) ||
     pathname.match(/^\/communities\/[^/]+\/chat$/) ||
-    (!user && Boolean(pathname.match(/^\/plans\/[^/]+$/)));
+    (!user && Boolean(pathname.match(/^\/plans\/[^/]+$/))) ||
+    needsOnboarding(user);
   if (hide) return null;
 
   const profileTo = user ? `/profile/${user.id}` : "/onboarding";

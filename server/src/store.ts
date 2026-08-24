@@ -29,6 +29,8 @@ export interface UserRecord {
   accountSource?: "verify" | "seed";
   firstName: string;
   lastName?: string;
+  /** Optional digest email. Phone is still the login. */
+  email?: string | null;
   bio?: string;
   ageRange?: AgeRange | null;
   ageConfirmedAt?: string | null;

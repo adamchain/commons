@@ -12,6 +12,7 @@ const UserSchema = new mongoose.Schema<UserRecord>(
     },
     firstName: { type: String, default: "" },
     lastName: { type: String, default: "" },
+    email: { type: String, default: null },
     bio: { type: String, default: "" },
     ageRange: { type: String, default: null },
     ageConfirmedAt: { type: String, default: null },

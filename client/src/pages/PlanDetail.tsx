@@ -252,8 +252,12 @@ export function PlanDetailPage() {
       ? `https://www.google.com/maps/search/?api=1&query=${plan.location.lat},${plan.location.lng}`
       : `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
 
-  const lockDisabled = lockBusy || !lockVenue.trim();
-  const lockHint = !lockVenue.trim() ? "Add a venue to continue" : null;
+  const lockDisabled = lockBusy || !lockVenue.trim() || !lockDate;
+  const lockHint = !lockVenue.trim()
+    ? "Add a venue to continue"
+    : !lockDate
+      ? "Pick a day to continue"
+      : null;
 
   const guestsBlock = (
     <PlanGuests

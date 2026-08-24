@@ -246,6 +246,7 @@ export interface PublicPlanDTO {
   hostFirstName: string;
   hostEmoji: string;
   coverImage: string;
+  description?: string;
   tags: InterestTag[];
   goingCount: number;
   interestedCount: number;
@@ -428,6 +429,7 @@ export interface MeDTO {
   phoneNumber: string;
   firstName: string;
   lastName?: string;
+  email?: string | null;
   bio?: string;
   ageRange?: AgeRange | null;
   /** ISO timestamp when the user confirmed they are 18+. */

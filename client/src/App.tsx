@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useAuth } from "./context/AuthContext";
@@ -7,6 +7,7 @@ import { CoachMarks } from "./components/CoachMarks";
 import { TopBar } from "./components/TopBar";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { listenForDeepLinks } from "./lib/deepLinks";
+import { needsOnboarding } from "./lib/onboarding";
 import { ChatPage } from "./pages/Chat";
 import { CreatePlanPage } from "./pages/CreatePlan";
 import { EditPlanPage } from "./pages/EditPlan";
@@ -62,14 +63,29 @@ function Protected({
     const t = setTimeout(() => setBootSplashDone(true), Math.max(0, remaining));
     return () => clearTimeout(t);
   }, [bootSplashDone]);
-  if (loading || !bootSplashDone) return <LoadingScreen simple tagline="A place for plans meant to be shared." />;
+  // Cold start only. If we already have a session, never flash the COMMONS
+  // splash on in-app navigations (Settings, etc.).
+  if (!user && (loading || !bootSplashDone)) {
+    return <LoadingScreen simple tagline="A place for plans meant to be shared." />;
+  }
   // The app is iOS-only; on the web there's nothing to sign into, so send
   // unauthenticated web visitors to the marketing landing instead of onboarding.
   // Preserve the query string (e.g. `?invite=CODE` from a deep link into "/")
   // so waitlist/invite credit survives the bounce.
   if (!user) return <Navigate to={`${isNative() ? "/onboarding" : "/welcome"}${location.search}`} replace />;
-  if (!allowIncomplete && !user.onboardingComplete) return <Navigate to={`/onboarding${location.search}`} replace />;
+  if (!allowIncomplete && needsOnboarding(user)) return <Navigate to={`/onboarding${location.search}`} replace />;
   return <>{children}</>;
+}
+
+function ProfileGate({ edit = false }: { edit?: boolean }) {
+  const { userId } = useParams();
+  const { user } = useAuth();
+  const own = Boolean(user && userId === user.id);
+  return (
+    <Protected allowIncomplete={own}>
+      {edit ? <EditProfilePage /> : <ProfilePage />}
+    </Protected>
+  );
 }
 
 // A shared plan link (/plans/:id) is the one deep link a logged-out visitor can
@@ -79,12 +95,12 @@ function Protected({
 function PlanRoute() {
   const { user, loading } = useAuth();
   const location = useLocation();
-  if (loading) return <LoadingScreen simple tagline="A place for plans meant to be shared." />;
-  if (user && user.onboardingComplete) return <PlanDetailPage />;
+  if (loading && !user) return <LoadingScreen simple tagline="A place for plans meant to be shared." />;
   const inviteCode = new URLSearchParams(location.search).get("invite") ?? undefined;
+  if (user && !needsOnboarding(user)) return <PlanDetailPage />;
   // Mid-signup visitors keep a path back to this plan instead of dumping onto
   // a generic onboarding screen with the shared event lost.
-  if (user && !user.onboardingComplete) {
+  if (user && needsOnboarding(user)) {
     return (
       <Navigate
         to="/onboarding"
@@ -173,9 +189,9 @@ export default function App() {
         <Route path="/settings/notifications" element={<Protected><NotificationPrefsPage /></Protected>} />
         <Route path="/settings/privacy" element={<Protected><PrivacyPage /></Protected>} />
         <Route path="/settings/blocked" element={<Protected><BlockedListPage /></Protected>} />
-        <Route path="/profile/:userId/edit" element={<Protected allowIncomplete><EditProfilePage /></Protected>} />
-        {/* Profile is reachable even before onboarding completes — users can review/edit themselves. */}
-        <Route path="/profile/:userId" element={<Protected allowIncomplete><ProfilePage /></Protected>} />
+        <Route path="/profile/:userId/edit" element={<ProfileGate edit />} />
+        {/* Own profile is reachable mid-onboarding so people can review themselves. Other profiles wait. */}
+        <Route path="/profile/:userId" element={<ProfileGate />} />
       </Routes>
       <BottomNav />
       <CoachMarks />

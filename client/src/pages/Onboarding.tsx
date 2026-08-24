@@ -13,6 +13,7 @@ import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
 import { getCurrentCoords } from "../lib/geolocate";
+import { hasOnboardingPhoto, needsOnboarding, safePostAuthPath } from "../lib/onboarding";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { LegalContent } from "../components/LegalContent";
 import { LEGAL_DOCS } from "../content/legal";
@@ -104,7 +105,9 @@ export function OnboardingPage() {
   // Event-referred signups bypass the invite-only launch gate and, on finish,
   // route back to the event they came from instead of the home feed.
   const eventRef = Boolean(nav?.eventRef);
-  const redirectTo = nav?.redirect && nav.redirect.startsWith("/") ? nav.redirect : "/";
+  const redirectTo = safePostAuthPath(
+    nav?.redirect && nav.redirect.startsWith("/") ? nav.redirect : "/",
+  );
   // TEMP launch gate: whether this device has already cleared the access-code
   // step. Read once so a refresh mid-onboarding doesn't re-prompt or bypass it.
   const [gatePassed, setGatePassed] = useState<boolean>(() => isGatePassed() || eventRef);
@@ -137,7 +140,7 @@ export function OnboardingPage() {
   // event they came from, or home). Skip on the "download" step — that's the
   // deliberate post-completion app nudge, which navigates on its own.
   useEffect(() => {
-    if (user?.onboardingComplete && step !== "download" && step !== "welcome")
+    if (user && !needsOnboarding(user) && step !== "download" && step !== "welcome")
       navigate(redirectTo, { replace: true });
   }, [user, step, redirectTo, navigate]);
 
@@ -633,13 +636,9 @@ function DownloadAppStep({ redirectTo, onContinue }: { redirectTo: string; onCon
   );
 }
 
-function hasOnboardingPhoto(user: MeDTO): boolean {
-  return Boolean(user.avatarPhotoDataUrl?.trim());
-}
-
 function pickInitial(user: MeDTO | null, gatePassed: boolean): Step {
   if (!user) return "phone";
-  if (user.onboardingComplete) return "phone";
+  if (!needsOnboarding(user)) return "phone";
   // TEMP launch gate: members must clear the access-code step before any of the
   // profile-setup steps. Admins are exempt so the operator can't lock themselves
   // out. Drop this check when the invite-only launch period ends.

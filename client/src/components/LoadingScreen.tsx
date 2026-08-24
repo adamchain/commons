@@ -179,10 +179,20 @@ const ICONS: Array<{
 export function LoadingScreen({
   tagline = "A place for plans meant to be shared.",
   simple = false,
+  compact = false,
 }: {
   tagline?: string;
   simple?: boolean;
+  compact?: boolean;
 }) {
+  if (compact) {
+    return (
+      <div className="page-loading" role="status" aria-live="polite">
+        <div className="loader-bar" />
+        {tagline ? <p className="page-loading-copy">{tagline}</p> : null}
+      </div>
+    );
+  }
   return (
     <div className={`loader-screen ${simple ? "loader-screen--simple" : ""}`} role="status" aria-live="polite">
       {!simple && (

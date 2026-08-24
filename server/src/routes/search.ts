@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/requireAuth.js";
+import { isOnboardingFinished } from "../lib/onboarding.js";
 import { store, type UserRecord } from "../store.js";
 import { findUserById } from "../userRepo.js";
 import { INTEREST_LABELS, type InterestTag } from "../types/shared.js";
@@ -26,6 +27,10 @@ searchRouter.get("/", requireAuth, async (req, res) => {
   const me = await findUserById(userId);
   if (!me) {
     res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  if (!isOnboardingFinished(me)) {
+    res.status(403).json({ error: "Finish setting up your profile to continue" });
     return;
   }
   const q = String(req.query.q ?? "").trim().toLowerCase();

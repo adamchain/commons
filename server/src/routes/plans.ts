@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/requireAuth.js";
+import { isOnboardingFinished } from "../lib/onboarding.js";
 import { store, type PlanRecord, type UserRecord } from "../store.js";
 import { findUserById, findUsersByIds } from "../userRepo.js";
 import { rankPlansForUser } from "../lib/recommend.js";
@@ -247,6 +248,7 @@ plansRouter.get("/:id/public", (req, res) => {
     hostFirstName: host?.firstName ?? "A host",
     hostEmoji: plan.hostEmoji || "✨",
     coverImage: coverUrlFor(plan),
+    description: plan.description?.trim() || undefined,
     tags: plan.tags,
     goingCount: parts.filter((p) => p.state === "going").length,
     interestedCount: parts.filter((p) => p.state === "interested").length,
@@ -260,6 +262,10 @@ plansRouter.get("/", requireAuth, async (req, res) => {
   const me = await findUserById(userId);
   if (!me) {
     res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  if (!isOnboardingFinished(me)) {
+    res.status(403).json({ error: "Finish setting up your profile to continue" });
     return;
   }
   const scope = combinedNeighborhoodScope(me);
@@ -288,6 +294,10 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   const me = await findUserById(userId);
   if (!me) {
     res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  if (!isOnboardingFinished(me)) {
+    res.status(403).json({ error: "Finish setting up your profile before posting a plan" });
     return;
   }
 
