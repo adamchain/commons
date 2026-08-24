@@ -9,6 +9,12 @@
   padding-bottom: var(--s-8);
 }
 
+/* Beat any later padding-top reset so the masthead CTA cannot slide up under
+   the fixed COMMONS top bar (safe-area + bar height). */
+.app-shell.app-shell--with-topbar.cmy-list {
+  padding-top: calc(var(--topbar-height, 56px) + 18px + env(safe-area-inset-top, 0px));
+}
+
 .cmy-muted {
   color: var(--text-muted);
   font-size: 0.95rem;
@@ -53,13 +59,24 @@
 .cmy-btn--block { width: 100%; }
 
 /* ---- List page ---- */
-.cmy-list-masthead {
+/* Stack the CTA under the title. A nowrap "Create a community" pill beside the
+   40px hero title overflows on iPhone and paints over the heading / top bar.
+   Copy takes the full row so the button wraps even if flex-direction is row. */
+.cmy-list .cmy-list-masthead {
   display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: var(--s-3);
+  position: relative;
+  z-index: 0;
 }
-.cmy-list-masthead-copy { min-width: 0; flex: 1; }
+.cmy-list .cmy-list-masthead-copy {
+  flex: 1 1 100%;
+  min-width: 100%;
+  width: 100%;
+}
 .cmy-list-eyebrow {
   letter-spacing: 0.75px;
   font-size: var(--text-micro);
@@ -81,7 +98,9 @@
   line-height: 1.05;
   color: var(--ink-900);
   margin: 0;
-  display: inline-block;
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .cmy-list-title::after {
   content: "";
@@ -98,12 +117,14 @@
   margin: var(--s-1) 0 0;
   max-width: 34ch;
 }
-.cmy-list-create {
-  flex-shrink: 0;
+.cmy-list .cmy-list-create {
+  flex: 0 0 auto;
+  align-self: flex-start;
   white-space: nowrap;
-  min-width: max-content;
   padding: 10px 20px;
   font-size: var(--text-body);
+  position: relative;
+  z-index: 0;
 }
 .cmy-list-section { display: flex; flex-direction: column; gap: var(--s-3); }
 
