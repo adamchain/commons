@@ -101,7 +101,7 @@ export function CommunitiesPage() {
 
       {hero && (
         <section className="cmy-list-section">
-          <h2 className="cmy-list-section-title">Your communities</h2>
+          <h2 className="cmy-list-section-title">Communities</h2>
           <CommunityHeroCard c={hero} />
           {restMine.length > 0 && (
             <ul className="cmy-row-list">
