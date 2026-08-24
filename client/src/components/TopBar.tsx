@@ -3,11 +3,12 @@ import { Link, useLocation } from "react-router-dom";
 import { Bell } from "lucide-react";
 import wordmark from "../assets/wordmark.png";
 import { api } from "../api/http";
+import { Avatar } from "./Avatar";
 import { useAuth } from "../context/AuthContext";
 import type { NotificationDTO } from "../types/shared";
 
 /**
- * AppHeader — wordmark left, Bell right (Profile lives in bottom nav).
+ * AppHeader — wordmark left, Bell + your photo right.
  * Padding 16h / 14 top / 10 bottom; icons 18px stroke 1.6 muted; gap 14px.
  * Hairline rule below (margin 0 20px).
  */
@@ -89,6 +90,22 @@ export function TopBar() {
           <Bell size={18} strokeWidth={1.6} />
           {hasUnread && <span className="top-bar-bell-dot" aria-hidden="true" />}
         </Link>
+        {user && (
+          <Link
+            to={`/profile/${user.id}`}
+            className="top-bar-icon-btn top-bar-icon-btn--avatar"
+            aria-label="Your profile"
+          >
+            <Avatar
+              seed={user.avatarSeed}
+              style={user.avatarStyle}
+              photoDataUrl={user.avatarPhotoDataUrl}
+              params={user.avatarParams}
+              name={user.firstName || undefined}
+              size="sm"
+            />
+          </Link>
+        )}
       </div>
       <div className="top-bar-rule" aria-hidden="true" />
     </header>

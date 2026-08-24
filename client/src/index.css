@@ -7426,6 +7426,17 @@ h1, h2, h3, h4, h5, h6 {
   height: 18px;
 }
 
+.top-bar-icon-btn--avatar {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.top-bar-icon-btn--avatar .avatar {
+  display: block;
+}
+
 /* Small unread dot on the notifications bell — driven by real unread state. */
 .top-bar-bell-dot {
   position: absolute;
