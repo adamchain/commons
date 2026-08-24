@@ -7,6 +7,7 @@
   flex-direction: column;
   gap: var(--s-4);
   padding-bottom: var(--s-8);
+  min-width: 0;
 }
 
 /* Beat any later padding-top reset so the masthead CTA cannot slide up under
@@ -59,22 +60,22 @@
 .cmy-btn--block { width: 100%; }
 
 /* ---- List page ---- */
-/* Stack the CTA under the title. A nowrap "Create a community" pill beside the
-   40px hero title overflows on iPhone and paints over the heading / top bar.
-   Copy takes the full row so the button wraps even if flex-direction is row. */
+/* One-column grid — never sit Create beside the 40px title. A nowrap flex-row
+   (and iOS column+wrap) painted the pill over “Communities” and the top bar. */
 .cmy-list .cmy-list-masthead {
-  display: flex;
-  flex-direction: column;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: flex-start;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: start;
+  align-items: start;
   gap: var(--s-3);
   position: relative;
   z-index: 0;
+  width: 100%;
+  min-width: 0;
 }
 .cmy-list .cmy-list-masthead-copy {
-  flex: 1 1 100%;
-  min-width: 100%;
+  min-width: 0;
+  max-width: 100%;
   width: 100%;
 }
 .cmy-list-eyebrow {
@@ -118,9 +119,10 @@
   max-width: 34ch;
 }
 .cmy-list .cmy-list-create {
-  flex: 0 0 auto;
-  align-self: flex-start;
-  white-space: nowrap;
+  justify-self: start;
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
   padding: 10px 20px;
   font-size: var(--text-body);
   position: relative;
