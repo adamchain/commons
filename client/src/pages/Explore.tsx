@@ -4,6 +4,7 @@ import { MapPin, Search } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
+import { JoinConfirmPopup } from "../components/JoinConfirmPopup";
 import { Label } from "../components/ui";
 import { COMMUNITY_CATEGORY_LABELS, type CommunityCardDTO, type CommunityDTO } from "../types/shared";
 
@@ -30,6 +31,7 @@ export function ExplorePage() {
   const [communities, setCommunities] = useState<CommunityCardDTO[]>([]);
   const [loadedComm, setLoadedComm] = useState(false);
   const [activeCat, setActiveCat] = useState<string>(PLACE_CATEGORIES[0]);
+  const [joinConfirm, setJoinConfirm] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -109,9 +111,10 @@ export function ExplorePage() {
                   </div>
                   <CommunityJoinCta
                     community={c}
-                    onJoined={(updated) =>
-                      setCommunities((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
-                    }
+                    onJoined={(updated) => {
+                      setCommunities((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+                      if (updated.myMembershipStatus === "active") setJoinConfirm(true);
+                    }}
                     onRequest={() => navigate(`/communities/${c.id}`, { state: { from: "explore" } })}
                   />
                 </Link>
@@ -175,6 +178,7 @@ export function ExplorePage() {
           Post a plan now
         </Link>
       </section>
+      {joinConfirm && <JoinConfirmPopup kind="community" onClose={() => setJoinConfirm(false)} />}
     </main>
   );
 }
