@@ -67,7 +67,7 @@
   font-weight: 700;
 }
 .cmy-list-section-title {
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.75px;
   font-size: var(--text-micro);
   color: var(--faint);

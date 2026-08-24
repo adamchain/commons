@@ -291,7 +291,7 @@ export function ProfilePage() {
 
         {profile.plansGated ? (
           <section className="profile-other-section">
-            <h3 className="profile-other-section-label">Upcoming plans</h3>
+            <h3 className="profile-other-section-label">Upcoming Plans</h3>
             <p className="profile-social-locked">
               Add them to your network to see their other plans. Plans you&apos;re
               both going to stay visible here — sharing a plan doesn&apos;t unlock
@@ -334,7 +334,7 @@ export function ProfilePage() {
         ) : profile.upcoming.length > 0 ? (
           <section className="profile-other-section">
             <div className="profile-other-section-head">
-              <h3 className="profile-other-section-label">Upcoming plans</h3>
+              <h3 className="profile-other-section-label">Upcoming Plans</h3>
               <span className="profile-other-section-count">
                 {profile.upcoming.length} plan{profile.upcoming.length === 1 ? "" : "s"}
               </span>
@@ -1048,7 +1048,7 @@ function planRelationshipBadge(
 }
 
 /**
- * Combined "Your Plans" section — upcoming (collapsed to 3, "Show X more"),
+ * Combined Plans section — upcoming (collapsed to 3, "Show X more"),
  * then a Past accordion. Upcoming rows tag each plan with YOUR PLAN (you
  * started it), IN, or INTERESTED.
  */
@@ -1084,7 +1084,7 @@ function YourPlansBlock({
   return (
     <section className="profile-block" id={id}>
       <div className="profile-block-heading-row">
-        <h3 className="who-block-heading">{isSelf ? "Your plans" : "Plans"}</h3>
+        <h3 className="who-block-heading">Plans</h3>
         {isSelf && (
           <div className="profile-plans-toggle" role="tablist" aria-label="Plans view">
             <button
@@ -1254,7 +1254,7 @@ function SettingsIcon() {
 }
 
 /**
- * "Your network" card — mirrors the wireframe: a labelled card with a row of
+ * Network card — mirrors the wireframe: a labelled card with a row of
  * five avatar slots (filled for people you're connected with, dashed circles
  * for the rest). Empty state prompts an invite; otherwise it links through to
  * the full network list.
@@ -1267,7 +1267,7 @@ function NetworkCard({ network }: { network: PublicUser[] | null }) {
   return (
     <div className="profile-network-card">
       <Link to="/network" className="profile-network-card-head">
-        <span className="profile-network-card-label">Your network</span>
+        <span className="profile-network-card-label">Network</span>
         <span className="profile-network-card-count">
           {count} {count === 1 ? "person" : "people"}
         </span>

@@ -232,7 +232,7 @@ h1, h2, h3, h4, h5, h6 {
   margin-bottom: 0;
 }
 
-/* Section label — 10px/600/muted/UPPERCASE, flex + gap for inline icon */
+/* Section label — 10px/600/muted/title case, flex + gap for inline icon */
 .ui-label {
   display: flex;
   align-items: center;
@@ -241,7 +241,7 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
   color: var(--muted);
   letter-spacing: 1.5px;
-  text-transform: uppercase;
+  text-transform: none;
   margin-bottom: 10px;
 }
 
@@ -3853,7 +3853,7 @@ h1, h2, h3, h4, h5, h6 {
   overflow-x: hidden;
   max-width: 100%;
 }
-/* "Your network" card (profile menu) — matches the wireframe. */
+/* Network card (profile menu) — matches the wireframe. */
 .profile-network-card-head {
   display: flex;
   align-items: baseline;
@@ -4373,7 +4373,7 @@ h1, h2, h3, h4, h5, h6 {
   transform: rotate(-90deg);
 }
 
-/* Combined "Your plans" card — one white card, thin dividers between rows,
+/* Combined Plans card — one white card, thin dividers between rows,
    replacing the old per-row bordered cards. */
 .profile-plan-card {
   background: var(--surface);
@@ -5023,7 +5023,7 @@ h1, h2, h3, h4, h5, h6 {
 .my-plans-past-item { display: flex; flex-direction: column; }
 .my-plans-do-again { margin-top: 6px; }
 
-/* Profile "Your plans" header row + do-again */
+/* Profile Plans header row + do-again */
 .profile-block-heading-row {
   display: flex;
   flex-direction: column;
@@ -13517,7 +13517,7 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
   color: var(--muted);
   letter-spacing: 1.5px;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .profile-other-section-head .profile-other-section-label {
   margin-bottom: 0;

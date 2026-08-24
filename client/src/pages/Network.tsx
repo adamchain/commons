@@ -39,7 +39,7 @@ export function NetworkPage() {
         </Link>
       </header>
       <ScreenTitle
-        title="Your network"
+        title="Network"
         subtitle={`${network.length} ${network.length === 1 ? "person" : "people"} you've added`}
       />
 
