@@ -52,7 +52,6 @@ export function PlanDetailPage() {
   const [lockCoverOpen, setLockCoverOpen] = useState(false);
   const [showAllGoing, setShowAllGoing] = useState(false);
   const [showAllInterested, setShowAllInterested] = useState(false);
-  const [confirmGrabs, setConfirmGrabs] = useState(false);
   const [grabsError, setGrabsError] = useState<string | null>(null);
   const [grabsBusy, setGrabsBusy] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
@@ -163,7 +162,6 @@ export function PlanDetailPage() {
     setGrabsError(null);
     try {
       await api(`/api/plans/${plan.id}/up-for-grabs`, { method: "POST" });
-      setConfirmGrabs(false);
       await load();
     } catch (e) {
       setGrabsError(e instanceof Error ? e.message : "Couldn't put this plan up for grabs.");
@@ -722,64 +720,20 @@ export function PlanDetailPage() {
               onClick={() => {
                 setConfirmCancel(true);
                 setCancelError(null);
-                setConfirmGrabs(false);
               }}
             >
               Cancel plan
             </button>
-            {!plan.upForGrabsAt && (
-              confirmGrabs ? (
-                <div className="plan-grabs-confirm" role="group" aria-label="Confirm put up for grabs">
-                  <p className="plan-grabs-confirm-copy">
-                    Put &ldquo;{plan.title}&rdquo; up for grabs? Anyone who&rsquo;s in can take over hosting
-                    instead of cancelling.
-                  </p>
-                  {grabsError && <p className="luma-inline-error">{grabsError}</p>}
-                  <div className="plan-grabs-confirm-actions">
-                    <button
-                      type="button"
-                      className="btn-secondary plan-host-action-btn"
-                      disabled={grabsBusy}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setConfirmGrabs(false);
-                        setGrabsError(null);
-                      }}
-                    >
-                      Keep hosting
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-primary plan-host-action-btn"
-                      disabled={grabsBusy}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        void putUpForGrabs();
-                      }}
-                    >
-                      {grabsBusy ? "Saving…" : "Put up for grabs"}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className="btn-secondary plan-host-action-btn plan-host-action-btn--grabs"
-                  onClick={() => {
-                    setConfirmGrabs(true);
-                    setGrabsError(null);
-                    setConfirmCancel(false);
-                  }}
-                >
-                  <Hand size={14} strokeWidth={1.8} aria-hidden="true" />
-                  Put it up for grabs
-                </button>
-              )
-            )}
-            <HostTransferControl
+            <PassHostingControl
+              planTitle={plan.title}
+              upForGrabs={Boolean(plan.upForGrabsAt)}
               candidates={plan.participants.going.filter((p) => p.id !== user.id)}
+              grabsBusy={grabsBusy}
+              grabsError={grabsError}
+              forceClosed={confirmCancel}
+              onOpen={() => setConfirmCancel(false)}
+              onClearGrabsError={() => setGrabsError(null)}
+              onPutUpForGrabs={() => void putUpForGrabs()}
               onTransfer={(id) => void transferHost(id)}
             />
           </div>
@@ -1133,16 +1087,101 @@ function RepeatIcon() {
   );
 }
 
-function HostTransferControl({
+/**
+ * Single host entry point for giving up the plan: put it up for grabs
+ * (anyone going can claim) or transfer to a specific going guest.
+ * Both existing APIs stay intact — this only folds the two buttons together.
+ */
+function PassHostingControl({
+  planTitle,
+  upForGrabs,
   candidates,
+  grabsBusy,
+  grabsError,
+  forceClosed,
+  onOpen,
+  onClearGrabsError,
+  onPutUpForGrabs,
   onTransfer,
 }: {
+  planTitle: string;
+  upForGrabs: boolean;
   candidates: PublicUser[];
+  grabsBusy: boolean;
+  grabsError: string | null;
+  forceClosed: boolean;
+  onOpen: () => void;
+  onClearGrabsError: () => void;
+  onPutUpForGrabs: () => void;
   onTransfer: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [confirmGrabs, setConfirmGrabs] = useState(false);
   const [pending, setPending] = useState<PublicUser | null>(null);
-  if (candidates.length === 0) return null;
+  const canGrabs = !upForGrabs;
+  const canTransfer = candidates.length > 0;
+
+  useEffect(() => {
+    if (!forceClosed) return;
+    setOpen(false);
+    setConfirmGrabs(false);
+    setPending(null);
+  }, [forceClosed]);
+
+  useEffect(() => {
+    if (!upForGrabs) return;
+    setConfirmGrabs(false);
+    setOpen(false);
+  }, [upForGrabs]);
+
+  if (!canGrabs && !canTransfer) return null;
+
+  function closePanel() {
+    setOpen(false);
+    setConfirmGrabs(false);
+    setPending(null);
+    onClearGrabsError();
+  }
+
+  if (confirmGrabs && canGrabs) {
+    return (
+      <div className="plan-grabs-confirm" role="group" aria-label="Confirm put up for grabs">
+        <p className="plan-grabs-confirm-copy">
+          Put &ldquo;{planTitle}&rdquo; up for grabs? Anyone who&rsquo;s in can take over hosting
+          instead of cancelling.
+        </p>
+        {grabsError && <p className="luma-inline-error">{grabsError}</p>}
+        <div className="plan-grabs-confirm-actions">
+          <button
+            type="button"
+            className="btn-secondary plan-host-action-btn"
+            disabled={grabsBusy}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setConfirmGrabs(false);
+              onClearGrabsError();
+            }}
+          >
+            Keep hosting
+          </button>
+          <button
+            type="button"
+            className="btn-primary plan-host-action-btn"
+            disabled={grabsBusy}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onPutUpForGrabs();
+            }}
+          >
+            {grabsBusy ? "Saving…" : "Put up for grabs"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (pending) {
     return (
       <div className="plan-grabs-confirm" role="group" aria-label="Confirm host transfer">
@@ -1168,40 +1207,64 @@ function HostTransferControl({
       </div>
     );
   }
+
   if (!open) {
     return (
       <button
         type="button"
-        className="btn-link plan-transfer-link"
-        onClick={() => setOpen(true)}
+        className="btn-secondary plan-host-action-btn plan-host-action-btn--grabs"
+        onClick={() => {
+          onOpen();
+          onClearGrabsError();
+          setOpen(true);
+        }}
       >
-        Transfer hosting
+        <Hand size={14} strokeWidth={1.8} aria-hidden="true" />
+        Pass hosting
       </button>
     );
   }
+
   return (
-    <div className="plan-transfer-picker" role="menu">
-      <div className="plan-transfer-picker-label">Hand off to:</div>
-      <div className="plan-transfer-picker-list">
-        {candidates.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            className="plan-transfer-pick"
-            onClick={() => setPending(c)}
-          >
-            <Avatar
-              seed={c.avatarSeed}
-              style={c.avatarStyle}
-              photoDataUrl={c.avatarPhotoDataUrl}
-              params={c.avatarParams}
-              size="sm"
-            />
-            <span>{c.firstName}</span>
-          </button>
-        ))}
-      </div>
-      <button type="button" className="btn-link" onClick={() => setOpen(false)}>
+    <div className="plan-pass-hosting" role="group" aria-label="Pass hosting">
+      {canGrabs && (
+        <button
+          type="button"
+          className="plan-pass-hosting-option"
+          onClick={() => {
+            onClearGrabsError();
+            setConfirmGrabs(true);
+          }}
+        >
+          <span className="plan-pass-hosting-option-title">Put it up for grabs</span>
+          <span className="plan-pass-hosting-option-sub">Anyone going can claim</span>
+        </button>
+      )}
+      {canTransfer && (
+        <div className="plan-pass-hosting-transfer">
+          <div className="plan-transfer-picker-label">Transfer to a specific person</div>
+          <div className="plan-transfer-picker-list" role="menu">
+            {candidates.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className="plan-transfer-pick"
+                onClick={() => setPending(c)}
+              >
+                <Avatar
+                  seed={c.avatarSeed}
+                  style={c.avatarStyle}
+                  photoDataUrl={c.avatarPhotoDataUrl}
+                  params={c.avatarParams}
+                  size="sm"
+                />
+                <span>{c.firstName}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <button type="button" className="btn-link" onClick={closePanel}>
         Cancel
       </button>
     </div>
