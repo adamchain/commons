@@ -3980,10 +3980,12 @@ h1, h2, h3, h4, h5, h6 {
   margin: 0;
   padding: 0 20px 14px;
   flex-wrap: nowrap;
+  min-width: 0;
+  width: 100%;
 }
 .feed-toolbar .segmented-feed-view {
   margin: 0;
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: row;
   gap: 6px;
@@ -3995,20 +3997,36 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--border);
   margin: 0 20px 14px;
 }
+/* Form `.segmented button` uses min-width: 120px + wrap so Create/Edit plan
+   toggles can stack. The feed keeps All plans / My plans / Filters on one
+   nowrap row, so that floor makes the pills overflow on iPhone SE and
+   Display Zoom (320pt) and paint over Filters. Shrink instead; ellipsis
+   only if Bold Text still can't fit. */
 .segmented.segmented-feed-view button {
   border-radius: 22px;
-  padding: 7px 16px;
+  padding: 7px 10px;
   background: var(--tan-mid);
   border: none;
   color: var(--muted);
   font-weight: 400;
   font-size: var(--text-body-small);
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .segmented.segmented-feed-view button.is-active {
   background: transparent;
   border: 1.5px solid var(--red);
   color: var(--red);
   font-weight: 600;
+}
+.feed-toolbar .page-filter-btn {
+  flex: 0 0 auto;
+  margin-left: 0;
+  padding: 7px 12px;
+  white-space: nowrap;
 }
 .page-filter-btn {
   margin-left: auto;
