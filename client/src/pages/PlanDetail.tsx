@@ -725,12 +725,12 @@ export function PlanDetailPage() {
               Cancel plan
             </button>
             <PassHostingControl
+              key={confirmCancel ? "closed" : "open"}
               planTitle={plan.title}
               upForGrabs={Boolean(plan.upForGrabsAt)}
               candidates={plan.participants.going.filter((p) => p.id !== user.id)}
               grabsBusy={grabsBusy}
               grabsError={grabsError}
-              forceClosed={confirmCancel}
               onOpen={() => setConfirmCancel(false)}
               onClearGrabsError={() => setGrabsError(null)}
               onPutUpForGrabs={() => void putUpForGrabs()}
@@ -1098,7 +1098,6 @@ function PassHostingControl({
   candidates,
   grabsBusy,
   grabsError,
-  forceClosed,
   onOpen,
   onClearGrabsError,
   onPutUpForGrabs,
@@ -1109,7 +1108,6 @@ function PassHostingControl({
   candidates: PublicUser[];
   grabsBusy: boolean;
   grabsError: string | null;
-  forceClosed: boolean;
   onOpen: () => void;
   onClearGrabsError: () => void;
   onPutUpForGrabs: () => void;
@@ -1120,19 +1118,6 @@ function PassHostingControl({
   const [pending, setPending] = useState<PublicUser | null>(null);
   const canGrabs = !upForGrabs;
   const canTransfer = candidates.length > 0;
-
-  useEffect(() => {
-    if (!forceClosed) return;
-    setOpen(false);
-    setConfirmGrabs(false);
-    setPending(null);
-  }, [forceClosed]);
-
-  useEffect(() => {
-    if (!upForGrabs) return;
-    setConfirmGrabs(false);
-    setOpen(false);
-  }, [upForGrabs]);
 
   if (!canGrabs && !canTransfer) return null;
 
