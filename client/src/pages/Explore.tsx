@@ -12,8 +12,7 @@ import { COMMUNITY_CATEGORY_LABELS, type CommunityCardDTO, type CommunityDTO } f
 // element at launch. Restore the functional search + nearby version from git
 // history when the rest of Explore ships.
 
-const HERO_PHOTO =
-  "https://images.unsplash.com/photo-1518998053901-5348d3961a04?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=1200&q=80";
+const HERO_PHOTO = "/landing/photo-shadows.jpg";
 
 const PLACE_CATEGORIES = ["Coffee", "Food", "Drinks", "Fitness", "Parks", "Culture"] as const;
 
