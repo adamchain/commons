@@ -24,6 +24,7 @@ import { linkPreviewRouter } from "./routes/linkPreview.js";
 import { searchRouter } from "./routes/search.js";
 import { usersRouter } from "./routes/users.js";
 import { shareRouter, injectPlanMeta, planIdFromDetailPath } from "./routes/share.js";
+import { helpchatRouter } from "./routes/helpchat.js";
 import { store } from "./store.js";
 import { readFileSync } from "node:fs";
 import { startNudgeSchedulers } from "./lib/nudges.js";
@@ -79,6 +80,7 @@ app.use("/api/notifications", notificationsRouter);
 app.use("/api/link-preview", linkPreviewRouter);
 app.use("/api/search", searchRouter);
 app.use("/api/users", usersRouter);
+app.use("/api/helpchat", helpchatRouter);
 app.use("/api", chatRouter); // chat router defines its own paths under /plans/.../conversation and /conversations/...
 
 // Public share-card image endpoint (no auth — crawlers fetch it). Reachable in

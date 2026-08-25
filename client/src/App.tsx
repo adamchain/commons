@@ -41,6 +41,7 @@ import { CommunityDetailPage } from "./pages/CommunityDetail";
 import { CommunityChatPage } from "./pages/CommunityChat";
 import { SettingsForumsPage } from "./pages/SettingsForums";
 import { CreateCommunityPage } from "./pages/CreateCommunity";
+import { HelpChatPage } from "./pages/HelpChat";
 
 const APP_BOOT_AT = Date.now();
 const MIN_BOOT_SPLASH_MS = 600;
@@ -162,6 +163,7 @@ export default function App() {
         <Route path="/legal/:slug" element={<LegalPage />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/dashboard" element={<Navigate to="/admin" replace />} />
         <Route path="/login" element={<Navigate to="/onboarding" replace />} />
 
         <Route path="/" element={<Protected><FeedPage /></Protected>} />
@@ -189,6 +191,7 @@ export default function App() {
         <Route path="/settings/notifications" element={<Protected><NotificationPrefsPage /></Protected>} />
         <Route path="/settings/privacy" element={<Protected><PrivacyPage /></Protected>} />
         <Route path="/settings/blocked" element={<Protected><BlockedListPage /></Protected>} />
+        <Route path="/helpchat" element={<Protected><HelpChatPage /></Protected>} />
         <Route path="/profile/:userId/edit" element={<ProfileGate edit />} />
         {/* Own profile is reachable mid-onboarding so people can review themselves. Other profiles wait. */}
         <Route path="/profile/:userId" element={<ProfileGate />} />
