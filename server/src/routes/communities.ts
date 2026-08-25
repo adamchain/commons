@@ -978,5 +978,7 @@ communitiesRouter.get("/:id/conversation", requireAuth, async (req, res) => {
     muted: store.isConversationMuted(viewerId, conv.id),
     isHost: hostId === viewerId,
     hostId,
+    coverImage: community.coverImage ?? null,
+    category: community.category,
   });
 });

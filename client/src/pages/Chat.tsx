@@ -12,11 +12,11 @@ import {
 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { PlanCoverThumb } from "../components/CoverThumb";
 import { PollCard } from "../components/PollCard";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
-import { interestVisual } from "../lib/interestIcons";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
@@ -401,19 +401,11 @@ export function ChatPage() {
           className="chat-header-card chat-header-card--compact"
           aria-label="Open plan details"
         >
-          {(() => {
-            const vis = interestVisual(plan.tags[0]);
-            const Icon = vis.Icon;
-            return (
-              <span
-                className="chat-header-icon-well"
-                style={{ background: vis.tint, color: vis.iconColor }}
-                aria-hidden="true"
-              >
-                <Icon size={18} strokeWidth={1.8} />
-              </span>
-            );
-          })()}
+          <PlanCoverThumb
+            planId={plan.id}
+            flyerDataUrl={plan.flyerDataUrl}
+            className="cover-thumb--sm"
+          />
           <div className="chat-header-text">
             <div className="chat-header-meta">
               {formatPlanDate(plan.date)} · {formatPlanTime(plan.time, plan.isFlexibleTime)} · {participantLabel}

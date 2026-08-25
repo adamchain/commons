@@ -43,10 +43,28 @@ const NATIVE_ORIGINS = new Set([
   "http://localhost",
 ]);
 
+function isLocalDevOrigin(origin: string): boolean {
+  if (isProduction) return false;
+  try {
+    const u = new URL(origin);
+    return (
+      (u.protocol === "http:" || u.protocol === "https:") &&
+      (u.hostname === "localhost" || u.hostname === "127.0.0.1")
+    );
+  } catch {
+    return false;
+  }
+}
+
 app.use(
   cors({
     origin: (origin, cb) => {
-      if (!origin || origin === clientUrl || NATIVE_ORIGINS.has(origin)) {
+      if (
+        !origin ||
+        origin === clientUrl ||
+        NATIVE_ORIGINS.has(origin) ||
+        isLocalDevOrigin(origin)
+      ) {
         cb(null, true);
         return;
       }

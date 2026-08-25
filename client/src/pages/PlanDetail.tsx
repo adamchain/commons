@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Camera, Hand, ImagePlus } from "lucide-react";
+import { ArrowLeft, Camera, Clock, Hand, ImagePlus, Plus, Share2, UserPlus, X } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
@@ -14,11 +15,11 @@ import { useAuth } from "../context/AuthContext";
 import { planHasEnded } from "../lib/planTime";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
 import { fileToResizedDataUrl } from "../lib/imageResize";
-import { formatPlaceAddress, formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
+import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
-import { type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
+import { INTEREST_LABELS, type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
 
 /** Same "set parts + · flexible" convention as the feed card — never show a
  *  specific time/date next to a field that's still open. */
@@ -52,6 +53,7 @@ export function PlanDetailPage() {
   const [lockCoverOpen, setLockCoverOpen] = useState(false);
   const [showAllGoing, setShowAllGoing] = useState(false);
   const [showAllInterested, setShowAllInterested] = useState(false);
+  const [showGuestsModal, setShowGuestsModal] = useState(false);
   const [grabsError, setGrabsError] = useState<string | null>(null);
   const [grabsBusy, setGrabsBusy] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
@@ -70,14 +72,24 @@ export function PlanDetailPage() {
     void load();
   }, [id]);
 
-  // Deep-link from feed "X Going" into the guest list — scroll + expand names.
+  // Deep-link from feed "X Going" into the guest list modal.
   useEffect(() => {
     if (!plan || location.hash !== "#guests") return;
-    setShowAllGoing(true);
-    setShowAllInterested(true);
-    const el = document.getElementById("guests");
-    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setShowGuestsModal(true);
   }, [plan?.id, location.hash]);
+
+  useEffect(() => {
+    if (!showGuestsModal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setShowGuestsModal(false);
+      if (location.hash === "#guests") {
+        navigate(location.pathname, { replace: true, state: navFrom });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showGuestsModal, location.hash, location.pathname, navigate, navFrom]);
 
   useEffect(() => {
     if (!plan) return;
@@ -240,8 +252,6 @@ export function PlanDetailPage() {
   const coverSrc =
     plan.flyerDataUrl ??
     (plan.planKind === "looking_for" ? null : pickCoverImage(coverPool, plan.id));
-  const prettyAddress = formatPlaceAddress(plan.location.address);
-  const showAddressLine = prettyAddress && prettyAddress !== plan.location.name;
   const mapsQuery = encodeURIComponent(
     [plan.location.name, plan.location.address].filter(Boolean).join(" "),
   );
@@ -249,6 +259,14 @@ export function PlanDetailPage() {
     plan.location.lat !== undefined && plan.location.lng !== undefined
       ? `https://www.google.com/maps/search/?api=1&query=${plan.location.lat},${plan.location.lng}`
       : `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
+  const interestTags = plan.tags.filter((t) => INTEREST_LABELS[t]);
+  const goingCount = plan.participants.going.length;
+  const interestedCount = plan.participants.interested.length;
+  const goingIds = new Set(plan.participants.going.map((u) => u.id));
+  const planPeoplePreview = [
+    ...plan.participants.going,
+    ...plan.participants.interested.filter((u) => !goingIds.has(u.id)),
+  ].slice(0, 4);
 
   const lockDisabled = lockBusy || !lockVenue.trim() || !lockDate;
   const lockHint = !lockVenue.trim()
@@ -291,8 +309,16 @@ export function PlanDetailPage() {
     />
   );
 
+  function closeGuestsModal() {
+    setShowGuestsModal(false);
+    if (location.hash === "#guests") {
+      navigate(location.pathname, { replace: true, state: navFrom });
+    }
+  }
+
   function goBackFromPlan() {
     if (location.hash === "#guests") {
+      setShowGuestsModal(false);
       navigate(location.pathname, { replace: true, state: navFrom });
       return;
     }
@@ -479,32 +505,147 @@ export function PlanDetailPage() {
       <div className="plan-detail-safe-scrim" aria-hidden="true" />
       <div className="plan-detail-hero">
         {coverSrc && <img src={coverSrc} alt="" loading="lazy" />}
-        <div className="plan-detail-hero-overlay" aria-hidden="true" />
-        <button
-          type="button"
-          className="plan-detail-back"
-          aria-label="Back"
-          onClick={() => {
-            // Guest-list deep-link: first back clears #guests (stay on plan),
-            // second back returns to feed/messages/etc.
-            if (location.hash === "#guests") {
-              navigate(location.pathname, { replace: true, state: navFrom });
-              return;
-            }
-            navigate(backHref);
-          }}
-        >
-          ←
-        </button>
-        <div className="plan-detail-hero-text">
-          <div className="plan-detail-hero-when">
-            {formatWhen(plan.date, plan.time, plan.isFlexibleTime)}
-          </div>
-          <h1>{sentenceCaseTitle(plan.title)}</h1>
+        <div className="plan-detail-hero-bar">
+          <button
+            type="button"
+            className="plan-detail-hero-btn"
+            aria-label="Back"
+            onClick={() => {
+              // Guest-list deep-link: first back clears #guests (stay on plan),
+              // second back returns to feed/messages/etc.
+              if (location.hash === "#guests") {
+                setShowGuestsModal(false);
+                navigate(location.pathname, { replace: true, state: navFrom });
+                return;
+              }
+              navigate(backHref);
+            }}
+          >
+            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
+          </button>
+          {!isPast && (
+            <div className="plan-detail-hero-bar-actions">
+              <button
+                type="button"
+                className="plan-detail-hero-btn"
+                aria-label="Invite"
+                onClick={() => setShowInvite(true)}
+              >
+                <UserPlus size={18} strokeWidth={2} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="plan-detail-hero-btn"
+                aria-label="Share"
+                onClick={() => setShowShare(true)}
+              >
+                <Share2 size={18} strokeWidth={2} aria-hidden="true" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
       <div className="plan-detail-body">
+        <header className="plan-detail-heading">
+          {interestTags.length > 0 && (
+            <div className="plan-detail-interests">
+              {interestTags.map((t) => (
+                <span key={t} className="plan-detail-interest">
+                  {INTEREST_LABELS[t]}
+                </span>
+              ))}
+            </div>
+          )}
+          <h1 className="plan-detail-title">{sentenceCaseTitle(plan.title)}</h1>
+          <div className="plan-detail-whenwhere">
+            {plan.isFlexibleLocation ? (
+              <span className="plan-detail-meta">
+                <PlanDetailPinIcon />
+                <span className="plan-detail-meta-label">Flexible</span>
+              </span>
+            ) : (
+              <a
+                className="plan-detail-meta"
+                href={mapsHref}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <PlanDetailPinIcon />
+                <span className="plan-detail-meta-label">{plan.location.name}</span>
+              </a>
+            )}
+            <span className="plan-detail-meta">
+              <Clock className="plan-detail-meta-icon" size={14} strokeWidth={2.2} aria-hidden="true" />
+              <span className="plan-detail-meta-label">
+                {formatWhen(plan.date, plan.time, plan.isFlexibleTime)}
+              </span>
+            </span>
+          </div>
+          <div className="plan-detail-people">
+            <div className="plan-detail-people-faces">
+              {planPeoplePreview.length > 0 && (
+                <div className="avatar-stack">
+                  {planPeoplePreview.map((person) => (
+                    <Link
+                      key={person.id}
+                      to={`/profile/${person.id}`}
+                      state={{ from: "plan", planId: plan.id }}
+                      className="avatar-stack-link"
+                      aria-label={person.firstName}
+                    >
+                      <Avatar
+                        seed={person.avatarSeed}
+                        style={person.avatarStyle}
+                        photoDataUrl={person.avatarPhotoDataUrl}
+                        params={person.avatarParams}
+                        name={person.firstName}
+                        size="sm"
+                      />
+                    </Link>
+                  ))}
+                </div>
+              )}
+              {!isPast && (
+                <button
+                  type="button"
+                  className={`plan-detail-people-add${planPeoplePreview.length > 0 ? " is-overlap" : ""}`}
+                  onClick={() => setShowInvite(true)}
+                  aria-label="Invite"
+                >
+                  <Plus size={14} strokeWidth={2.6} />
+                </button>
+              )}
+              <span className="plan-detail-people-count">
+                {goingCount === 0 && interestedCount === 0
+                  ? "No one yet"
+                  : [
+                      goingCount > 0 ? `${goingCount} going` : null,
+                      interestedCount > 0 ? `${interestedCount} interested` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+              </span>
+            </div>
+            <div className="plan-detail-people-actions">
+              <button
+                type="button"
+                onClick={() => setShowGuestsModal(true)}
+              >
+                View all
+              </button>
+              {!isPast && (
+                <>
+                  <span aria-hidden="true"> / </span>
+                  <button type="button" onClick={() => setShowInvite(true)}>
+                    Invite
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </header>
+
         <button
           type="button"
           className="host-row plan-detail-card"
@@ -616,43 +757,6 @@ export function PlanDetailPage() {
           </Link>
         )}
 
-        <div className="plan-meta-card">
-          <div className="plan-meta-row">
-            <span className="plan-meta-icon" aria-hidden="true"><ClockIcon /></span>
-            <div className="plan-meta-text">
-              <span className="plan-meta-label">Date &amp; time</span>
-              <span className="plan-meta-value">
-                {formatWhen(plan.date, plan.time, plan.isFlexibleTime)}
-              </span>
-            </div>
-          </div>
-          {plan.isFlexibleLocation ? (
-            <div className="plan-meta-row">
-              <span className="plan-meta-icon" aria-hidden="true"><PinIcon /></span>
-              <div className="plan-meta-text">
-                <span className="plan-meta-label">Location</span>
-                <span className="plan-meta-value">Flexible</span>
-              </div>
-            </div>
-          ) : (
-            <a
-              className="plan-meta-row plan-meta-row--link"
-              href={mapsHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`Open ${plan.location.name} in Google Maps`}
-            >
-              <span className="plan-meta-icon" aria-hidden="true"><PinIcon /></span>
-              <div className="plan-meta-text">
-                <span className="plan-meta-label">Location</span>
-                <span className="plan-meta-value">{plan.location.name}</span>
-                {showAddressLine && <span className="plan-meta-sub">{prettyAddress}</span>}
-                <span className="plan-meta-maps">Tap to open maps ↗</span>
-              </div>
-            </a>
-          )}
-        </div>
-
         {/* Full action toolkit on every plan — Get there, Invite, and Share
             appear whether or not you're the host. Hidden once the event is over. */}
         {!isPast && (
@@ -662,11 +766,15 @@ export function PlanDetailPage() {
             <span className="action-btn-label">Get there</span>
           </button>
           <button type="button" className="action-btn action-btn--stack" onClick={() => setShowInvite(true)}>
-            <span className="action-btn-icon" aria-hidden="true"><PlusIcon /></span>
+            <span className="action-btn-icon" aria-hidden="true">
+              <UserPlus size={22} strokeWidth={1.8} />
+            </span>
             <span className="action-btn-label">Invite</span>
           </button>
           <button type="button" className="action-btn action-btn--stack" onClick={() => setShowShare(true)}>
-            <span className="action-btn-icon" aria-hidden="true"><ShareIcon /></span>
+            <span className="action-btn-icon" aria-hidden="true">
+              <Share2 size={22} strokeWidth={1.8} />
+            </span>
             <span className="action-btn-label">Share</span>
           </button>
         </div>
@@ -749,6 +857,44 @@ export function PlanDetailPage() {
       {showInvite && (
         <InviteSheet planId={plan.id} planTitle={plan.title} onClose={() => setShowInvite(false)} />
       )}
+      {showGuestsModal &&
+        createPortal(
+          <div
+            className="modal-backdrop"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="plan-guests-modal-title"
+            onClick={closeGuestsModal}
+          >
+            <div className="modal-card plan-guests-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="plan-guests-modal-head">
+                <h2 id="plan-guests-modal-title">People</h2>
+                <button
+                  type="button"
+                  className="plan-guests-modal-close"
+                  aria-label="Close"
+                  onClick={closeGuestsModal}
+                >
+                  <X size={18} strokeWidth={2} />
+                </button>
+              </div>
+              <div className="plan-guests-modal-body">
+                <PlanGuests
+                  plan={plan}
+                  userId={user.id}
+                  isHosting={isHosting}
+                  showAllGoing
+                  showAllInterested
+                  onToggleGoing={() => undefined}
+                  onToggleInterested={() => undefined}
+                  onApproved={() => void load()}
+                  variant="modal"
+                />
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
       {showLockCoverLib && (
         <CoverLibraryModal
           onPick={(url) => {
@@ -820,16 +966,42 @@ function ParticipantsRow({
   expanded,
   onToggle,
   countLabel,
+  listOnly = false,
 }: {
   people: PublicUser[];
   planId: string;
   expanded: boolean;
   onToggle: () => void;
   countLabel: string;
+  listOnly?: boolean;
 }) {
   const profileFrom: NavFromState = { from: "plan", planId };
   const visible = expanded ? people : people.slice(0, 5);
   const canExpand = people.length > 0;
+  const nameList = (
+    <ul className="who-row-name-list">
+      {people.map((person) => (
+        <li key={person.id}>
+          <Link to={`/profile/${person.id}`} state={profileFrom} className="who-row-name">
+            <Avatar
+              seed={person.avatarSeed}
+              style={person.avatarStyle}
+              photoDataUrl={person.avatarPhotoDataUrl}
+              params={person.avatarParams}
+              size="sm"
+            />
+            <span className="who-row-name-text">
+              <span className="who-row-name-primary">{person.firstName}</span>
+              {person.lastName ? (
+                <span className="who-row-name-sub">{person.lastName}</span>
+              ) : null}
+            </span>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+  if (listOnly) return nameList;
   return (
     <>
       <div className="who-row-body">
@@ -873,29 +1045,7 @@ function ParticipantsRow({
           </button>
         )}
       </div>
-      {expanded && (
-        <ul className="who-row-name-list">
-          {people.map((person) => (
-            <li key={person.id}>
-              <Link to={`/profile/${person.id}`} state={profileFrom} className="who-row-name">
-                <Avatar
-                  seed={person.avatarSeed}
-                  style={person.avatarStyle}
-                  photoDataUrl={person.avatarPhotoDataUrl}
-                  params={person.avatarParams}
-                  size="sm"
-                />
-                <span className="who-row-name-text">
-                  <span className="who-row-name-primary">{person.firstName}</span>
-                  {person.lastName ? (
-                    <span className="who-row-name-sub">{person.lastName}</span>
-                  ) : null}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      {expanded && nameList}
     </>
   );
 }
@@ -934,6 +1084,7 @@ function PlanGuests({
   onToggleGoing,
   onToggleInterested,
   onApproved,
+  variant = "page",
 }: {
   plan: PlanDTO;
   userId: string;
@@ -943,9 +1094,11 @@ function PlanGuests({
   onToggleGoing: () => void;
   onToggleInterested: () => void;
   onApproved: () => void;
+  variant?: "page" | "modal";
 }) {
+  const listOnly = variant === "modal";
   return (
-    <section id="guests" className="who-block plan-detail-card">
+    <section id={listOnly ? undefined : "guests"} className={listOnly ? "plan-guests-modal-list" : "who-block plan-detail-card"}>
       <div className="who-row">
         <h3 className="who-block-heading">Going · {plan.participants.going.length}</h3>
         {plan.participants.going.length === 0 ? (
@@ -954,9 +1107,10 @@ function PlanGuests({
           <ParticipantsRow
             people={plan.participants.going}
             planId={plan.id}
-            expanded={showAllGoing}
+            expanded={listOnly || showAllGoing}
             onToggle={onToggleGoing}
             countLabel={`${plan.participants.going.length} going`}
+            listOnly={listOnly}
           />
         )}
       </div>
@@ -1004,14 +1158,34 @@ function PlanGuests({
             <ParticipantsRow
               people={plan.participants.interested}
               planId={plan.id}
-              expanded={showAllInterested}
+              expanded={listOnly || showAllInterested}
               onToggle={onToggleInterested}
               countLabel={`${plan.participants.interested.length} interested`}
+              listOnly={listOnly}
             />
           )}
         </div>
       )}
     </section>
+  );
+}
+
+function PlanDetailPinIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      className="plan-detail-meta-icon"
+      aria-hidden="true"
+    >
+      <path
+        d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"
+        fill="currentColor"
+      />
+      <circle cx="12" cy="10" r="3" fill="#fff" />
+    </svg>
   );
 }
 
@@ -1046,24 +1220,6 @@ function NavIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <polygon points="3 11 22 2 13 21 11 13 3 11" />
-    </svg>
-  );
-}
-
-function PlusIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  );
-}
-
-function ShareIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-      <polyline points="16 6 12 2 8 6" />
-      <line x1="12" x2="12" y1="2" y2="15" />
     </svg>
   );
 }

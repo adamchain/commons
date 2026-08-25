@@ -267,6 +267,8 @@ export interface ConversationSummaryDTO {
    */
   communityId?: string;
   communityName?: string;
+  /** Plan flyer / community cover when one exists. */
+  coverImage?: string | null;
 }
 
 /** One option in a poll, with the ids of everyone who picked it. */

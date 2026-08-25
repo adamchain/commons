@@ -110,6 +110,7 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
             title: p.title,
             date: p.date,
             wentCount: store.listParticipationsForPlan(p.id).filter((q) => q.state === "going").length,
+            flyerDataUrl: p.flyerDataUrl,
           }))
       : [],
     sharedPlanId,

@@ -112,6 +112,7 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
       unreadCount: conv ? msgs.filter((m) => !m.readBy.includes(userId)).length : 0,
       participantCount,
       myRole,
+      coverImage: plan.flyerDataUrl ?? null,
     });
   }
 
@@ -140,6 +141,7 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
       myRole: community.organizerId === userId ? "hosting" : "going",
       communityId: community.id,
       communityName: community.name,
+      coverImage: community.coverImage ?? null,
     });
   }
 

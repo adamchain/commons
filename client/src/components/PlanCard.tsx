@@ -15,8 +15,8 @@ import { useCardImages, pickCoverImage } from "../lib/cardImages";
 
 /**
  * Compact event card. Looking-for (2+ flexible fields) gets a red left edge;
- * confirmed plans are plain white. Shows the uploaded flyer, or a stable stock
- * cover from the admin library so cards are never blank.
+ * confirmed plans are plain white. Shows the uploaded flyer; confirmed plans
+ * also fall back to a stable stock cover from the admin library.
  */
 export function PlanCard({
   plan,

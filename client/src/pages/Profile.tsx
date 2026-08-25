@@ -17,9 +17,9 @@ import {
 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { CommunityCoverThumb, PlanCoverThumb } from "../components/CoverThumb";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime } from "../lib/format";
-import { interestVisual } from "../lib/interestIcons";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import {
   COMMUNITY_CATEGORY_LABELS,
@@ -64,7 +64,7 @@ interface ProfilePayload {
   neighborhood: { id: string; name: string; metro: string } | null;
   stats: { hosted: number; joined: number };
   upcoming: PlanDTO[];
-  past: Array<{ id: string; title: string; date: string; wentCount: number }>;
+  past: Array<{ id: string; title: string; date: string; wentCount: number; flyerDataUrl?: string }>;
   sharedPlanId: string | null;
   /** Null until viewer earns visibility (shared completed plan or in network). */
   socialLinks: { instagram?: string; tiktok?: string } | null;
@@ -300,8 +300,6 @@ export function ProfilePage() {
             {profile.upcoming.length > 0 && (
               <div className="profile-other-plans" style={{ marginTop: 12 }}>
                 {profile.upcoming.map((p) => {
-                  const vis = interestVisual(p.tags[0]);
-                  const Icon = vis.Icon;
                   const going = p.participants.going.length;
                   return (
                     <Link
@@ -310,13 +308,11 @@ export function ProfilePage() {
                       state={{ from: "profile", profileUserId: userId }}
                       className="profile-other-plan-card"
                     >
-                      <span
-                        className="profile-other-plan-icon"
-                        style={{ background: vis.tint, color: vis.iconColor }}
-                        aria-hidden="true"
-                      >
-                        <Icon size={15} strokeWidth={1.8} />
-                      </span>
+                      <PlanCoverThumb
+                        planId={p.id}
+                        flyerDataUrl={p.flyerDataUrl}
+                        className="cover-thumb--sm"
+                      />
                       <span className="profile-other-plan-text">
                         <span className="profile-other-plan-title">{p.title}</span>
                         <span className="profile-other-plan-meta">
@@ -341,8 +337,6 @@ export function ProfilePage() {
             </div>
             <div className="profile-other-plans">
               {profile.upcoming.map((p) => {
-                const vis = interestVisual(p.tags[0]);
-                const Icon = vis.Icon;
                 const going = p.participants.going.length;
                 return (
                   <Link
@@ -351,13 +345,11 @@ export function ProfilePage() {
                     state={{ from: "profile", profileUserId: userId }}
                     className="profile-other-plan-card"
                   >
-                    <span
-                      className="profile-other-plan-icon"
-                      style={{ background: vis.tint, color: vis.iconColor }}
-                      aria-hidden="true"
-                    >
-                      <Icon size={15} strokeWidth={1.8} />
-                    </span>
+                    <PlanCoverThumb
+                      planId={p.id}
+                      flyerDataUrl={p.flyerDataUrl}
+                      className="cover-thumb--sm"
+                    />
                     <span className="profile-other-plan-body">
                       <span className="profile-other-plan-title">{p.title}</span>
                       <span className="profile-other-plan-date">
@@ -398,18 +390,13 @@ export function ProfilePage() {
             <section className="profile-other-section">
               <h3 className="profile-other-section-label">Communities</h3>
               <div className="profile-other-communities">
-                {communities.map((c) => {
-                  const vis = interestVisual(c.category);
-                  const Icon = vis.Icon;
-                  return (
+                {communities.map((c) => (
                     <Link key={c.id} to={`/communities/${c.id}`} className="profile-other-community-row">
-                      <span
-                        className="profile-other-community-icon"
-                        style={{ background: vis.tint, color: vis.iconColor }}
-                        aria-hidden="true"
-                      >
-                        <Icon size={13} strokeWidth={1.8} />
-                      </span>
+                      <CommunityCoverThumb
+                        coverImage={c.coverImage}
+                        category={c.category}
+                        className="cover-thumb-frame--sm"
+                      />
                       <span className="profile-other-community-info">
                         <span className="profile-other-community-name">{c.name}</span>
                         <span className="profile-other-community-meta">
@@ -419,8 +406,7 @@ export function ProfilePage() {
                       </span>
                       <ChevronRight size={13} strokeWidth={1.6} className="profile-other-community-chevron" aria-hidden="true" />
                     </Link>
-                  );
-                })}
+                ))}
               </div>
             </section>
           </>
@@ -502,18 +488,13 @@ export function ProfilePage() {
         <section className="profile-block">
           <h3 className="profile-section-label">Communities</h3>
           <div className="profile-communities-list">
-            {communities.map((c) => {
-              const vis = interestVisual(c.category);
-              const Icon = vis.Icon;
-              return (
+            {communities.map((c) => (
                 <Link key={c.id} to={`/communities/${c.id}`} className="profile-community-row">
-                  <span
-                    className="profile-community-icon-well"
-                    style={{ background: vis.tint, color: vis.iconColor }}
-                    aria-hidden="true"
-                  >
-                    <Icon size={13} strokeWidth={1.8} />
-                  </span>
+                  <CommunityCoverThumb
+                    coverImage={c.coverImage}
+                    category={c.category}
+                    className="cover-thumb-frame--sm"
+                  />
                   <span className="profile-community-info">
                     <span className="profile-community-name">{c.name}</span>
                     <span className="profile-community-meta">
@@ -524,8 +505,7 @@ export function ProfilePage() {
                   </span>
                   <ChevronRight size={13} strokeWidth={1.6} className="profile-community-chevron" aria-hidden="true" />
                 </Link>
-              );
-            })}
+            ))}
           </div>
         </section>
       )}
@@ -1063,7 +1043,7 @@ function YourPlansBlock({
 }: {
   id?: string;
   upcoming: PlanDTO[];
-  past: Array<{ id: string; title: string; date: string; wentCount: number }>;
+  past: Array<{ id: string; title: string; date: string; wentCount: number; flyerDataUrl?: string }>;
   isSelf: boolean;
   profileUserId: string;
   view: "list" | "calendar";
@@ -1131,8 +1111,6 @@ function YourPlansBlock({
             <div className="profile-plan-card">
               {visibleUpcoming.map((p) => {
                 const badge = planRelationshipBadge(p, profileUserId);
-                const vis = interestVisual(p.tags[0]);
-                const Icon = vis.Icon;
                 return (
                   <Link
                     key={p.id}
@@ -1140,13 +1118,11 @@ function YourPlansBlock({
                     state={profileBack}
                     className="profile-plan-row"
                   >
-                    <span
-                      className="profile-list-icon-well"
-                      style={{ background: vis.tint, color: vis.iconColor }}
-                      aria-hidden="true"
-                    >
-                      <Icon size={15} strokeWidth={1.8} />
-                    </span>
+                    <PlanCoverThumb
+                      planId={p.id}
+                      flyerDataUrl={p.flyerDataUrl}
+                      className="cover-thumb--sm"
+                    />
                     <span className="profile-list-title">{p.title}</span>
                     <span className="profile-list-when">{formatPlanDate(p.date)}</span>
                     <span className={`profile-plan-chip ${badge.className}`}>
@@ -1196,6 +1172,11 @@ function YourPlansBlock({
                     state={profileBack}
                     className="profile-plan-row"
                   >
+                      <PlanCoverThumb
+                        planId={p.id}
+                        flyerDataUrl={p.flyerDataUrl}
+                        className="cover-thumb--sm"
+                      />
                       <span className="profile-list-title">{p.title}</span>
                       <span className="profile-list-when">{formatPlanDate(p.date)}</span>
                     </Link>

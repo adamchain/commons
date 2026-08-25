@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Calendar, Star } from "lucide-react";
 import { api } from "../api/http";
+import { PlanCoverThumb } from "../components/CoverThumb";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { EmptyCard, Label, ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
@@ -140,8 +141,11 @@ function PlanRow({ plan }: { plan: PlanDTO }) {
 
   return (
     <Link to={`/plans/${plan.id}`} state={{ from: "my-plans" }} className="my-plans-row">
-      <span className="my-plans-row-name">{sentenceCaseTitle(plan.title)}</span>
-      <span className="my-plans-row-meta">{meta}</span>
+      <PlanCoverThumb planId={plan.id} flyerDataUrl={plan.flyerDataUrl} />
+      <span className="my-plans-row-text">
+        <span className="my-plans-row-name">{sentenceCaseTitle(plan.title)}</span>
+        <span className="my-plans-row-meta">{meta}</span>
+      </span>
     </Link>
   );
 }

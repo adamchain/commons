@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BarChart2, MessageCircle } from "lucide-react";
 import { api, parseApiError } from "../api/http";
+import { PlanCoverThumb } from "../components/CoverThumb";
 import { ScreenTitle } from "../components/ui";
 import { formatRelative, sentenceCaseTitle } from "../lib/format";
 import { interestVisual } from "../lib/interestIcons";
@@ -21,16 +22,6 @@ function previewLooksLikePoll(text: string | null | undefined): boolean {
 function cleanPreview(text: string | null | undefined): string {
   if (!text) return "No messages yet";
   return text.replace(/📊\s*/g, "").trim() || "No messages yet";
-}
-
-function chatVisual(c: ConversationSummaryDTO) {
-  const explicit = (c as { interestTag?: InterestTag }).interestTag;
-  if (explicit) return interestVisual(explicit);
-  const title = c.planTitle?.toLowerCase() ?? "";
-  if (title.includes("yoga")) return interestVisual("wellness");
-  if (title.includes("run")) return interestVisual("workouts");
-  if (title.includes("coffee") || title.includes("core")) return interestVisual("coffee");
-  return interestVisual(null);
 }
 
 export function MessagesPage() {
@@ -146,22 +137,14 @@ export function MessagesPage() {
               ) : (
                 <div className="messages-card">
                   <div className="messages-list">
-                    {forums.map((f) => {
-                      const { Icon, iconColor, tint } = interestVisual(f.interestTag);
-                      return (
+                    {forums.map((f) => (
                         <Link
                           key={f.interestTag}
                           to={`/forums/${f.interestTag}`}
                           state={{ from: "messages" }}
                           className="messages-row"
                         >
-                          <span
-                            className="messages-row-icon"
-                            style={{ background: tint, color: iconColor }}
-                            aria-hidden="true"
-                          >
-                            <Icon size={18} strokeWidth={1.8} />
-                          </span>
+                          <PlanCoverThumb planId={f.interestTag} />
                           <div className="messages-row-body">
                             <div className="messages-row-top">
                               <span className="messages-row-title">{f.label}</span>
@@ -188,8 +171,7 @@ export function MessagesPage() {
                             </div>
                           </div>
                         </Link>
-                      );
-                    })}
+                    ))}
                   </div>
                 </div>
               )}
@@ -253,16 +235,12 @@ export function MessagesPage() {
                 const isPoll = previewLooksLikePoll(c.lastMessagePreview);
                 const canDismiss = Boolean(c.conversationId);
                 const title = c.communityName ?? sentenceCaseTitle(c.planTitle);
-                const { Icon, iconColor, tint } = chatVisual(c);
                 const rowInner = (
                   <>
-                    <span
-                      className="messages-row-icon"
-                      style={{ background: tint, color: iconColor }}
-                      aria-hidden="true"
-                    >
-                      <Icon size={18} strokeWidth={1.8} />
-                    </span>
+                    <PlanCoverThumb
+                      planId={c.communityId || c.planId}
+                      flyerDataUrl={c.coverImage}
+                    />
                     <div className="messages-row-body">
                       <div className="messages-row-top">
                         <span className="messages-row-title">{title}</span>

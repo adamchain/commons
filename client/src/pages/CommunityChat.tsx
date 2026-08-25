@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { BarChart2 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { CommunityCoverThumb } from "../components/CoverThumb";
 import { PollCard } from "../components/PollCard";
 import { useAuth } from "../context/AuthContext";
 import { sentenceCaseTitle } from "../lib/format";
@@ -10,7 +11,7 @@ import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
 import { useStickToBottom } from "../lib/useStickToBottom";
-import type { MessageDTO, PublicUser } from "../types/shared";
+import type { CommunityCategory, MessageDTO, PublicUser } from "../types/shared";
 
 const CHAT_IMAGE_MAX_PX = 1024;
 const CHAT_IMAGE_QUALITY = 0.85;
@@ -29,6 +30,8 @@ interface CommunityConversation {
   muted: boolean;
   isHost: boolean;
   hostId: string;
+  coverImage?: string | null;
+  category?: CommunityCategory;
 }
 
 export function CommunityChatPage() {
@@ -434,6 +437,11 @@ export function CommunityChatPage() {
           className="chat-header-card chat-header-card--compact"
           aria-label="Open community"
         >
+          <CommunityCoverThumb
+            coverImage={conv.coverImage ?? null}
+            category={conv.category ?? "coffee"}
+            className="cover-thumb-frame--sm"
+          />
           <div className="chat-header-text">
             <div className="chat-header-meta">{participantLabel}</div>
           </div>

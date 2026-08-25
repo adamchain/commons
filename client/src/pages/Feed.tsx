@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Coffee, MessageCircle, SlidersHorizontal } from "lucide-react";
+import { Coffee, MessageCircle } from "lucide-react";
 import { api } from "../api/http";
 import { FilterSheet } from "../components/FilterSheet";
 import { InviteSheet } from "../components/InviteSheet";
@@ -69,7 +69,7 @@ export function FeedPage() {
   const [selectedAgeRange, setSelectedAgeRange] = useState<AgeRange | null>(() => loadPersistedFilters().selectedAgeRange);
   const [hideCancelled, setHideCancelled] = useState(() => loadPersistedFilters().hideCancelled);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [view, setView] = useState<"all" | "mine">("all");
+  const [view, setView] = useState<"plans" | "ideas">("plans");
   const { user, setUser } = useAuth();
   const [networkPrompt, setNetworkPrompt] = useState<NetworkPromptDTO | null>(null);
   const location = useLocation();
@@ -324,13 +324,15 @@ export function FeedPage() {
     return p.planKind === "looking_for" && flexCount > 1 && !p.lockedAt;
   }, []);
 
+  useEffect(() => {
+    if (!justPostedId) return;
+    const posted = plans.find((p) => p.id === justPostedId);
+    if (!posted) return;
+    setView(isIdeaPlan(posted) ? "ideas" : "plans");
+  }, [justPostedId, plans, isIdeaPlan]);
+
   const activePlans = useMemo(() => {
     let list = plans ?? [];
-    if (view === "mine") {
-      // For "Looking for / my plans" view: plans the user is going or
-      // interested in. Includes confirmed + looking-for naturally.
-      list = list.filter((p) => p.myState === "going" || p.myState === "interested");
-    }
     if (selectedTag) list = list.filter((p) => p.tags.includes(selectedTag));
     if (selectedHoodId) list = list.filter((p) => p.neighborhoodId === selectedHoodId);
     if (selectedAgeRange) list = list.filter((p) => p.creator.ageRange === selectedAgeRange);
@@ -339,7 +341,6 @@ export function FeedPage() {
     // Past plans never appear in the main feed.
     list = list.filter((p) => !p.cancelledAt && !planHasEnded(p));
 
-    // Upcoming confirmed soonest-first, then ideas by recency.
     const upcoming: PlanDTO[] = [];
     const ideas: PlanDTO[] = [];
     for (const p of list) {
@@ -349,7 +350,7 @@ export function FeedPage() {
     upcoming.sort((a, b) => `${a.date}T${a.time || "23:59"}`.localeCompare(`${b.date}T${b.time || "23:59"}`));
     ideas.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
 
-    const active = [...upcoming, ...ideas];
+    const active = view === "ideas" ? ideas : upcoming;
     // A just-posted plan is pinned to the very top regardless of its date, so
     // the user immediately sees what they created.
     if (justPostedId) {
@@ -428,36 +429,34 @@ export function FeedPage() {
         )}
 
         <div className="feed-toolbar">
-          <div className="segmented segmented-feed-view" role="tablist" aria-label="Feed scope">
+          <div className="segmented segmented-feed-view" role="group" aria-label="Feed">
             <button
               type="button"
-              role="tab"
-              aria-selected={view === "all"}
-              className={view === "all" ? "is-active" : ""}
-              onClick={() => setView("all")}
+              aria-pressed={view === "plans"}
+              className={view === "plans" ? "is-active" : ""}
+              onClick={() => setView("plans")}
             >
-              All plans
+              Plans
             </button>
             <button
               type="button"
-              role="tab"
-              aria-selected={view === "mine"}
-              className={view === "mine" ? "is-active" : ""}
-              onClick={() => setView("mine")}
+              aria-pressed={view === "ideas"}
+              className={view === "ideas" ? "is-active" : ""}
+              onClick={() => setView("ideas")}
             >
-              My plans
+              Ideas
+            </button>
+            <button
+              type="button"
+              className={activeFilterCount > 0 ? "is-active" : ""}
+              onClick={() => setFilterOpen(true)}
+              aria-label="Filter plans"
+              aria-pressed={activeFilterCount > 0}
+            >
+              Filters
+              {activeFilterCount > 0 && <span className="page-filter-count">{activeFilterCount}</span>}
             </button>
           </div>
-          <button
-            type="button"
-            className={`page-filter-btn ${activeFilterCount > 0 ? "page-filter-btn--active" : ""}`}
-            onClick={() => setFilterOpen(true)}
-            aria-label="Filter plans"
-          >
-            <SlidersHorizontal size={12} strokeWidth={1.8} />
-            Filters
-            {activeFilterCount > 0 && <span className="page-filter-count">{activeFilterCount}</span>}
-          </button>
         </div>
 
         {networkPrompt && (
@@ -540,25 +539,21 @@ function FeedEmptyState({
   hasFilters,
   onClearFilters,
 }: {
-  view: "all" | "mine";
+  view: "plans" | "ideas";
   hasAnyPlans: boolean;
   hasFilters: boolean;
   onClearFilters: () => void;
 }) {
   // Pick copy based on what's actually causing the empty result.
-  // The 3 buckets the user can hit: filters hide everything; "My plans" tab
-  // empty; or truly nothing in the feed (slow week).
   let headline: string;
   let body: string;
   if (hasFilters) {
     headline = "Nothing matches those filters.";
     body = "Try clearing them — there's more going on across the city.";
-  } else if (view === "mine") {
-    headline = "Nothing on your plate yet.";
-    body = "Join something from the feed — see what's happening this week →";
+  } else if (view === "ideas") {
+    headline = "No ideas out there yet.";
+    body = "Float something — coffee this week, a walk, whatever's on your mind.";
   } else if (hasAnyPlans) {
-    // Edge case: plans exist but none in the filtered view (rare without filters
-    // — usually a stale state). Treat like the slow-week message.
     headline = "Nothing near you this week.";
     body = "Be the first to post.";
   } else {
@@ -579,15 +574,9 @@ function FeedEmptyState({
             Clear filters
           </button>
         ) : null}
-        {view === "mine" && !hasFilters ? (
-          <Link to="/" className="btn-primary">
-            See what's happening
-          </Link>
-        ) : (
-          <Link to="/plans/new" className="btn-primary">
-            Post a plan
-          </Link>
-        )}
+        <Link to="/plans/new" className="btn-primary">
+          {view === "ideas" ? "Share an idea" : "Post a plan"}
+        </Link>
       </div>
     </div>
   );

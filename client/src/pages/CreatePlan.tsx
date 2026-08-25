@@ -1501,54 +1501,44 @@ function IdeaForm({
   const titleMissing = attemptedSubmit && !form.title.trim();
 
   return (
-    <main className="app-shell app-shell--mid idea-form-page">
+    <main
+      className="app-shell app-shell--mid idea-form-page"
+      style={keyboardInset > 0 ? { paddingBottom: keyboardInset } : undefined}
+    >
       <header className="idea-form-header">
         <button type="button" className="idea-form-back" onClick={onBack}>
           <ArrowLeft size={14} strokeWidth={2} aria-hidden="true" />
           Back
         </button>
-        <button
-          type="submit"
-          form="idea-form"
-          className="idea-form-submit-link"
-          disabled={submitting}
-        >
-          {submitting ? "Posting…" : "Put it out there"}
-        </button>
       </header>
 
-      <div className="idea-form-title-block">
-        <h1 className="idea-form-title">Just an Idea</h1>
-        <p className="idea-form-sub">
-          Just a thought. See who&apos;s down. No plan too big or small.
-        </p>
-      </div>
+      <form id="idea-form" onSubmit={submit} className="idea-form">
+        <div className="idea-form-scroll">
+          <div className="idea-form-title-block">
+            <h1 className="idea-form-title">Just an Idea</h1>
+            <p className="idea-form-sub">
+              Just a thought. See who&apos;s down. No plan too big or small.
+            </p>
+          </div>
 
-      {(inviteUserName || inviteNames.length > 0) && (
-        <div className="create-plan-invite-banner" role="note">
-          Inviting{" "}
-          <strong>{inviteUserName ?? inviteNames[0]}</strong>
-          {invitedCount > 1 ? ` + ${invitedCount - 1} more` : ""} once you post
-        </div>
-      )}
+          {(inviteUserName || inviteNames.length > 0) && (
+            <div className="create-plan-invite-banner" role="note">
+              Inviting{" "}
+              <strong>{inviteUserName ?? inviteNames[0]}</strong>
+              {invitedCount > 1 ? ` + ${invitedCount - 1} more` : ""} once you post
+            </div>
+          )}
 
-      {communityId ? (
-        <div className="create-plan-invite-banner" role="note">
-          Posting to{" "}
-          <strong>{communityName ?? "your community"}</strong>
-          {" "}members ·{" "}
-          {communityVisibility === "community_only"
-            ? "Only members can see this"
-            : "Also shows on the main feed"}
-        </div>
-      ) : null}
-
-      <form
-        id="idea-form"
-        onSubmit={submit}
-        className="idea-form"
-        style={keyboardInset > 0 ? { paddingBottom: keyboardInset } : undefined}
-      >
+          {communityId ? (
+            <div className="create-plan-invite-banner" role="note">
+              Posting to{" "}
+              <strong>{communityName ?? "your community"}</strong>
+              {" "}members ·{" "}
+              {communityVisibility === "community_only"
+                ? "Only members can see this"
+                : "Also shows on the main feed"}
+            </div>
+          ) : null}
         {communityId ? (
           <div className="create-community-tag">
             <div className="seg-toggle" role="group" aria-label="Community visibility">
@@ -1838,6 +1828,12 @@ function IdeaForm({
             </button>
           </div>
         )}
+        </div>
+        <div className="idea-form-cta">
+          <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
+            {submitting ? "Posting…" : "Put it out there"}
+          </button>
+        </div>
       </form>
     </main>
   );
