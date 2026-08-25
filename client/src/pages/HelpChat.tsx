@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ArrowUp, Bot, Sparkles } from "lucide-react";
 import { API_BASE } from "../api/http";
@@ -28,6 +28,133 @@ async function buildHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
+// ── Inline markdown renderer ────────────────────────────────────────────────
+// Handles: **bold**, *italic*, `code`, ### headings, - bullet lists, numbered
+// lists, blank-line paragraphs. No external deps.
+
+interface Token {
+  type: "heading" | "bullet" | "ordered" | "paragraph" | "blank";
+  level?: number;
+  items?: string[];
+  text?: string;
+}
+
+function tokenize(md: string): Token[] {
+  const lines = md.split("\n");
+  const tokens: Token[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Headings
+    const hm = line.match(/^(#{1,3})\s+(.*)/);
+    if (hm) {
+      tokens.push({ type: "heading", level: hm[1].length, text: hm[2] });
+      i++;
+      continue;
+    }
+
+    // Bullet list block
+    if (/^[-*]\s+/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^[-*]\s+/.test(lines[i])) {
+        items.push(lines[i].replace(/^[-*]\s+/, ""));
+        i++;
+      }
+      tokens.push({ type: "bullet", items });
+      continue;
+    }
+
+    // Ordered list block
+    if (/^\d+\.\s+/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^\d+\.\s+/.test(lines[i])) {
+        items.push(lines[i].replace(/^\d+\.\s+/, ""));
+        i++;
+      }
+      tokens.push({ type: "ordered", items });
+      continue;
+    }
+
+    // Blank line
+    if (line.trim() === "") {
+      tokens.push({ type: "blank" });
+      i++;
+      continue;
+    }
+
+    // Paragraph — accumulate until blank or block element
+    const paraLines: string[] = [];
+    while (
+      i < lines.length &&
+      lines[i].trim() !== "" &&
+      !/^(#{1,3}\s|[-*]\s|\d+\.\s)/.test(lines[i])
+    ) {
+      paraLines.push(lines[i]);
+      i++;
+    }
+    tokens.push({ type: "paragraph", text: paraLines.join(" ") });
+  }
+
+  return tokens.filter((t) => t.type !== "blank");
+}
+
+type InlinePart = string | React.ReactElement;
+
+function renderInline(text: string): InlinePart[] {
+  const parts: InlinePart[] = [];
+  const re = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let key = 0;
+
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    if (m[2] !== undefined) parts.push(<strong key={key++}>{m[2]}</strong>);
+    else if (m[3] !== undefined) parts.push(<em key={key++}>{m[3]}</em>);
+    else if (m[4] !== undefined) parts.push(<code key={key++} className="helpchat-code">{m[4]}</code>);
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
+function MarkdownMessage({ content }: { content: string }) {
+  const tokens = tokenize(content);
+  return (
+    <div className="helpchat-md">
+      {tokens.map((tok, i) => {
+        if (tok.type === "heading") {
+          const Tag = tok.level === 1 ? "h2" : tok.level === 2 ? "h3" : "h4";
+          return <Tag key={i} className={`helpchat-md-h${tok.level ?? 2}`}>{renderInline(tok.text ?? "")}</Tag>;
+        }
+        if (tok.type === "bullet") {
+          return (
+            <ul key={i} className="helpchat-md-list">
+              {tok.items!.map((item, j) => (
+                <li key={j} className="helpchat-md-li">{renderInline(item)}</li>
+              ))}
+            </ul>
+          );
+        }
+        if (tok.type === "ordered") {
+          return (
+            <ol key={i} className="helpchat-md-list helpchat-md-ol">
+              {tok.items!.map((item, j) => (
+                <li key={j} className="helpchat-md-li">{renderInline(item)}</li>
+              ))}
+            </ol>
+          );
+        }
+        return <p key={i} className="helpchat-md-p">{renderInline(tok.text ?? "")}</p>;
+      })}
+    </div>
+  );
+}
+
+// ── Page ────────────────────────────────────────────────────────────────────
+
 export function HelpChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -51,7 +178,6 @@ export function HelpChatPage() {
     setStreaming(true);
     setError(null);
 
-    // Add a placeholder for the assistant reply
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
     try {
@@ -63,9 +189,7 @@ export function HelpChatPage() {
         body: JSON.stringify({ messages: nextMessages }),
       });
 
-      if (!res.ok || !res.body) {
-        throw new Error(`${res.status}: ${res.statusText}`);
-      }
+      if (!res.ok || !res.body) throw new Error(`${res.status}: ${res.statusText}`);
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -96,13 +220,12 @@ export function HelpChatPage() {
               });
             }
           } catch {
-            // ignore parse errors on individual chunks
+            /* ignore chunk parse errors */
           }
         }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
-      // Remove the empty placeholder
       setMessages((prev) => {
         const copy = [...prev];
         if (copy[copy.length - 1]?.role === "assistant" && copy[copy.length - 1].content === "") {
@@ -164,27 +287,28 @@ export function HelpChatPage() {
         ) : (
           <div className="helpchat-messages">
             {messages.map((msg, i) => (
-              <div
-                key={i}
-                className={`helpchat-msg helpchat-msg--${msg.role}`}
-              >
+              <div key={i} className={`helpchat-msg helpchat-msg--${msg.role}`}>
                 {msg.role === "assistant" && (
                   <div className="helpchat-bot-avatar" aria-hidden="true">
                     <Bot size={14} strokeWidth={1.8} />
                   </div>
                 )}
                 <div className="helpchat-bubble">
-                  {msg.content || (streaming && i === messages.length - 1 ? (
-                    <span className="helpchat-typing">
-                      <span /><span /><span />
-                    </span>
-                  ) : null)}
+                  {msg.role === "assistant" ? (
+                    msg.content ? (
+                      <MarkdownMessage content={msg.content} />
+                    ) : streaming && i === messages.length - 1 ? (
+                      <span className="helpchat-typing">
+                        <span /><span /><span />
+                      </span>
+                    ) : null
+                  ) : (
+                    msg.content
+                  )}
                 </div>
               </div>
             ))}
-            {error && (
-              <p className="helpchat-error">{error}</p>
-            )}
+            {error && <p className="helpchat-error">{error}</p>}
             <div ref={endRef} />
           </div>
         )}

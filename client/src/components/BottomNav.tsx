@@ -52,6 +52,7 @@ export function BottomNav() {
     pathname === "/plans/new" ||
     pathname.match(/^\/plans\/[^/]+\/chat$/) ||
     pathname.match(/^\/communities\/[^/]+\/chat$/) ||
+    pathname === "/helpchat" ||
     (!user && Boolean(pathname.match(/^\/plans\/[^/]+$/))) ||
     needsOnboarding(user);
   if (hide) return null;
