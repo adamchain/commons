@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "ios:sync": "VITE_API_URL=https://www.oncommons.co npm run build && npx cap copy ios",
     "lint": "eslint .",
     "preview": "vite preview"
   },
