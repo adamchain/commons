@@ -1,7 +1,6 @@
 App/build
 App/Pods
 App/output
-App/App/public
 DerivedData
 xcuserdata
 
@@ -9,5 +8,7 @@ xcuserdata
 capacitor-cordova-ios-plugins
 
 # Generated Config files
-App/App/capacitor.config.json
 App/App/config.xml
+
+# Web bundle is copied here by `npx cap copy ios` and committed so Xcode
+# opens with the latest production assets without a local rebuild.

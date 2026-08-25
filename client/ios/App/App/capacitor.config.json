@@ -1,0 +1,16 @@
+{
+	"appId": "com.oncommons.mvp",
+	"appName": "Commons",
+	"webDir": "dist",
+	"ios": {
+		"contentInset": "never"
+	},
+	"packageClassList": [
+		"AppPlugin",
+		"CAPCameraPlugin",
+		"ClipboardPlugin",
+		"GeolocationPlugin",
+		"PreferencesPlugin",
+		"PushNotificationsPlugin"
+	]
+}
