@@ -210,7 +210,7 @@ function ReportModal({
                     checked={reason === opt.id}
                     onChange={() => setReason(opt.id)}
                   />
-                  {opt.label}
+                  <span>{opt.label}</span>
                 </label>
               ))}
             </fieldset>
@@ -227,7 +227,7 @@ function ReportModal({
               placeholder="Add context if it helps"
             />
             {error && <p className="error-text">{error}</p>}
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <div className="plan-report-actions">
               <button type="button" className="btn-link" disabled={busy} onClick={onClose}>
                 Cancel
               </button>
