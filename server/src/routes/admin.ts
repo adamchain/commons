@@ -572,4 +572,50 @@ adminRouter.post("/forums/posts/:id/reject", (req, res) => {
   res.json({ ok: true, post });
 });
 
+const REPORT_REASON_LABELS: Record<string, string> = {
+  harassment: "Harassment or bullying",
+  spam: "Spam or scam",
+  inappropriate: "Inappropriate content",
+  safety: "Safety concern",
+  other: "Other",
+};
+
+adminRouter.get("/reports", async (_req, res) => {
+  const rows = store.listReports();
+  const reports = await Promise.all(
+    rows.map(async (r) => {
+      const reporter = await findUserById(r.reporterId);
+      const target = await findUserById(r.targetUserId);
+      const plan = r.planId ? store.findPlanById(r.planId) : undefined;
+      return {
+        id: r.id,
+        reason: r.reason,
+        reasonLabel: REPORT_REASON_LABELS[r.reason] ?? r.reason,
+        details: r.details ?? "",
+        status: r.status,
+        createdAt: r.createdAt,
+        reviewedAt: r.reviewedAt ?? null,
+        reporter: reporter
+          ? { id: reporter.id, firstName: reporter.firstName, lastName: reporter.lastName ?? "" }
+          : { id: r.reporterId, firstName: "Unknown", lastName: "" },
+        target: target
+          ? { id: target.id, firstName: target.firstName, lastName: target.lastName ?? "" }
+          : { id: r.targetUserId, firstName: "Unknown", lastName: "" },
+        plan: plan ? { id: plan.id, title: plan.title } : null,
+      };
+    }),
+  );
+  res.json({ reports });
+});
+
+adminRouter.post("/reports/:id/review", (req, res) => {
+  const updated = store.updateReportStatus(String(req.params.id), "reviewed");
+  if (!updated) {
+    res.status(404).json({ error: "Report not found" });
+    return;
+  }
+  store.log("report_reviewed", { reportId: updated.id });
+  res.json({ ok: true, report: updated });
+});
+
 export { adminRouter };

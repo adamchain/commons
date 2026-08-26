@@ -28,6 +28,7 @@ import type {
   ParticipationRecord,
   PlanRecord,
   PlanSuggestionRecord,
+  ReportRecord,
 } from "../store.js";
 
 function compile<T>(name: string, schema: Schema<T>): Model<T> {
@@ -246,6 +247,28 @@ const LogSchema = new Schema<LogRecord>(
 LogSchema.index({ id: 1 }, { unique: true });
 LogSchema.index({ createdAt: -1 });
 export const LogModel = compile<LogRecord>("Log", LogSchema);
+
+const ReportSchema = new Schema<ReportRecord>(
+  {
+    id: { type: String, required: true },
+    reporterId: { type: String, required: true },
+    targetUserId: { type: String, required: true },
+    planId: { type: String, default: null },
+    reason: {
+      type: String,
+      enum: ["harassment", "spam", "inappropriate", "safety", "other"],
+      required: true,
+    },
+    details: { type: String },
+    status: { type: String, enum: ["open", "reviewed"], default: "open" },
+    createdAt: { type: String, required: true },
+    reviewedAt: { type: String, default: null },
+  },
+  { collection: "reports" },
+);
+ReportSchema.index({ id: 1 }, { unique: true });
+ReportSchema.index({ status: 1, createdAt: -1 });
+export const ReportModel = compile<ReportRecord>("Report", ReportSchema);
 
 // Card images — admin-curated cover art for event cards. Tiny collection, but
 // durable so the library survives restarts and isn't tied to a code deploy.

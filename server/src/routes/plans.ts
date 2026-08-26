@@ -441,6 +441,7 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     new Set(rawCoHosts.map(String).filter((id) => id && id !== userId)),
   )
     .filter((id) => Boolean(store.findUserById(id)))
+    .filter((id) => !store.isBlockedEitherWay(userId, id))
     .slice(0, 5);
 
   // Optional flyer — uploaded data URL or library https cover.
@@ -911,6 +912,7 @@ plansRouter.post("/:id/invite", requireAuth, async (req, res) => {
   let hiddenForSome = false;
   for (const id of userIds) {
     if (id === userId) continue;
+    if (store.isBlockedEitherWay(userId, id)) continue;
     const existing = store.findParticipation(planId, id);
     if (existing) continue; // already in — nothing to invite
     // Hidden case: network-only plan, invitee not in the host's network and
@@ -1057,6 +1059,15 @@ plansRouter.get("/:id", requireAuth, async (req, res) => {
   const userId = String(req.userId);
   const plan = store.findPlanById(planId);
   if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  const me = await findUserById(userId);
+  if (!me) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  if (plan.creatorId !== me.id && store.isBlockedEitherWay(me.id, plan.creatorId)) {
     res.status(404).json({ error: "Plan not found" });
     return;
   }

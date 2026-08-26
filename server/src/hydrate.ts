@@ -24,6 +24,7 @@ import {
   ParticipationModel,
   PlanModel,
   PlanSuggestionModel,
+  ReportModel,
 } from "./models/index.js";
 import { DeviceModel } from "./models/Device.js";
 import { InviteCodeModel } from "./models/InviteCode.js";
@@ -63,6 +64,7 @@ export async function hydrateSnapshotFromMongo(): Promise<void> {
       forumPosts,
       forumReplies,
       forumPostLikes,
+      reports,
     ] = await Promise.all([
       UserModel.find({}).lean(),
       NeighborhoodModel.find({}).lean(),
@@ -88,6 +90,7 @@ export async function hydrateSnapshotFromMongo(): Promise<void> {
       ForumPostModel.find({}).lean(),
       ForumReplyModel.find({}).lean(),
       ForumPostLikeModel.find({}).lean(),
+      ReportModel.find({}).lean(),
     ]);
 
     // `reset` replaces the snapshot wholesale. We bypass mirror here — Mongo
@@ -118,6 +121,7 @@ export async function hydrateSnapshotFromMongo(): Promise<void> {
       forumPosts,
       forumReplies,
       forumPostLikes,
+      reports,
     });
 
     // Ensure one forum row per InterestTag even if Mongo was empty / partial.

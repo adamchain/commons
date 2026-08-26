@@ -10,6 +10,7 @@ import { InviteSheet } from "../components/InviteSheet";
 import { LocationAutocomplete } from "../components/LocationAutocomplete";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { ParticipationButtons } from "../components/ParticipationButtons";
+import { PlanSafetyMenu } from "../components/PlanSafetyMenu";
 import { ShareSheet } from "../components/ShareSheet";
 import { useAuth } from "../context/AuthContext";
 import { planHasEnded } from "../lib/planTime";
@@ -557,7 +558,17 @@ export function PlanDetailPage() {
               ))}
             </div>
           )}
-          <h1 className="plan-detail-title">{sentenceCaseTitle(plan.title)}</h1>
+          <div className="plan-detail-title-row">
+            <h1 className="plan-detail-title">{sentenceCaseTitle(plan.title)}</h1>
+            {!isHosting && (
+              <PlanSafetyMenu
+                targetUserId={plan.creator.id}
+                targetFirstName={plan.creator.firstName}
+                planId={plan.id}
+                planTitle={plan.title}
+              />
+            )}
+          </div>
           <div className="plan-detail-whenwhere">
             {plan.isFlexibleLocation ? (
               <span className="plan-detail-meta">

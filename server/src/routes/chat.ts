@@ -84,6 +84,7 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
   for (const [planId, myRole] of roleByPlan) {
     const plan = store.findPlanById(planId);
     if (!plan) continue;
+    if (plan.creatorId !== userId && store.isBlockedEitherWay(userId, plan.creatorId)) continue;
     const conv = store.findGroupConversationByPlan(planId);
     if (conv && store.hasLeftConversation(userId, conv.id)) continue;
     // If a conversation exists but the user explicitly left it, keep it out of
@@ -159,6 +160,7 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
 function canAccessPlanGroupChat(planId: string, userId: string): boolean {
   const plan = store.findPlanById(planId);
   if (!plan) return false;
+  if (plan.creatorId !== userId && store.isBlockedEitherWay(userId, plan.creatorId)) return false;
   if (plan.creatorId === userId) return true;
   const part = store.findParticipation(planId, userId);
   if (part?.state === "going") return true;
@@ -253,6 +255,13 @@ chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => 
     res.status(403).json({ error: "Not a participant" });
     return;
   }
+  if (conv.type === "dm") {
+    const otherId = conv.participantIds.find((id) => id !== userId);
+    if (otherId && store.isBlockedEitherWay(userId, otherId)) {
+      res.status(403).json({ error: "You can't message this person" });
+      return;
+    }
+  }
   const blocked = communityPostBlockReason(conv, userId);
   if (blocked) {
     res.status(403).json({ error: blocked });
@@ -273,6 +282,7 @@ chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => 
     // reads. Once they mark notifications read, dedup advances by message id.
     for (const recipientId of conv.participantIds) {
       if (recipientId === userId) continue;
+      if (store.isBlockedEitherWay(userId, recipientId)) continue;
       await emit({
         userId: recipientId,
         kind: "newGroupChatMessage",
@@ -328,6 +338,7 @@ chatRouter.post("/conversations/:id/polls", requireAuth, async (req, res) => {
     const planTitle = plan?.title ?? "your plan";
     for (const recipientId of conv.participantIds) {
       if (recipientId === userId) continue;
+      if (store.isBlockedEitherWay(userId, recipientId)) continue;
       await emit({
         userId: recipientId,
         kind: "newGroupChatMessage",

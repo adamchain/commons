@@ -288,6 +288,22 @@ export interface LogRecord {
   createdAt: string;
 }
 
+export type ReportReason = "harassment" | "spam" | "inappropriate" | "safety" | "other";
+export type ReportStatus = "open" | "reviewed";
+
+/** Member-submitted safety reports, shown in the admin panel. */
+export interface ReportRecord {
+  id: string;
+  reporterId: string;
+  targetUserId: string;
+  planId?: string | null;
+  reason: ReportReason;
+  details?: string;
+  status: ReportStatus;
+  createdAt: string;
+  reviewedAt?: string | null;
+}
+
 /**
  * Foundation for both Your Network (V1) and Communities (V2). Each row is a
  * directed relationship from `userId` to `targetId`. `kind` distinguishes
@@ -553,6 +569,7 @@ interface Snapshot {
   dropouts: DropoutRecord[];
   smsCodes: SmsCodeRecord[];
   logs: LogRecord[];
+  reports: ReportRecord[];
   planSuggestions: PlanSuggestionRecord[];
   notifications: NotificationRecord[];
   relationships: RelationshipRecord[];
@@ -584,6 +601,7 @@ function emptySnapshot(): Snapshot {
     dropouts: [],
     smsCodes: [],
     logs: [],
+    reports: [],
     planSuggestions: [],
     notifications: [],
     relationships: [],
@@ -660,6 +678,7 @@ function load(): Snapshot {
       forumReplies: parsed.forumReplies ?? [],
       forumPostLikes: parsed.forumPostLikes ?? [],
       devices: parsed.devices ?? [],
+      reports: parsed.reports ?? [],
     };
   } catch {
     return emptySnapshot();
@@ -841,14 +860,32 @@ export const store = {
     this.deleteRelationship(userId, targetId, "network");
     this.deleteRelationship(targetId, userId, "network");
 
-    // Remove the blocked user from any group chat this user hosts.
+    // Drop pending network requests both ways so neither can accept later.
+    if (user.incomingNetworkRequests?.includes(targetId)) {
+      user.incomingNetworkRequests = user.incomingNetworkRequests.filter((id) => id !== targetId);
+    }
+    if (target?.incomingNetworkRequests?.includes(userId)) {
+      target.incomingNetworkRequests = target.incomingNetworkRequests.filter((id) => id !== userId);
+      mongoMirror.upsertUser(target);
+    }
+
+    // Remove each other from chats the other person hosts so neither can keep
+    // a private thread going under a plan the other created.
     for (const plan of snapshot.plans) {
-      if (plan.creatorId !== userId) continue;
+      if (plan.creatorId !== userId && plan.creatorId !== targetId) continue;
       const conv = snapshot.conversations.find((c) => c.planId === plan.id && c.type === "group");
-      if (conv && conv.participantIds.includes(targetId)) {
-        conv.participantIds = conv.participantIds.filter((id) => id !== targetId);
+      const dropId = plan.creatorId === userId ? targetId : userId;
+      if (conv && conv.participantIds.includes(dropId)) {
+        conv.participantIds = conv.participantIds.filter((id) => id !== dropId);
         mongoMirror.upsertConversation(conv);
       }
+    }
+
+    for (const conv of snapshot.conversations) {
+      if (conv.type !== "dm") continue;
+      if (!conv.participantIds.includes(userId) || !conv.participantIds.includes(targetId)) continue;
+      conv.participantIds = conv.participantIds.filter((id) => id !== userId && id !== targetId);
+      mongoMirror.upsertConversation(conv);
     }
 
     persist();
@@ -1144,6 +1181,44 @@ export const store = {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, Math.max(0, limit));
   },
+  createReport(input: {
+    reporterId: string;
+    targetUserId: string;
+    planId?: string | null;
+    reason: ReportReason;
+    details?: string;
+  }): ReportRecord {
+    const record: ReportRecord = {
+      id: randomUUID(),
+      reporterId: input.reporterId,
+      targetUserId: input.targetUserId,
+      planId: input.planId ?? null,
+      reason: input.reason,
+      details: input.details,
+      status: "open",
+      createdAt: new Date().toISOString(),
+      reviewedAt: null,
+    };
+    snapshot.reports.push(record);
+    persist();
+    mongoMirror.upsertReport(record);
+    return record;
+  },
+  listReports(): ReportRecord[] {
+    return [...snapshot.reports].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+  findReportById(id: string): ReportRecord | undefined {
+    return snapshot.reports.find((r) => r.id === id);
+  },
+  updateReportStatus(id: string, status: ReportStatus): ReportRecord | undefined {
+    const row = this.findReportById(id);
+    if (!row) return undefined;
+    row.status = status;
+    row.reviewedAt = status === "reviewed" ? new Date().toISOString() : null;
+    persist();
+    mongoMirror.upsertReport(row);
+    return row;
+  },
   listParticipationsForPlan(planId: string): ParticipationRecord[] {
     return snapshot.participations.filter((p) => p.planId === planId);
   },
@@ -1280,6 +1355,11 @@ export const store = {
     return conv;
   },
   createDm(planId: string, a: string, b: string): ConversationRecord {
+    if (this.isBlockedEitherWay(a, b)) {
+      const existing = this.findDmInPlan(planId, a, b);
+      if (existing) return existing;
+      throw new Error("Can't message someone you've blocked");
+    }
     const existing = this.findDmInPlan(planId, a, b);
     if (existing) return existing;
     const conv: ConversationRecord = {

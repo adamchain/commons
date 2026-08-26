@@ -23,6 +23,7 @@ import { venuesRouter } from "./routes/venues.js";
 import { linkPreviewRouter } from "./routes/linkPreview.js";
 import { searchRouter } from "./routes/search.js";
 import { usersRouter } from "./routes/users.js";
+import { reportsRouter } from "./routes/reports.js";
 import { shareRouter, injectPlanMeta, planIdFromDetailPath } from "./routes/share.js";
 import { helpchatRouter } from "./routes/helpchat.js";
 import { store } from "./store.js";
@@ -98,6 +99,7 @@ app.use("/api/notifications", notificationsRouter);
 app.use("/api/link-preview", linkPreviewRouter);
 app.use("/api/search", searchRouter);
 app.use("/api/users", usersRouter);
+app.use("/api/reports", reportsRouter);
 app.use("/api/helpchat", helpchatRouter);
 app.use("/api", chatRouter); // chat router defines its own paths under /plans/.../conversation and /conversations/...
 

@@ -775,3 +775,13 @@ export interface SearchResultsDTO {
   plans: PlanDTO[];
   people: PersonSearchResultDTO[];
 }
+
+export type ReportReason = "harassment" | "spam" | "inappropriate" | "safety" | "other";
+
+export const REPORT_REASON_OPTIONS: { id: ReportReason; label: string }[] = [
+  { id: "harassment", label: "Harassment or bullying" },
+  { id: "spam", label: "Spam or scam" },
+  { id: "inappropriate", label: "Inappropriate content" },
+  { id: "safety", label: "Safety concern" },
+  { id: "other", label: "Something else" },
+];

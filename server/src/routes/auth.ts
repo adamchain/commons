@@ -500,6 +500,7 @@ authRouter.post("/network-add", requireAuth, async (req, res) => {
   for (const id of userIds) {
     if (id === userId) continue;
     if (!allowed.has(id)) continue;
+    if (store.isBlockedEitherWay(userId, id)) continue;
     if (!next.has(id)) newlyAdded.push(id);
     next.add(id);
   }
@@ -534,6 +535,10 @@ authRouter.post("/friend-add", requireAuth, async (req, res) => {
   const target = await findUserById(targetId);
   if (!viewer || !target) {
     res.status(404).json({ error: "User not found" });
+    return;
+  }
+  if (store.isBlockedEitherWay(userId, targetId)) {
+    res.status(403).json({ error: "You can't connect with this person" });
     return;
   }
   // Already connected — no-op.
@@ -585,6 +590,10 @@ authRouter.post("/network-accept", requireAuth, async (req, res) => {
   }
   if (!(me.incomingNetworkRequests ?? []).includes(requesterId)) {
     res.status(400).json({ error: "No pending request from that person" });
+    return;
+  }
+  if (store.isBlockedEitherWay(userId, requesterId)) {
+    res.status(403).json({ error: "You can't connect with this person" });
     return;
   }
   await connectNetwork(userId, requesterId);
@@ -671,6 +680,7 @@ authRouter.get("/network", requireAuth, async (req, res) => {
   const users = ids
     .map((id) => store.findUserById(id))
     .filter((u): u is UserRecord => !!u)
+    .filter((u) => !store.isBlockedEitherWay(userId, u.id))
     .map((u) => ({
       id: u.id,
       firstName: u.firstName,

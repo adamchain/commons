@@ -32,6 +32,7 @@ import {
   ParticipationModel,
   PlanModel,
   PlanSuggestionModel,
+  ReportModel,
 } from "./models/index.js";
 import { DeviceModel } from "./models/Device.js";
 import { InviteCodeModel } from "./models/InviteCode.js";
@@ -62,6 +63,7 @@ import type {
   PlanRecord,
   PlanSuggestionRecord,
   RelationshipRecord,
+  ReportRecord,
   UserRecord,
 } from "./store.js";
 
@@ -277,6 +279,10 @@ export const mongoMirror = {
   // Logs
   upsertLog(l: LogRecord): void {
     upsert(LogModel as never, l, `upsertLog ${l.id}`);
+  },
+
+  upsertReport(r: ReportRecord): void {
+    upsert(ReportModel as never, r, `upsertReport ${r.id}`);
   },
 
   // Notifications

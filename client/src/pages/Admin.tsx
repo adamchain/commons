@@ -501,6 +501,124 @@ function AdminUserDetailModal({ userId, onClose }: { userId: string; onClose: ()
   );
 }
 
+interface AdminReportRow {
+  id: string;
+  reason: string;
+  reasonLabel: string;
+  details: string;
+  status: "open" | "reviewed";
+  createdAt: string;
+  reviewedAt: string | null;
+  reporter: { id: string; firstName: string; lastName: string };
+  target: { id: string; firstName: string; lastName: string };
+  plan: { id: string; title: string } | null;
+}
+
+function ReportsReview() {
+  const [rows, setRows] = useState<AdminReportRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await api<{ reports: AdminReportRow[] }>("/api/admin/reports");
+      setRows(r.reports);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Failed to load");
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function markReviewed(id: string) {
+    setBusyId(id);
+    try {
+      await api(`/api/admin/reports/${id}/review`, { method: "POST" });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Couldn't update");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const openCount = rows?.filter((r) => r.status === "open").length ?? 0;
+
+  return (
+    <section className="admin-section">
+      <h2 className="admin-section-title">
+        Safety reports{rows ? ` · ${openCount} open` : ""}
+      </h2>
+      <div className="admin-card">
+        {error && <p className="error-text">{error}</p>}
+        {!rows ? (
+          <p>Loading…</p>
+        ) : rows.length === 0 ? (
+          <p style={{ opacity: 0.7, margin: 0 }}>No reports yet.</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            {rows.map((r) => (
+              <div
+                key={r.id}
+                style={{
+                  border: "1px solid rgba(0,0,0,0.1)",
+                  borderRadius: 12,
+                  padding: "0.75rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.3rem",
+                  opacity: r.status === "reviewed" ? 0.65 : 1,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem" }}>
+                  <strong>{r.reasonLabel}</strong>
+                  <span style={{ fontSize: 12, opacity: 0.6 }}>
+                    {r.status === "open" ? "Open" : "Reviewed"} ·{" "}
+                    {new Date(r.createdAt).toLocaleString()}
+                  </span>
+                </div>
+                <div style={{ fontSize: 13 }}>
+                  <Link to={`/profile/${r.target.id}`} className="admin-link">
+                    {r.target.firstName} {r.target.lastName}
+                  </Link>{" "}
+                  reported by {r.reporter.firstName} {r.reporter.lastName}
+                  {r.plan ? (
+                    <>
+                      {" "}
+                      on{" "}
+                      <Link to={`/plans/${r.plan.id}`} className="admin-link">
+                        {r.plan.title}
+                      </Link>
+                    </>
+                  ) : null}
+                </div>
+                {r.details ? (
+                  <div style={{ fontSize: 13, opacity: 0.85, whiteSpace: "pre-wrap" }}>{r.details}</div>
+                ) : null}
+                {r.status === "open" && (
+                  <div>
+                    <button
+                      type="button"
+                      className="admin-btn"
+                      disabled={busyId === r.id}
+                      onClick={() => void markReviewed(r.id)}
+                    >
+                      {busyId === r.id ? "Saving…" : "Mark reviewed"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 interface AdminCommunityRow {
   id: string;
   name: string;
@@ -928,6 +1046,8 @@ export function AdminPage() {
             </section>
 
             <CardImagesManager />
+
+            <ReportsReview />
 
             <CommunitiesReview />
 
