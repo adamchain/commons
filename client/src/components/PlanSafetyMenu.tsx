@@ -228,11 +228,11 @@ function ReportModal({
             />
             {error && <p className="error-text">{error}</p>}
             <div className="plan-report-actions">
-              <button type="button" className="btn-link" disabled={busy} onClick={onClose}>
-                Cancel
-              </button>
               <button type="button" className="btn-primary" disabled={busy} onClick={() => void submit()}>
                 {busy ? "Sending…" : "Submit report"}
+              </button>
+              <button type="button" className="btn-link" disabled={busy} onClick={onClose}>
+                Cancel
               </button>
             </div>
           </>

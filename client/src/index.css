@@ -1039,11 +1039,60 @@ h1, h2, h3, h4, h5, h6 {
   transform: scale(0.96);
 }
 
+.plan-detail-hero--empty {
+  background: var(--surface-2);
+}
+.plan-detail-hero-cover-cta {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--text-body);
+  font-weight: 500;
+  cursor: pointer;
+}
+.plan-detail-hero-cover-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px;
+  pointer-events: none;
+}
+.plan-detail-hero-cover-empty .cover-picker-buttons {
+  pointer-events: auto;
+}
+.plan-detail-hero-cover-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 14px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.4));
+}
+.plan-detail-heading .plan-meta-card {
+  margin-bottom: 0;
+}
+
 .plan-detail-heading {
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 8px 2px 14px;
+  overflow: visible;
 }
 .plan-detail-interests {
   display: flex;
@@ -1234,9 +1283,22 @@ h1, h2, h3, h4, h5, h6 {
 }
 .plan-report-actions {
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+}
+.plan-report-actions .btn-primary {
+  width: 100%;
+}
+.plan-report-actions .btn-link {
+  width: 100%;
+  padding: 12px 20px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--border);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: var(--text-body);
+  background: transparent;
 }
 .plan-detail-whenwhere {
   display: flex;
@@ -7302,61 +7364,9 @@ h1, h2, h3, h4, h5, h6 {
   font-style: italic;
 }
 
-/* ---- Lock in a Just an Idea ---- */
+/* ---- Lock in a Just an Idea (same details screen) ---- */
 .plan-detail-page--lock-in {
-  padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: calc(var(--nav-height, 58px) + 108px + env(safe-area-inset-bottom, 0px));
-}
-.lock-in-top {
-  padding: 8px 16px 14px;
-}
-.lock-in-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 44px;
-  padding: 0;
-  margin: 0 0 8px;
-  color: var(--muted);
-  font-size: var(--text-body);
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-.lock-in-title {
-  font-size: var(--text-screen-title);
-  font-weight: 700;
-  letter-spacing: -0.4px;
-  color: var(--ink);
-  margin: 0 0 8px;
-  line-height: 1.15;
-}
-.lock-in-started {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0;
-  margin: 0 0 8px;
-  background: none;
-  border: none;
-  color: var(--muted);
-  font-size: var(--text-body);
-  cursor: pointer;
-}
-.lock-in-started strong {
-  color: var(--ink);
-  font-weight: 600;
-}
-.lock-in-quote {
-  margin: 0;
-  font-size: var(--text-body);
-  font-style: italic;
-  color: var(--faint);
-  line-height: 1.45;
-}
-.plan-detail-body--lock-in {
-  padding-top: 0;
-  gap: 12px;
 }
 .plan-meta-card--edit {
   overflow: visible;
