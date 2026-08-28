@@ -52,8 +52,6 @@ export function PlanDetailPage() {
   const [lockBusy, setLockBusy] = useState(false);
   const [showLockCoverLib, setShowLockCoverLib] = useState(false);
   const [lockCoverOpen, setLockCoverOpen] = useState(false);
-  const [showAllGoing, setShowAllGoing] = useState(false);
-  const [showAllInterested, setShowAllInterested] = useState(false);
   const [showGuestsModal, setShowGuestsModal] = useState(false);
   const [grabsError, setGrabsError] = useState<string | null>(null);
   const [grabsBusy, setGrabsBusy] = useState(false);
@@ -277,19 +275,6 @@ export function PlanDetailPage() {
     : !lockDate
       ? "Pick a day to continue"
       : null;
-
-  const guestsBlock = (
-    <PlanGuests
-      plan={plan}
-      userId={user.id}
-      isHosting={isHosting}
-      showAllGoing={showAllGoing}
-      showAllInterested={showAllInterested}
-      onToggleGoing={() => setShowAllGoing((v) => !v)}
-      onToggleInterested={() => setShowAllInterested((v) => !v)}
-      onApproved={() => void load()}
-    />
-  );
 
   const lockFlyerInput = (
     <input
@@ -687,9 +672,9 @@ export function PlanDetailPage() {
           </Link>
         )}
 
-        {/* Full action toolkit on every plan — Get there, Invite, and Share
-            appear whether or not you're the host. Hidden once the event is over. */}
-        {!isPast && (
+        {/* Invite/Share also live on the hero. Skip this row while locking in
+            so it doesn't sit under the Lock it in bar. */}
+        {!isPast && !lockingIn && (
         <div className="plan-actions-row plan-actions-row--triple">
           <button type="button" className="action-btn action-btn--stack" onClick={() => setShowGetThere(true)}>
             <span className="action-btn-icon" aria-hidden="true"><NavIcon /></span>
@@ -778,10 +763,6 @@ export function PlanDetailPage() {
         )}
       </div>
 
-      <div className="plan-guests-wrap">
-        {guestsBlock}
-      </div>
-
       {lockingIn && (
         <div className="lock-in-cta-bar">
           <button
@@ -849,15 +830,6 @@ export function PlanDetailPage() {
           </div>,
           document.body,
         )}
-      {showLockCoverLib && (
-        <CoverLibraryModal
-          onPick={(url) => {
-            setLockFlyer(url);
-            setShowLockCoverLib(false);
-          }}
-          onClose={() => setShowLockCoverLib(false)}
-        />
-      )}
 
       {confirmCancel && (
         <div

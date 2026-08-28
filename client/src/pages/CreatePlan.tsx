@@ -732,14 +732,7 @@ export function CreatePlanPage() {
           ← Back
         </button>
         <span className="create-header-title">New plan</span>
-        <button
-          type="submit"
-          form="create-plan-form"
-          className="create-header-post"
-          disabled={submitting}
-        >
-          {submitting ? "Posting…" : "Post it"}
-        </button>
+        <span className="create-header-post" aria-hidden="true" />
       </header>
 
       {(inviteUserId && inviteUserName) || inviteNames.length > 0 ? (
@@ -1326,9 +1319,11 @@ export function CreatePlanPage() {
           </div>
         )}
 
-        <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
-          {submitting ? "Posting…" : "Post it"}
-        </button>
+        <div className="lock-in-cta-bar lock-in-cta-bar--flush">
+          <button type="submit" className="btn-primary btn-block" disabled={submitting}>
+            {submitting ? "Posting…" : "Post it"}
+          </button>
+        </div>
 
         {!effectiveCommunityId ? (
           <p className="create-communities-footer">
@@ -1501,10 +1496,7 @@ function IdeaForm({
   const titleMissing = attemptedSubmit && !form.title.trim();
 
   return (
-    <main
-      className="app-shell app-shell--mid idea-form-page"
-      style={keyboardInset > 0 ? { paddingBottom: keyboardInset } : undefined}
-    >
+    <main className="app-shell app-shell--mid idea-form-page">
       <header className="idea-form-header">
         <button type="button" className="idea-form-back" onClick={onBack}>
           <ArrowLeft size={14} strokeWidth={2} aria-hidden="true" />
@@ -1829,8 +1821,11 @@ function IdeaForm({
           </div>
         )}
         </div>
-        <div className="idea-form-cta">
-          <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
+        <div
+          className="lock-in-cta-bar lock-in-cta-bar--flush"
+          style={keyboardInset > 0 ? { bottom: keyboardInset } : undefined}
+        >
+          <button type="submit" className="btn-primary btn-block" disabled={submitting}>
             {submitting ? "Posting…" : "Put it out there"}
           </button>
         </div>
