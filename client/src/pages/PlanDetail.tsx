@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Camera, Clock, Hand, ImagePlus, Share2, UserPlus, X } from "lucide-react";
+import { ArrowLeft, Ban, Camera, Clock, Hand, ImagePlus, MoreVertical, Pencil, Send, UserPlus, X } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
@@ -55,6 +55,7 @@ export function PlanDetailPage() {
   const [showGuestsModal, setShowGuestsModal] = useState(false);
   const [grabsError, setGrabsError] = useState<string | null>(null);
   const [grabsBusy, setGrabsBusy] = useState(false);
+  const [showPassHosting, setShowPassHosting] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -377,18 +378,10 @@ export function PlanDetailPage() {
               <button
                 type="button"
                 className="plan-detail-hero-btn"
-                aria-label="Invite"
-                onClick={() => setShowInvite(true)}
-              >
-                <UserPlus size={18} strokeWidth={2} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className="plan-detail-hero-btn"
                 aria-label="Share"
                 onClick={() => setShowShare(true)}
               >
-                <Share2 size={18} strokeWidth={2} aria-hidden="true" />
+                <Send size={18} strokeWidth={2} aria-hidden="true" />
               </button>
             </div>
           )}
@@ -408,7 +401,23 @@ export function PlanDetailPage() {
           )}
           <div className="plan-detail-title-row">
             <h1 className="plan-detail-title">{sentenceCaseTitle(plan.title)}</h1>
-            {!isHosting && (
+            {isHosting ? (
+              <HostManageMenu
+                onEdit={() => navigate(`/plans/${plan.id}/edit`)}
+                onPassHosting={() => {
+                  setShowPassHosting(true);
+                  setConfirmCancel(false);
+                }}
+                onCancel={() => {
+                  setConfirmCancel(true);
+                  setCancelError(null);
+                }}
+                canPassHosting={
+                  (!plan.upForGrabsAt && !plan.cancelledAt) ||
+                  plan.participants.going.some((p) => p.id !== user.id)
+                }
+              />
+            ) : (
               <PlanSafetyMenu
                 targetUserId={plan.creator.id}
                 targetFirstName={plan.creator.firstName}
@@ -630,43 +639,32 @@ export function PlanDetailPage() {
           </div>
         )}
 
-        {!isPast && canChat && (
-          <Link
-            to={`/plans/${plan.id}/chat`}
-            state={{ from: "plan", planId: plan.id }}
-            className="chat-entry chat-entry--prominent plan-detail-card"
-          >
-            <span className="chat-entry-icon" aria-hidden="true"><ChatBubbleIcon /></span>
-            <span className="chat-entry-text">
-              Chat
-              <span className="chat-entry-count">
-                {plan.participants.going.length + plan.participants.interested.length} in the thread
+        {!isPast && (!lockingIn || canChat) && (
+        <div className="plan-actions-row">
+          {!lockingIn && (
+            <button type="button" className="action-btn action-btn--stack" onClick={() => setShowGetThere(true)}>
+              <span className="action-btn-icon" aria-hidden="true"><NavIcon /></span>
+              <span className="action-btn-label">Get there</span>
+            </button>
+          )}
+          {!lockingIn && (
+            <button type="button" className="action-btn action-btn--stack" onClick={() => setShowInvite(true)}>
+              <span className="action-btn-icon" aria-hidden="true">
+                <UserPlus size={22} strokeWidth={1.8} />
               </span>
-            </span>
-            <span className="chat-entry-arrow">›</span>
-          </Link>
-        )}
-
-        {/* Invite/Share also live on the hero. Skip this row while locking in
-            so it doesn't sit under the Lock it in bar. */}
-        {!isPast && !lockingIn && (
-        <div className="plan-actions-row plan-actions-row--triple">
-          <button type="button" className="action-btn action-btn--stack" onClick={() => setShowGetThere(true)}>
-            <span className="action-btn-icon" aria-hidden="true"><NavIcon /></span>
-            <span className="action-btn-label">Get there</span>
-          </button>
-          <button type="button" className="action-btn action-btn--stack" onClick={() => setShowInvite(true)}>
-            <span className="action-btn-icon" aria-hidden="true">
-              <UserPlus size={22} strokeWidth={1.8} />
-            </span>
-            <span className="action-btn-label">Invite</span>
-          </button>
-          <button type="button" className="action-btn action-btn--stack" onClick={() => setShowShare(true)}>
-            <span className="action-btn-icon" aria-hidden="true">
-              <Share2 size={22} strokeWidth={1.8} />
-            </span>
-            <span className="action-btn-label">Share</span>
-          </button>
+              <span className="action-btn-label">Invite</span>
+            </button>
+          )}
+          {canChat && (
+            <Link
+              to={`/plans/${plan.id}/chat`}
+              state={{ from: "plan", planId: plan.id }}
+              className="action-btn action-btn--stack"
+            >
+              <span className="action-btn-icon" aria-hidden="true"><ChatBubbleIcon /></span>
+              <span className="action-btn-label">Join the chat</span>
+            </Link>
+          )}
         </div>
         )}
 
@@ -707,35 +705,47 @@ export function PlanDetailPage() {
           </div>
         )}
 
-        {!isPast && isHosting && !plan.cancelledAt && (
-          <div className="plan-host-actions">
-            <Link to={`/plans/${plan.id}/edit`} className="btn-secondary plan-host-action-btn">
-              Edit plan
-            </Link>
-            <button
-              type="button"
-              className="btn-secondary plan-host-action-btn plan-host-action-btn--danger"
-              onClick={() => {
-                setConfirmCancel(true);
-                setCancelError(null);
-              }}
+        {!isPast && isHosting && !plan.cancelledAt && showPassHosting &&
+          createPortal(
+            <div
+              className="modal-backdrop"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="pass-hosting-title"
+              onClick={() => setShowPassHosting(false)}
             >
-              Cancel plan
-            </button>
-            <PassHostingControl
-              key={confirmCancel ? "closed" : "open"}
-              planTitle={plan.title}
-              upForGrabs={Boolean(plan.upForGrabsAt)}
-              candidates={plan.participants.going.filter((p) => p.id !== user.id)}
-              grabsBusy={grabsBusy}
-              grabsError={grabsError}
-              onOpen={() => setConfirmCancel(false)}
-              onClearGrabsError={() => setGrabsError(null)}
-              onPutUpForGrabs={() => void putUpForGrabs()}
-              onTransfer={(id) => void transferHost(id)}
-            />
-          </div>
-        )}
+              <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+                <div className="plan-guests-modal-head">
+                  <h2 id="pass-hosting-title">Pass hosting</h2>
+                  <button
+                    type="button"
+                    className="plan-guests-modal-close"
+                    aria-label="Close"
+                    onClick={() => setShowPassHosting(false)}
+                  >
+                    <X size={18} strokeWidth={2} />
+                  </button>
+                </div>
+                <PassHostingControl
+                  planTitle={plan.title}
+                  upForGrabs={Boolean(plan.upForGrabsAt)}
+                  candidates={plan.participants.going.filter((p) => p.id !== user.id)}
+                  grabsBusy={grabsBusy}
+                  grabsError={grabsError}
+                  panelOnly
+                  onOpen={() => setConfirmCancel(false)}
+                  onClearGrabsError={() => setGrabsError(null)}
+                  onPutUpForGrabs={() => void putUpForGrabs()}
+                  onTransfer={(id) => {
+                    void transferHost(id);
+                    setShowPassHosting(false);
+                  }}
+                  onClose={() => setShowPassHosting(false)}
+                />
+              </div>
+            </div>,
+            document.body,
+          )}
       </div>
 
       {lockingIn && (
@@ -1135,12 +1145,106 @@ function ChatBubbleIcon() {
 
 function RepeatIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeJoin="round" aria-hidden="true">
       <path d="M17 1l4 4-4 4" />
       <path d="M3 11V9a4 4 0 0 1 4-4h14" />
       <path d="M7 23l-4-4 4-4" />
       <path d="M21 13v2a4 4 0 0 1-4 4H3" />
     </svg>
+  );
+}
+
+function HostManageMenu({
+  onEdit,
+  onPassHosting,
+  onCancel,
+  canPassHosting,
+}: {
+  onEdit: () => void;
+  onPassHosting: () => void;
+  onCancel: () => void;
+  canPassHosting: boolean;
+}) {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: PointerEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="plan-safety-menu" ref={wrapRef}>
+      <button
+        type="button"
+        className="plan-safety-menu-btn"
+        aria-label="Manage plan"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+      >
+        <MoreVertical size={18} strokeWidth={1.7} aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="plan-safety-dropdown" role="menu">
+          <button
+            type="button"
+            className="plan-safety-dropdown-item"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onEdit();
+            }}
+          >
+            <Pencil size={14} strokeWidth={1.8} aria-hidden="true" />
+            Edit plan
+          </button>
+          {canPassHosting && (
+            <button
+              type="button"
+              className="plan-safety-dropdown-item"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onPassHosting();
+              }}
+            >
+              <Hand size={14} strokeWidth={1.8} aria-hidden="true" />
+              Pass hosting
+            </button>
+          )}
+          <button
+            type="button"
+            className="plan-safety-dropdown-item is-danger"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onCancel();
+            }}
+          >
+            <Ban size={14} strokeWidth={1.8} aria-hidden="true" />
+            Cancel plan
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1159,6 +1263,8 @@ function PassHostingControl({
   onClearGrabsError,
   onPutUpForGrabs,
   onTransfer,
+  panelOnly = false,
+  onClose,
 }: {
   planTitle: string;
   upForGrabs: boolean;
@@ -1169,8 +1275,10 @@ function PassHostingControl({
   onClearGrabsError: () => void;
   onPutUpForGrabs: () => void;
   onTransfer: (id: string) => void;
+  panelOnly?: boolean;
+  onClose?: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(panelOnly);
   const [confirmGrabs, setConfirmGrabs] = useState(false);
   const [pending, setPending] = useState<PublicUser | null>(null);
   const canGrabs = !upForGrabs;
@@ -1183,6 +1291,7 @@ function PassHostingControl({
     setConfirmGrabs(false);
     setPending(null);
     onClearGrabsError();
+    onClose?.();
   }
 
   if (confirmGrabs && canGrabs) {
@@ -1240,7 +1349,7 @@ function PassHostingControl({
             onClick={() => {
               onTransfer(pending.id);
               setPending(null);
-              setOpen(false);
+              closePanel();
             }}
           >
             Hand off to {pending.firstName}
@@ -1251,6 +1360,7 @@ function PassHostingControl({
   }
 
   if (!open) {
+    if (panelOnly) return null;
     return (
       <button
         type="button"
