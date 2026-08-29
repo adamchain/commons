@@ -629,8 +629,8 @@ h1, h2, h3, h4, h5, h6 {
 .participation {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 8px;
-  margin-top: 6px;
+  gap: 12px;
+  margin-top: 12px;
 }
 
 .participation-hint {
@@ -645,10 +645,10 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--surface);
   color: var(--accent);
   font-size: var(--text-body);
-  padding: 13px;
-  border-radius: 14px;
+  padding: 15px;
+  border-radius: 16px;
   border: 1.5px solid var(--accent);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
   font-weight: 600;
   letter-spacing: 0;
   transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
@@ -659,30 +659,32 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .participation .btn-going.is-active {
-  background: var(--surface);
-  color: var(--accent);
-  border-color: var(--accent);
-  box-shadow: var(--shadow-sm);
+  background: #8B3A3A;
+  color: #FFFFFF;
+  border-color: #8B3A3A;
+  box-shadow: none;
 }
 
 .participation .btn-interested {
-  background: var(--surface);
-  color: var(--text);
-  border: 1.5px solid var(--tan-mid);
-  border-radius: 14px;
-  padding: 11px;
+  background: #A67B7B;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 16px;
+  padding: 15px;
   font-size: var(--text-body);
   font-weight: 500;
+  opacity: 0.7;
 }
 
 .participation .btn-interested:hover {
-  background: var(--paper-200);
+  opacity: 0.85;
 }
 
 .participation .btn-interested.is-active {
-  background: var(--surface);
-  color: var(--accent);
-  border-color: var(--accent);
+  background: #A67B7B;
+  color: #FFFFFF;
+  border: none;
+  opacity: 1;
 }
 
 /* ---------- Avatars + participant lists ---------- */
@@ -1405,10 +1407,10 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .plan-detail-card {
-  background: var(--surface);
-  border-radius: 14px;
-  padding: 13px 14px;
-  box-shadow: var(--shadow-sm);
+  background: #FFFFFF;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 /* Plan detail type scale. Body, rows, and buttons share --text-body (13px).
@@ -3567,10 +3569,10 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: var(--surface);
+  background: #FFFFFF;
   border: none;
-  border-radius: 14px;
-  padding: 10px 14px;
+  border-radius: 16px;
+  padding: 14px 16px;
   cursor: pointer;
   color: var(--text);
   margin-bottom: 16px;
@@ -3578,7 +3580,7 @@ h1, h2, h3, h4, h5, h6 {
   text-align: left;
   font-size: var(--text-body);
   transition: background 120ms ease;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 .host-row.plan-detail-card {
   margin-bottom: 0;
@@ -3626,7 +3628,7 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 400;
 }
 .host-row:hover {
-  background: var(--surface-2);
+  background: #F8F8F8;
 }
 .host-row strong {
   font-weight: 700;
@@ -3649,9 +3651,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 .plan-actions-row {
   display: flex;
-  background: var(--surface);
-  border-radius: 14px;
-  box-shadow: var(--shadow-sm);
+  background: #FFFFFF;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   overflow: hidden;
   margin-top: 0;
   gap: 0;
