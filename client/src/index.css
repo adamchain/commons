@@ -1121,6 +1121,41 @@ h1, h2, h3, h4, h5, h6 {
   flex: 1;
   min-width: 0;
 }
+.plan-detail-page--create {
+  padding-top: 0;
+  padding-bottom: calc(108px + env(safe-area-inset-bottom, 0px));
+}
+.plan-detail-title-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+  border-radius: 0;
+  font: inherit;
+  font-size: var(--text-page);
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.15;
+  letter-spacing: -0.7px;
+}
+.plan-detail-title-input::placeholder {
+  color: var(--faint);
+  font-weight: 600;
+}
+.plan-detail-desc-input {
+  width: 100%;
+  min-height: 72px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+  border-radius: 0;
+  resize: vertical;
+  font: inherit;
+  font-size: var(--text-body);
+  line-height: 1.45;
+}
 .plan-detail-title-row {
   display: flex;
   align-items: flex-start;
@@ -1334,13 +1369,14 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   gap: 10px;
   margin-top: 2px;
-}
-.plan-detail-people-faces {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  flex: 1;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
 }
 .plan-detail-people .avatar-stack > * {
   box-shadow: 0 0 0 2px var(--bg);
@@ -1351,25 +1387,6 @@ h1, h2, h3, h4, h5, h6 {
   border: none;
   box-sizing: border-box;
 }
-.plan-detail-people-add {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--red);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-}
-.plan-detail-people-add.is-overlap {
-  margin-left: -8px;
-  box-shadow: 0 0 0 2px var(--bg);
-  z-index: 1;
-}
 .plan-detail-people-count {
   font-size: var(--text-body);
   font-weight: 600;
@@ -1378,22 +1395,6 @@ h1, h2, h3, h4, h5, h6 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.plan-detail-people-actions {
-  margin-left: auto;
-  flex-shrink: 0;
-  color: var(--red);
-  font-size: var(--text-body-small);
-  font-weight: 600;
-  white-space: nowrap;
-}
-.plan-detail-people-actions button {
-  color: inherit;
-  font: inherit;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
 }
 
 .plan-detail-body {
@@ -12580,10 +12581,6 @@ h1, h2, h3, h4, h5, h6 {
   outline: none;
 }
 
-.plan-participation-slot {
-  min-height: 76px;
-  margin-bottom: 12px;
-}
 .plan-participation-slot .participation {
   margin: 0;
 }

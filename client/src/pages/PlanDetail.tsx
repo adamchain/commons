@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Camera, Clock, Hand, ImagePlus, Plus, Share2, UserPlus, X } from "lucide-react";
+import { ArrowLeft, Camera, Clock, Hand, ImagePlus, Share2, UserPlus, X } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
@@ -264,10 +264,13 @@ export function PlanDetailPage() {
   const goingCount = plan.participants.going.length;
   const interestedCount = plan.participants.interested.length;
   const goingIds = new Set(plan.participants.going.map((u) => u.id));
-  const planPeoplePreview = [
+  const planPeople = [
     ...plan.participants.going,
     ...plan.participants.interested.filter((u) => !goingIds.has(u.id)),
-  ].slice(0, 4);
+  ];
+  const peoplePreviewMax = 4;
+  const planPeoplePreview = planPeople.slice(0, peoplePreviewMax);
+  const peopleOthers = Math.max(0, planPeople.length - peoplePreviewMax);
 
   const lockDisabled = lockBusy || !lockVenue.trim() || !lockDate;
   const lockHint = !lockVenue.trim()
@@ -497,68 +500,40 @@ export function PlanDetailPage() {
               </span>
             </div>
           )}
-          <div className="plan-detail-people">
-            <div className="plan-detail-people-faces">
-              {planPeoplePreview.length > 0 && (
-                <div className="avatar-stack">
-                  {planPeoplePreview.map((person) => (
-                    <Link
-                      key={person.id}
-                      to={`/profile/${person.id}`}
-                      state={{ from: "plan", planId: plan.id }}
-                      className="avatar-stack-link"
-                      aria-label={person.firstName}
-                    >
-                      <Avatar
-                        seed={person.avatarSeed}
-                        style={person.avatarStyle}
-                        photoDataUrl={person.avatarPhotoDataUrl}
-                        params={person.avatarParams}
-                        name={person.firstName}
-                        size="sm"
-                      />
-                    </Link>
-                  ))}
-                </div>
-              )}
-              {!isPast && (
-                <button
-                  type="button"
-                  className={`plan-detail-people-add${planPeoplePreview.length > 0 ? " is-overlap" : ""}`}
-                  onClick={() => setShowInvite(true)}
-                  aria-label="Invite"
-                >
-                  <Plus size={14} strokeWidth={2.6} />
-                </button>
-              )}
-              <span className="plan-detail-people-count">
-                {goingCount === 0 && interestedCount === 0
-                  ? "No one yet"
-                  : [
-                      goingCount > 0 ? `${goingCount} going` : null,
-                      interestedCount > 0 ? `${interestedCount} interested` : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
+          <button
+            type="button"
+            className="plan-detail-people"
+            onClick={() => setShowGuestsModal(true)}
+            aria-label={
+              planPeople.length === 0
+                ? "No one yet. View who's going"
+                : `${goingCount} going${interestedCount > 0 ? `, ${interestedCount} interested` : ""}. View who's going`
+            }
+          >
+            {planPeoplePreview.length > 0 && (
+              <span className="avatar-stack">
+                {planPeoplePreview.map((person) => (
+                  <span key={person.id} className="avatar-stack-link">
+                    <Avatar
+                      seed={person.avatarSeed}
+                      style={person.avatarStyle}
+                      photoDataUrl={person.avatarPhotoDataUrl}
+                      params={person.avatarParams}
+                      name={person.firstName}
+                      size="sm"
+                    />
+                  </span>
+                ))}
               </span>
-            </div>
-            <div className="plan-detail-people-actions">
-              <button
-                type="button"
-                onClick={() => setShowGuestsModal(true)}
-              >
-                View all
-              </button>
-              {!isPast && (
-                <>
-                  <span aria-hidden="true"> / </span>
-                  <button type="button" onClick={() => setShowInvite(true)}>
-                    Invite
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
+            )}
+            <span className="plan-detail-people-count">
+              {planPeople.length === 0
+                ? "No one yet"
+                : peopleOthers > 0
+                  ? `+ ${peopleOthers} ${peopleOthers === 1 ? "other" : "others"}`
+                  : null}
+            </span>
+          </button>
         </header>
 
         <button
