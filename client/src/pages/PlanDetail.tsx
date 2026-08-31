@@ -63,6 +63,7 @@ export function PlanDetailPage() {
   const [cancelError, setCancelError] = useState<string | null>(null);
   const lockFormRef = useRef<HTMLDivElement | null>(null);
   const lockFlyerRef = useRef<HTMLInputElement | null>(null);
+  const lockDateRef = useRef<HTMLInputElement | null>(null);
   const coverPool = useCardImages();
 
   const load = async () => {
@@ -457,14 +458,24 @@ export function PlanDetailPage() {
                   />
                 </div>
               </div>
-              <div className="plan-meta-row plan-meta-row--edit">
+              <div
+                className="plan-meta-row plan-meta-row--edit"
+                style={{ cursor: "pointer" }}
+                onClick={() => {
+                  const inp = lockDateRef.current;
+                  if (!inp) return;
+                  try { (inp as HTMLInputElement & { showPicker(): void }).showPicker(); }
+                  catch { inp.focus(); }
+                }}
+              >
                 <span className="plan-meta-icon" aria-hidden="true"><CalendarIcon /></span>
-                <label className="plan-meta-text" htmlFor="lock-date">
+                <div className="plan-meta-text">
                   <span className="plan-meta-label">Day</span>
                   <span className={`plan-meta-value ${!lockDate ? "is-placeholder" : ""}`}>
                     {lockDate ? formatPlanDate(lockDate) : "Pick a day"}
                   </span>
                   <input
+                    ref={lockDateRef}
                     id="lock-date"
                     className="plan-meta-native-input"
                     type="date"
@@ -472,7 +483,7 @@ export function PlanDetailPage() {
                     min={new Date().toISOString().slice(0, 10)}
                     onChange={(e) => setLockDate(e.target.value)}
                   />
-                </label>
+                </div>
               </div>
               <div className="plan-meta-row plan-meta-row--edit">
                 <span className="plan-meta-icon" aria-hidden="true"><ClockIcon /></span>
