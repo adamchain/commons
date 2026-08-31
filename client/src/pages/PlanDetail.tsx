@@ -58,6 +58,7 @@ export function PlanDetailPage() {
   const [showPassHosting, setShowPassHosting] = useState(false);
   const [showHostSheet, setShowHostSheet] = useState(false);
   const [chatPreview, setChatPreview] = useState<MessageDTO[] | null>(null);
+  const [chatConvId, setChatConvId] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -125,6 +126,7 @@ export function PlanDetailPage() {
     void (async () => {
       try {
         const conv = await api<ConversationDTO>(`/api/plans/${plan.id}/conversation`);
+        setChatConvId(conv.id);
         const msgs = await api<MessageDTO[]>(`/api/conversations/${conv.id}/messages`);
         setChatPreview(msgs.filter((m) => !m.kind || m.kind === "user").slice(-2));
       } catch {
@@ -561,9 +563,9 @@ export function PlanDetailPage() {
             <span className="plan-detail-people-count">
               {planPeople.length === 0
                 ? "No one yet"
-                : peopleOthers > 0
-                  ? `+ ${peopleOthers} ${peopleOthers === 1 ? "other" : "others"}`
-                  : null}
+                : goingCount > 0
+                  ? `${goingCount} going`
+                  : `${interestedCount} interested`}
             </span>
           </button>
         </header>
@@ -599,7 +601,14 @@ export function PlanDetailPage() {
           <ChatPreviewCard
             planId={plan.id}
             messages={chatPreview}
+            convId={chatConvId}
             navState={{ from: "plan", planId: plan.id }}
+            onSent={(msg) => {
+              setChatPreview((prev) => {
+                const list = prev ?? [];
+                return [...list, msg].filter((m) => !m.kind || m.kind === "user").slice(-2);
+              });
+            }}
           />
         )}
 
@@ -1208,53 +1217,100 @@ function RepeatIcon() {
 function ChatPreviewCard({
   planId,
   messages,
+  convId,
   navState,
+  onSent,
 }: {
   planId: string;
   messages: MessageDTO[] | null;
+  convId: string | null;
   navState: { from: string; planId: string };
+  onSent: (msg: MessageDTO) => void;
 }) {
+  const [body, setBody] = useState("");
+  const [sending, setSending] = useState(false);
+  const hasMessages = messages && messages.length > 0;
+  const placeholder = hasMessages ? "Add to the chat..." : "nothing yet — say hi 👋";
+
+  async function send() {
+    if (!convId || !body.trim() || sending) return;
+    setSending(true);
+    try {
+      const msg = await api<MessageDTO>(`/api/conversations/${convId}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ body: body.trim() }),
+      });
+      setBody("");
+      onSent(msg);
+    } catch {
+      /* silent — user can open full chat */
+    } finally {
+      setSending(false);
+    }
+  }
+
   return (
-    <Link
-      to={`/plans/${planId}/chat`}
-      state={navState}
-      className="plan-detail-card chat-preview-card"
-    >
-      <div className="chat-preview-header">
-        <span className="chat-preview-title">Chat</span>
-        <ChevronRight size={16} strokeWidth={2} color="var(--text-muted)" aria-hidden="true" />
-      </div>
-      {messages === null ? (
-        <span className="chat-preview-empty">Loading…</span>
-      ) : messages.length === 0 ? (
-        <span className="chat-preview-empty">nothing yet — say hi 👋</span>
-      ) : (
-        <div className="chat-preview-messages">
-          {messages.map((msg) => (
-            <div key={msg.id} className="chat-preview-message">
-              {msg.sender && (
-                <Avatar
-                  seed={msg.sender.avatarSeed}
-                  style={msg.sender.avatarStyle}
-                  photoDataUrl={msg.sender.avatarPhotoDataUrl}
-                  params={msg.sender.avatarParams}
-                  name={msg.sender.firstName}
-                  size="sm"
-                />
-              )}
-              <div className="chat-preview-message-body">
-                {msg.sender && (
-                  <span className="chat-preview-message-sender">{msg.sender.firstName}</span>
-                )}
-                <span className="chat-preview-message-text">
-                  {msg.imageUrl ? "📷 Photo" : msg.body}
-                </span>
-              </div>
-            </div>
-          ))}
+    <div className="plan-detail-card chat-preview-card">
+      <Link
+        to={`/plans/${planId}/chat`}
+        state={navState}
+        className="chat-preview-messages-link"
+      >
+        <div className="chat-preview-header">
+          <span className="chat-preview-title">Chat</span>
+          <ChevronRight size={16} strokeWidth={2} color="var(--text-muted)" aria-hidden="true" />
         </div>
-      )}
-    </Link>
+        {messages === null ? (
+          <span className="chat-preview-empty">Loading…</span>
+        ) : hasMessages ? (
+          <div className="chat-preview-messages">
+            {messages.map((msg) => (
+              <div key={msg.id} className="chat-preview-message">
+                {msg.sender && (
+                  <Avatar
+                    seed={msg.sender.avatarSeed}
+                    style={msg.sender.avatarStyle}
+                    photoDataUrl={msg.sender.avatarPhotoDataUrl}
+                    params={msg.sender.avatarParams}
+                    name={msg.sender.firstName}
+                    size="sm"
+                  />
+                )}
+                <div className="chat-preview-message-body">
+                  {msg.sender && (
+                    <span className="chat-preview-message-sender">{msg.sender.firstName}</span>
+                  )}
+                  <span className="chat-preview-message-text">
+                    {msg.imageUrl ? "📷 Photo" : msg.body}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </Link>
+      <div className={`chat-preview-compose${hasMessages ? " chat-preview-compose--below-msgs" : ""}`}>
+        <input
+          className="chat-preview-input"
+          type="text"
+          placeholder={placeholder}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); }
+          }}
+        />
+        <button
+          type="button"
+          className={`chat-composer-send${body.trim() ? " is-ready" : ""}`}
+          disabled={!body.trim() || sending || !convId}
+          onClick={() => void send()}
+          aria-label="Send"
+        >
+          <Send size={14} strokeWidth={2} aria-hidden="true" />
+        </button>
+      </div>
+    </div>
   );
 }
 
