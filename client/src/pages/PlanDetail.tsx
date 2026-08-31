@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Ban, Camera, Clock, Hand, ImagePlus, MoreVertical, Pencil, Send, UserPlus, X } from "lucide-react";
+import { ArrowLeft, Camera, ChevronRight, Clock, Hand, ImagePlus, Pencil, Send, UserPlus, X } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
@@ -20,7 +20,7 @@ import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
-import { INTEREST_LABELS, type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
+import { INTEREST_LABELS, type ConversationDTO, type MessageDTO, type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
 
 /** Same "set parts + · flexible" convention as the feed card — never show a
  *  specific time/date next to a field that's still open. */
@@ -56,6 +56,8 @@ export function PlanDetailPage() {
   const [grabsError, setGrabsError] = useState<string | null>(null);
   const [grabsBusy, setGrabsBusy] = useState(false);
   const [showPassHosting, setShowPassHosting] = useState(false);
+  const [showHostSheet, setShowHostSheet] = useState(false);
+  const [chatPreview, setChatPreview] = useState<MessageDTO[] | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -111,6 +113,24 @@ export function PlanDetailPage() {
     setLockFlexTime(plan.isFlexibleTime);
     setLockFlyer(plan.flyerDataUrl ?? null);
   }, [plan?.id, plan?.date, plan?.lockedAt, plan?.isFlexibleTime, plan?.isFlexibleLocation, plan?.flyerDataUrl]);
+
+  // Fetch the last 2 user messages for the inline chat preview.
+  useEffect(() => {
+    if (!plan || !user) return;
+    const hosting = plan.creator.id === user.id;
+    const eligible = hosting || plan.myState === "going" || plan.myState === "interested";
+    if (!eligible) { setChatPreview([]); return; }
+    setChatPreview(null);
+    void (async () => {
+      try {
+        const conv = await api<ConversationDTO>(`/api/plans/${plan.id}/conversation`);
+        const msgs = await api<MessageDTO[]>(`/api/conversations/${conv.id}/messages`);
+        setChatPreview(msgs.filter((m) => !m.kind || m.kind === "user").slice(-2));
+      } catch {
+        setChatPreview([]);
+      }
+    })();
+  }, [plan?.id, plan?.myState, user?.id]);
 
   if (!plan || !user) {
     return <LoadingScreen tagline="Loading plan" />;
@@ -378,6 +398,14 @@ export function PlanDetailPage() {
               <button
                 type="button"
                 className="plan-detail-hero-btn"
+                aria-label="Invite"
+                onClick={() => setShowInvite(true)}
+              >
+                <UserPlus size={18} strokeWidth={2} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="plan-detail-hero-btn"
                 aria-label="Share"
                 onClick={() => setShowShare(true)}
               >
@@ -401,23 +429,7 @@ export function PlanDetailPage() {
           )}
           <div className="plan-detail-title-row">
             <h1 className="plan-detail-title">{sentenceCaseTitle(plan.title)}</h1>
-            {isHosting ? (
-              <HostManageMenu
-                onEdit={() => navigate(`/plans/${plan.id}/edit`)}
-                onPassHosting={() => {
-                  setShowPassHosting(true);
-                  setConfirmCancel(false);
-                }}
-                onCancel={() => {
-                  setConfirmCancel(true);
-                  setCancelError(null);
-                }}
-                canPassHosting={
-                  (!plan.upForGrabsAt && !plan.cancelledAt) ||
-                  plan.participants.going.some((p) => p.id !== user.id)
-                }
-              />
-            ) : (
+            {!isHosting && (
               <PlanSafetyMenu
                 targetUserId={plan.creator.id}
                 targetFirstName={plan.creator.firstName}
@@ -572,6 +584,14 @@ export function PlanDetailPage() {
           </div>
         )}
 
+        {!isPast && canChat && !lockingIn && (
+          <ChatPreviewCard
+            planId={plan.id}
+            messages={chatPreview}
+            navState={{ from: "plan", planId: plan.id }}
+          />
+        )}
+
         {isPast && (
           <div className="plan-past-actions">
             <p className="plan-past-note">This one's a wrap. Want to run it back?</p>
@@ -639,34 +659,6 @@ export function PlanDetailPage() {
           </div>
         )}
 
-        {!isPast && (!lockingIn || canChat) && (
-        <div className="plan-actions-row">
-          {!lockingIn && (
-            <button type="button" className="action-btn action-btn--stack" onClick={() => setShowGetThere(true)}>
-              <span className="action-btn-icon" aria-hidden="true"><NavIcon /></span>
-              <span className="action-btn-label">Get there</span>
-            </button>
-          )}
-          {!lockingIn && (
-            <button type="button" className="action-btn action-btn--stack" onClick={() => setShowInvite(true)}>
-              <span className="action-btn-icon" aria-hidden="true">
-                <UserPlus size={22} strokeWidth={1.8} />
-              </span>
-              <span className="action-btn-label">Invite</span>
-            </button>
-          )}
-          {canChat && (
-            <Link
-              to={`/plans/${plan.id}/chat`}
-              state={{ from: "plan", planId: plan.id }}
-              className="action-btn action-btn--stack"
-            >
-              <span className="action-btn-icon" aria-hidden="true"><ChatBubbleIcon /></span>
-              <span className="action-btn-label">Join the chat</span>
-            </Link>
-          )}
-        </div>
-        )}
 
         {plan.cancelledAt && (
           <div className="plan-cancelled-banner" role="alert">
@@ -703,6 +695,20 @@ export function PlanDetailPage() {
               <> The host will apply it shortly.</>
             )}
           </div>
+        )}
+
+        {isHosting && !isPast && !lockingIn && !plan.cancelledAt && (
+          <button
+            type="button"
+            className="plan-edit-row plan-detail-card"
+            onClick={() => setShowHostSheet(true)}
+          >
+            <span className="plan-edit-row-label">
+              <Pencil size={14} strokeWidth={1.8} aria-hidden="true" />
+              Edit plan
+            </span>
+            <ChevronRight size={16} strokeWidth={1.8} color="var(--text-muted)" aria-hidden="true" />
+          </button>
         )}
 
         {!isPast && isHosting && !plan.cancelledAt && showPassHosting &&
@@ -815,6 +821,48 @@ export function PlanDetailPage() {
           </div>,
           document.body,
         )}
+
+      {showHostSheet && (
+        <div className="sheet-backdrop" onClick={() => setShowHostSheet(false)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-handle" />
+            <button
+              type="button"
+              className="sheet-link"
+              onClick={() => { setShowHostSheet(false); navigate(`/plans/${plan.id}/edit`); }}
+            >
+              Edit plan
+            </button>
+            {((!plan.upForGrabsAt && !plan.cancelledAt) || plan.participants.going.some((p) => p.id !== user.id)) && (
+              <button
+                type="button"
+                className="sheet-link"
+                onClick={() => {
+                  setShowHostSheet(false);
+                  setShowPassHosting(true);
+                  setConfirmCancel(false);
+                }}
+              >
+                Pass hosting
+              </button>
+            )}
+            <button
+              type="button"
+              className="sheet-link sheet-link--danger"
+              onClick={() => {
+                setShowHostSheet(false);
+                setConfirmCancel(true);
+                setCancelError(null);
+              }}
+            >
+              Cancel plan
+            </button>
+            <button type="button" className="btn-link sheet-cancel" onClick={() => setShowHostSheet(false)}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {confirmCancel && (
         <div
@@ -1127,14 +1175,6 @@ function PinIcon() {
   );
 }
 
-function NavIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polygon points="3 11 22 2 13 21 11 13 3 11" />
-    </svg>
-  );
-}
-
 function ChatBubbleIcon() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1154,97 +1194,56 @@ function RepeatIcon() {
   );
 }
 
-function HostManageMenu({
-  onEdit,
-  onPassHosting,
-  onCancel,
-  canPassHosting,
+function ChatPreviewCard({
+  planId,
+  messages,
+  navState,
 }: {
-  onEdit: () => void;
-  onPassHosting: () => void;
-  onCancel: () => void;
-  canPassHosting: boolean;
+  planId: string;
+  messages: MessageDTO[] | null;
+  navState: { from: string; planId: string };
 }) {
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: PointerEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
   return (
-    <div className="plan-safety-menu" ref={wrapRef}>
-      <button
-        type="button"
-        className="plan-safety-menu-btn"
-        aria-label="Manage plan"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setOpen((v) => !v);
-        }}
-      >
-        <MoreVertical size={18} strokeWidth={1.7} aria-hidden="true" />
-      </button>
-      {open && (
-        <div className="plan-safety-dropdown" role="menu">
-          <button
-            type="button"
-            className="plan-safety-dropdown-item"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              onEdit();
-            }}
-          >
-            <Pencil size={14} strokeWidth={1.8} aria-hidden="true" />
-            Edit plan
-          </button>
-          {canPassHosting && (
-            <button
-              type="button"
-              className="plan-safety-dropdown-item"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                onPassHosting();
-              }}
-            >
-              <Hand size={14} strokeWidth={1.8} aria-hidden="true" />
-              Pass hosting
-            </button>
-          )}
-          <button
-            type="button"
-            className="plan-safety-dropdown-item is-danger"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              onCancel();
-            }}
-          >
-            <Ban size={14} strokeWidth={1.8} aria-hidden="true" />
-            Cancel plan
-          </button>
+    <Link
+      to={`/plans/${planId}/chat`}
+      state={navState}
+      className="plan-detail-card chat-preview-card"
+    >
+      <div className="chat-preview-header">
+        <span className="chat-preview-title">Chat</span>
+        <ChevronRight size={16} strokeWidth={2} color="var(--text-muted)" aria-hidden="true" />
+      </div>
+      {messages === null ? (
+        <span className="chat-preview-empty">Loading…</span>
+      ) : messages.length === 0 ? (
+        <span className="chat-preview-empty">nothing yet — say hi 👋</span>
+      ) : (
+        <div className="chat-preview-messages">
+          {messages.map((msg) => (
+            <div key={msg.id} className="chat-preview-message">
+              {msg.sender && (
+                <Avatar
+                  seed={msg.sender.avatarSeed}
+                  style={msg.sender.avatarStyle}
+                  photoDataUrl={msg.sender.avatarPhotoDataUrl}
+                  params={msg.sender.avatarParams}
+                  name={msg.sender.firstName}
+                  size="sm"
+                />
+              )}
+              <div className="chat-preview-message-body">
+                {msg.sender && (
+                  <span className="chat-preview-message-sender">{msg.sender.firstName}</span>
+                )}
+                <span className="chat-preview-message-text">
+                  {msg.imageUrl ? "📷 Photo" : msg.body}
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
       )}
-    </div>
+    </Link>
   );
 }
 
