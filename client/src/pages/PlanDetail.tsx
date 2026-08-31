@@ -294,7 +294,6 @@ export function PlanDetailPage() {
   ];
   const peoplePreviewMax = 4;
   const planPeoplePreview = planPeople.slice(0, peoplePreviewMax);
-  const peopleOthers = Math.max(0, planPeople.length - peoplePreviewMax);
 
   const lockDisabled = lockBusy || !lockVenue.trim() || !lockDate;
   const lockHint = !lockVenue.trim()
