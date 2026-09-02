@@ -490,21 +490,19 @@ export function PlanDetailPage() {
                 <span className="plan-meta-icon" aria-hidden="true"><ClockIcon /></span>
                 <div className="plan-meta-text plan-meta-text--time">
                   <span className="plan-meta-label">Time</span>
-                  <div className="plan-meta-time-row">
-                    {lockFlexTime ? (
-                      <span className="plan-meta-value is-placeholder">Flexible time</span>
-                    ) : (
-                      <input
-                        id="lock-time"
-                        className="plan-meta-time-input"
-                        type="time"
-                        value={lockTime}
-                        onChange={(e) => setLockTime(e.target.value)}
-                      />
-                    )}
-                    <FlexChip active={lockFlexTime} onClick={() => setLockFlexTime((v) => !v)} />
-                  </div>
+                  {lockFlexTime ? (
+                    <span className="plan-meta-value is-placeholder">Flexible time</span>
+                  ) : (
+                    <input
+                      id="lock-time"
+                      className="plan-meta-time-input"
+                      type="time"
+                      value={lockTime}
+                      onChange={(e) => setLockTime(e.target.value)}
+                    />
+                  )}
                 </div>
+                <FlexChip active={lockFlexTime} onClick={() => setLockFlexTime((v) => !v)} />
               </div>
             </div>
           ) : (

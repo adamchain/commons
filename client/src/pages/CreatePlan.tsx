@@ -1007,34 +1007,32 @@ export function CreatePlanPage() {
               <span className="plan-meta-icon" aria-hidden="true"><Clock size={18} strokeWidth={1.8} /></span>
               <div className="plan-meta-text plan-meta-text--time">
                 <span className="plan-meta-label">Time</span>
-                <div className="plan-meta-time-row">
-                  {form.isFlexibleTime ? (
-                    <span className="plan-meta-value is-placeholder">Flexible time</span>
-                  ) : (
-                    <input
-                      id="time"
-                      className="plan-meta-time-input"
-                      type="time"
-                      min={!form.isFlexibleDate && form.date === today() ? nowTime() : undefined}
-                      value={form.time}
-                      aria-invalid={Boolean(timeError)}
-                      onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
-                    />
-                  )}
-                  <FlexToggle
-                    active={form.isFlexibleTime}
-                    onClick={() =>
-                      setForm((f) => {
-                        const next = !f.isFlexibleTime;
-                        return next
-                          ? { ...f, isFlexibleTime: true }
-                          : { ...f, isFlexibleTime: false, time: f.time || defaultPlanTime() };
-                      })
-                    }
-                    label="Flexible"
+                {form.isFlexibleTime ? (
+                  <span className="plan-meta-value is-placeholder">Flexible time</span>
+                ) : (
+                  <input
+                    id="time"
+                    className="plan-meta-time-input"
+                    type="time"
+                    min={!form.isFlexibleDate && form.date === today() ? nowTime() : undefined}
+                    value={form.time}
+                    aria-invalid={Boolean(timeError)}
+                    onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
                   />
-                </div>
+                )}
               </div>
+              <FlexToggle
+                active={form.isFlexibleTime}
+                onClick={() =>
+                  setForm((f) => {
+                    const next = !f.isFlexibleTime;
+                    return next
+                      ? { ...f, isFlexibleTime: true }
+                      : { ...f, isFlexibleTime: false, time: f.time || defaultPlanTime() };
+                  })
+                }
+                label="Flexible"
+              />
             </div>
           </div>
           {(attemptedSubmit && locationError) || dateError || timeError ? (
@@ -1073,15 +1071,6 @@ export function CreatePlanPage() {
         </header>
 
         <div className="host-row plan-detail-card">
-          {user && (
-            <Avatar
-              seed={user.avatarSeed}
-              style={user.avatarStyle}
-              photoDataUrl={user.avatarPhotoDataUrl}
-              params={user.avatarParams}
-              size="md"
-            />
-          )}
           <span className="host-row-text">
             Started by <strong>you</strong>
           </span>
