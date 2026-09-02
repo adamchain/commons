@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Camera, ChevronRight, Clock, Hand, ImagePlus, Pencil, Send, UserPlus, X } from "lucide-react";
+import { ArrowLeft, Camera, ChevronRight, Hand, ImagePlus, Pencil, Send, UserPlus, X } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
@@ -512,7 +512,9 @@ export function PlanDetailPage() {
               {plan.isFlexibleLocation ? (
                 <span className="plan-detail-meta">
                   <PlanDetailPinIcon />
-                  <span className="plan-detail-meta-label">Flexible</span>
+                  <span className="plan-detail-meta-label">
+                    Flexible · {formatWhen(plan.date, plan.time, plan.isFlexibleTime)}
+                  </span>
                 </span>
               ) : (
                 <a
@@ -522,15 +524,11 @@ export function PlanDetailPage() {
                   rel="noopener noreferrer"
                 >
                   <PlanDetailPinIcon />
-                  <span className="plan-detail-meta-label">{plan.location.name}</span>
+                  <span className="plan-detail-meta-label">
+                    {plan.location.name} · {formatWhen(plan.date, plan.time, plan.isFlexibleTime)}
+                  </span>
                 </a>
               )}
-              <span className="plan-detail-meta">
-                <Clock className="plan-detail-meta-icon" size={14} strokeWidth={2.2} aria-hidden="true" />
-                <span className="plan-detail-meta-label">
-                  {formatWhen(plan.date, plan.time, plan.isFlexibleTime)}
-                </span>
-              </span>
             </div>
           )}
           <button
@@ -576,7 +574,6 @@ export function PlanDetailPage() {
             navigate(`/profile/${plan.creator.id}`, { state: { from: "plan", planId: plan.id } })
           }
         >
-          <Avatar seed={plan.creator.avatarSeed} style={plan.creator.avatarStyle} photoDataUrl={plan.creator.avatarPhotoDataUrl} params={plan.creator.avatarParams} size="md" />
           <span className="host-row-text">
             Started by <strong>{isHosting ? "you" : plan.creator.firstName}</strong>
             {plan.coHosts && plan.coHosts.length > 0 && (
@@ -596,7 +593,7 @@ export function PlanDetailPage() {
           </div>
         )}
 
-        {!isPast && canChat && !lockingIn && (
+        {!isPast && canChat && (isLookingFor || !lockingIn) && (
           <ChatPreviewCard
             planId={plan.id}
             messages={chatPreview}

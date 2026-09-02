@@ -966,7 +966,7 @@ function PassItOnControl({
   return (
     <div>
       <p className="form-help" style={{ marginTop: 0 }}>
-        Pass it on — hand off to someone who&apos;s going.
+        Transfer hosting to someone who&apos;s going.
       </p>
       {!open ? (
         <button
@@ -974,7 +974,7 @@ function PassItOnControl({
           className="btn-secondary btn-block"
           onClick={() => setOpen(true)}
         >
-          Pick a new host
+          Transfer hosting
         </button>
       ) : (
         <div className="plan-transfer-picker-list" style={{ marginTop: 8 }}>

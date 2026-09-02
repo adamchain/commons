@@ -350,7 +350,7 @@ export function FeedPage() {
     upcoming.sort((a, b) => `${a.date}T${a.time || "23:59"}`.localeCompare(`${b.date}T${b.time || "23:59"}`));
     ideas.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
 
-    const active = view === "ideas" ? ideas : upcoming;
+    const active = view === "ideas" ? ideas : [...upcoming, ...ideas];
     // A just-posted plan is pinned to the very top regardless of its date, so
     // the user immediately sees what they created.
     if (justPostedId) {
