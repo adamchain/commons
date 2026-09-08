@@ -16,6 +16,7 @@ import {
 import { planHasEnded } from "../lib/planTime.js";
 import { nextNetworkPrompt, otherGoingIds, userWasGoing } from "../lib/networkPrompt.js";
 import { emit } from "../lib/notify.js";
+import { textBlockedReason } from "../lib/contentFilter.js";
 
 export const authRouter = Router();
 
@@ -223,6 +224,12 @@ authRouter.post("/verify-code", async (req, res) => {
     res.status(500).json({ error: "Could not finish sign in. Please try again." });
     return;
   }
+  if (user.ejectedAt) {
+    res.status(403).json({
+      error: "This account was removed for violating the COMMONS Terms of Service.",
+    });
+    return;
+  }
   // F.9 — every new account lands with at least one notification instead of
   // an empty bell. Best-effort: never block sign-in on this.
   if (isNewUser) {
@@ -342,6 +349,11 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
     }
     const existing = (await findUserById(userId))?.notificationPrefs ?? {};
     patch.notificationPrefs = { ...existing, ...next };
+  }
+  const blockedText = textBlockedReason(patch.firstName, patch.lastName, patch.bio);
+  if (blockedText) {
+    res.status(400).json({ error: blockedText });
+    return;
   }
   await updateUser(userId, patch);
   // Auto-join the forum for each interest the user just saved (onboarding or

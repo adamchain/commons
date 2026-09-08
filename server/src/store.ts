@@ -80,6 +80,8 @@ export interface UserRecord {
   /** Conversations the user explicitly left / removed from inbox. ensure* must
    *  not re-add them until they open the thread again (which clears this). */
   leftConversationIds?: string[];
+  /** Set when COMMONS ejects the account for Terms / UGC violations. Blocks sign-in. */
+  ejectedAt?: string | null;
 }
 
 export interface NeighborhoodRecord {
@@ -290,6 +292,8 @@ export interface LogRecord {
 
 export type ReportReason = "harassment" | "spam" | "inappropriate" | "safety" | "other";
 export type ReportStatus = "open" | "reviewed";
+export type ReportSource = "report" | "block";
+export type ReportContentKind = "user" | "plan" | "message" | "forum_post" | "community_post";
 
 /** Member-submitted safety reports, shown in the admin panel. */
 export interface ReportRecord {
@@ -297,6 +301,9 @@ export interface ReportRecord {
   reporterId: string;
   targetUserId: string;
   planId?: string | null;
+  contentKind?: ReportContentKind | null;
+  contentId?: string | null;
+  source?: ReportSource;
   reason: ReportReason;
   details?: string;
   status: ReportStatus;
@@ -904,6 +911,55 @@ export const store = {
   listBlockedUserIds(userId: string): string[] {
     return snapshot.users.find((u) => u.id === userId)?.blockedUserIds ?? [];
   },
+  isUserEjected(userId: string): boolean {
+    return Boolean(snapshot.users.find((u) => u.id === userId)?.ejectedAt);
+  },
+  /** Cancel the member's plans, take down their posts, and lock the account. */
+  ejectUser(userId: string): UserRecord | undefined {
+    const user = snapshot.users.find((u) => u.id === userId);
+    if (!user) return undefined;
+    const now = new Date().toISOString();
+    user.ejectedAt = now;
+    for (const plan of snapshot.plans) {
+      if (plan.creatorId === userId && !plan.cancelledAt) {
+        plan.cancelledAt = now;
+        mongoMirror.upsertPlan(plan);
+      }
+    }
+    for (const post of snapshot.forumPosts) {
+      if (post.authorId === userId && post.approvalStatus !== "rejected") {
+        post.approvalStatus = "rejected";
+        mongoMirror.upsertForumPost(post);
+      }
+    }
+    for (const post of snapshot.communityPosts) {
+      if (post.authorId === userId && !post.deletedAt) {
+        post.approvalStatus = "rejected";
+        post.deletedAt = now;
+        mongoMirror.upsertCommunityPost(post);
+      }
+    }
+    persist();
+    mongoMirror.upsertUser(user);
+    return user;
+  },
+  viewerReportedPlan(viewerId: string, planId: string): boolean {
+    return snapshot.reports.some(
+      (r) => r.reporterId === viewerId && r.planId === planId,
+    );
+  },
+  viewerReportedContent(
+    viewerId: string,
+    contentKind: ReportContentKind,
+    contentId: string,
+  ): boolean {
+    return snapshot.reports.some(
+      (r) =>
+        r.reporterId === viewerId &&
+        r.contentKind === contentKind &&
+        r.contentId === contentId,
+    );
+  },
   /** True when either user has blocked the other — used to gate visibility both ways. */
   isBlockedEitherWay(aId: string, bId: string): boolean {
     const a = snapshot.users.find((u) => u.id === aId);
@@ -1185,6 +1241,9 @@ export const store = {
     reporterId: string;
     targetUserId: string;
     planId?: string | null;
+    contentKind?: ReportContentKind | null;
+    contentId?: string | null;
+    source?: ReportSource;
     reason: ReportReason;
     details?: string;
   }): ReportRecord {
@@ -1193,6 +1252,9 @@ export const store = {
       reporterId: input.reporterId,
       targetUserId: input.targetUserId,
       planId: input.planId ?? null,
+      contentKind: input.contentKind ?? null,
+      contentId: input.contentId ?? null,
+      source: input.source ?? "report",
       reason: input.reason,
       details: input.details,
       status: "open",

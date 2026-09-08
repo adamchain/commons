@@ -254,6 +254,9 @@ const ReportSchema = new Schema<ReportRecord>(
     reporterId: { type: String, required: true },
     targetUserId: { type: String, required: true },
     planId: { type: String, default: null },
+    contentKind: { type: String, default: null },
+    contentId: { type: String, default: null },
+    source: { type: String, enum: ["report", "block"], default: "report" },
     reason: {
       type: String,
       enum: ["harassment", "spam", "inappropriate", "safety", "other"],

@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
+import { PlanSafetyMenu } from "../components/PlanSafetyMenu";
 import { formatRelative } from "../lib/format";
 import type { ForumPostDetailDTO, ForumPostDTO, ForumReplyDTO } from "../types/shared";
 
@@ -116,7 +117,12 @@ export function ForumPostPage() {
             {deleting ? "Deleting…" : "Delete"}
           </button>
         ) : (
-          <span />
+          <PlanSafetyMenu
+            targetUserId={post.author.id}
+            targetFirstName={post.author.firstName}
+            contentKind="forum_post"
+            contentId={post.id}
+          />
         )}
       </header>
 

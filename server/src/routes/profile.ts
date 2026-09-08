@@ -20,6 +20,10 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
     res.status(404).json({ error: "User not found" });
     return;
   }
+  if (targetId !== viewerId && store.isUserEjected(targetId)) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
   const neighborhood = target.neighborhoodId
     ? store.findNeighborhoodById(target.neighborhoodId)
     : null;

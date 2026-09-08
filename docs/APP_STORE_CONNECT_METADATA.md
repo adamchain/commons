@@ -248,11 +248,13 @@ Please see the attached "APP_STORE_REVIEWER_INSTRUCTIONS.md" document for comple
 - Same content adapted for iPad layout
 
 **Screenshot Tips:**
-- Use device frames for better presentation
-- Include brief captions/annotations highlighting key features
-- Show the app with realistic demo content (use test account data)
+- Capture on an **iPhone** (simulator or device) so the status bar is iOS (time, Cellular/Wi-Fi, battery). Do not upload Android screenshots or images that show an Android status bar or gesture bar.
+- Capture from the iOS app, not a web browser or Android emulator.
+- Use App Store Connect → **View All Sizes in Media Manager** to replace every size (6.9", 6.7", 6.5").
+- Show the app's main features: home feed, plan detail, chat, create plan, profile.
+- Use realistic demo content (test account data)
 - Ensure text is readable and UI elements are clear
-- Avoid showing personal user data
+- Avoid showing personal user data, Android chrome, Google Play, or other non-iOS platform UI
 
 ---
 

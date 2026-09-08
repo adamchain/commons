@@ -18,6 +18,7 @@ import {
   isActiveCommunityMember,
   isCommunityOrganizer,
 } from "../lib/communityAccess.js";
+import { textBlockedReason } from "../lib/contentFilter.js";
 import {
   ALL_COMMUNITY_CATEGORIES,
   normalizeCommunityCategory,
@@ -266,6 +267,11 @@ communitiesRouter.post("/", requireAuth, async (req, res) => {
     res.status(400).json({ error: "Name and description are required" });
     return;
   }
+  const filtered = textBlockedReason(name, description, screeningQuestion);
+  if (filtered) {
+    res.status(400).json({ error: filtered });
+    return;
+  }
 
   const community = store.createCommunity({
     name,
@@ -346,6 +352,11 @@ communitiesRouter.patch("/:id", requireAuth, async (req, res) => {
     const s = req.body.screeningQuestion;
     patch.screeningQuestion =
       typeof s === "string" && s.trim() ? s.trim().slice(0, 280) : null;
+  }
+  const filtered = textBlockedReason(patch.name, patch.description, patch.screeningQuestion);
+  if (filtered) {
+    res.status(400).json({ error: filtered });
+    return;
   }
   if ("bulletinPermission" in (req.body ?? {})) {
     patch.bulletinPermission = parsePermission(req.body.bulletinPermission, community.bulletinPermission);
@@ -753,7 +764,13 @@ communitiesRouter.get("/:id/posts", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Join the community to see the bulletin" });
     return;
   }
-  const posts = store.listCommunityPosts(community.id);
+  const posts = store.listCommunityPosts(community.id).filter((p) => {
+    if (p.authorId === viewerId) return true;
+    if (store.isUserEjected(p.authorId)) return false;
+    if (store.isBlockedEitherWay(viewerId, p.authorId)) return false;
+    if (store.viewerReportedContent(viewerId, "community_post", p.id)) return false;
+    return true;
+  });
   // Authors can see their own pending posts on the feed; organizers get the
   // full pending queue in a separate array for the approval UI.
   const myPending = viewerIsOrganizer
@@ -800,6 +817,11 @@ communitiesRouter.post("/:id/posts", requireAuth, async (req, res) => {
     rawImage.startsWith("data:image/") && rawImage.length < 1_600_000 ? rawImage : null;
   if (!content && !image) {
     res.status(400).json({ error: "Write something to post" });
+    return;
+  }
+  const filtered = textBlockedReason(content);
+  if (filtered) {
+    res.status(400).json({ error: filtered });
     return;
   }
   // Organizer posts are always live. Member posts wait when approval is required.

@@ -296,9 +296,18 @@ When creating a plan, you choose who can see it:
 ## Blocking
 
 If someone is bothering you:
-- Go to their profile → tap the ⋯ menu → Block
-- Blocked users can't see your plans, profile, or message you
+- Open a plan, profile, chat, forum post, or community post → tap ⋯ → **Block**
+- Their content is removed from your feed immediately
+- COMMONS is notified so we can review the conduct
 - Manage your blocked list in **Settings → Privacy → Blocked users**
+
+## Reporting
+
+Flag objectionable content or abusive users:
+- Same ⋯ menu → **Report** → pick a reason
+- Reports go to COMMONS. We review them within 24 hours and, when substantiated, remove the content and eject the user.
+
+COMMONS has **zero tolerance** for objectionable content and abusive users. You agree to that in the Terms during onboarding.
 
 ---
 

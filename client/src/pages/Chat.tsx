@@ -13,6 +13,7 @@ import {
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { PlanCoverThumb } from "../components/CoverThumb";
+import { BlockConfirmModal, ReportModal } from "../components/PlanSafetyMenu";
 import { PollCard } from "../components/PollCard";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
@@ -73,6 +74,8 @@ export function ChatPage() {
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [leaveBusy, setLeaveBusy] = useState(false);
   const [leaveErr, setLeaveErr] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [blockOpen, setBlockOpen] = useState(false);
   const composerMenuRef = useRef<HTMLDivElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -377,6 +380,30 @@ export function ChatPage() {
               <button type="button" role="menuitem" onClick={() => void toggleMute()}>
                 {conv.muted ? "Unmute notifications" : "Mute notifications"}
               </button>
+              {!conv.isHost && (
+                <>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      setReportOpen(true);
+                    }}
+                  >
+                    Report organizer
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      setBlockOpen(true);
+                    }}
+                  >
+                    Block organizer
+                  </button>
+                </>
+              )}
               <button
                 type="button"
                 role="menuitem"
@@ -790,6 +817,26 @@ export function ChatPage() {
             </div>
           </div>
         </div>
+      )}
+      {reportOpen && (
+        <ReportModal
+          targetUserId={conv.hostId}
+          targetFirstName={plan.creator.firstName}
+          planId={plan.id}
+          planTitle={plan.title}
+          contentKind="plan"
+          onClose={() => setReportOpen(false)}
+        />
+      )}
+      {blockOpen && (
+        <BlockConfirmModal
+          targetUserId={conv.hostId}
+          targetFirstName={plan.creator.firstName}
+          onClose={() => setBlockOpen(false)}
+          onBlocked={async () => {
+            navigate("/", { replace: true });
+          }}
+        />
       )}
     </main>
   );

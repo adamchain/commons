@@ -6,6 +6,8 @@ import { CommunityCover } from "../components/CommunityCover";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
 import { JoinConfirmPopup } from "../components/JoinConfirmPopup";
 import { PlanCard } from "../components/PlanCard";
+import { PlanSafetyMenu } from "../components/PlanSafetyMenu";
+import { useAuth } from "../context/AuthContext";
 import {
   ALL_COMMUNITY_CATEGORIES,
   COMMUNITY_CATEGORY_LABELS,
@@ -559,6 +561,7 @@ function BulletinTab({
   canPost: boolean;
   onPendingChange?: () => void;
 }) {
+  const { user } = useAuth();
   const [posts, setPosts] = useState<CommunityPostDTO[]>([]);
   const [pending, setPending] = useState<CommunityPostDTO[]>([]);
   const [draft, setDraft] = useState("");
@@ -699,6 +702,14 @@ function BulletinTab({
                 )}
                 {p.canDelete && (
                   <button type="button" className="cmy-icon-btn" onClick={() => del(p.id)} title="Delete">×</button>
+                )}
+                {user && user.id !== p.author.id && (
+                  <PlanSafetyMenu
+                    targetUserId={p.author.id}
+                    targetFirstName={p.author.firstName}
+                    contentKind="community_post"
+                    contentId={p.id}
+                  />
                 )}
               </div>
             </div>

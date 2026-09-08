@@ -4,6 +4,7 @@ import { BarChart2 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCoverThumb } from "../components/CoverThumb";
+import { BlockConfirmModal, ReportModal } from "../components/PlanSafetyMenu";
 import { PollCard } from "../components/PollCard";
 import { useAuth } from "../context/AuthContext";
 import { sentenceCaseTitle } from "../lib/format";
@@ -59,8 +60,8 @@ export function CommunityChatPage() {
   const [pinnedPollsOpen, setPinnedPollsOpen] = useState(false);
   const [composerMenuOpen, setComposerMenuOpen] = useState(false);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
-  const [blockArmed, setBlockArmed] = useState(false);
-  const [blockBusy, setBlockBusy] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [blockOpen, setBlockOpen] = useState(false);
   const [chatReady, setChatReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsJoin, setNeedsJoin] = useState(false);
@@ -132,8 +133,6 @@ export function CommunityChatPage() {
 
   useEffect(() => {
     if (!headerMenuOpen) {
-      setBlockArmed(false);
-      setBlockBusy(false);
       return;
     }
     const close = (e: MouseEvent) => {
@@ -276,25 +275,6 @@ export function CommunityChatPage() {
     }
   }
 
-  async function blockOrganizer() {
-    if (!conv) return;
-    // Two-tap confirm in the menu — native window.confirm freezes the iOS WebView
-    // for ~30s and never sends the request.
-    if (!blockArmed) {
-      setBlockArmed(true);
-      return;
-    }
-    setBlockBusy(true);
-    try {
-      await api(`/api/users/${conv.hostId}/block`, { method: "POST" });
-      await api(`/api/conversations/${conv.id}/leave`, { method: "POST" }).catch(() => undefined);
-      navigate("/messages");
-    } catch {
-      setBlockBusy(false);
-      setBlockArmed(false);
-    }
-  }
-
   async function toggleHeart(messageId: string) {
     if (!conv) return;
     try {
@@ -411,9 +391,28 @@ export function CommunityChatPage() {
                 {conv.muted ? "Unmute notifications" : "Mute notifications"}
               </button>
               {!conv.isHost && (
-                <button type="button" role="menuitem" disabled={blockBusy} onClick={() => void blockOrganizer()}>
-                  {blockBusy ? "Blocking…" : blockArmed ? "Tap again to confirm" : "Block organizer"}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      setReportOpen(true);
+                    }}
+                  >
+                    Report organizer
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      setBlockOpen(true);
+                    }}
+                  >
+                    Block organizer
+                  </button>
+                </>
               )}
               <button
                 type="button"
@@ -779,6 +778,29 @@ export function CommunityChatPage() {
             </div>
           </div>
         </div>
+      )}
+      {reportOpen && (
+        <ReportModal
+          targetUserId={conv.hostId}
+          targetFirstName={
+            conv.participants.find((p) => p.id === conv.hostId)?.firstName || "this person"
+          }
+          contentKind="user"
+          onClose={() => setReportOpen(false)}
+        />
+      )}
+      {blockOpen && (
+        <BlockConfirmModal
+          targetUserId={conv.hostId}
+          targetFirstName={
+            conv.participants.find((p) => p.id === conv.hostId)?.firstName || "this person"
+          }
+          onClose={() => setBlockOpen(false)}
+          onBlocked={async () => {
+            await api(`/api/conversations/${conv.id}/leave`, { method: "POST" }).catch(() => undefined);
+            navigate("/messages");
+          }}
+        />
       )}
     </main>
   );

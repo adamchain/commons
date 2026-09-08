@@ -14,6 +14,7 @@ import {
   type InterestTag,
   type PublicUser,
 } from "../types/shared.js";
+import { textBlockedReason } from "../lib/contentFilter.js";
 
 export const forumsRouter = Router();
 
@@ -136,11 +137,18 @@ forumsRouter.get("/:tag/posts", requireAuth, async (req, res) => {
   const posts = store.listPosts(tag, sort);
   const users = await findUsersByIds(posts.map((p) => p.authorId));
   const viewerIsAdmin = await isCommonsAdmin(viewerId);
+  const visible = posts.filter((p) => {
+    if (p.authorId === viewerId) return true;
+    if (store.isUserEjected(p.authorId)) return false;
+    if (store.isBlockedEitherWay(viewerId, p.authorId)) return false;
+    if (store.viewerReportedContent(viewerId, "forum_post", p.id)) return false;
+    return true;
+  });
   res.json({
     interestTag: tag,
     label: INTEREST_LABELS[tag],
     emoji: INTEREST_EMOJI[tag],
-    posts: posts.map((p) => postDTO(p, users, viewerId, viewerIsAdmin)),
+    posts: visible.map((p) => postDTO(p, users, viewerId, viewerIsAdmin)),
   });
 });
 
@@ -162,6 +170,11 @@ forumsRouter.post("/:tag/posts", requireAuth, async (req, res) => {
         : null;
   if (!content && !imageUrl) {
     res.status(400).json({ error: "Write something to post" });
+    return;
+  }
+  const filtered = textBlockedReason(content);
+  if (filtered) {
+    res.status(400).json({ error: filtered });
     return;
   }
   // Sponsored posting is a V1 stub — no client UI submits it yet, but the
@@ -195,6 +208,15 @@ forumsRouter.get("/posts/:postId", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Post not found" });
     return;
   }
+  if (
+    post.authorId !== viewerId &&
+    (store.isUserEjected(post.authorId) ||
+      store.isBlockedEitherWay(viewerId, post.authorId) ||
+      store.viewerReportedContent(viewerId, "forum_post", post.id))
+  ) {
+    res.status(404).json({ error: "Post not found" });
+    return;
+  }
   const replies = store.listReplies(post.id);
   const userIds = [post.authorId, ...replies.map((r) => r.authorId)];
   const users = await findUsersByIds(userIds);
@@ -216,6 +238,11 @@ forumsRouter.post("/posts/:postId/replies", requireAuth, async (req, res) => {
   const content = String(req.body?.content ?? "").trim().slice(0, MAX_REPLY_LENGTH);
   if (!content) {
     res.status(400).json({ error: "Write a reply" });
+    return;
+  }
+  const filtered = textBlockedReason(content);
+  if (filtered) {
+    res.status(400).json({ error: filtered });
     return;
   }
   const reply = store.createReply(post.id, viewerId, content);

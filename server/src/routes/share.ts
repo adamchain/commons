@@ -174,41 +174,16 @@ async function emojiDataUri(emoji: string): Promise<string | null> {
   }
 }
 
-/** Circular Commons "C" mark — used when the vibe icon can't be fetched. */
-function commonsMark(): El {
-  return h(
-    "div",
-    {
-      display: "flex",
-      width: 72,
-      height: 72,
-      borderRadius: 999,
-      background: "rgba(255,255,255,0.96)",
-      alignItems: "center",
-      justifyContent: "center",
-      border: "2px solid rgba(255,255,255,0.55)",
-      boxShadow: "0 8px 20px rgba(0,0,0,0.28)",
-    },
-    [
-      h(
-        "div",
-        {
-          display: "flex",
-          width: 52,
-          height: 52,
-          borderRadius: 14,
-          background: BRAND,
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: "Montserrat",
-          fontWeight: 800,
-          fontSize: 28,
-          color: "#fff",
-        },
-        "C",
-      ),
-    ],
-  );
+/** Commons wordmark (black type + red thread) for the share-card chip. */
+function wordmarkDataUri(): string {
+  const buf = readFileSync(fileURLToPath(new URL("../../assets/wordmark.png", import.meta.url)));
+  return `data:image/png;base64,${buf.toString("base64")}`;
+}
+
+let wordmarkUri: string | null = null;
+function wordmarkSrc(): string {
+  if (!wordmarkUri) wordmarkUri = wordmarkDataUri();
+  return wordmarkUri;
 }
 
 // ---- satori element helpers (no JSX — the server isn't set up to compile it) --
@@ -220,33 +195,63 @@ function text(value: string, style: Record<string, unknown>): El {
   return { type: "div", props: { style: { display: "flex", ...style }, children: value } };
 }
 
-const BRAND = "#E8552F"; // Commons warm coral (from the app's accent)
+const RED = "#C13B3B";
+const INK = "#1A1A2E";
+const PAPER = "#FDFAF7";
 
-function vibeBadge(iconSrc: string | null): El {
-  if (!iconSrc) return commonsMark();
+function logoChip(): El {
   return h(
     "div",
     {
       display: "flex",
-      width: 72,
-      height: 72,
-      borderRadius: 999,
-      background: "rgba(255,255,255,0.96)",
       alignItems: "center",
-      justifyContent: "center",
-      border: "2px solid rgba(255,255,255,0.55)",
-      boxShadow: "0 8px 20px rgba(0,0,0,0.28)",
+      background: PAPER,
+      borderRadius: 16,
+      padding: "10px 16px",
+      boxShadow: "0 8px 24px rgba(0,0,0,0.28)",
     },
     [
       {
         type: "img",
         props: {
-          src: iconSrc,
-          width: 40,
+          src: wordmarkSrc(),
+          width: 228,
           height: 40,
-          style: { width: 40, height: 40 },
+          style: { width: 228, height: 40, objectFit: "contain" },
         },
       },
+    ],
+  );
+}
+
+function goingPill(going: number, interested: number): El {
+  return h(
+    "div",
+    {
+      display: "flex",
+      alignItems: "center",
+      alignSelf: "flex-start",
+      background: "rgba(253,250,247,0.94)",
+      borderRadius: 999,
+      padding: "8px 16px 8px 12px",
+      marginBottom: 18,
+      boxShadow: "0 4px 16px rgba(0,0,0,0.22)",
+    },
+    [
+      h("div", {
+        display: "flex",
+        width: 10,
+        height: 10,
+        borderRadius: 999,
+        background: RED,
+        marginRight: 10,
+      }),
+      text(countBadge(going, interested), {
+        color: INK,
+        fontFamily: "Inter",
+        fontWeight: 600,
+        fontSize: 22,
+      }),
     ],
   );
 }
@@ -255,7 +260,6 @@ function buildTree(
   plan: PlanRecord,
   cover: string | null,
   counts: { going: number; interested: number },
-  vibeIcon: string | null,
 ): El {
   const host = store.findUserById(plan.creatorId);
   const hostName = host?.firstName ?? "A host";
@@ -279,7 +283,7 @@ function buildTree(
     layers.push(
       h("div", {
         position: "absolute", top: 0, left: 0, width: OG_WIDTH, height: OG_HEIGHT,
-        background: "linear-gradient(135deg, #F2704B 0%, #E8552F 55%, #C23A18 100%)",
+        background: "linear-gradient(135deg, #1A1A2E 0%, #C13B3B 100%)",
       })
     );
   }
@@ -292,68 +296,32 @@ function buildTree(
     })
   );
 
-  // Top row: wordmark + circular vibe/brand mark (image, never emoji text).
+  // Top: real wordmark on a paper chip (readable on any cover).
   layers.push(
     h(
       "div",
       {
-        position: "absolute", top: 44, left: 56, right: 56, display: "flex",
-        alignItems: "center", justifyContent: "space-between",
+        position: "absolute", top: 40, left: 48, right: 48, display: "flex",
+        alignItems: "center",
       },
-      [
-        h(
-          "div",
-          { display: "flex", alignItems: "center" },
-          [
-            h("div", {
-              display: "flex", width: 44, height: 44, borderRadius: 12, background: BRAND,
-              alignItems: "center", justifyContent: "center", marginRight: 16,
-              fontSize: 26, color: "#fff", fontFamily: "Montserrat", fontWeight: 800,
-            }, "C"),
-            text("COMMONS", {
-              color: "#fff", fontFamily: "Montserrat", fontWeight: 800, fontSize: 30,
-              letterSpacing: 3, textShadow: "0 2px 12px rgba(0,0,0,0.4)",
-            }),
-          ]
-        ),
-        vibeBadge(vibeIcon),
-      ]
+      [logoChip()],
     )
   );
 
   // Bottom content block.
   const bottom: unknown[] = [
-    // Live count pill.
-    h(
-      "div",
-      {
-        display: "flex", alignItems: "center", alignSelf: "flex-start",
-        background: BRAND, color: "#fff", borderRadius: 999,
-        padding: "12px 24px", marginBottom: 22, fontFamily: "Inter", fontWeight: 600, fontSize: 30,
-        boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
-      },
-      [
-        h("div", {
-          display: "flex", width: 16, height: 16, borderRadius: 999,
-          background: "#fff", marginRight: 14,
-        }),
-        text(countBadge(counts.going, counts.interested), { color: "#fff" }),
-      ]
-    ),
-    // Title.
+    goingPill(counts.going, counts.interested),
     text(titleCase(plan.title), {
-      color: "#fff", fontFamily: "Montserrat", fontWeight: 800, fontSize: 68,
-      lineHeight: 1.05, letterSpacing: -1, maxHeight: 224, overflow: "hidden",
+      color: "#fff", fontFamily: "Montserrat", fontWeight: 800, fontSize: 64,
+      lineHeight: 1.08, letterSpacing: -1.2, maxHeight: 210, overflow: "hidden",
       textShadow: "0 3px 18px rgba(0,0,0,0.45)",
     }),
-    // Meta line.
-    text([dateLine, place].filter(Boolean).join("     ·     "), {
-      color: "rgba(255,255,255,0.92)", fontFamily: "Inter", fontWeight: 600, fontSize: 32,
-      marginTop: 20, textShadow: "0 2px 10px rgba(0,0,0,0.5)",
+    text([dateLine, place].filter(Boolean).join("  ·  "), {
+      color: "rgba(255,255,255,0.9)", fontFamily: "Inter", fontWeight: 600, fontSize: 28,
+      marginTop: 16, textShadow: "0 2px 10px rgba(0,0,0,0.5)",
     }),
-    // Host.
     text(`Hosted by ${hostName}`, {
-      color: "rgba(255,255,255,0.78)", fontFamily: "Inter", fontWeight: 400, fontSize: 26, marginTop: 10,
+      color: "rgba(255,255,255,0.72)", fontFamily: "Inter", fontWeight: 400, fontSize: 24, marginTop: 8,
     }),
   ];
 
@@ -390,7 +358,7 @@ function cacheKey(plan: PlanRecord, going: number, interested: number): string {
     plan.hostEmoji ?? "",
     plan.cancelledAt ?? "",
   ].join("|");
-  return `${plan.id}:${going}:${interested}:${fp}`;
+  return `ogv3:${plan.id}:${going}:${interested}:${fp}`;
 }
 
 async function renderPlanCard(plan: PlanRecord): Promise<Buffer> {
@@ -400,8 +368,7 @@ async function renderPlanCard(plan: PlanRecord): Promise<Buffer> {
   if (hit) return hit;
 
   const cover = await coverDataUri(plan);
-  const vibeIcon = await emojiDataUri(plan.hostEmoji || "✨");
-  const svg = await satori(buildTree(plan, cover, counts, vibeIcon) as never, {
+  const svg = await satori(buildTree(plan, cover, counts) as never, {
     width: OG_WIDTH,
     height: OG_HEIGHT,
     fonts: loadFonts(),

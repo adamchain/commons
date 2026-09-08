@@ -15,11 +15,15 @@ export function PlanSafetyMenu({
   targetFirstName,
   planId,
   planTitle,
+  contentKind,
+  contentId,
 }: {
   targetUserId: string;
   targetFirstName: string;
-  planId: string;
-  planTitle: string;
+  planId?: string;
+  planTitle?: string;
+  contentKind?: "user" | "plan" | "message" | "forum_post" | "community_post";
+  contentId?: string;
 }) {
   const { refreshUser } = useAuth();
   const navigate = useNavigate();
@@ -96,6 +100,8 @@ export function PlanSafetyMenu({
           targetFirstName={targetFirstName}
           planId={planId}
           planTitle={planTitle}
+          contentKind={contentKind}
+          contentId={contentId}
           onClose={() => setReportOpen(false)}
         />
       )}
@@ -114,17 +120,21 @@ export function PlanSafetyMenu({
   );
 }
 
-function ReportModal({
+export function ReportModal({
   targetUserId,
   targetFirstName,
   planId,
   planTitle,
+  contentKind,
+  contentId,
   onClose,
 }: {
   targetUserId: string;
   targetFirstName: string;
-  planId: string;
-  planTitle: string;
+  planId?: string;
+  planTitle?: string;
+  contentKind?: "user" | "plan" | "message" | "forum_post" | "community_post";
+  contentId?: string;
   onClose: () => void;
 }) {
   const [reason, setReason] = useState<ReportReason | "">("");
@@ -153,7 +163,9 @@ function ReportModal({
         method: "POST",
         body: JSON.stringify({
           targetUserId,
-          planId,
+          planId: planId || undefined,
+          contentKind: contentKind ?? (planId ? "plan" : "user"),
+          contentId: contentId || planId || undefined,
           reason,
           details: details.trim() || undefined,
         }),
@@ -182,8 +194,9 @@ function ReportModal({
               Thanks for the report
             </h4>
             <p style={{ marginTop: 0 }}>
-              Our team will review this in the admin panel. You can also block this person so
-              they can&apos;t message, invite, or follow you.
+              Our team reviews every report within 24 hours. If it violates our Terms, we remove
+              the content and eject the person who posted it. You can also block them so they
+              disappear from your feed immediately.
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button type="button" className="btn-primary" onClick={onClose}>
@@ -197,8 +210,11 @@ function ReportModal({
               Report {targetFirstName || "this person"}
             </h4>
             <p className="plan-report-sub">
-              This is about &ldquo;{planTitle}&rdquo;. Reports go straight to Commons admins —
-              they won&apos;t see who filed this.
+              {planTitle
+                ? `This is about “${planTitle}”. `
+                : ""}
+              Reports go to COMMONS. We have no tolerance for objectionable content or abusive
+              users, and we act within 24 hours.
             </p>
             <fieldset className="plan-report-reasons" aria-label="Reason">
               {REPORT_REASON_OPTIONS.map((opt) => (
@@ -243,7 +259,7 @@ function ReportModal({
   );
 }
 
-function BlockConfirmModal({
+export function BlockConfirmModal({
   targetUserId,
   targetFirstName,
   onClose,
@@ -286,7 +302,8 @@ function BlockConfirmModal({
         </h4>
         <p style={{ marginTop: 0 }}>
           You won&apos;t be able to message each other, invite each other to plans, or follow
-          each other. They won&apos;t see your profile or plans, and you won&apos;t see theirs.
+          each other. Their content is removed from your feed immediately, and COMMONS is
+          notified so we can review it.
         </p>
         {error && <p className="error-text">{error}</p>}
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>

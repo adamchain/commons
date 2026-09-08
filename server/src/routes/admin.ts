@@ -5,6 +5,7 @@ import { isAdminPhone } from "../lib/adminPhones.js";
 import { isGcsConfigured, listDefaultImages, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
 import { store } from "../store.js";
 import { listAllUsers, findUserById } from "../userRepo.js";
+import { runBehaviorAgent, analyzeUserBehavior } from "../lib/behaviorAgent.js";
 import { normalizeCommunityCategory } from "../types/shared.js";
 
 const adminRouter = Router();
@@ -315,7 +316,18 @@ adminRouter.get("/users/:id", async (req, res) => {
       hosted,
       participations,
     },
+    behavior: analyzeUserBehavior(u),
   });
+});
+
+adminRouter.get("/behavior", async (_req, res) => {
+  try {
+    const users = await listAllUsers();
+    res.json(runBehaviorAgent(users));
+  } catch (err) {
+    console.error("[admin] behavior agent failed", err);
+    res.status(500).json({ error: "Behavior agent failed to run." });
+  }
 });
 
 // ---- Event-card image library ----
@@ -602,6 +614,8 @@ adminRouter.get("/reports", async (_req, res) => {
           ? { id: target.id, firstName: target.firstName, lastName: target.lastName ?? "" }
           : { id: r.targetUserId, firstName: "Unknown", lastName: "" },
         plan: plan ? { id: plan.id, title: plan.title } : null,
+        source: r.source ?? "report",
+        contentKind: r.contentKind ?? null,
       };
     }),
   );
@@ -616,6 +630,41 @@ adminRouter.post("/reports/:id/review", (req, res) => {
   }
   store.log("report_reviewed", { reportId: updated.id });
   res.json({ ok: true, report: updated });
+});
+
+adminRouter.post("/reports/:id/eject", (req, res) => {
+  const report = store.findReportById(String(req.params.id));
+  if (!report) {
+    res.status(404).json({ error: "Report not found" });
+    return;
+  }
+  if (report.planId) {
+    const plan = store.findPlanById(report.planId);
+    if (plan && !plan.cancelledAt) {
+      store.updatePlan(report.planId, { cancelledAt: new Date().toISOString() });
+    }
+  }
+  if (report.contentKind === "forum_post" && report.contentId) {
+    store.setForumPostApprovalStatus(report.contentId, "rejected");
+  }
+  if (report.contentKind === "community_post" && report.contentId) {
+    store.setCommunityPostApprovalStatus(report.contentId, "rejected");
+  }
+  const ejected = store.ejectUser(report.targetUserId);
+  if (!ejected) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  const updated = store.updateReportStatus(report.id, "reviewed");
+  store.log("report_ejected", {
+    reportId: report.id,
+    targetUserId: report.targetUserId,
+  });
+  console.warn("[safety] ejected_user", {
+    reportId: report.id,
+    targetUserId: report.targetUserId,
+  });
+  res.json({ ok: true, report: updated, ejected: true });
 });
 
 export { adminRouter };

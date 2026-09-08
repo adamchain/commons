@@ -13065,6 +13065,7 @@ a.action-btn--stack {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  flex: 1;
 }
 
 .forum-post-author {

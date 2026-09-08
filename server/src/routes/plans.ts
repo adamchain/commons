@@ -5,6 +5,11 @@ import { store, type PlanRecord, type UserRecord } from "../store.js";
 import { findUserById, findUsersByIds } from "../userRepo.js";
 import { rankPlansForUser } from "../lib/recommend.js";
 import {
+  combinedNeighborhoodScope,
+  planVisibleToViewer,
+  userHoods,
+} from "../lib/feedScope.js";
+import {
   ALL_INTERESTS,
   type InterestTag,
   type JoinType,
@@ -18,6 +23,7 @@ import {
 import { onPlanCreatedVenueNudge, notifyInterestedPlanLocked } from "../lib/nudges.js";
 import { emit } from "../lib/notify.js";
 import { planHasEnded, plansOverlap, FLEXIBLE_DATE_PLACEHOLDER } from "../lib/planTime.js";
+import { textBlockedReason } from "../lib/contentFilter.js";
 import { communityCreationBlockReason } from "../lib/communityAccess.js";
 import { coverUrlFor } from "./share.js";
 import type { PublicPlanDTO } from "../types/shared.js";
@@ -42,69 +48,7 @@ function normalizeFlyerDataUrl(raw: unknown): string | undefined {
   return undefined;
 }
 
-function userHoods(me: UserRecord): string[] {
-  const raw = me.neighborhoodIds?.length
-    ? me.neighborhoodIds
-    : me.neighborhoodId
-      ? [me.neighborhoodId]
-      : [];
-  // Drop unknown / legacy ObjectId refs so an orphaned profile field can't
-  // empty the feed or block posting.
-  return [
-    ...new Set(
-      raw
-        .map((id) => store.resolveNeighborhoodId(id))
-        .filter((id): id is string => Boolean(id)),
-    ),
-  ];
-}
-
-function combinedNeighborhoodScope(me: UserRecord): string[] | null {
-  const hoods = userHoods(me);
-  if (hoods.length === 0) return null;
-  const set = new Set<string>();
-  for (const id of hoods) {
-    store.neighborhoodScope(id).forEach((x) => set.add(x));
-  }
-  // Empty array is truthy — treat "no valid scope" like no hoods so the feed
-  // falls back to city-wide instead of matching nothing.
-  return set.size > 0 ? [...set] : null;
-}
-
-export function planVisibleToViewer(plan: PlanRecord, me: UserRecord): boolean {
-  // Blocking hides a plan both ways — the host's blocked list and the
-  // viewer's own blocked list are checked so it doesn't matter who blocked
-  // whom first.
-  if (plan.creatorId !== me.id && store.isBlockedEitherWay(me.id, plan.creatorId)) {
-    return false;
-  }
-  // Community-only plans are visible only to that community's active members
-  // (the creator always sees their own). Public community plans fall through to
-  // the normal audience rules below and surface for everyone.
-  if (plan.communityId && plan.communityVisibility === "community_only") {
-    if (plan.creatorId === me.id) return true;
-    const membership = store.findCommunityMembership(plan.communityId, me.id);
-    if (membership?.status !== "active") return false;
-  }
-  const v: PlanVisibility = plan.visibility ?? "everyone";
-  if (v === "network") {
-    // Visible to the creator, anyone in the creator's network, or anyone
-    // already RSVP'd (going or interested) — flipping visibility shouldn't
-    // hide a plan from people who already engaged with it.
-    if (plan.creatorId === me.id) return true;
-    const creator = store.findUserById(plan.creatorId);
-    if (creator?.networkIds?.includes(me.id)) return true;
-    const myPart = store.findParticipation(plan.id, me.id);
-    if (myPart?.state === "going" || myPart?.state === "interested") return true;
-    return false;
-  }
-  if (v === "community") {
-    const tag = plan.visibilityCommunityTag;
-    if (!tag) return true;
-    return me.interests.includes(tag);
-  }
-  return true;
-}
+export { planVisibleToViewer, userHoods } from "../lib/feedScope.js";
 
 export function userToPublic(user: UserRecord): PublicUser {
   return {
@@ -368,6 +312,11 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     res.status(400).json({ error: "Title and date are required" });
     return;
   }
+  const filtered = textBlockedReason(title, description);
+  if (filtered) {
+    res.status(400).json({ error: filtered });
+    return;
+  }
   const resolvedDate = isFlexibleDate ? FLEXIBLE_DATE_PLACEHOLDER : dateInput;
   // Exact location is the default; Flexible is opt-in. Require a venue/place
   // name unless the host explicitly toggled flexible. Neighborhood is not
@@ -620,6 +569,14 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
   if (req.body?.description !== undefined) {
     const d = String(req.body.description ?? "").trim();
     patch.description = d || undefined;
+  }
+  const filtered = textBlockedReason(
+    typeof patch.title === "string" ? patch.title : undefined,
+    typeof patch.description === "string" ? patch.description : undefined,
+  );
+  if (filtered) {
+    res.status(400).json({ error: filtered });
+    return;
   }
   if (req.body?.hostEmoji !== undefined) {
     const e = String(req.body.hostEmoji).trim();

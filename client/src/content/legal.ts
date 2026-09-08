@@ -214,7 +214,7 @@ export const PRIVACY_POLICY: LegalDocument = {
 export const TERMS_OF_SERVICE: LegalDocument = {
   slug: "terms",
   title: "Terms of Service",
-  updated: "July 2026",
+  updated: "September 2026",
   intro: [],
   sections: [
     {
@@ -249,11 +249,15 @@ export const TERMS_OF_SERVICE: LegalDocument = {
     },
     {
       n: "4",
-      title: "Community Conduct",
+      title: "Community Conduct; Zero Tolerance",
       blocks: [
         {
           type: "p",
-          text: "You agree to act in good faith and follow our Community Guidelines. You may not harass, threaten, or abuse others; post false or misleading information; join plans in bad faith; or use the app to harm others. We may remove content, suspend, or remove members who violate these Terms or the Guidelines, in our sole discretion, acting in good faith. A removed member may request reconsideration at safety@oncommons.co; reinstatement is at our discretion and this is not a guaranteed appeal.",
+          text: "You agree to act in good faith and follow our Community Guidelines. COMMONS has zero tolerance for objectionable content and abusive users. You may not harass, threaten, bully, or abuse others; post hate speech, pornography, sexual content involving minors, graphic violence, or other objectionable material; post false or misleading information; join plans in bad faith; or use the app to harm others. We filter user-generated content for these terms and patterns; you can flag any content or profile in the app; and you can block any user so their content is removed from your feed immediately. Blocking also notifies COMMONS so we can review the conduct. We may remove content, suspend, or eject members who violate these Terms or the Guidelines, in our sole discretion, acting in good faith. A removed member may request reconsideration at safety@oncommons.co; reinstatement is at our discretion and this is not a guaranteed appeal.",
+        },
+        {
+          type: "p",
+          text: "When you report objectionable content or an abusive user, COMMONS will review the report and, when the report is substantiated, remove the content and eject the user who provided it within 24 hours.",
         },
       ],
     },

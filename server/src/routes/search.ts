@@ -75,6 +75,7 @@ searchRouter.get("/", requireAuth, async (req, res) => {
     if (!u.onboardingComplete) return false;
     if (u.discoverableBySearch === false) return false;
     if (store.isBlockedEitherWay(userId, u.id)) return false;
+    if (store.isUserEjected(u.id)) return false;
     const fullName = `${u.firstName} ${u.lastName ?? ""}`.trim().toLowerCase();
     return fullName.includes(q) || u.firstName.toLowerCase().includes(q);
   });

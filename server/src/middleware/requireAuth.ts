@@ -30,6 +30,10 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
+    if (user.ejectedAt) {
+      res.status(403).json({ error: "This account was removed for violating the COMMONS Terms of Service." });
+      return;
+    }
     req.userId = user.id;
     next();
   } catch {

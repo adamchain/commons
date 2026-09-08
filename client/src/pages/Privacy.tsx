@@ -67,7 +67,7 @@ export function PrivacyPage() {
           <Link to="/settings/blocked" className="settings-row">
             <div className="settings-row-body" style={{ paddingLeft: 0 }}>
               <div className="settings-row-title">Blocked accounts</div>
-              <div className="settings-row-sub">Manage who you&apos;ve blocked</div>
+              <div className="settings-row-sub">Hidden from your feed instantly; we&apos;re notified to review</div>
             </div>
             <div className="settings-row-right">
               <span className="settings-row-chevron">

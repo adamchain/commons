@@ -18,6 +18,7 @@ import {
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCoverThumb, PlanCoverThumb } from "../components/CoverThumb";
+import { ReportModal } from "../components/PlanSafetyMenu";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime } from "../lib/format";
 import { hrefForBack, type NavFromState } from "../lib/navState";
@@ -92,6 +93,7 @@ export function ProfilePage() {
   const [communities, setCommunities] = useState<CommunityCardDTO[]>([]);
   const [plansView, setPlansView] = useState<"list" | "calendar">("list");
   const [actionSheetOpen, setActionSheetOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const isSelf = user?.id === userId;
 
   const reloadProfile = () =>
@@ -173,7 +175,7 @@ export function ProfilePage() {
 
   async function reportProfile() {
     setActionSheetOpen(false);
-    window.location.href = `mailto:safety@oncommons.co?subject=${encodeURIComponent(`Report ${displayName}`)}&body=${encodeURIComponent(`I'd like to report this profile:\n${window.location.href}`)}`;
+    setReportOpen(true);
   }
 
   async function blockFromSheet() {
@@ -421,6 +423,14 @@ export function ProfilePage() {
             onClose={() => setActionSheetOpen(false)}
           />
         )}
+        {reportOpen && (
+          <ReportModal
+            targetUserId={profile.user.id}
+            targetFirstName={firstName}
+            contentKind="user"
+            onClose={() => setReportOpen(false)}
+          />
+        )}
       </main>
     );
   }
@@ -645,8 +655,8 @@ function ProfileActionSheet({
         {confirmingBlock ? (
           <>
             <p className="profile-action-confirm-copy">
-              Block {firstName}? They won&apos;t see your plans or profile, and you
-              won&apos;t see theirs.
+              Block {firstName}? Their content disappears from your feed immediately,
+            and COMMONS is notified so we can review it.
             </p>
             {blockError && <p className="profile-action-confirm-error">{blockError}</p>}
             <button

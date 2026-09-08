@@ -77,8 +77,9 @@ Verification: SMS code will be sent via Twilio
 
 ### Legal & Privacy
 - Privacy Policy: Available in-app at Settings → Legal → Privacy Policy
-- Terms of Service: Available in-app at Settings → Legal → Terms of Service
+- Terms of Service: Available in-app at Settings → Legal → Terms of Service (includes zero-tolerance UGC rules and 24-hour moderation SLA)
 - Support contact: privacy@oncommons.co
+- Safety: report/block from plan ⋯, profile ⋯, chat ⋯, forum posts, and community bulletin posts
 
 ---
 
@@ -135,7 +136,7 @@ All API endpoints are live and tested. The reviewer test account has pre-populat
 
 3. **Push Notifications:** Used for plan updates, chat messages, and community activity notifications.
 
-4. **User-Generated Content:** The app includes robust content moderation features, user blocking, and reporting tools accessible from any user profile or post.
+4. **User-Generated Content:** Members agree to the Terms (including zero tolerance for objectionable content) before using the app. They can report and block from plans, profiles, chats, forums, and community posts. Blocking hides content from that member's feed immediately and notifies COMMONS. We review reports within 24 hours and remove violating content / eject the offending account. Automated keyword filtering rejects prohibited text on post.
 
 5. **Invite-Only Model:** While the app is generally invite-only, the provided test account bypasses invite requirements for full feature testing.
 

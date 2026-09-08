@@ -5,6 +5,7 @@ import { ArrowLeft, Heart, MessageCircle } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
+import { PlanSafetyMenu } from "../components/PlanSafetyMenu";
 import { formatRelative } from "../lib/format";
 import { interestVisual } from "../lib/interestIcons";
 import { hrefForBack, type NavFromState } from "../lib/navState";
@@ -229,7 +230,13 @@ export function ForumPage() {
       ) : (
         <div className="forum-post-list">
           {data.posts.map((post) => (
-            <ForumPostCard key={post.id} post={post} tag={tag} onLike={() => void toggleLike(post.id)} />
+            <ForumPostCard
+              key={post.id}
+              post={post}
+              tag={tag}
+              viewerId={user?.id}
+              onLike={() => void toggleLike(post.id)}
+            />
           ))}
         </div>
       )}
@@ -261,10 +268,12 @@ function ForumPostCard({
   post,
   tag,
   onLike,
+  viewerId,
 }: {
   post: ForumPostDTO;
   tag: string;
   onLike: () => void;
+  viewerId?: string;
 }) {
   return (
     <article className="forum-post-card">
@@ -289,6 +298,21 @@ function ForumPostCard({
             </span>
             <span className="forum-post-time">{formatRelative(post.createdAt)}</span>
           </div>
+          {viewerId && viewerId !== post.author.id && (
+            <div
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+            >
+              <PlanSafetyMenu
+                targetUserId={post.author.id}
+                targetFirstName={post.author.firstName}
+                contentKind="forum_post"
+                contentId={post.id}
+              />
+            </div>
+          )}
         </div>
         <p className="forum-post-content">{post.content}</p>
         {post.imageUrl && <img src={post.imageUrl} alt="" className="forum-post-image" />}

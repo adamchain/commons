@@ -31,7 +31,17 @@ usersRouter.post("/:id/block", requireAuth, async (req, res) => {
     return;
   }
   store.blockUser(userId, targetId);
-  store.log("user_blocked", { userId, targetId });
+  const report = store.createReport({
+    reporterId: userId,
+    targetUserId: targetId,
+    reason: "inappropriate",
+    source: "block",
+    contentKind: "user",
+    details:
+      "This person was blocked. Their content is hidden from the reporter's feed immediately. Review for Terms violations.",
+  });
+  store.log("user_blocked", { userId, targetId, reportId: report.id });
+  console.warn("[safety] user_blocked", { reporterId: userId, targetUserId: targetId, reportId: report.id });
   res.json({ ok: true, blockedUserIds: store.listBlockedUserIds(userId) });
 });
 

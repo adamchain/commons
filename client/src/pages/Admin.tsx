@@ -75,6 +75,311 @@ type AdminSummary = {
   }[];
 };
 
+type BehaviorSeverity = "critical" | "high" | "medium" | "low";
+
+type BehaviorSuggestion = {
+  id: string;
+  kind: string;
+  severity: BehaviorSeverity;
+  title: string;
+  why: string;
+  evidence: string[];
+  actions: string[];
+  neighborhoodName?: string;
+  userIds: string[];
+  sampleUsers: { id: string; firstName: string }[];
+};
+
+type FlaggedUser = {
+  id: string;
+  firstName: string;
+  neighborhoodName: string | null;
+  segment: string;
+  flags: string[];
+  daysSinceActive: number | null;
+  feedUpcoming: number;
+  feedMatchingInterests: number;
+  rsvps: number;
+  hosted: number;
+  suggestions: string[];
+};
+
+type BehaviorReport = {
+  generatedAt: string;
+  brief: string;
+  universe: { totalUsers: number; verifiedUsers: number; seedUsers: number };
+  funnel: {
+    signedUp: number;
+    onboarded: number;
+    fullyOnboarded: number;
+    firstRsvp: number;
+    firstGoing: number;
+    firstHost: number;
+    active7d: number;
+    onboardPct: number;
+    activationPct: number;
+    goingPct: number;
+  };
+  falloff: {
+    stuckOnboarding: number;
+    neverActivated: number;
+    earlyFalloff: number;
+    churnRisk: number;
+    dormant: number;
+    slowFeed: number;
+    ghosting: number;
+    isolated: number;
+  };
+  feedHealth: {
+    neighborhoodId: string;
+    name: string;
+    users: number;
+    upcomingPlans: number;
+    status: "barren" | "thin" | "ok" | "healthy";
+  }[];
+  interestGaps: { tag: string; label: string; users: number; upcomingPlans: number }[];
+  cohorts: { weekStart: string; signups: number; stillActive7d: number; everRsvped: number }[];
+  suggestions: BehaviorSuggestion[];
+  flaggedUsers: FlaggedUser[];
+};
+
+const SEGMENT_LABELS: Record<string, string> = {
+  stuck_onboarding: "Stuck onboarding",
+  never_activated: "Never RSVP’d",
+  early_falloff: "Early falloff",
+  dormant: "Dormant",
+  churn_risk: "Churn risk",
+  slow_feed: "Slow feed",
+  ghosting: "Ghosting",
+  isolated: "Isolated",
+  lonely_host: "Lonely host",
+  feed_fatigue: "Feed fatigue",
+  healthy: "Healthy",
+  ejected: "Ejected",
+};
+
+function pillClassForSeverity(s: BehaviorSeverity): string {
+  if (s === "critical") return "admin-pill admin-pill--crit";
+  if (s === "high") return "admin-pill admin-pill--high";
+  if (s === "medium") return "admin-pill admin-pill--wait";
+  return "admin-pill admin-pill--ok";
+}
+
+function BehaviorAgentPanel({
+  report,
+  onSelectUser,
+}: {
+  report: BehaviorReport;
+  onSelectUser: (id: string) => void;
+}) {
+  const [segmentFilter, setSegmentFilter] = useState<string>("all");
+  const flagged = useMemo(() => {
+    if (segmentFilter === "all") return report.flaggedUsers;
+    return report.flaggedUsers.filter((u) => u.segment === segmentFilter || u.flags.includes(segmentFilter));
+  }, [report.flaggedUsers, segmentFilter]);
+
+  const funnelSteps = [
+    ["Signed up", report.funnel.signedUp],
+    ["Onboarded", report.funnel.onboarded],
+    ["First RSVP", report.funnel.firstRsvp],
+    ["Going", report.funnel.firstGoing],
+    ["Hosted", report.funnel.firstHost],
+    ["Active 7d", report.funnel.active7d],
+  ] as const;
+
+  const falloffChips: [string, number][] = [
+    ["stuck_onboarding", report.falloff.stuckOnboarding],
+    ["never_activated", report.falloff.neverActivated],
+    ["early_falloff", report.falloff.earlyFalloff],
+    ["churn_risk", report.falloff.churnRisk],
+    ["dormant", report.falloff.dormant],
+    ["slow_feed", report.falloff.slowFeed],
+    ["ghosting", report.falloff.ghosting],
+    ["isolated", report.falloff.isolated],
+  ];
+
+  return (
+    <section className="admin-section">
+      <h2 className="admin-section-title">Behavior agent</h2>
+      <p className="admin-brief">{report.brief}</p>
+      <p className="admin-muted" style={{ margin: "0 0 0.85rem" }}>
+        Rule agent over live members (excludes seed when real accounts exist). Scores slow feeds, funnel
+        drop, and retention — then ranks what to do this week. Snapshot{" "}
+        {new Date(report.generatedAt).toLocaleString()} · {report.universe.verifiedUsers} verified /{" "}
+        {report.universe.seedUsers} seed.
+      </p>
+
+      <div className="admin-funnel">
+        {funnelSteps.map(([label, value], i) => (
+          <div key={label} className="admin-funnel-step">
+            <div className="admin-kpi-label">{label}</div>
+            <div className="admin-kpi-value">{value}</div>
+            {i === 1 ? <div className="admin-kpi-hint">{report.funnel.onboardPct}% of signup</div> : null}
+            {i === 2 ? <div className="admin-kpi-hint">{report.funnel.activationPct}% of finished profiles</div> : null}
+            {i === 3 ? <div className="admin-kpi-hint">{report.funnel.goingPct}% of RSVPs</div> : null}
+          </div>
+        ))}
+      </div>
+
+      <div className="admin-chip-list" style={{ margin: "0.85rem 0 1rem" }}>
+        {falloffChips.map(([key, n]) => (
+          <button
+            key={key}
+            type="button"
+            className={`admin-chip admin-chip-btn ${segmentFilter === key ? "is-on" : ""}`}
+            onClick={() => setSegmentFilter(segmentFilter === key ? "all" : key)}
+          >
+            {SEGMENT_LABELS[key] ?? key} <strong>{n}</strong>
+          </button>
+        ))}
+      </div>
+
+      <div className="admin-grid-2" style={{ marginBottom: "1rem" }}>
+        <div className="admin-card">
+          <h3 className="admin-section-title" style={{ marginBottom: "0.5rem" }}>
+            Feed health by neighborhood
+          </h3>
+          {report.feedHealth.length === 0 ? (
+            <p className="admin-muted">No neighborhood membership yet.</p>
+          ) : (
+            <ul className="admin-log-list" style={{ maxHeight: 260 }}>
+              {report.feedHealth.map((h) => (
+                <li key={h.neighborhoodId}>
+                  <span>
+                    {h.name}{" "}
+                    <span className={`admin-pill admin-pill--feed-${h.status}`}>{h.status}</span>
+                  </span>
+                  <span className="admin-muted" style={{ marginLeft: "auto" }}>
+                    {h.upcomingPlans} upcoming · {h.users} members
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="admin-card">
+          <h3 className="admin-section-title" style={{ marginBottom: "0.5rem" }}>
+            Signup cohorts (6 weeks)
+          </h3>
+          <ul className="admin-log-list" style={{ maxHeight: 260 }}>
+            {report.cohorts.map((c) => (
+              <li key={c.weekStart}>
+                <span>Week of {c.weekStart}</span>
+                <span className="admin-muted" style={{ marginLeft: "auto" }}>
+                  {c.signups} joined · {c.everRsvped} RSVP’d · {c.stillActive7d} active 7d
+                </span>
+              </li>
+            ))}
+          </ul>
+          {report.interestGaps.length > 0 ? (
+            <>
+              <h3 className="admin-section-title" style={{ margin: "0.85rem 0 0.4rem" }}>
+                Interest supply gaps
+              </h3>
+              <div className="admin-chip-list">
+                {report.interestGaps.map((g) => (
+                  <span key={g.tag} className="admin-chip">
+                    {g.label} <strong>{g.users} people / {g.upcomingPlans} plans</strong>
+                  </span>
+                ))}
+              </div>
+            </>
+          ) : null}
+        </div>
+      </div>
+
+      <h3 className="admin-section-title">Suggestions</h3>
+      {report.suggestions.length === 0 ? (
+        <p className="admin-muted">No concentrated problems in the current snapshot.</p>
+      ) : (
+        <div className="admin-suggest-list">
+          {report.suggestions.map((s) => (
+            <article key={s.id} className={`admin-suggest admin-suggest--${s.severity}`}>
+              <header className="admin-suggest-head">
+                <span className={pillClassForSeverity(s.severity)}>{s.severity}</span>
+                <h4>{s.title}</h4>
+                <span className="admin-muted">{s.userIds.length} people</span>
+              </header>
+              <p>{s.why}</p>
+              {s.evidence.length > 0 ? (
+                <ul className="admin-suggest-evidence">
+                  {s.evidence.map((e) => (
+                    <li key={e}>{e}</li>
+                  ))}
+                </ul>
+              ) : null}
+              <ol className="admin-suggest-actions">
+                {s.actions.map((a) => (
+                  <li key={a}>{a}</li>
+                ))}
+              </ol>
+              {s.sampleUsers.length > 0 ? (
+                <p className="admin-muted" style={{ margin: "0.5rem 0 0" }}>
+                  e.g.{" "}
+                  {s.sampleUsers.map((u, i) => (
+                    <span key={u.id}>
+                      {i > 0 ? ", " : ""}
+                      <button type="button" className="admin-inline-link" onClick={() => onSelectUser(u.id)}>
+                        {u.firstName}
+                      </button>
+                    </span>
+                  ))}
+                </p>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      )}
+
+      <h3 className="admin-section-title" style={{ marginTop: "1.25rem" }}>
+        Flagged members {segmentFilter !== "all" ? `· ${SEGMENT_LABELS[segmentFilter] ?? segmentFilter}` : ""}
+      </h3>
+      {flagged.length === 0 ? (
+        <p className="admin-muted">Nobody in this slice.</p>
+      ) : (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Segment</th>
+                <th>Idle</th>
+                <th>Feed</th>
+                <th>RSVPs</th>
+                <th>Do next</th>
+              </tr>
+            </thead>
+            <tbody>
+              {flagged.map((u) => (
+                <tr key={u.id} className="admin-row-clickable" onClick={() => onSelectUser(u.id)}>
+                  <td>
+                    <div style={{ fontWeight: 600 }}>{u.firstName}</div>
+                    <div className="admin-muted" style={{ fontSize: "0.7rem" }}>
+                      {u.neighborhoodName ?? "No hood"}
+                    </div>
+                  </td>
+                  <td>
+                    <span className="admin-pill admin-pill--wait">{SEGMENT_LABELS[u.segment] ?? u.segment}</span>
+                  </td>
+                  <td className="admin-muted">{u.daysSinceActive == null ? "—" : `${u.daysSinceActive}d`}</td>
+                  <td>
+                    {u.feedUpcoming} upcoming
+                    <div className="admin-muted" style={{ fontSize: "0.7rem" }}>
+                      {u.feedMatchingInterests} match interests
+                    </div>
+                  </td>
+                  <td>{u.rsvps}</td>
+                  <td className="admin-muted">{u.suggestions[0] ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function maskPhone(phone: string): string {
   const d = phone.replace(/\D/g, "");
   if (d.length <= 4) return "••••";
@@ -354,6 +659,15 @@ type AdminUserDetail = {
     hosted: { id: string; title: string; date: string; cancelled: boolean; goingCount: number }[];
     participations: { planId: string; title: string; date: string; state: string }[];
   };
+  behavior: {
+    segment: string;
+    flags: string[];
+    lastActiveAt: string | null;
+    daysSinceActive: number | null;
+    feedUpcoming: number;
+    feedMatchingInterests: number;
+    suggestions: string[];
+  };
 };
 
 /** Admin drill-down: a user's full profile details + activity. */
@@ -454,6 +768,37 @@ function AdminUserDetailModal({ userId, onClose }: { userId: string; onClose: ()
               ) : null}
             </dl>
 
+            {data.behavior ? (
+              <div className="admin-card" style={{ marginBottom: "1rem" }}>
+                <h3 className="admin-section-title" style={{ marginBottom: "0.4rem" }}>
+                  Behavior
+                </h3>
+                <p style={{ margin: "0 0 0.5rem" }}>
+                  <span className="admin-pill admin-pill--wait">
+                    {SEGMENT_LABELS[data.behavior.segment] ?? data.behavior.segment}
+                  </span>{" "}
+                  <span className="admin-muted">
+                    {data.behavior.feedUpcoming} upcoming in feed · {data.behavior.feedMatchingInterests}{" "}
+                    match interests
+                    {data.behavior.daysSinceActive != null
+                      ? ` · last active ${data.behavior.daysSinceActive}d ago`
+                      : ""}
+                  </span>
+                </p>
+                {data.behavior.suggestions.length > 0 ? (
+                  <ul className="admin-suggest-actions" style={{ margin: 0 }}>
+                    {data.behavior.suggestions.map((s) => (
+                      <li key={s}>{s}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="admin-muted" style={{ margin: 0 }}>
+                    No intervention flagged.
+                  </p>
+                )}
+              </div>
+            ) : null}
+
             <h3 className="admin-section-title" style={{ marginBottom: "0.4rem" }}>
               Hosted · {data.activity.hosted.length}
             </h3>
@@ -509,6 +854,8 @@ interface AdminReportRow {
   status: "open" | "reviewed";
   createdAt: string;
   reviewedAt: string | null;
+  source?: "report" | "block";
+  contentKind?: string | null;
   reporter: { id: string; firstName: string; lastName: string };
   target: { id: string; firstName: string; lastName: string };
   plan: { id: string; title: string } | null;
@@ -545,6 +892,19 @@ function ReportsReview() {
     }
   }
 
+  async function ejectFromReport(id: string) {
+    if (!window.confirm("Remove this content and eject the user? They will not be able to sign in.")) return;
+    setBusyId(id);
+    try {
+      await api(`/api/admin/reports/${id}/eject`, { method: "POST" });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Couldn't eject");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   const openCount = rows?.filter((r) => r.status === "open").length ?? 0;
 
   return (
@@ -552,6 +912,9 @@ function ReportsReview() {
       <h2 className="admin-section-title">
         Safety reports{rows ? ` · ${openCount} open` : ""}
       </h2>
+      <p style={{ fontSize: 13, opacity: 0.75, margin: "0 0 12px" }}>
+        Act on substantiated reports within 24 hours: remove the content and eject the user.
+      </p>
       <div className="admin-card">
         {error && <p className="error-text">{error}</p>}
         {!rows ? (
@@ -576,6 +939,7 @@ function ReportsReview() {
                 <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem" }}>
                   <strong>{r.reasonLabel}</strong>
                   <span style={{ fontSize: 12, opacity: 0.6 }}>
+                    {r.source === "block" ? "Block · " : ""}
                     {r.status === "open" ? "Open" : "Reviewed"} ·{" "}
                     {new Date(r.createdAt).toLocaleString()}
                   </span>
@@ -599,14 +963,22 @@ function ReportsReview() {
                   <div style={{ fontSize: 13, opacity: 0.85, whiteSpace: "pre-wrap" }}>{r.details}</div>
                 ) : null}
                 {r.status === "open" && (
-                  <div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className="admin-btn"
+                      disabled={busyId === r.id}
+                      onClick={() => void ejectFromReport(r.id)}
+                    >
+                      {busyId === r.id ? "Saving…" : "Remove content & eject"}
+                    </button>
                     <button
                       type="button"
                       className="admin-btn"
                       disabled={busyId === r.id}
                       onClick={() => void markReviewed(r.id)}
                     >
-                      {busyId === r.id ? "Saving…" : "Mark reviewed"}
+                      Dismiss (no violation)
                     </button>
                   </div>
                 )}
@@ -789,6 +1161,7 @@ function CommunitiesReview() {
 
 export function AdminPage() {
   const [summary, setSummary] = useState<AdminSummary | null>(null);
+  const [behavior, setBehavior] = useState<BehaviorReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userQuery, setUserQuery] = useState("");
@@ -798,8 +1171,12 @@ export function AdminPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await api<AdminSummary>("/api/admin/summary");
+      const [data, agent] = await Promise.all([
+        api<AdminSummary>("/api/admin/summary"),
+        api<BehaviorReport>("/api/admin/behavior"),
+      ]);
       setSummary(data);
+      setBehavior(agent);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to load";
       if (msg.startsWith("401:")) {
@@ -810,6 +1187,7 @@ export function AdminPage() {
         setError(msg);
       }
       setSummary(null);
+      setBehavior(null);
     } finally {
       setLoading(false);
     }
@@ -899,6 +1277,10 @@ export function AdminPage() {
           <p className="admin-muted">Loading…</p>
         ) : summary ? (
           <>
+            {behavior ? (
+              <BehaviorAgentPanel report={behavior} onSelectUser={setSelectedUserId} />
+            ) : null}
+
             <section className="admin-section">
               <h2 className="admin-section-title">North-star metrics</h2>
               <div className="admin-kpis">

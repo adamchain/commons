@@ -981,6 +981,17 @@ function LegalConsentStep({
       <h3 className="guidelines-heading">Community guidelines</h3>
       <ul className="guidelines-list">
         <li>
+          <span className="guidelines-icon" aria-hidden="true">🛡️</span>
+          <div>
+            <strong>Zero tolerance.</strong>
+            <p>
+              There is no tolerance for objectionable content or abusive users. Flag anything that
+              feels off. Block anyone who crosses a line — they leave your feed immediately, and
+              we review every report within 24 hours.
+            </p>
+          </div>
+        </li>
+        <li>
           <span className="guidelines-icon" aria-hidden="true">💛</span>
           <div>
             <strong>Built for women.</strong>
@@ -1075,7 +1086,7 @@ function LegalConsentStep({
         )}
         <span>
           I have read and agree to the Commons Community Guidelines, Terms of Service, and Privacy
-          Policy.
+          Policy. I understand COMMONS has no tolerance for objectionable content or abusive users.
         </span>
       </button>
 

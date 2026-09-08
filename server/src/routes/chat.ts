@@ -10,6 +10,7 @@ import {
   communityMembershipBlockReason,
 } from "../lib/communityAccess.js";
 import { isGcsConfigured, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
+import { textBlockedReason } from "../lib/contentFilter.js";
 import type { ConversationDTO, ConversationSummaryDTO, MessageDTO, PollDTO } from "../types/shared.js";
 
 const MAX_CHAT_IMAGE_CHARS = 1_600_000;
@@ -226,7 +227,14 @@ chatRouter.get("/conversations/:id/messages", requireAuth, async (req, res) => {
     return;
   }
   const hostId = conversationHostId(conv);
-  const raw = store.listMessagesForConversation(convId);
+  const raw = store.listMessagesForConversation(convId).filter((m) => {
+    if (m.kind === "system") return true;
+    if (m.senderId === userId) return true;
+    if (store.isUserEjected(m.senderId)) return false;
+    if (store.isBlockedEitherWay(userId, m.senderId)) return false;
+    if (store.viewerReportedContent(userId, "message", m.id)) return false;
+    return true;
+  });
   const messages = await Promise.all(raw.map((m) => toMessageDto(m, userId, hostId)));
   res.json(messages);
 });
@@ -244,6 +252,11 @@ chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => 
   }
   if (!body && !imageUrl) {
     res.status(400).json({ error: "Message body required" });
+    return;
+  }
+  const filtered = textBlockedReason(body);
+  if (filtered) {
+    res.status(400).json({ error: filtered });
     return;
   }
   const conv = store.findConversationById(convId);
@@ -314,6 +327,11 @@ chatRouter.post("/conversations/:id/polls", requireAuth, async (req, res) => {
   }
   if (options.length < 2) {
     res.status(400).json({ error: "Add at least two options" });
+    return;
+  }
+  const filtered = textBlockedReason(question, ...options);
+  if (filtered) {
+    res.status(400).json({ error: filtered });
     return;
   }
   const conv = store.findConversationById(convId);
