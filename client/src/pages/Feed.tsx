@@ -9,7 +9,7 @@ import { PlanCard } from "../components/PlanCard";
 import { PostSuccessSheet } from "../components/PostSuccessSheet";
 import { WeekStrip } from "../components/WeekStrip";
 import { useAuth } from "../context/AuthContext";
-import { planHasEnded } from "../lib/planTime";
+import { isIdeaPlan, planHasEnded } from "../lib/planTime";
 import { consumeFeedScroll } from "../lib/navState";
 import { useNeighborhoods } from "../lib/useNeighborhoods";
 import { FORUM_INTERESTS, INTEREST_LABELS } from "../types/shared";
@@ -313,23 +313,12 @@ export function FeedPage() {
     }
   }, [selectedTag, selectedHoodId, selectedAgeRange, hideCancelled]);
 
-  // Looking-for card with 2+ flexible fields and not locked in yet — mirrors
-  // PlanCard's own isLooking check so the feed groups exactly what the cards
-  // visually flag as "idea" cards.
-  const isIdeaPlan = useCallback((p: PlanDTO) => {
-    const flexCount =
-      (p.isFlexibleTime ? 1 : 0) +
-      (p.isFlexibleLocation ? 1 : 0) +
-      (p.isFlexibleDate ? 1 : 0);
-    return p.planKind === "looking_for" && flexCount > 1 && !p.lockedAt;
-  }, []);
-
   useEffect(() => {
     if (!justPostedId) return;
     const posted = plans.find((p) => p.id === justPostedId);
     if (!posted) return;
     setView(isIdeaPlan(posted) ? "ideas" : "plans");
-  }, [justPostedId, plans, isIdeaPlan]);
+  }, [justPostedId, plans]);
 
   const activePlans = useMemo(() => {
     let list = plans ?? [];
@@ -350,7 +339,7 @@ export function FeedPage() {
     upcoming.sort((a, b) => `${a.date}T${a.time || "23:59"}`.localeCompare(`${b.date}T${b.time || "23:59"}`));
     ideas.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
 
-    const active = view === "ideas" ? ideas : [...upcoming, ...ideas];
+    const active = view === "ideas" ? ideas : upcoming;
     // A just-posted plan is pinned to the very top regardless of its date, so
     // the user immediately sees what they created.
     if (justPostedId) {
@@ -361,7 +350,7 @@ export function FeedPage() {
       }
     }
     return active;
-  }, [plans, view, selectedTag, selectedHoodId, selectedAgeRange, selectedDayIso, hideCancelled, justPostedId, isIdeaPlan]);
+  }, [plans, view, selectedTag, selectedHoodId, selectedAgeRange, selectedDayIso, hideCancelled, justPostedId]);
 
   const filteredPlans = activePlans;
 

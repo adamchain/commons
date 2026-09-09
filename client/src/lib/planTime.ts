@@ -34,3 +34,8 @@ export function planHasEnded(plan: PlanDTO, now: Date = new Date()): boolean {
   if (plan.isFlexibleDate && !plan.lockedAt) return false;
   return planEndTimestamp(plan) < now.getTime();
 }
+
+/** Unlocked looking-for posts — feed Ideas tab and the red-edge idea card. */
+export function isIdeaPlan(plan: Pick<PlanDTO, "planKind" | "lockedAt">): boolean {
+  return plan.planKind === "looking_for" && !plan.lockedAt;
+}

@@ -9,14 +9,13 @@ import { useAuth } from "../context/AuthContext";
 import type { PlanDTO } from "../types/shared";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
 import { saveFeedScroll, type NavFromState } from "../lib/navState";
-import { planHasEnded } from "../lib/planTime";
-import { useNeighborhoods } from "../lib/useNeighborhoods";
+import { isIdeaPlan, planHasEnded } from "../lib/planTime";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
 
 /**
- * Compact event card. Looking-for (2+ flexible fields) gets a red left edge;
- * confirmed plans are plain white. Shows the uploaded flyer; confirmed plans
- * also fall back to a stable stock cover from the admin library.
+ * Compact event card. Looking-for posts get a red left edge; confirmed
+ * plans are plain white. Shows the uploaded flyer; confirmed plans also
+ * fall back to a stable stock cover from the admin library.
  */
 export function PlanCard({
   plan,
@@ -28,18 +27,11 @@ export function PlanCard({
   navFrom?: NavFromState;
 }) {
   const title = sentenceCaseTitle(plan.title);
-  const flexCount =
-    (plan.isFlexibleTime ? 1 : 0) +
-    (plan.isFlexibleLocation ? 1 : 0) +
-    (plan.isFlexibleDate ? 1 : 0);
-  // Only 2+ flexible fields = Looking For card. One flexible field = confirmed.
-  const isLooking = plan.planKind === "looking_for" && flexCount > 1 && !plan.lockedAt;
+  const isLooking = isIdeaPlan(plan);
   const coverPool = useCardImages();
   const coverImage =
     plan.flyerDataUrl ??
     (plan.planKind === "looking_for" ? null : pickCoverImage(coverPool, plan.id));
-  const hoods = useNeighborhoods();
-  const hoodName = hoods[plan.neighborhoodId]?.name ?? null;
   const isCancelled = Boolean(plan.cancelledAt);
   const hasEnded = !isCancelled && planHasEnded(plan);
   const { user } = useAuth();
@@ -47,21 +39,9 @@ export function PlanCard({
   const [linkOpen, setLinkOpen] = useState(false);
   const cardNavigate = useNavigate();
 
-  // Flexible parts say "flexible" — never invent a fixed date that contradicts Lock It In.
-  const whenParts: string[] = [];
-  if (plan.isFlexibleTime) {
-    whenParts.push(formatPlanDate(plan.date));
-    whenParts.push("flexible");
-  } else {
-    whenParts.push(formatPlanDate(plan.date));
-    whenParts.push(formatPlanTime(plan.time, false));
-  }
-  const locationPart = plan.isFlexibleLocation
-    ? "flexible"
-    : hoodName
-      ? `${plan.location.name}`
-      : plan.location.name;
-  const metaLine = [...whenParts, locationPart].filter(Boolean).join(" · ");
+  // Ideas: one "Flexible" when nothing concrete is set. Confirmed plans keep
+  // date · time · place, with "flexible" only for the unset slots.
+  const metaLine = isLooking ? ideaMetaLine(plan) : confirmedMetaLine(plan);
 
   const goingCount = plan.participants.going.length;
   const interestedCount = plan.participants.interested.length;
@@ -347,6 +327,31 @@ export function PlanCard({
       )}
     </div>
   );
+}
+
+function ideaMetaLine(plan: PlanDTO): string {
+  const parts: string[] = [];
+  const dateUnset = plan.isFlexibleDate || plan.date.startsWith("2099-12-31");
+  const timeUnset = plan.isFlexibleTime || !plan.time?.trim() || plan.time === "Flexible";
+  const locationName = plan.location?.name?.trim() ?? "";
+  const locUnset = plan.isFlexibleLocation || !locationName;
+  if (!dateUnset) parts.push(formatPlanDate(plan.date));
+  if (!timeUnset) parts.push(formatPlanTime(plan.time, false));
+  if (!locUnset) parts.push(locationName);
+  return parts.length > 0 ? parts.join(" · ") : "Flexible";
+}
+
+function confirmedMetaLine(plan: PlanDTO): string {
+  const whenParts: string[] = [];
+  if (plan.isFlexibleTime) {
+    whenParts.push(formatPlanDate(plan.date));
+    whenParts.push("flexible");
+  } else {
+    whenParts.push(formatPlanDate(plan.date));
+    whenParts.push(formatPlanTime(plan.time, false));
+  }
+  const locationPart = plan.isFlexibleLocation ? "flexible" : plan.location.name;
+  return [...whenParts, locationPart].filter(Boolean).join(" · ");
 }
 
 function QuickJoin({

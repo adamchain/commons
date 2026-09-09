@@ -3592,7 +3592,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 0 12px;
+  margin: 0 0 6px;
 }
 .plan-card-meta-line--single {
   display: block;
@@ -3622,8 +3622,8 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   color: var(--red, var(--accent));
 }
 .plan-card-going-label {
-  font-weight: 500;
-  color: var(--text-muted);
+  font-weight: 700;
+  color: inherit;
 }
 .plan-card-attendees .plan-card-going-sep {
   color: var(--text-muted);
@@ -6112,7 +6112,7 @@ a.action-btn--stack {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   /* Reserve room on the right for the floating save star so the kind pill
      (Looking For / Cancelled / etc.) never tucks under it. */
   padding-right: 34px;
@@ -6225,7 +6225,7 @@ a.action-btn--stack {
   align-items: baseline;
   gap: 0;
   min-width: 0;
-  color: var(--accent);
+  color: var(--red, var(--accent));
   font-weight: 700;
   font-size: var(--text-body);
 }
@@ -6591,8 +6591,8 @@ a.action-btn--stack {
 
 .plan-card-going-count {
   font-size: var(--text-body);
-  font-weight: 600;
-  color: var(--text-muted);
+  font-weight: 700;
+  color: var(--red, var(--accent));
 }
 
 .plan-card-tags {
@@ -7681,16 +7681,21 @@ a.action-btn--stack {
   padding: 0;
   margin: 0;
   font: inherit;
-  color: var(--accent);
-  font-weight: 600;
+  color: var(--red, var(--accent));
+  font-weight: 700;
   cursor: pointer;
   text-align: left;
   text-decoration: none;
 }
-/* "Going" stays muted gray even when the count itself is the accent link. */
+.plan-card-going-count--link:hover,
+.plan-card-going-count--link:focus {
+  color: var(--red, var(--accent));
+  text-decoration: none;
+}
 .plan-card-going-count--link .plan-card-going-label {
-  color: var(--text-muted);
-  font-weight: 500;
+  color: inherit;
+  font-weight: inherit;
+  text-decoration: none;
 }
 .plan-card-going-count--link:focus-visible {
   outline: 2px solid var(--accent);
@@ -8410,15 +8415,15 @@ a.action-btn--stack {
 }
 
 .plan-card-going-count {
-  color: var(--accent);
-  font-weight: 600;
+  color: var(--red, var(--accent));
+  font-weight: 700;
 }
 
 .plan-card--compact .plan-card-description {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   font-style: normal;
   font-size: var(--text-body);
-  line-height: 1.4;
+  line-height: 1.35;
   color: var(--text-muted);
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -8428,22 +8433,22 @@ a.action-btn--stack {
 
 .plan-card-flyer {
   margin: 0;
-  height: 210px;
+  height: 128px;
   aspect-ratio: auto;
   overflow: hidden;
   border-radius: 20px 20px 0 0;
   background: var(--surface-2);
 }
 .plan-card-body {
-  padding: 14px 16px 16px;
+  padding: 10px 12px 10px;
 }
 .plan-card--compact.plan-card-link {
   padding: 0;
   display: block;
 }
 .plan-card--compact .plan-card-footer-row {
-  margin-top: 12px;
-  padding-bottom: 4px;
+  margin-top: 8px;
+  padding-bottom: 0;
 }
 .cover-thumb,
 .cover-thumb-frame {
