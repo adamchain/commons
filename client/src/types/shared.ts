@@ -665,6 +665,7 @@ export interface CommunityPostDTO {
   createdAt: string;
   /** Viewer may delete this post (own post, or organizer/admin on any). */
   canDelete: boolean;
+  replies: CommunityPostDTO[];
 }
 
 /** Compact card for the Explore rail + profile "Communities" list. */

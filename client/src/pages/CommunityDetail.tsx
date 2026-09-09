@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { MessageCircle } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
@@ -91,7 +92,7 @@ export function CommunityDetailPage() {
   if (loading) {
     return (
       <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy">
-        <button type="button" className="cmy-btn cmy-btn--ghost cmy-btn--sm" onClick={() => navigate(backHref)}>
+        <button type="button" className="detail-back" onClick={() => navigate(backHref)}>
           ← Back
         </button>
         <p className="cmy-muted">Loading…</p>
@@ -162,10 +163,15 @@ export function CommunityDetailPage() {
         </div>
         <div className="cmy-header-body">
           <div className="cmy-header-row">
-            <div className="cmy-header-info">
+            <button
+              type="button"
+              className="cmy-header-members"
+              onClick={() => setTab("members")}
+              aria-label={`${community.memberCount} ${community.memberCount === 1 ? "member" : "members"}`}
+            >
               {members.length > 0 && (
                 <span className="cmy-header-avatars">
-                  {members.slice(0, 3).map((m) => (
+                  {members.slice(0, 4).map((m) => (
                     <Avatar
                       key={m.user.id}
                       seed={m.user.avatarSeed}
@@ -177,10 +183,13 @@ export function CommunityDetailPage() {
                   ))}
                 </span>
               )}
-              <span className="cmy-header-meta">
-                {community.memberCount} {community.memberCount === 1 ? "member" : "members"} · Organized by {community.organizer.firstName}
+              <span className="cmy-header-members-copy">
+                <span className="cmy-header-count">
+                  {community.memberCount} {community.memberCount === 1 ? "member" : "members"}
+                </span>
+                <span className="cmy-header-org">Organized by {community.organizer.firstName}</span>
               </span>
-            </div>
+            </button>
             <JoinControl
               community={community}
               onChange={setCommunity}
@@ -217,7 +226,7 @@ export function CommunityDetailPage() {
         )}
       </nav>
 
-      {tab === "bulletin" && community.bulletinEnabled && (canSeeInside ? <BulletinTab community={community} canPost={canPostBulletin} onPendingChange={load} /> : (
+      {tab === "bulletin" && community.bulletinEnabled && (canSeeInside ? <BulletinTab community={community} canPost={canPostBulletin} canReply={isActiveMember || community.isOrganizer} onPendingChange={load} /> : (
         <LockedPanel
           community={community}
           onChange={setCommunity}
@@ -475,9 +484,9 @@ function JoinControl({
   if (status === "active") {
     return (
       <div className="cmy-join-row">
-        <span className="cmy-member-pill">Member ✓</span>
+        <span className="cmy-member-pill">Member</span>
         {!community.isOrganizer && (
-          <button type="button" className="cmy-btn cmy-btn--ghost" disabled={busy} onClick={() => void doLeave()}>
+          <button type="button" className="cmy-btn cmy-btn--ghost cmy-btn--sm" disabled={busy} onClick={() => void doLeave()}>
             {busy ? "Leaving…" : "Leave"}
           </button>
         )}
@@ -486,19 +495,19 @@ function JoinControl({
   }
   if (isPending) {
     return (
-      <>
+      <div className="cmy-join-col">
         <span className="cmy-status-pill">Requested</span>
         <p className="cmy-pending-note">
           Request sent — organizers usually respond within a day.
         </p>
-      </>
+      </div>
     );
   }
 
   // Visitor
   if (community.hasScreening && asking) {
     return (
-      <div className="cmy-screen">
+      <div className="cmy-join-col cmy-screen">
         <p className="cmy-screen-q">{community.screeningQuestion ?? "A quick question before you join:"}</p>
         <textarea
           className="cmy-textarea"
@@ -535,7 +544,7 @@ function JoinControl({
     <div className="cmy-join-row">
       <button
         type="button"
-        className="cmy-btn cmy-btn--primary"
+        className="cmy-btn cmy-btn--primary cmy-btn--sm"
         disabled={busy}
         onClick={() => (community.hasScreening ? setAsking(true) : void doJoin())}
       >
@@ -555,10 +564,12 @@ function JoinControl({
 function BulletinTab({
   community,
   canPost,
+  canReply,
   onPendingChange,
 }: {
   community: CommunityDTO;
   canPost: boolean;
+  canReply: boolean;
   onPendingChange?: () => void;
 }) {
   const { user } = useAuth();
@@ -567,6 +578,9 @@ function BulletinTab({
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [postErr, setPostErr] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [replyDraft, setReplyDraft] = useState("");
+  const [replyBusy, setReplyBusy] = useState(false);
 
   const load = useCallback(async () => {
     const r = await api<{ posts: CommunityPostDTO[]; pending?: CommunityPostDTO[] }>(
@@ -596,6 +610,25 @@ function BulletinTab({
       setPostErr(parseApiError(e));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function submitReply(parentId: string) {
+    if (!replyDraft.trim() || replyBusy) return;
+    setReplyBusy(true);
+    setPostErr(null);
+    try {
+      await api(`/api/communities/${community.id}/posts`, {
+        method: "POST",
+        body: JSON.stringify({ content: replyDraft.trim(), parentId }),
+      });
+      setReplyDraft("");
+      setReplyTo(null);
+      await load();
+    } catch (e) {
+      setPostErr(parseApiError(e));
+    } finally {
+      setReplyBusy(false);
     }
   }
 
@@ -715,6 +748,78 @@ function BulletinTab({
             </div>
             {p.content && <p className="cmy-post-body">{p.content}</p>}
             {p.image && <img className="cmy-post-image" src={p.image} alt="" loading="lazy" />}
+            {(p.replies?.length ?? 0) > 0 && (
+              <ul className="cmy-reply-list">
+                {(p.replies ?? []).map((r) => (
+                  <li key={r.id} className="cmy-reply">
+                    <Avatar seed={r.author.avatarSeed} style={r.author.avatarStyle} photoDataUrl={r.author.avatarPhotoDataUrl} params={r.author.avatarParams} size="xs" />
+                    <div className="cmy-reply-body">
+                      <div className="cmy-reply-top">
+                        <span className="cmy-post-name">{r.author.firstName}</span>
+                        <span className="cmy-post-time">{formatRelative(r.createdAt)}</span>
+                        {r.canDelete && (
+                          <button type="button" className="cmy-icon-btn" onClick={() => del(r.id)} title="Delete">×</button>
+                        )}
+                      </div>
+                      {r.content && <p className="cmy-post-body">{r.content}</p>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {canReply && (
+              replyTo === p.id ? (
+                <div className="cmy-reply-composer">
+                  <input
+                    type="text"
+                    className="cmy-composer-input"
+                    placeholder={`Reply to ${p.author.firstName}…`}
+                    value={replyDraft}
+                    autoFocus
+                    onChange={(e) => setReplyDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void submitReply(p.id);
+                      if (e.key === "Escape") {
+                        setReplyTo(null);
+                        setReplyDraft("");
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="cmy-btn cmy-btn--primary cmy-btn--sm"
+                    disabled={replyBusy || !replyDraft.trim()}
+                    onClick={() => void submitReply(p.id)}
+                  >
+                    Reply
+                  </button>
+                  <button
+                    type="button"
+                    className="cmy-btn cmy-btn--ghost cmy-btn--sm"
+                    disabled={replyBusy}
+                    onClick={() => {
+                      setReplyTo(null);
+                      setReplyDraft("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="cmy-reply-btn"
+                  onClick={() => {
+                    setReplyTo(p.id);
+                    setReplyDraft("");
+                    setPostErr(null);
+                  }}
+                >
+                  <MessageCircle size={14} strokeWidth={2} aria-hidden="true" />
+                  Reply{p.replies?.length ? ` · ${p.replies.length}` : ""}
+                </button>
+              )
+            )}
           </li>
         ))}
       </ul>
@@ -906,6 +1011,20 @@ function MembersTab({
       )}
 
       <h3 className="cmy-subhead">{members.length} {members.length === 1 ? "member" : "members"}</h3>
+      {members.length > 0 && (
+        <div className="cmy-members-preview" aria-hidden="true">
+          {members.slice(0, 8).map((m) => (
+            <Avatar
+              key={m.user.id}
+              seed={m.user.avatarSeed}
+              style={m.user.avatarStyle}
+              photoDataUrl={m.user.avatarPhotoDataUrl}
+              params={m.user.avatarParams}
+              size="sm"
+            />
+          ))}
+        </div>
+      )}
       <ul className="cmy-member-list">
         {members.map((m) => (
           <li key={m.user.id} className="cmy-member-row">

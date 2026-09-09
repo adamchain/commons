@@ -198,11 +198,17 @@ function CommunityJoinCta({
   const status = community.myMembershipStatus;
 
   if (status === "active") {
-    return <span className="xpl-comm-joined">Joined</span>;
+    return <span className="xpl-comm-tag xpl-comm-joined">Joined</span>;
   }
   if (status === "pending") {
     return (
-      <span className="xpl-comm-join xpl-comm-join--pending" onClick={(e) => e.preventDefault()}>
+      <span
+        className="xpl-comm-tag xpl-comm-join--pending"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+      >
         Requested
       </span>
     );
@@ -236,8 +242,8 @@ function CommunityJoinCta({
   }
 
   return (
-    <button type="button" className="xpl-comm-join" disabled={busy} onClick={handleClick}>
-      {busy ? "…" : community.hasScreening ? "Request →" : "Join →"}
+    <button type="button" className="xpl-comm-tag xpl-comm-join" disabled={busy} onClick={handleClick}>
+      {busy ? "…" : community.hasScreening ? "Request" : "Join"}
     </button>
   );
 }

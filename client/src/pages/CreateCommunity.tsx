@@ -80,7 +80,7 @@ export function CreateCommunityPage() {
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy">
       <header className="cmy-create-head">
-        <button type="button" className="cmy-btn cmy-btn--ghost cmy-btn--sm" onClick={() => navigate(-1)}>← Back</button>
+        <button type="button" className="detail-back" onClick={() => navigate(-1)}>← Back</button>
         <h1 className="cmy-name">Create a community</h1>
       </header>
 

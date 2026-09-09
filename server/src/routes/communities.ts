@@ -133,6 +133,7 @@ function postDTO(
   organizerId: string,
   viewerId: string,
   viewerIsOrganizer: boolean,
+  replies: CommunityPostDTO[] = [],
 ): CommunityPostDTO {
   const status = post.approvalStatus ?? "approved";
   return {
@@ -145,6 +146,7 @@ function postDTO(
     approvalStatus: status === "pending" ? "pending" : "approved",
     createdAt: post.createdAt,
     canDelete: viewerIsOrganizer || post.authorId === viewerId,
+    replies,
   };
 }
 
@@ -771,20 +773,44 @@ communitiesRouter.get("/:id/posts", requireAuth, async (req, res) => {
     if (store.viewerReportedContent(viewerId, "community_post", p.id)) return false;
     return true;
   });
+  function visibleReply(p: CommunityPostRecord): boolean {
+    if (p.authorId === viewerId) return true;
+    if (store.isUserEjected(p.authorId)) return false;
+    if (store.isBlockedEitherWay(viewerId, p.authorId)) return false;
+    if (store.viewerReportedContent(viewerId, "community_post", p.id)) return false;
+    return true;
+  }
   // Authors can see their own pending posts on the feed; organizers get the
   // full pending queue in a separate array for the approval UI.
   const myPending = viewerIsOrganizer
     ? []
     : store.listPendingCommunityPosts(community.id).filter((p) => p.authorId === viewerId);
   const pending = viewerIsOrganizer ? store.listPendingCommunityPosts(community.id) : [];
-  const allForUsers = [...posts, ...myPending, ...pending];
+  const repliesByParent = new Map<string, CommunityPostRecord[]>();
+  for (const post of posts) {
+    const nested = store.listCommunityPostReplies(community.id, post.id).filter(visibleReply);
+    if (nested.length) repliesByParent.set(post.id, nested);
+  }
+  const allForUsers = [
+    ...posts,
+    ...myPending,
+    ...pending,
+    ...[...repliesByParent.values()].flat(),
+  ];
   const users = await findUsersByIds(allForUsers.map((p) => p.authorId));
+  const toDto = (p: CommunityPostRecord, nested: CommunityPostDTO[] = []) =>
+    postDTO(p, users, community.organizerId, viewerId, viewerIsOrganizer, nested);
   res.json({
     posts: [
-      ...myPending.map((p) => postDTO(p, users, community.organizerId, viewerId, viewerIsOrganizer)),
-      ...posts.map((p) => postDTO(p, users, community.organizerId, viewerId, viewerIsOrganizer)),
+      ...myPending.map((p) => toDto(p)),
+      ...posts.map((p) =>
+        toDto(
+          p,
+          (repliesByParent.get(p.id) ?? []).map((r) => toDto(r)),
+        ),
+      ),
     ],
-    pending: pending.map((p) => postDTO(p, users, community.organizerId, viewerId, viewerIsOrganizer)),
+    pending: pending.map((p) => toDto(p)),
   });
 });
 
@@ -805,9 +831,11 @@ communitiesRouter.post("/:id/posts", requireAuth, async (req, res) => {
     res.status(403).json({ error: blocked });
     return;
   }
+  const parentIdRaw = typeof req.body?.parentId === "string" ? req.body.parentId.trim() : "";
   const mayPost =
     viewerIsOrganizer || (community.bulletinPermission === "members" && isActive);
-  if (!mayPost) {
+  const mayReply = Boolean(parentIdRaw) && (viewerIsOrganizer || isActive);
+  if (!mayPost && !mayReply) {
     res.status(403).json({ error: "You don't have permission to post here" });
     return;
   }
@@ -824,15 +852,31 @@ communitiesRouter.post("/:id/posts", requireAuth, async (req, res) => {
     res.status(400).json({ error: filtered });
     return;
   }
+  let parentId: string | null = null;
+  if (parentIdRaw) {
+    const parent = store.findCommunityPostById(parentIdRaw);
+    if (
+      !parent ||
+      parent.communityId !== community.id ||
+      parent.parentId ||
+      (parent.approvalStatus ?? "approved") !== "approved"
+    ) {
+      res.status(404).json({ error: "Post not found" });
+      return;
+    }
+    parentId = parent.id;
+  }
   // Organizer posts are always live. Member posts wait when approval is required.
+  // Replies skip the queue so the thread can actually continue.
   const needsApproval =
-    !viewerIsOrganizer && (community.bulletinRequiresApproval ?? false);
+    !parentId && !viewerIsOrganizer && (community.bulletinRequiresApproval ?? false);
   const post = store.createCommunityPost({
     communityId: community.id,
     authorId: viewerId,
     content,
-    image,
+    image: parentId ? null : image,
     approvalStatus: needsApproval ? "pending" : "approved",
+    parentId,
   });
   const users = await findUsersByIds([post.authorId]);
   store.log("community_post_created", {
@@ -908,6 +952,10 @@ communitiesRouter.post("/:id/posts/:postId/pin", requireAuth, async (req, res) =
   const post = store.findCommunityPostById(String(req.params.postId));
   if (!post || post.communityId !== community.id) {
     res.status(404).json({ error: "Post not found" });
+    return;
+  }
+  if (post.parentId) {
+    res.status(400).json({ error: "Replies can't be pinned" });
     return;
   }
   if ((post.approvalStatus ?? "approved") !== "approved") {

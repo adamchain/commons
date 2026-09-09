@@ -357,6 +357,7 @@ const CommunityPostSchema = new Schema<CommunityPostRecord>(
       enum: ["pending", "approved", "rejected"],
       default: "approved",
     },
+    parentId: { type: String, default: null },
     createdAt: { type: String, required: true },
     deletedAt: { type: String, default: null },
   },
@@ -364,7 +365,7 @@ const CommunityPostSchema = new Schema<CommunityPostRecord>(
 );
 CommunityPostSchema.index({ id: 1 }, { unique: true });
 CommunityPostSchema.index({ communityId: 1, createdAt: -1 });
-CommunityPostSchema.index({ communityId: 1, approvalStatus: 1 });
+CommunityPostSchema.index({ communityId: 1, parentId: 1, createdAt: 1 });
 export const CommunityPostModel = compile<CommunityPostRecord>("CommunityPost", CommunityPostSchema);
 
 // Interest Forums — one row per InterestTag (citywide topic boards).

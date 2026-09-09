@@ -436,6 +436,8 @@ export interface CommunityPostRecord {
    * Missing/undefined on legacy rows is treated as approved.
    */
   approvalStatus?: "pending" | "approved" | "rejected";
+  /** Parent bulletin post when this row is a reply. */
+  parentId?: string | null;
   createdAt: string;
   /** Soft delete — non-null means hidden. */
   deletedAt?: string | null;
@@ -2180,6 +2182,7 @@ export const store = {
         (p) =>
           p.communityId === communityId &&
           !p.deletedAt &&
+          !p.parentId &&
           (p.approvalStatus ?? "approved") === "approved",
       )
       .sort((a, b) => {
@@ -2188,12 +2191,24 @@ export const store = {
         return b.createdAt.localeCompare(a.createdAt);
       });
   },
+  listCommunityPostReplies(communityId: string, parentId: string): CommunityPostRecord[] {
+    return snapshot.communityPosts
+      .filter(
+        (p) =>
+          p.communityId === communityId &&
+          p.parentId === parentId &&
+          !p.deletedAt &&
+          (p.approvalStatus ?? "approved") === "approved",
+      )
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  },
   listPendingCommunityPosts(communityId: string): CommunityPostRecord[] {
     return snapshot.communityPosts
       .filter(
         (p) =>
           p.communityId === communityId &&
           !p.deletedAt &&
+          !p.parentId &&
           p.approvalStatus === "pending",
       )
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -2207,6 +2222,7 @@ export const store = {
     content: string;
     image?: string | null;
     approvalStatus?: "pending" | "approved";
+    parentId?: string | null;
   }): CommunityPostRecord {
     const row: CommunityPostRecord = {
       id: randomUUID(),
@@ -2216,6 +2232,7 @@ export const store = {
       image: input.image ?? null,
       pinned: false,
       approvalStatus: input.approvalStatus ?? "approved",
+      parentId: input.parentId ?? null,
       createdAt: new Date().toISOString(),
       deletedAt: null,
     };
@@ -2251,7 +2268,12 @@ export const store = {
   softDeleteCommunityPost(id: string): CommunityPostRecord | undefined {
     const row = snapshot.communityPosts.find((p) => p.id === id);
     if (!row) return undefined;
-    row.deletedAt = new Date().toISOString();
+    const now = new Date().toISOString();
+    row.deletedAt = now;
+    for (const reply of snapshot.communityPosts.filter((p) => p.parentId === id && !p.deletedAt)) {
+      reply.deletedAt = now;
+      mongoMirror.upsertCommunityPost(reply);
+    }
     persist();
     mongoMirror.upsertCommunityPost(row);
     return row;

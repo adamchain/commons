@@ -247,7 +247,13 @@ function CommunityJoinLink({ c, onJoined }: { c: CommunityCardDTO; onJoined: (up
   if (status === "active") return <span className="cmy-joined-pill cmy-joined-pill--quiet">Joined</span>;
   if (status === "pending") {
     return (
-      <span className="cmy-browse-join cmy-browse-join--pending" onClick={(e) => e.preventDefault()}>
+      <span
+        className="cmy-browse-join cmy-browse-join--pending"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+      >
         Requested
       </span>
     );
@@ -283,7 +289,7 @@ function CommunityJoinLink({ c, onJoined }: { c: CommunityCardDTO; onJoined: (up
 
   return (
     <button type="button" className="cmy-browse-join" disabled={busy} onClick={handleClick}>
-      {busy ? "…" : c.hasScreening ? "Request →" : "Join →"}
+      {busy ? "…" : c.hasScreening ? "Request" : "Join"}
     </button>
   );
 }

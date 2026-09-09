@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { BarChart2 } from "lucide-react";
+import { ArrowLeft, BarChart2 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCoverThumb } from "../components/CoverThumb";
@@ -19,6 +19,8 @@ const CHAT_IMAGE_QUALITY = 0.85;
 
 const POLL_MS = 4000;
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
+const CHAT_HEADER_CLASS =
+  "app-header app-header--minimal chat-header-bar chat-header-bar--thread app-header--sticky";
 
 interface CommunityConversation {
   id: string;
@@ -158,8 +160,11 @@ export function CommunityChatPage() {
     const communityHref = `/communities/${communityIdFromState || id}`;
     return (
       <main className="app-shell app-shell--chat">
-        <header className="app-header app-header--minimal chat-header-bar chat-header-bar--thread">
-          <Link to={backTo} className="detail-back">{backLabel}</Link>
+        <header className={CHAT_HEADER_CLASS}>
+          <Link to={backTo} className="detail-back chat-back-link">
+            <ArrowLeft size={13} strokeWidth={2.2} aria-hidden="true" />
+            {backLabel.replace(/^←\s*/, "")}
+          </Link>
           <div className="chat-thread-title">Chat</div>
           <span aria-hidden="true" />
         </header>
@@ -176,8 +181,11 @@ export function CommunityChatPage() {
   if (error || !conv || !user) {
     return (
       <main className="app-shell app-shell--chat">
-        <header className="app-header app-header--minimal chat-header-bar chat-header-bar--thread">
-          <Link to={backTo} className="detail-back">{backLabel}</Link>
+        <header className={CHAT_HEADER_CLASS}>
+          <Link to={backTo} className="detail-back chat-back-link">
+            <ArrowLeft size={13} strokeWidth={2.2} aria-hidden="true" />
+            {backLabel.replace(/^←\s*/, "")}
+          </Link>
           <div className="chat-thread-title">Chat</div>
           <span aria-hidden="true" />
         </header>
@@ -372,8 +380,11 @@ export function CommunityChatPage() {
 
   return (
     <main ref={shellRef} className="app-shell app-shell--chat">
-      <header className="app-header app-header--minimal chat-header-bar chat-header-bar--thread">
-        <Link to={backTo} className="detail-back">{backLabel}</Link>
+      <header className={CHAT_HEADER_CLASS}>
+        <Link to={backTo} className="detail-back chat-back-link">
+          <ArrowLeft size={13} strokeWidth={2.2} aria-hidden="true" />
+          {backLabel.replace(/^←\s*/, "")}
+        </Link>
         <div className="chat-thread-title">{sentenceCaseTitle(conv.communityName)}</div>
         <div className="chat-header-menu-wrap" ref={headerMenuRef}>
           <button

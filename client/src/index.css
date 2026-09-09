@@ -10980,7 +10980,7 @@ a.action-btn--stack {
 
 .xpl-hero {
   position: relative;
-  height: 200px;
+  height: 168px;
   overflow: hidden;
   margin: 0 0 0;
 }
@@ -11021,7 +11021,7 @@ a.action-btn--stack {
   position: absolute;
   left: 16px;
   right: 16px;
-  bottom: 18px;
+  bottom: 14px;
   z-index: 2;
 }
 .xpl-hero-location {
@@ -11037,10 +11037,10 @@ a.action-btn--stack {
 }
 .xpl-hero-title {
   margin: 0;
-  font-size: var(--text-hero);
+  font-size: 32px;
   font-weight: 800;
   color: #fff;
-  letter-spacing: -1.8px;
+  letter-spacing: -1.4px;
   line-height: 0.92;
 }
 
@@ -11063,6 +11063,8 @@ a.action-btn--stack {
 }
 .xpl-section-head .ui-label {
   margin-bottom: 6px;
+  font-size: var(--text-body-small);
+  letter-spacing: 1.2px;
 }
 .xpl-coming-soon {
   color: var(--red);
@@ -11185,31 +11187,32 @@ a.action-btn--stack {
   background: var(--tan);
   vertical-align: middle;
 }
-.xpl-comm-join {
+.xpl-comm-tag {
   flex-shrink: 0;
-  padding: 0;
-  border: none;
-  background: none;
-  font-size: var(--text-body);
-  font-weight: 700;
-  color: var(--red);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.xpl-comm-join--pending {
-  color: var(--muted);
-  font-weight: 600;
-  cursor: default;
-}
-.xpl-comm-joined {
-  flex-shrink: 0;
-  font-size: var(--text-micro);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--faint);
-  background: var(--tan);
-  border-radius: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 26px;
   padding: 4px 10px;
+  border: none;
+  border-radius: 22px;
+  font-size: var(--text-body-small);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+  background: var(--tan);
+  color: var(--faint);
+}
+.xpl-comm-join {
+  cursor: pointer;
+  background: none;
+  color: var(--red);
+}
+.xpl-comm-join--pending,
+.xpl-comm-joined {
+  cursor: default;
 }
 .xpl-comm-empty {
   display: flex;
