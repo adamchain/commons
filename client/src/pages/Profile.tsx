@@ -1065,17 +1065,13 @@ function YourPlansBlock({
   const hiddenCount = Math.max(0, upcoming.length - visibleUpcoming.length);
   const profileBack: NavFromState = { from: "profile", profileUserId };
 
-  const seeAllLink = (
-    <Link to="/my-plans" className="profile-see-all-link" style={{ display: "inline-block", marginTop: 10 }}>
-      See all plans →
-    </Link>
-  );
-
   return (
     <section className="profile-block" id={id}>
-      <div className="profile-block-heading-row">
-        <h3 className="who-block-heading">Plans</h3>
-        {isSelf && (
+      {isSelf && (
+        <div className="profile-block-heading-row">
+          <Link to="/my-plans" className="profile-see-all-link">
+            See all plans →
+          </Link>
           <div className="profile-plans-toggle" role="tablist" aria-label="Plans view">
             <button
               type="button"
@@ -1096,27 +1092,15 @@ function YourPlansBlock({
               Calendar
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {view === "calendar" && (
-        <>
-          <MonthCalendar plans={upcoming} profileUserId={profileUserId} />
-          {isSelf && seeAllLink}
-        </>
+        <MonthCalendar plans={upcoming} profileUserId={profileUserId} />
       )}
 
       {view === "list" && (
         <>
-          {isSelf && (
-            <Link
-              to="/my-plans"
-              className="profile-see-all-link"
-              style={{ display: "inline-block", marginTop: 6, marginBottom: 10 }}
-            >
-              See all plans →
-            </Link>
-          )}
           {visibleUpcoming.length > 0 ? (
             <div className="profile-plan-card">
               {visibleUpcoming.map((p) => {
@@ -1134,7 +1118,9 @@ function YourPlansBlock({
                       className="cover-thumb--sm"
                     />
                     <span className="profile-list-title">{p.title}</span>
-                    <span className="profile-list-when">{formatPlanDate(p.date)}</span>
+                    <span className="profile-list-when">
+                      {formatPlanDate(p.date, { isFlexibleDate: p.isFlexibleDate })}
+                    </span>
                     <span className={`profile-plan-chip ${badge.className}`}>
                       {badge.label}
                     </span>
