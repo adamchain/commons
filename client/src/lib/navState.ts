@@ -19,12 +19,28 @@ export type NavFromState = {
   profileUserId?: string;
   forumTag?: string;
   communityId?: string;
+  /** Messages Plans vs Interests — used when `from` is `"messages"`. */
+  messagesTab?: "plans" | "interests";
 };
+
+/** Back target for a forum thread when location.state is missing (deep link, post → forum). */
+export function forumBackState(navFrom: NavFromState | null | undefined, tag: string): NavFromState {
+  if (!navFrom?.from) {
+    return { from: "messages", messagesTab: "interests" };
+  }
+  if (navFrom.from === "forum") {
+    return { ...navFrom, forumTag: navFrom.forumTag ?? tag };
+  }
+  if (navFrom.from === "messages") {
+    return { ...navFrom, messagesTab: navFrom.messagesTab ?? "interests" };
+  }
+  return navFrom;
+}
 
 export function hrefForBack(state: NavFromState | null | undefined): string {
   switch (state?.from) {
     case "messages":
-      return "/messages";
+      return state.messagesTab === "interests" ? "/messages?tab=interests" : "/messages";
     case "notifications":
       return "/notifications";
     case "feed":
@@ -34,7 +50,7 @@ export function hrefForBack(state: NavFromState | null | undefined): string {
     case "chat":
       return state.planId ? `/plans/${state.planId}/chat` : "/messages";
     case "forum":
-      return state.forumTag ? `/forums/${state.forumTag}` : "/messages";
+      return state.forumTag ? `/forums/${state.forumTag}` : "/messages?tab=interests";
     case "settings-forums":
       return "/settings/forums";
     case "my-plans":

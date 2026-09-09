@@ -12541,6 +12541,13 @@ a.action-btn--stack {
   display: flex;
   flex-direction: column;
 }
+.app-shell--messages-lock .messages-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
 .messages-row-body {
   min-width: 0;
   display: flex;
@@ -12933,6 +12940,10 @@ a.action-btn--stack {
 }
 .forum-join-more-block {
   margin-top: 16px;
+}
+.forum-join-select {
+  width: 100%;
+  cursor: pointer;
 }
 
 .forum-leave-btn {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
@@ -11,6 +11,7 @@ import type { ForumPostDetailDTO, ForumPostDTO, ForumReplyDTO } from "../types/s
 export function ForumPostPage() {
   const { tag = "", postId = "" } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [data, setData] = useState<ForumPostDetailDTO | null>(null);
   const [ready, setReady] = useState(false);
@@ -69,14 +70,14 @@ export function ForumPostPage() {
     setDeleting(true);
     try {
       await api(`/api/forums/posts/${postId}`, { method: "DELETE" });
-      navigate(`/forums/${tag}`);
+      navigate(`/forums/${tag}`, { state: location.state });
     } catch {
       setDeleting(false);
     }
   };
 
   const makeThisAPlan = () => {
-    navigate("/plans/new", { state: { fromForumTag: tag } });
+    navigate("/plans/new", { state: { fromForumTag: tag, forumNav: location.state } });
   };
 
   if (!ready) {
@@ -94,7 +95,7 @@ export function ForumPostPage() {
       <main className="app-shell app-shell--mid app-shell--with-nav app-shell--with-topbar">
         <div className="empty-state">
           <p style={{ margin: 0 }}>This post isn't available.</p>
-          <Link to={`/forums/${tag}`} className="btn-primary" style={{ marginTop: 14, display: "inline-block" }}>
+          <Link to={`/forums/${tag}`} state={location.state} className="btn-primary" style={{ marginTop: 14, display: "inline-block" }}>
             Back to forum
           </Link>
         </div>
@@ -108,7 +109,7 @@ export function ForumPostPage() {
   return (
     <main className="app-shell app-shell--mid app-shell--with-nav app-shell--with-topbar forum-page">
       <header className="app-header create-header">
-        <Link to={`/forums/${tag}`} className="detail-back">
+        <Link to={`/forums/${tag}`} state={location.state} className="detail-back">
           ← Forum
         </Link>
         <span className="create-header-title">Post</span>

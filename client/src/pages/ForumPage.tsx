@@ -8,7 +8,7 @@ import { useAuth } from "../context/AuthContext";
 import { PlanSafetyMenu } from "../components/PlanSafetyMenu";
 import { formatRelative } from "../lib/format";
 import { interestVisual } from "../lib/interestIcons";
-import { hrefForBack, type NavFromState } from "../lib/navState";
+import { forumBackState, hrefForBack, type NavFromState } from "../lib/navState";
 import type { ForumPostDTO, ForumSort, InterestTag } from "../types/shared";
 
 interface ForumPostsResponse {
@@ -22,14 +22,8 @@ export function ForumPage() {
   const { tag = "" } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const navFrom = (location.state as NavFromState | null) ?? null;
-  const backHref = hrefForBack(
-    navFrom?.from
-      ? navFrom.from === "forum"
-        ? { ...navFrom, forumTag: navFrom.forumTag ?? tag }
-        : navFrom
-      : { from: "messages" },
-  );
+  const navFrom = forumBackState((location.state as NavFromState | null) ?? null, tag);
+  const backHref = hrefForBack(navFrom);
   const backLabel =
     navFrom?.from === "feed"
       ? "Home"
@@ -97,7 +91,7 @@ export function ForumPage() {
     setLeaving(true);
     try {
       await api(`/api/forums/${tag}/leave`, { method: "POST" });
-      navigate("/messages");
+      navigate("/messages?tab=interests");
     } catch {
       setLeaving(false);
     }
@@ -109,7 +103,7 @@ export function ForumPage() {
 
   const confirmPostPlan = () => {
     setPlanModalOpen(false);
-    navigate("/plans/new", { state: { fromForumTag: tag } });
+    navigate("/plans/new", { state: { fromForumTag: tag, forumNav: navFrom } });
   };
 
   if (!ready && !data) {
@@ -128,7 +122,7 @@ export function ForumPage() {
       <main className="app-shell app-shell--mid app-shell--with-nav app-shell--with-topbar">
         <div className="empty-state">
           <p style={{ margin: 0 }}>Couldn't load this forum.</p>
-          <Link to="/messages" className="btn-primary" style={{ marginTop: 14, display: "inline-block" }}>
+          <Link to="/messages?tab=interests" className="btn-primary" style={{ marginTop: 14, display: "inline-block" }}>
             Back to Messages
           </Link>
         </div>
@@ -234,6 +228,7 @@ export function ForumPage() {
               key={post.id}
               post={post}
               tag={tag}
+              navFrom={navFrom}
               viewerId={user?.id}
               onLike={() => void toggleLike(post.id)}
             />
@@ -267,17 +262,19 @@ export function ForumPage() {
 function ForumPostCard({
   post,
   tag,
+  navFrom,
   onLike,
   viewerId,
 }: {
   post: ForumPostDTO;
   tag: string;
+  navFrom: NavFromState;
   onLike: () => void;
   viewerId?: string;
 }) {
   return (
     <article className="forum-post-card">
-      <Link to={`/forums/${tag}/posts/${post.id}`} className="forum-post-card-link">
+      <Link to={`/forums/${tag}/posts/${post.id}`} state={navFrom} className="forum-post-card-link">
         <div className="forum-post-head">
           <Avatar
             seed={post.author.avatarSeed}
@@ -327,7 +324,7 @@ function ForumPostCard({
           <Heart size={16} strokeWidth={1.8} fill={post.likedByMe ? "currentColor" : "none"} />{" "}
           {post.likeCount}
         </button>
-        <Link to={`/forums/${tag}/posts/${post.id}`} className="forum-reply-link">
+        <Link to={`/forums/${tag}/posts/${post.id}`} state={navFrom} className="forum-reply-link">
           <MessageCircle size={16} strokeWidth={1.8} /> {post.replyCount}{" "}
           {post.replyCount === 1 ? "reply" : "replies"}
         </Link>

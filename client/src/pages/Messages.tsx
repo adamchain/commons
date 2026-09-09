@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { BarChart2, MessageCircle } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { PlanCoverThumb } from "../components/CoverThumb";
 import { ScreenTitle } from "../components/ui";
 import { formatRelative, sentenceCaseTitle } from "../lib/format";
-import { interestVisual } from "../lib/interestIcons";
 import {
   FORUM_INTERESTS,
   INTEREST_LABELS,
@@ -13,6 +12,8 @@ import {
   type ForumSummaryDTO,
   type InterestTag,
 } from "../types/shared";
+
+const MESSAGES_INTERESTS_FROM = { from: "messages" as const, messagesTab: "interests" as const };
 
 function previewLooksLikePoll(text: string | null | undefined): boolean {
   if (!text) return false;
@@ -26,9 +27,10 @@ function cleanPreview(text: string | null | undefined): string {
 
 export function MessagesPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get("tab") === "interests" ? "interests" : "plans";
   const [items, setItems] = useState<ConversationSummaryDTO[]>([]);
   const [ready, setReady] = useState(false);
-  const [tab, setTab] = useState<"plans" | "interests">("plans");
   const [forums, setForums] = useState<ForumSummaryDTO[]>([]);
   const [forumsReady, setForumsReady] = useState(false);
   const [joiningTag, setJoiningTag] = useState<InterestTag | null>(null);
@@ -86,7 +88,7 @@ export function MessagesPage() {
     setJoinErr(null);
     try {
       await api(`/api/forums/${tag}/join`, { method: "POST" });
-      navigate(`/forums/${tag}`, { state: { from: "messages" } });
+      navigate(`/forums/${tag}`, { state: MESSAGES_INTERESTS_FROM });
     } catch (e) {
       setJoinErr(e instanceof Error ? e.message : "Couldn't join that forum.");
       setJoiningTag(null);
@@ -103,7 +105,7 @@ export function MessagesPage() {
           role="tab"
           aria-selected={tab === "plans"}
           className={`messages-tab ${tab === "plans" ? "is-active" : ""}`}
-          onClick={() => setTab("plans")}
+          onClick={() => setSearchParams({}, { replace: true })}
         >
           Plans
         </button>
@@ -112,12 +114,13 @@ export function MessagesPage() {
           role="tab"
           aria-selected={tab === "interests"}
           className={`messages-tab ${tab === "interests" ? "is-active" : ""}`}
-          onClick={() => setTab("interests")}
+          onClick={() => setSearchParams({ tab: "interests" }, { replace: true })}
         >
           Interests
         </button>
       </div>
 
+      <div className="messages-scroll">
       {tab === "interests" ? (
         <>
           <p className="messages-tab-sub">
@@ -141,7 +144,7 @@ export function MessagesPage() {
                         <Link
                           key={f.interestTag}
                           to={`/forums/${f.interestTag}`}
-                          state={{ from: "messages" }}
+                          state={MESSAGES_INTERESTS_FROM}
                           className="messages-row"
                         >
                           <PlanCoverThumb planId={f.interestTag} />
@@ -177,30 +180,28 @@ export function MessagesPage() {
               )}
               {availableForums.length > 0 && (
                 <div className="forum-join-more-block">
-                  <p className="form-eyebrow">{forums.length === 0 ? "Pick an interest" : "Join more forums"}</p>
-                  <div className="settings-interests-grid">
-                    {availableForums.map((t) => {
-                      const { Icon, iconColor, tint } = interestVisual(t);
-                      return (
-                        <button
-                          key={t}
-                          type="button"
-                          className="settings-interest-pill settings-forum-join-pill"
-                          disabled={joiningTag === t}
-                          onClick={() => void joinForum(t)}
-                        >
-                          <span
-                            className="settings-forum-icon settings-forum-icon--sm"
-                            style={{ background: tint, color: iconColor }}
-                            aria-hidden="true"
-                          >
-                            <Icon size={14} strokeWidth={1.8} />
-                          </span>
-                          {INTEREST_LABELS[t]}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <label className="form-eyebrow" htmlFor="join-more-forums">
+                    {forums.length === 0 ? "Pick an interest" : "Join more forums"}
+                  </label>
+                  <select
+                    id="join-more-forums"
+                    className="forum-join-select"
+                    value=""
+                    disabled={!!joiningTag}
+                    onChange={(e) => {
+                      const next = e.target.value as InterestTag;
+                      if (next) void joinForum(next);
+                    }}
+                  >
+                    <option value="" disabled>
+                      {joiningTag ? "Joining…" : "Choose a forum…"}
+                    </option>
+                    {availableForums.map((t) => (
+                      <option key={t} value={t}>
+                        {INTEREST_LABELS[t]}
+                      </option>
+                    ))}
+                  </select>
                   {joinErr && <p className="error-text" style={{ marginTop: 12 }}>{joinErr}</p>}
                 </div>
               )}
@@ -300,6 +301,7 @@ export function MessagesPage() {
           </div>
         </>
       )}
+      </div>
 
       {dismissTarget && (
         <div

@@ -21,6 +21,7 @@ import { Avatar } from "../components/Avatar";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
 import { LocationAutocomplete } from "../components/LocationAutocomplete";
 import { useAuth } from "../context/AuthContext";
+import type { NavFromState } from "../lib/navState";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
@@ -102,6 +103,7 @@ export function CreatePlanPage() {
   // "Make this a plan" from an Interest Forum navigates here with
   // { fromForumTag: tag } — preselect that interest as the plan's vibe.
   const fromForumTag = (location.state as { fromForumTag?: string } | null)?.fromForumTag ?? null;
+  const forumNav = (location.state as { forumNav?: NavFromState } | null)?.forumNav ?? null;
   const prefillName = searchParams.get("name") ?? "";
   const prefillAddress = searchParams.get("address") ?? "";
   // "Do it again" seeds the title from a past plan, and carries that plan's
@@ -212,7 +214,9 @@ export function CreatePlanPage() {
       return;
     }
     if (fromForumTag) {
-      navigate(`/forums/${fromForumTag}`);
+      navigate(`/forums/${fromForumTag}`, {
+        state: forumNav ?? { from: "messages", messagesTab: "interests" },
+      });
       return;
     }
     if (communityId) {
@@ -229,7 +233,9 @@ export function CreatePlanPage() {
       return;
     }
     if (fromForumTag) {
-      navigate(`/forums/${fromForumTag}`);
+      navigate(`/forums/${fromForumTag}`, {
+        state: forumNav ?? { from: "messages", messagesTab: "interests" },
+      });
       return;
     }
     if (communityId) {

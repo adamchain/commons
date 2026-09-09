@@ -119,32 +119,30 @@ export function SettingsForumsPage() {
       )}
 
       {available.length > 0 && (
-        <>
-          <p className="form-eyebrow">Join more forums</p>
-          <div className="settings-interests-grid">
-            {available.map((t) => {
-              const { Icon, iconColor, tint } = interestVisual(t);
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  className="settings-interest-pill settings-forum-join-pill"
-                  disabled={busyTag === t}
-                  onClick={() => void join(t)}
-                >
-                  <span
-                    className="settings-forum-icon settings-forum-icon--sm"
-                    style={{ background: tint, color: iconColor }}
-                    aria-hidden="true"
-                  >
-                    <Icon size={14} strokeWidth={1.8} />
-                  </span>
-                  {INTEREST_LABELS[t]}
-                </button>
-              );
-            })}
-          </div>
-        </>
+        <div className="forum-join-more-block">
+          <label className="form-eyebrow" htmlFor="settings-join-more-forums">
+            Join more forums
+          </label>
+          <select
+            id="settings-join-more-forums"
+            className="forum-join-select"
+            value=""
+            disabled={!!busyTag}
+            onChange={(e) => {
+              const next = e.target.value as InterestTag;
+              if (next) void join(next);
+            }}
+          >
+            <option value="" disabled>
+              {busyTag ? "Joining…" : "Choose a forum…"}
+            </option>
+            {available.map((t) => (
+              <option key={t} value={t}>
+                {INTEREST_LABELS[t]}
+              </option>
+            ))}
+          </select>
+        </div>
       )}
 
       {err && <p className="error-text" style={{ marginTop: 12 }}>{err}</p>}
