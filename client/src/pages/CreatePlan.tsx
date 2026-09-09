@@ -1883,11 +1883,11 @@ function IdeaForm({
         )}
         </div>
         <div
-          className="lock-in-cta-bar lock-in-cta-bar--flush"
-          style={keyboardInset > 0 ? { bottom: keyboardInset } : undefined}
+          className="idea-form-cta"
+          style={keyboardInset > 0 ? { paddingBottom: 16 + keyboardInset } : undefined}
         >
-          <button type="submit" className="btn-primary btn-block" disabled={submitting}>
-            {submitting ? "Posting…" : "Put it out there"}
+          <button type="submit" className="btn btn-primary btn-block idea-primary-cta" disabled={submitting}>
+            {submitting ? "Posting…" : "Put It Out There"}
           </button>
         </div>
       </form>
