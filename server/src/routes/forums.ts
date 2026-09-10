@@ -15,12 +15,32 @@ import {
   type PublicUser,
 } from "../types/shared.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
+import { isGcsConfigured, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
 
 export const forumsRouter = Router();
 
 const MAX_POST_LENGTH = 4000;
 const MAX_REPLY_LENGTH = 2000;
 const PREVIEW_LENGTH = 140;
+const MAX_FORUM_IMAGE_CHARS = 1_600_000;
+
+async function resolveForumImageUrl(raw: string): Promise<string | null> {
+  if (raw.startsWith("http://") || raw.startsWith("https://")) {
+    return raw.slice(0, 2048);
+  }
+  if (!raw.startsWith("data:image/") || raw.length >= MAX_FORUM_IMAGE_CHARS) return null;
+  if (isGcsConfigured()) {
+    const parsed = parseDataUrl(raw);
+    if (parsed) {
+      try {
+        return await uploadCardImage(parsed.buffer, parsed.contentType, "forum-images");
+      } catch (err) {
+        console.error("[forums] image GCS upload failed; storing inline", err);
+      }
+    }
+  }
+  return raw;
+}
 
 // 2.6 — only the highest-density interests have a live forum; the rest are
 // feed filters only. `ALL_INTERESTS` still backs "Join more forums" on the
@@ -69,6 +89,7 @@ function replyDTO(reply: ForumReplyRecord, users: Map<string, Awaited<ReturnType
     postId: reply.postId,
     author: publicFor(reply.authorId, users),
     content: reply.content,
+    imageUrl: reply.imageUrl ?? null,
     createdAt: reply.createdAt,
   };
 }
@@ -162,12 +183,11 @@ forumsRouter.post("/:tag/posts", requireAuth, async (req, res) => {
   }
   const content = String(req.body?.content ?? "").trim().slice(0, MAX_POST_LENGTH);
   const rawImage = typeof req.body?.imageUrl === "string" ? req.body.imageUrl : "";
-  const imageUrl =
-    rawImage.startsWith("data:image/") && rawImage.length < 1_600_000
-      ? rawImage
-      : rawImage.startsWith("http")
-        ? rawImage.slice(0, 2048)
-        : null;
+  const imageUrl = rawImage ? await resolveForumImageUrl(rawImage) : null;
+  if (rawImage && !imageUrl) {
+    res.status(400).json({ error: "Couldn't attach that image" });
+    return;
+  }
   if (!content && !imageUrl) {
     res.status(400).json({ error: "Write something to post" });
     return;
@@ -227,7 +247,7 @@ forumsRouter.get("/posts/:postId", requireAuth, async (req, res) => {
   });
 });
 
-// POST /api/forums/posts/:postId/replies — { content }
+// POST /api/forums/posts/:postId/replies — { content, imageUrl? }
 forumsRouter.post("/posts/:postId/replies", requireAuth, async (req, res) => {
   const viewerId = String(req.userId);
   const post = store.findForumPostById(String(req.params.postId));
@@ -236,7 +256,13 @@ forumsRouter.post("/posts/:postId/replies", requireAuth, async (req, res) => {
     return;
   }
   const content = String(req.body?.content ?? "").trim().slice(0, MAX_REPLY_LENGTH);
-  if (!content) {
+  const rawImage = typeof req.body?.imageUrl === "string" ? req.body.imageUrl : "";
+  const imageUrl = rawImage ? await resolveForumImageUrl(rawImage) : null;
+  if (rawImage && !imageUrl) {
+    res.status(400).json({ error: "Couldn't attach that image" });
+    return;
+  }
+  if (!content && !imageUrl) {
     res.status(400).json({ error: "Write a reply" });
     return;
   }
@@ -245,7 +271,7 @@ forumsRouter.post("/posts/:postId/replies", requireAuth, async (req, res) => {
     res.status(400).json({ error: filtered });
     return;
   }
-  const reply = store.createReply(post.id, viewerId, content);
+  const reply = store.createReply(post.id, viewerId, content, imageUrl);
   if (!reply) {
     res.status(404).json({ error: "Post not found" });
     return;

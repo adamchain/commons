@@ -431,6 +431,7 @@ const ForumReplySchema = new Schema<ForumReplyRecord>(
     postId: { type: String, required: true },
     authorId: { type: String, required: true },
     content: { type: String, required: true },
+    imageUrl: { type: String, default: null },
     createdAt: { type: String, required: true },
   },
   { collection: "forumReplies" },

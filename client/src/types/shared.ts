@@ -743,6 +743,7 @@ export interface ForumReplyDTO {
   postId: string;
   author: PublicUser;
   content: string;
+  imageUrl: string | null;
   createdAt: string;
 }
 

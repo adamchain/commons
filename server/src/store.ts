@@ -542,6 +542,7 @@ export interface ForumReplyRecord {
   postId: string;
   authorId: string;
   content: string;
+  imageUrl?: string | null;
   createdAt: string;
 }
 
@@ -2413,7 +2414,11 @@ export const store = {
           interestTag: m.interestTag,
           joinedAt: m.joinedAt,
           latestPost: latest
-            ? { authorId: latest.authorId, content: latest.content, createdAt: latest.createdAt }
+            ? {
+                authorId: latest.authorId,
+                content: latest.content || (latest.imageUrl ? "📷 Photo" : ""),
+                createdAt: latest.createdAt,
+              }
             : null,
         };
       });
@@ -2487,7 +2492,12 @@ export const store = {
       .filter((r) => r.postId === postId)
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   },
-  createReply(postId: string, authorId: string, content: string): ForumReplyRecord | undefined {
+  createReply(
+    postId: string,
+    authorId: string,
+    content: string,
+    imageUrl?: string | null,
+  ): ForumReplyRecord | undefined {
     const post = this.findForumPostById(postId);
     if (!post) return undefined;
     const row: ForumReplyRecord = {
@@ -2495,6 +2505,7 @@ export const store = {
       postId,
       authorId,
       content,
+      imageUrl: imageUrl ?? null,
       createdAt: new Date().toISOString(),
     };
     snapshot.forumReplies.push(row);

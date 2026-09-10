@@ -1,14 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Heart, MessageCircle } from "lucide-react";
+import { ArrowLeft, Heart, ImagePlus, MessageCircle } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
 import { PlanSafetyMenu } from "../components/PlanSafetyMenu";
 import { formatRelative } from "../lib/format";
+import { resolveForumImage } from "../lib/forumImage";
 import { interestVisual } from "../lib/interestIcons";
 import { forumBackState, hrefForBack, type NavFromState } from "../lib/navState";
+import { isNative } from "../lib/platform";
 import type { ForumPostDTO, ForumSort, InterestTag } from "../types/shared";
 
 interface ForumPostsResponse {
@@ -38,6 +40,9 @@ export function ForumPage() {
   const [ready, setReady] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [content, setContent] = useState("");
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [attachingImage, setAttachingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
@@ -56,20 +61,41 @@ export function ForumPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tag, sort]);
 
+  const resetComposer = () => {
+    setComposerOpen(false);
+    setContent("");
+    setPendingImage(null);
+    setError(null);
+  };
+
+  const pickComposerImage = async (file?: File) => {
+    setAttachingImage(true);
+    try {
+      const dataUrl = await resolveForumImage(file ?? null);
+      if (dataUrl) setPendingImage(dataUrl);
+    } catch {
+      setError("Couldn't read that image. Try another.");
+    } finally {
+      setAttachingImage(false);
+    }
+  };
+
   const submitPost = async (e: FormEvent) => {
     e.preventDefault();
     const trimmed = content.trim();
-    if (!trimmed) return;
+    if (!trimmed && !pendingImage) return;
     setPosting(true);
     setError(null);
     try {
       const post = await api<ForumPostDTO>(`/api/forums/${tag}/posts`, {
         method: "POST",
-        body: JSON.stringify({ content: trimmed }),
+        body: JSON.stringify({
+          content: trimmed,
+          ...(pendingImage ? { imageUrl: pendingImage } : {}),
+        }),
       });
       setData((prev) => (prev ? { ...prev, posts: [post, ...prev.posts] } : prev));
-      setContent("");
-      setComposerOpen(false);
+      resetComposer();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't post — try again.");
     } finally {
@@ -168,7 +194,7 @@ export function ForumPage() {
             Popular
           </button>
         </div>
-        <button type="button" className="btn forum-make-plan-btn" onClick={makeThisAPlan}>
+        <button type="button" className="btn btn-primary forum-make-plan-btn" onClick={makeThisAPlan}>
           Post a Plan
         </button>
       </div>
@@ -196,22 +222,59 @@ export function ForumPage() {
               rows={3}
               autoFocus
             />
+            {pendingImage && (
+              <div className="forum-attach-preview">
+                <div className="forum-attach-thumb">
+                  <img src={pendingImage} alt="" />
+                  <button
+                    type="button"
+                    className="forum-attach-remove"
+                    aria-label="Remove image"
+                    onClick={() => setPendingImage(null)}
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            )}
             {error && <p className="error-text">{error}</p>}
             <div className="forum-composer-actions">
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  void pickComposerImage(f);
+                  if (imageInputRef.current) imageInputRef.current.value = "";
+                }}
+              />
               <button
                 type="button"
-                className="btn-link"
+                className="forum-attach-btn"
+                disabled={attachingImage || posting}
+                aria-label="Add photo"
                 onClick={() => {
-                  setComposerOpen(false);
-                  setContent("");
-                  setError(null);
+                  if (isNative()) void pickComposerImage();
+                  else imageInputRef.current?.click();
                 }}
               >
-                Cancel
+                <ImagePlus size={18} strokeWidth={1.8} />
+                {attachingImage ? "Adding…" : "Photo"}
               </button>
-              <button type="submit" className="btn btn-primary" disabled={posting || !content.trim()}>
-                {posting ? "Posting…" : "Post"}
-              </button>
+              <div className="forum-composer-actions-end">
+                <button type="button" className="btn-link" onClick={resetComposer}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={posting || attachingImage || (!content.trim() && !pendingImage)}
+                >
+                  {posting ? "Posting…" : "Post"}
+                </button>
+              </div>
             </div>
           </form>
         )}
@@ -311,7 +374,7 @@ function ForumPostCard({
             </div>
           )}
         </div>
-        <p className="forum-post-content">{post.content}</p>
+        {post.content ? <p className="forum-post-content">{post.content}</p> : null}
         {post.imageUrl && <img src={post.imageUrl} alt="" className="forum-post-image" />}
       </Link>
       <div className="forum-post-footer">

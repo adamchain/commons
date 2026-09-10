@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { ImagePlus } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
 import { PlanSafetyMenu } from "../components/PlanSafetyMenu";
 import { formatRelative } from "../lib/format";
+import { resolveForumImage } from "../lib/forumImage";
+import { isNative } from "../lib/platform";
 import type { ForumPostDetailDTO, ForumPostDTO, ForumReplyDTO } from "../types/shared";
 
 export function ForumPostPage() {
@@ -16,6 +19,9 @@ export function ForumPostPage() {
   const [data, setData] = useState<ForumPostDetailDTO | null>(null);
   const [ready, setReady] = useState(false);
   const [reply, setReply] = useState("");
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [attachingImage, setAttachingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -37,16 +43,32 @@ export function ForumPostPage() {
     setData((prev) => (prev ? { ...prev, post: updated } : prev));
   };
 
+  const pickReplyImage = async (file?: File) => {
+    setAttachingImage(true);
+    setError(null);
+    try {
+      const dataUrl = await resolveForumImage(file ?? null);
+      if (dataUrl) setPendingImage(dataUrl);
+    } catch {
+      setError("Couldn't read that image. Try another.");
+    } finally {
+      setAttachingImage(false);
+    }
+  };
+
   const submitReply = async (e: FormEvent) => {
     e.preventDefault();
     const trimmed = reply.trim();
-    if (!trimmed || !data) return;
+    if ((!trimmed && !pendingImage) || !data) return;
     setSending(true);
     setError(null);
     try {
       const created = await api<ForumReplyDTO>(`/api/forums/posts/${postId}/replies`, {
         method: "POST",
-        body: JSON.stringify({ content: trimmed }),
+        body: JSON.stringify({
+          content: trimmed,
+          ...(pendingImage ? { imageUrl: pendingImage } : {}),
+        }),
       });
       setData((prev) =>
         prev
@@ -58,6 +80,7 @@ export function ForumPostPage() {
           : prev,
       );
       setReply("");
+      setPendingImage(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't reply — try again.");
     } finally {
@@ -149,7 +172,7 @@ export function ForumPostPage() {
             <span className="forum-post-time">{formatRelative(post.createdAt)}</span>
           </div>
         </div>
-        <p className="forum-post-content">{post.content}</p>
+        {post.content ? <p className="forum-post-content">{post.content}</p> : null}
         {post.imageUrl && <img src={post.imageUrl} alt="" className="forum-post-image" />}
         <div className="forum-post-footer">
           <button
@@ -160,7 +183,7 @@ export function ForumPostPage() {
           >
             <HeartIcon filled={post.likedByMe} /> {post.likeCount}
           </button>
-          <button type="button" className="btn forum-make-plan-btn" onClick={makeThisAPlan}>
+          <button type="button" className="btn btn-primary forum-make-plan-btn" onClick={makeThisAPlan}>
             Make this a plan
           </button>
         </div>
@@ -188,7 +211,8 @@ export function ForumPostPage() {
                   <span className="forum-reply-author">{r.author.firstName}</span>
                   <span className="forum-reply-time">{formatRelative(r.createdAt)}</span>
                 </div>
-                <p className="forum-reply-content">{r.content}</p>
+                {r.content ? <p className="forum-reply-content">{r.content}</p> : null}
+                {r.imageUrl && <img src={r.imageUrl} alt="" className="forum-reply-image" />}
               </div>
             </div>
           ))
@@ -196,6 +220,22 @@ export function ForumPostPage() {
       </section>
 
       <form onSubmit={submitReply} className="forum-reply-composer">
+        {pendingImage && (
+          <div className="forum-attach-preview">
+            <div className="forum-attach-thumb">
+              <img src={pendingImage} alt="" />
+              <button
+                type="button"
+                className="forum-attach-remove"
+                aria-label="Remove image"
+                onClick={() => setPendingImage(null)}
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="forum-reply-composer-row">
         <Avatar
           seed={user?.avatarSeed ?? "me"}
           style={user?.avatarStyle}
@@ -205,19 +245,43 @@ export function ForumPostPage() {
           size="sm"
         />
         <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            void pickReplyImage(f);
+            if (imageInputRef.current) imageInputRef.current.value = "";
+          }}
+        />
+        <button
+          type="button"
+          className="forum-attach-btn forum-attach-btn--icon"
+          disabled={attachingImage || sending}
+          aria-label="Add photo"
+          onClick={() => {
+            if (isNative()) void pickReplyImage();
+            else imageInputRef.current?.click();
+          }}
+        >
+          <ImagePlus size={18} strokeWidth={1.8} />
+        </button>
+        <input
           type="text"
-          placeholder="Write a reply…"
+          placeholder={pendingImage ? "Add a caption…" : "Write a reply…"}
           value={reply}
           onChange={(e) => setReply(e.target.value)}
         />
         <button
           type="submit"
           className="forum-reply-send-btn"
-          disabled={sending || !reply.trim()}
+          disabled={sending || attachingImage || (!reply.trim() && !pendingImage)}
           aria-label="Send reply"
         >
           <SendIcon />
         </button>
+        </div>
       </form>
       {error && <p className="error-text">{error}</p>}
     </main>
