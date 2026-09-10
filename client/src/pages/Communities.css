@@ -48,13 +48,21 @@
   cursor: pointer;
   transition: filter 0.15s ease, background 0.15s ease;
 }
-.cmy-btn:disabled { opacity: 0.38; cursor: default; }
-.cmy-btn--primary { background: var(--community-pink); color: var(--paper-50); }
-.cmy-btn--primary:not(:disabled):hover { filter: brightness(1.08); }
+.cmy-btn--primary { background: var(--red); color: var(--accent-on); }
+.cmy-btn--primary:not(:disabled):hover { background: var(--accent-hover); filter: none; }
 .cmy-btn--ghost {
-  background: transparent;
-  color: var(--text-muted);
-  border: 1px solid var(--hairline, rgba(0,0,0,0.12));
+  background: var(--btn-neutral);
+  color: var(--btn-neutral-on);
+  border: none;
+}
+.cmy-btn:disabled,
+.cmy-btn--primary:disabled,
+.cmy-btn--ghost:disabled {
+  opacity: 1;
+  cursor: default;
+  background: var(--btn-disabled);
+  color: var(--btn-disabled-on);
+  filter: none;
 }
 .cmy-btn--sm { padding: var(--s-1) var(--s-3); font-size: 0.85rem; }
 .cmy-btn--block { width: 100%; }
@@ -177,8 +185,8 @@
   -webkit-backdrop-filter: blur(8px);
 }
 .cmy-joined-pill--quiet {
-  color: var(--faint);
-  background: var(--tan);
+  color: var(--status-on);
+  background: var(--status);
   border: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -336,10 +344,10 @@
   box-sizing: border-box;
   min-height: 26px;
   border: none;
-  background: var(--tan);
+  background: var(--red);
   padding: 4px 10px;
   border-radius: var(--r-pill);
-  color: var(--red);
+  color: var(--accent-on);
   font-family: var(--font-ui);
   font-weight: 700;
   font-size: var(--text-body-small);
@@ -347,10 +355,12 @@
   white-space: nowrap;
   line-height: 1;
 }
-.cmy-browse-join:disabled { opacity: 0.5; cursor: default; }
+.cmy-browse-join:disabled,
 .cmy-browse-join--pending {
-  color: var(--faint);
+  opacity: 1;
   cursor: default;
+  background: var(--status);
+  color: var(--status-on);
 }
 
 /* ---- Detail header ---- */
@@ -457,9 +467,9 @@
 }
 .cmy-cover-overlay .cmy-name { color: #fff; }
 .cmy-founding {
-  background: var(--surface);
-  border: 1px solid var(--community-pink-border);
-  color: var(--community-pink);
+  background: var(--status);
+  border: none;
+  color: var(--status-on);
   padding: 2px 8px;
   border-radius: var(--r-pill);
   font-size: 0.68rem;

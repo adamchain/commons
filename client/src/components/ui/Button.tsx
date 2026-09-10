@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
-type Variant = "primary" | "secondary" | "ghost" | "link";
+type Variant = "primary" | "soft" | "secondary" | "ghost" | "link";
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
@@ -9,7 +9,8 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 /**
- * Shared button. Primary = solid red #C13B3B; disabled = same red at 38% opacity.
+ * Shared button. Primary = brand red; soft = #965252 sibling; secondary = #ab9393 utility.
+ * Disabled uses a beige fill — never faded red/pink.
  */
 export function Button({
   variant = "primary",
@@ -22,11 +23,13 @@ export function Button({
   const base =
     variant === "primary"
       ? "btn-primary"
-      : variant === "secondary"
-        ? "btn-secondary"
-        : variant === "link"
-          ? "btn-link"
-          : "btn-pill-ghost";
+      : variant === "soft"
+        ? "btn-soft"
+        : variant === "secondary"
+          ? "btn-secondary"
+          : variant === "link"
+            ? "btn-link"
+            : "btn-pill-ghost";
   return (
     <button
       type={type}

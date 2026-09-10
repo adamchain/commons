@@ -249,8 +249,8 @@ h1, h2, h3, h4, h5, h6 {
 .pill-joined {
   font-size: var(--text-caption);
   font-weight: 600;
-  color: var(--faint);
-  background: var(--tan-mid);
+  color: var(--status-on);
+  background: var(--status);
   border-radius: 22px;
   padding: 5px 10px;
 }
@@ -458,8 +458,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .badge-muted {
-  background: var(--surface-2);
-  color: var(--text-muted);
+  background: var(--status);
+  color: var(--status-on);
 }
 
 .plan-card-meta {
@@ -523,7 +523,19 @@ h1, h2, h3, h4, h5, h6 {
   font-size: var(--text-body-small);
 }
 
-/* ---------- Buttons ---------- */
+/* ---------- Buttons (3-tier) ----------
+   Primary: brand red, white text — I'm In, Post plan, Post poll.
+   Soft: #965252, white text — sibling next to a primary (Interested).
+   Neutral: #ab9393, dark text — standalone utility (Edit, Cancel).
+   Disabled: beige, never a faded/pink red. */
+
+.btn,
+.btn-primary,
+.btn-soft,
+.btn-secondary {
+  -webkit-appearance: none;
+  appearance: none;
+}
 
 .btn {
   display: inline-flex;
@@ -540,30 +552,57 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid transparent;
 }
 
-.btn:active {
+.btn:active:not(:disabled) {
   transform: scale(0.98);
 }
 
-.btn-primary {
-  background: var(--accent);
+.btn-primary,
+a.btn-primary,
+button.btn-primary {
+  background: var(--red);
   color: var(--accent-on);
   box-shadow: none;
+  border: none;
 }
 
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled),
+a.btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
+  color: var(--accent-on);
   transform: translateY(-1px);
 }
 
-.btn-secondary {
-  background: transparent;
-  color: var(--text);
-  border: 1.5px solid var(--text);
+.btn-soft,
+button.btn-soft {
+  background: var(--btn-soft);
+  color: var(--btn-soft-on);
+  box-shadow: none;
+  border: none;
+  padding: 14px 22px;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  font-size: var(--text-body);
+  cursor: pointer;
 }
 
-.btn-secondary:hover {
-  background: var(--text);
-  color: var(--surface);
+.btn-soft:hover:not(:disabled) {
+  background: var(--btn-soft-hover);
+  color: var(--btn-soft-on);
+}
+
+.btn-secondary,
+a.btn-secondary,
+button.btn-secondary {
+  background: var(--btn-neutral);
+  color: var(--btn-neutral-on);
+  border: none;
+  box-shadow: none;
+}
+
+.btn-secondary:hover:not(:disabled),
+a.btn-secondary:hover:not(:disabled) {
+  background: var(--btn-neutral-hover);
+  color: var(--btn-neutral-on);
 }
 
 .btn-ghost {
@@ -575,8 +614,25 @@ h1, h2, h3, h4, h5, h6 {
   width: 100%;
 }
 
+.btn-primary:disabled,
+.btn-soft:disabled,
+.btn-secondary:disabled,
+.btn:disabled.btn-primary,
+.btn:disabled.btn-soft,
+.btn:disabled.btn-secondary,
+button.btn-primary:disabled,
+button.btn-secondary:disabled,
+a.btn-primary[aria-disabled="true"] {
+  background: var(--btn-disabled);
+  color: var(--btn-disabled-on);
+  opacity: 1;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+  filter: none;
+}
+
 .btn:disabled {
-  opacity: 0.55;
   cursor: not-allowed;
 }
 
@@ -642,47 +698,56 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .participation .btn-going {
-  background: var(--surface);
-  color: var(--accent);
+  background: var(--red);
+  color: var(--accent-on);
   font-size: var(--text-body);
   padding: 15px;
   border-radius: 16px;
-  border: 1.5px solid var(--accent);
+  border: none;
   box-shadow: none;
   font-weight: 600;
   letter-spacing: 0;
-  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  transition: background 120ms ease, color 120ms ease;
 }
 
-.participation .btn-going:hover {
-  background: var(--accent-soft);
+.participation .btn-going:hover:not(:disabled) {
+  background: var(--accent-hover);
 }
 
 .participation .btn-going.is-active {
   background: var(--red);
-  color: #FFFFFF;
-  border-color: var(--red);
-  box-shadow: none;
+  color: var(--accent-on);
+}
+
+.participation .btn-going:disabled {
+  background: var(--btn-disabled);
+  color: var(--btn-disabled-on);
+  opacity: 1;
 }
 
 .participation .btn-interested {
-  background: transparent;
-  color: var(--text);
-  border: 1.5px solid var(--text);
+  background: var(--btn-soft);
+  color: var(--btn-soft-on);
+  border: none;
   border-radius: 16px;
   padding: 15px;
   font-size: var(--text-body);
-  font-weight: 500;
+  font-weight: 600;
 }
 
-.participation .btn-interested:hover {
-  background: var(--tan);
+.participation .btn-interested:hover:not(:disabled) {
+  background: var(--btn-soft-hover);
 }
 
 .participation .btn-interested.is-active {
-  background: transparent;
-  color: var(--red);
-  border: 1.5px solid var(--red);
+  background: var(--btn-soft);
+  color: var(--btn-soft-on);
+}
+
+.participation .btn-interested:disabled {
+  background: var(--btn-disabled);
+  color: var(--btn-disabled-on);
+  opacity: 1;
 }
 
 /* ---------- Avatars + participant lists ---------- */
@@ -3096,7 +3161,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
 }
 .btn-block { width: 100%; }
 .btn-primary {
-  background: var(--accent, #2c2c2c);
+  background: var(--red);
   color: var(--accent-on);
   border: none;
   padding: 14px 22px;
@@ -3108,16 +3173,16 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
 }
 .btn-primary:disabled,
 .btn:disabled.btn-primary {
-  background: #c13b3b;
-  color: #fff;
-  opacity: 0.38;
+  background: var(--btn-disabled);
+  color: var(--btn-disabled-on);
+  opacity: 1;
   cursor: not-allowed;
   transform: none;
 }
 .btn-secondary {
-  background: transparent;
-  color: var(--text);
-  border: 1.5px solid var(--text);
+  background: var(--btn-neutral);
+  color: var(--btn-neutral-on);
+  border: none;
   padding: 12px 20px;
   border-radius: var(--radius-pill);
   font-weight: 600;
@@ -4881,8 +4946,9 @@ a.action-btn--stack {
   border: 1px solid var(--accent);
 }
 .profile-plan-chip--interested {
-  color: var(--text-muted);
-  border: 1px solid var(--border);
+  color: var(--status-on);
+  background: var(--status);
+  border: none;
 }
 /* Plain red text row — no dashed box, just a tappable line inside the card. */
 .profile-show-more-row {
@@ -6240,16 +6306,15 @@ a.action-btn--stack {
   white-space: nowrap;
   flex-shrink: 0;
 }
-/* Selected participation pills — red outline on white (never a red/pink fill). */
 .plan-card-state-pill--in {
-  background: var(--card);
-  color: var(--accent);
-  border: 1.5px solid var(--accent);
+  background: var(--red);
+  color: var(--accent-on);
+  border: none;
 }
 .plan-card-state-pill--interested {
-  background: var(--card);
-  color: var(--accent);
-  border: 1.5px solid var(--accent);
+  background: var(--btn-soft);
+  color: var(--btn-soft-on);
+  border: none;
 }
 
 .plan-card-kind-pill.is-confirmed {
@@ -7142,7 +7207,7 @@ a.action-btn--stack {
   color: var(--accent-hover);
 }
 
-/* Outlined Join pill — one main action per feed card. */
+/* Join CTA on feed cards — primary red. */
 .plan-card-quick-join {
   display: inline-flex;
   align-items: center;
@@ -7153,9 +7218,9 @@ a.action-btn--stack {
   font-size: var(--text-body);
   font-weight: 600;
   letter-spacing: 0;
-  color: var(--accent);
-  background: transparent;
-  border: 1.5px solid var(--accent);
+  color: var(--accent-on);
+  background: var(--red);
+  border: none;
   border-radius: 999px;
   cursor: pointer;
   white-space: nowrap;
@@ -7163,22 +7228,20 @@ a.action-btn--stack {
   transition: background 120ms ease, color 120ms ease;
 }
 .plan-card-quick-join:hover:not(:disabled) {
-  background: rgba(var(--accent-rgb), 0.06);
+  background: var(--accent-hover);
+  color: var(--accent-on);
 }
 .plan-card-quick-join.is-active {
-  background: var(--card);
-  color: var(--accent);
-  border-color: var(--accent);
+  background: var(--red);
+  color: var(--accent-on);
 }
-.plan-card-quick-join.is-full {
-  color: var(--text-muted);
-  border-color: var(--border-strong);
-  background: var(--tan-mid);
-  cursor: default;
-}
+.plan-card-quick-join.is-full,
 .plan-card-quick-join:disabled {
-  opacity: 0.55;
+  color: var(--btn-disabled-on);
+  background: var(--btn-disabled);
+  border: none;
   cursor: not-allowed;
+  opacity: 1;
 }
 
 .plan-card-suggest {
@@ -11183,8 +11246,8 @@ a.action-btn--stack {
   border-radius: 999px;
   font-size: var(--text-micro);
   font-weight: 700;
-  color: var(--red);
-  background: var(--tan);
+  color: var(--status-on);
+  background: var(--status);
   vertical-align: middle;
 }
 .xpl-comm-tag {
@@ -11207,12 +11270,14 @@ a.action-btn--stack {
 }
 .xpl-comm-join {
   cursor: pointer;
-  background: none;
-  color: var(--red);
+  background: var(--red);
+  color: var(--accent-on);
 }
 .xpl-comm-join--pending,
 .xpl-comm-joined {
   cursor: default;
+  background: var(--status);
+  color: var(--status-on);
 }
 .xpl-comm-empty {
   display: flex;
@@ -12583,7 +12648,7 @@ a.action-btn--stack {
 }
 .messages-row-meta {
   font-size: var(--text-body-small);
-  color: var(--faint);
+  color: var(--status);
   margin-top: 1px;
 }
 .messages-row-time {
@@ -13817,9 +13882,14 @@ a.action-btn--stack {
   margin-top: 0;
   padding: 15px !important;
   border-radius: 28px !important;
-  background: #d04040 !important;
+  background: var(--red) !important;
+  color: var(--accent-on) !important;
   font-size: var(--text-body) !important;
   font-weight: 600 !important;
+}
+.idea-primary-cta:disabled {
+  background: var(--btn-disabled) !important;
+  color: var(--btn-disabled-on) !important;
 }
 .idea-form-page .create-plan-invite-banner {
   margin: 0 0 12px;
