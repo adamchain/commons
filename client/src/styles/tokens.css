@@ -70,21 +70,26 @@
   --font-serif: var(--font-ui);
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono-Regular", Menlo, monospace;
 
-  /* Typography — Figma Visual Design Spec (single source of truth).
-     Prefer these vars everywhere; do not hardcode role sizes in components.
-     Supersedes older scale (body 15 / row 16 / card 20). */
-  --text-hero: 40px; /* Explore masthead — weight 800, white, ls -1.8 */
-  --text-page: 26px; /* Settings, Notifications — weight 800, ls -0.8 */
-  --text-screen-title: 20px; /* Messages, section heads — weight 700, ls -0.5 */
-  --text-card-large: 17px; /* Plan card titles — weight 600, ls -0.3 */
-  --text-card: 16px; /* Intent options / dense cards — weight 700, ls -0.3 */
-  --text-card-small: 13px; /* Row titles, chat names — weight 600, ls -0.2 */
-  --text-body: 13px; /* Body + form fields — weight 400 */
-  --text-body-small: 12px; /* Meta, previews — muted */
-  --text-caption: 10px; /* Section labels — weight 600, ls 1.5 */
-  --text-micro: 9px; /* Pills, tags, timestamps — weight 600, faint */
-  --text-meta: var(--text-body-small);
-  --text-row: var(--text-card-small);
+  /* Type scale — five roles only. Map every UI string to one of these.
+     Display · Title · Body · Label (small-caps eyebrows) · Caption (meta). */
+  --type-display: 26px;
+  --type-title: 20px;
+  --type-body: 13px;
+  --type-label: 10px;
+  --type-caption: 12px;
+
+  --text-hero: var(--type-display);
+  --text-page: var(--type-display);
+  --text-screen-title: var(--type-title);
+  --text-card-large: var(--type-title);
+  --text-card: var(--type-body);
+  --text-card-small: var(--type-body);
+  --text-body: var(--type-body);
+  --text-body-small: var(--type-caption);
+  --text-caption: var(--type-label);
+  --text-micro: var(--type-label);
+  --text-meta: var(--type-caption);
+  --text-row: var(--type-body);
 
   /* Semantic aliases (legacy + new) */
   --accent-rgb: 193, 59, 59;

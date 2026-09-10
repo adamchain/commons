@@ -507,26 +507,27 @@ export function PlanDetailPage() {
             </div>
           ) : (
             <div className="plan-detail-whenwhere">
-              {plan.isFlexibleLocation ? (
-                <span className="plan-detail-meta">
-                  <PlanDetailPinIcon />
-                  <span className="plan-detail-meta-label">
-                    Flexible · {formatWhen(plan.date, plan.time, plan.isFlexibleTime)}
-                  </span>
+              <div className="plan-detail-fact">
+                <span className="type-label">Date &amp; time</span>
+                <span className="plan-detail-fact-value">
+                  {formatWhen(plan.date, plan.time, plan.isFlexibleTime)}
                 </span>
-              ) : (
-                <a
-                  className="plan-detail-meta"
-                  href={mapsHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <PlanDetailPinIcon />
-                  <span className="plan-detail-meta-label">
-                    {plan.location.name} · {formatWhen(plan.date, plan.time, plan.isFlexibleTime)}
-                  </span>
-                </a>
-              )}
+              </div>
+              <div className="plan-detail-fact">
+                <span className="type-label">Location</span>
+                {plan.isFlexibleLocation ? (
+                  <span className="plan-detail-fact-value">Flexible</span>
+                ) : (
+                  <a
+                    className="plan-detail-fact-value"
+                    href={mapsHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {plan.location.name}
+                  </a>
+                )}
+              </div>
             </div>
           )}
           <button
@@ -573,10 +574,13 @@ export function PlanDetailPage() {
           }
         >
           <span className="host-row-text">
-            Started by <strong>{isHosting ? "you" : plan.creator.firstName}</strong>
-            {plan.coHosts && plan.coHosts.length > 0 && (
-              <> &amp; <strong>{plan.coHosts.map((h) => (h.id === user.id ? "you" : h.firstName)).join(" & ")}</strong></>
-            )}
+            <span className="host-row-label">Started by</span>
+            <strong>
+              {isHosting ? "you" : plan.creator.firstName}
+              {plan.coHosts && plan.coHosts.length > 0 && (
+                <> &amp; {plan.coHosts.map((h) => (h.id === user.id ? "you" : h.firstName)).join(" & ")}</>
+              )}
+            </strong>
           </span>
           <span className="host-row-chevron" aria-hidden="true">›</span>
         </button>
@@ -1140,25 +1144,6 @@ function PlanGuests({
         </div>
       )}
     </section>
-  );
-}
-
-function PlanDetailPinIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      className="plan-detail-meta-icon"
-      aria-hidden="true"
-    >
-      <path
-        d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"
-        fill="currentColor"
-      />
-      <circle cx="12" cy="10" r="3" fill="#fff" />
-    </svg>
   );
 }
 

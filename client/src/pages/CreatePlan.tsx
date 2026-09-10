@@ -1078,7 +1078,8 @@ export function CreatePlanPage() {
 
         <div className="host-row plan-detail-card">
           <span className="host-row-text">
-            Started by <strong>you</strong>
+            <span className="host-row-label">Started by</span>
+            <strong>you</strong>
           </span>
         </div>
 

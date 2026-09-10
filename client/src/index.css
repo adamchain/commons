@@ -173,17 +173,11 @@ h1, h2, h3, h4, h5, h6 {
 
 .brand {
   font-family: var(--font-display);
-  font-size: 34px;
+  font-size: var(--type-display);
   font-weight: 600;
   letter-spacing: -0.02em;
   margin: 0;
   line-height: 1.1;
-}
-
-@media (min-width: 720px) {
-  .brand {
-    font-size: 34px;
-  }
 }
 
 .brand-tagline {
@@ -203,7 +197,40 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
 }
 
-/* Screen title — 20px/700/ink, red underline bar */
+/* Five-role type utilities. Prefer these over one-off font-size declarations. */
+.type-display {
+  font-size: var(--type-display);
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  line-height: 1.15;
+}
+.type-title {
+  font-size: var(--type-title);
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+}
+.type-body {
+  font-size: var(--type-body);
+  font-weight: 400;
+  line-height: 1.65;
+}
+.type-label {
+  font-size: var(--type-label);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1.3;
+}
+.type-caption {
+  font-size: var(--type-caption);
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* Screen title — Title role, red underline bar */
 .screen-title {
   margin-bottom: 16px;
 }
@@ -232,16 +259,16 @@ h1, h2, h3, h4, h5, h6 {
   margin-bottom: 0;
 }
 
-/* Section label — 10px/600/muted/title case, flex + gap for inline icon */
+/* Section label — Label role */
 .ui-label {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: var(--text-caption);
+  font-size: var(--type-label);
   font-weight: 600;
   color: var(--muted);
-  letter-spacing: 1.5px;
-  text-transform: none;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   margin-bottom: 10px;
 }
 
@@ -901,11 +928,11 @@ a.btn-primary[aria-disabled="true"] {
 }
 
 .who-block-heading {
-  font-size: var(--text-body-small);
-  text-transform: none; /* no caps — final pass */
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
-  font-weight: 700;
+  font-size: var(--type-label);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  font-weight: 600;
   margin: 0 0 6px;
 }
 
@@ -1178,7 +1205,7 @@ a.btn-primary[aria-disabled="true"] {
 }
 .plan-detail-title {
   margin: 0;
-  font-size: var(--text-page);
+  font-size: var(--type-display);
   font-weight: 700;
   color: var(--ink);
   line-height: 1.15;
@@ -1288,7 +1315,7 @@ a.btn-primary[aria-disabled="true"] {
 }
 .plan-report-modal h4 {
   margin: 0 0 8px;
-  font-size: var(--text-page-small, 1.15rem);
+  font-size: var(--type-title);
   font-weight: 700;
   letter-spacing: -0.3px;
   color: var(--ink);
@@ -1402,9 +1429,30 @@ a.btn-primary[aria-disabled="true"] {
 }
 .plan-detail-whenwhere {
   display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 16px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.plan-detail-fact {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+.plan-detail-fact-value {
+  font-size: var(--type-body);
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.3;
+}
+a.plan-detail-fact-value {
+  text-decoration: none;
+  color: var(--ink);
+}
+a.plan-detail-fact-value:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .plan-detail-meta {
   display: inline-flex;
@@ -1480,16 +1528,12 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-/* Plan detail type scale. Body, rows, and buttons share --text-body (13px).
-   Labels/meta sit at --text-body-small (12px). Only the hero / lock-in title
-   stays larger (--text-screen-title). The 16px card size on chat + date/location
-   was making this page look mixed. */
+/* Plan detail: Display title, Label eyebrows, Body copy. */
 .plan-detail-page {
-  font-size: var(--text-body);
+  font-size: var(--type-body);
 }
 .plan-detail-page .plan-meta-value,
 .plan-detail-page .chat-entry-text,
-.plan-detail-page .who-block-heading,
 .plan-detail-page .action-btn--stack,
 .plan-detail-page .action-btn-label,
 .plan-detail-page .btn-primary,
@@ -1500,19 +1544,28 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
 .plan-detail-page .plan-meta-card--edit .location-autocomplete input,
 .plan-detail-page .plan-pass-hosting-option-title,
 .plan-detail-page .plan-transfer-pick {
-  font-size: var(--text-body);
+  font-size: var(--type-body);
 }
-.plan-detail-page .plan-meta-label,
 .plan-detail-page .chat-entry-count,
 .plan-detail-page .plan-meta-sub,
 .plan-detail-page .plan-meta-maps,
 .plan-detail-page .roster-name,
 .plan-detail-page .plan-pass-hosting-option-sub,
 .plan-detail-page .plan-transfer-picker-label {
-  font-size: var(--text-body-small);
+  font-size: var(--type-caption);
 }
 .plan-detail-page .who-block {
   margin-top: 0;
+}
+.plan-detail-page .plan-meta-label,
+.plan-detail-page .who-block-heading,
+.plan-detail-page .chat-preview-title,
+.plan-detail-page .host-row-label {
+  font-size: var(--type-label);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 .plan-hero-cover {
@@ -1556,9 +1609,6 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   }
   .plan-hero-cover {
     margin: -28px -28px 0;
-  }
-  .plan-hero h1 {
-    font-size: 32px;
   }
 }
 
@@ -1857,7 +1907,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
 }
 
 .login-mobile-brand .brand {
-  font-size: 36px;
+  font-size: var(--type-display);
 }
 
 @media (min-width: 900px) {
@@ -1877,7 +1927,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
 }
 
 .login-card-heading {
-  font-size: 30px;
+  font-size: var(--type-display);
   font-weight: 800;
   margin: 0 0 6px;
   letter-spacing: -0.01em;
@@ -2634,7 +2684,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
 
 @media (min-width: 720px) {
   .loader-wordmark {
-    font-size: 36px;
+    font-size: var(--type-display);
   }
 }
 
@@ -2796,7 +2846,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   gap: 8px;
   margin: 0 24px 18px;
   color: #fff;
-  font-size: 12px;
+  font-size: var(--type-label);
   font-weight: 700;
   letter-spacing: 0.22em;
   text-transform: uppercase;
@@ -2891,7 +2941,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-muted);
-  font-size: 13.5px;
+  font-size: var(--type-body);
   font-weight: 600;
   cursor: pointer;
   text-align: left;
@@ -2927,7 +2977,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   align-items: flex-start;
   gap: 10px;
   margin: 16px 0 14px;
-  font-size: 13.5px;
+  font-size: var(--type-body);
   line-height: 1.45;
   color: var(--text);
   text-transform: none;
@@ -2973,7 +3023,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   border-radius: var(--r-md);
   background: var(--accent-soft);
   color: var(--text);
-  font-size: 13.5px;
+  font-size: var(--type-body);
   line-height: 1.45;
   text-align: center;
 }
@@ -3043,7 +3093,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   color: #fff;
 }
 .onboarding-card--landing .loader-wordmark {
-  font-size: 44px;
+  font-size: var(--type-display);
   text-align: center;
   animation: none;
   margin: 0 0 8px;
@@ -3461,7 +3511,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   color: var(--text);
 }
 .path-picker-intent-head {
-  font-size: 24px;
+  font-size: var(--type-display);
   font-weight: 800;
   color: var(--ink);
   letter-spacing: -0.8px;
@@ -3612,10 +3662,11 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   min-width: 0;
 }
 .plan-meta-label {
-  font-size: var(--text-body-small);
-  color: var(--text-subtle);
+  font-size: var(--type-label);
+  color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.12em;
+  font-weight: 600;
 }
 .plan-meta-value {
   font-size: var(--text-card);
@@ -3645,9 +3696,29 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   margin-bottom: 16px;
   width: 100%;
   text-align: left;
-  font-size: var(--text-body);
+  font-size: var(--type-body);
   transition: background 120ms ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.host-row-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.host-row-label {
+  font-size: var(--type-label);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.host-row-text strong {
+  font-size: var(--type-body);
+  font-weight: 600;
+  color: var(--ink);
 }
 .host-row.plan-detail-card {
   margin-bottom: 0;
@@ -3796,9 +3867,11 @@ a.action-btn--stack {
   margin-bottom: 10px;
 }
 .chat-preview-title {
-  font-size: var(--text-body);
+  font-size: var(--type-label);
   font-weight: 600;
-  color: var(--text);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 .chat-preview-messages {
   display: flex;
@@ -4063,9 +4136,9 @@ a.action-btn--stack {
   padding: 16px;
 }
 .share-preview-fallback-emoji { font-size: 40px; }
-.share-preview-fallback-title { font-weight: 700; font-size: 18px; color: var(--text); }
+.share-preview-fallback-title { font-weight: 700; font-size: var(--type-title); color: var(--text); }
 .share-preview-caption {
-  font-size: 12.5px;
+  font-size: var(--type-caption);
   color: var(--text-muted);
   text-align: center;
 }
@@ -4130,7 +4203,7 @@ a.action-btn--stack {
   background: var(--surface-2);
   color: var(--text-muted);
 }
-.share-channel-label { font-size: 11.5px; color: var(--text-muted); }
+.share-channel-label { font-size: var(--type-caption); color: var(--text-muted); }
 
 /* Public event landing (logged-out shared-link funnel) + download-app step */
 .public-event {
@@ -4204,7 +4277,7 @@ a.action-btn--stack {
   border-radius: 999px;
 }
 .public-event-title {
-  font-size: 24px;
+  font-size: var(--type-display);
   line-height: 1.2;
   font-weight: 800;
   margin: 4px 0 10px;
@@ -4410,7 +4483,7 @@ a.action-btn--stack {
   text-decoration: none;
 }
 .profile-network-card-empty {
-  font-size: 13.5px;
+  font-size: var(--type-body);
   line-height: 1.5;
   color: var(--text-muted);
   margin: 0 0 14px;
@@ -5455,7 +5528,7 @@ a.action-btn--stack {
 .feed-forum-suggestion-text {
   flex: 1;
   min-width: 0;
-  font-size: 13.5px;
+  font-size: var(--type-body);
   font-weight: 600;
   color: var(--text);
   line-height: 1.35;
@@ -5801,7 +5874,7 @@ a.action-btn--stack {
 .welcome-headline {
   margin: 0;
   font-family: var(--font-ui);
-  font-size: 36px;
+  font-size: var(--type-display);
   line-height: 1.05;
   font-weight: 800;
   letter-spacing: -1.2px;
@@ -6211,7 +6284,7 @@ a.action-btn--stack {
   align-items: center;
   gap: 8px;
   color: var(--text-muted);
-  font-size: 13.5px;
+  font-size: var(--type-body);
   font-weight: 400;
 }
 .plan-card-meta-sub {
@@ -7312,7 +7385,7 @@ a.action-btn--stack {
   max-width: 92%;
   margin: 10px 0 2px;
   text-align: center;
-  font-size: 12.5px;
+  font-size: var(--type-caption);
   color: var(--text-muted);
   padding: 6px 12px;
   background: var(--surface-2);
@@ -8100,7 +8173,7 @@ a.action-btn--stack {
 }
 
 .filter-sheet-title {
-  font-size: 18px;
+  font-size: var(--type-title);
   font-weight: 800;
   margin: 0;
 }
@@ -9079,9 +9152,9 @@ a.action-btn--stack {
   justify-content: space-between;
   gap: 8px;
   margin: 0;
-  font-size: 13px;
+  font-size: var(--type-label);
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -9089,7 +9162,7 @@ a.action-btn--stack {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: var(--type-caption);
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
@@ -9658,11 +9731,11 @@ a.action-btn--stack {
   margin-top: 22px;
 }
 .settings-group-label {
-  font-size: var(--text-body-small);
+  font-size: var(--type-label);
   font-weight: 600;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--text-muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
   margin: 0 14px 10px;
 }
 .settings-card {
@@ -10374,7 +10447,7 @@ a.action-btn--stack {
 /* Poll creation modal */
 .poll-modal-title {
   margin: 0 0 2px;
-  font-size: 18px;
+  font-size: var(--type-title);
 }
 .poll-modal-sub {
   margin: 0 0 14px;
@@ -10782,11 +10855,11 @@ a.action-btn--stack {
 /* Section eyebrow — compact muted label. */
 .form-eyebrow {
   margin: 6px 0 -4px;
-  font-size: var(--text-body-small);
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--text-muted);
+  font-size: var(--type-label);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 /* Settings card — visibility segmented toggle + collapsible options. */
@@ -11092,15 +11165,15 @@ a.action-btn--stack {
   align-items: center;
   gap: 5px;
   margin-bottom: 6px;
-  font-size: var(--text-caption);
+  font-size: var(--type-label);
   font-weight: 600;
   color: rgba(255, 255, 255, 0.55);
-  letter-spacing: 1.4px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 .xpl-hero-title {
   margin: 0;
-  font-size: 32px;
+  font-size: var(--type-display);
   font-weight: 800;
   color: #fff;
   letter-spacing: -1.4px;
@@ -12058,13 +12131,13 @@ a.action-btn--stack {
 }
 .legal-doc-p {
   margin: 0 0 10px;
-  font-size: 14.5px;
+  font-size: var(--type-body);
   line-height: 1.6;
   color: var(--ink-700);
 }
 .legal-doc-subhead {
   margin: 12px 0 6px;
-  font-size: 14.5px;
+  font-size: var(--type-body);
   font-weight: 600;
   color: var(--text);
 }
@@ -12076,7 +12149,7 @@ a.action-btn--stack {
   gap: 5px;
 }
 .legal-doc-list li {
-  font-size: 14.5px;
+  font-size: var(--type-body);
   line-height: 1.55;
   color: var(--ink-700);
 }
@@ -12141,7 +12214,7 @@ a.action-btn--stack {
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-muted);
-  font-size: 13.5px;
+  font-size: var(--type-body);
   line-height: 1.45;
   font-weight: 400;
   text-align: left;
@@ -12240,7 +12313,7 @@ a.action-btn--stack {
 }
 .legal-modal-title {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--type-title);
   font-weight: 700;
 }
 .legal-modal-close {
@@ -12281,7 +12354,7 @@ a.action-btn--stack {
   border-radius: var(--r-md);
   border: 1px solid var(--accent);
   background: #fff;
-  font-size: 13.5px;
+  font-size: var(--type-body);
   font-weight: 600;
   color: var(--text);
   cursor: pointer;
@@ -12963,13 +13036,10 @@ a.action-btn--stack {
   background: var(--surface);
 }
 
-/* Global: drop shouty all-caps on common UI labels */
-.settings-group-label,
-.form-eyebrow,
+/* Chips stay sentence case — Label eyebrows keep tracked caps. */
 .community-chip,
 .plan-card-state-pill,
-.my-plans-section-title,
-.who-block-heading {
+.my-plans-section-title {
   text-transform: none;
   letter-spacing: 0;
 }
@@ -13581,7 +13651,7 @@ a.action-btn--stack {
 }
 .coach-title {
   margin: 0 0 6px;
-  font-size: 18px;
+  font-size: var(--type-title);
   font-weight: 700;
   color: var(--text);
 }
@@ -14109,7 +14179,7 @@ a.action-btn--stack {
   gap: 0;
 }
 .profile-other-stat-num {
-  font-size: 18px;
+  font-size: var(--type-title);
   font-weight: 700;
   color: var(--ink);
   letter-spacing: -0.4px;
@@ -14465,7 +14535,7 @@ a.action-btn--stack {
   box-shadow: 0 2px 10px rgba(193,59,59,0.12);
 }
 .helpchat-empty-title {
-  font-size: 22px;
+  font-size: var(--type-title);
   font-weight: 700;
   color: var(--text);
   margin: 0 0 8px;
@@ -14553,13 +14623,13 @@ a.action-btn--stack {
 .helpchat-md { display: flex; flex-direction: column; gap: 8px; }
 .helpchat-md-p { margin: 0; }
 .helpchat-md-h2 {
-  font-size: 15px;
+  font-size: var(--type-body);
   font-weight: 700;
   color: var(--text);
   margin: 4px 0 0;
 }
 .helpchat-md-h3 {
-  font-size: 13px;
+  font-size: var(--type-body);
   font-weight: 700;
   color: var(--text);
   text-transform: uppercase;
@@ -14584,7 +14654,7 @@ a.action-btn--stack {
 .helpchat-md em { font-style: italic; }
 .helpchat-code {
   font-family: ui-monospace, monospace;
-  font-size: 12px;
+  font-size: var(--type-caption);
   background: var(--tan-mid);
   color: var(--red);
   padding: 1px 5px;

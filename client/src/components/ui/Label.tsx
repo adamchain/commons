@@ -5,7 +5,7 @@ type Props = {
   className?: string;
 };
 
-/** Section label above rows/groups — 10px / 600 / muted / title case / ls 1.5 */
+/** Section label — Label role: 10px / 600 / muted / uppercase / tracked. */
 export function Label({ children, className = "" }: Props) {
   return <div className={`ui-label ${className}`.trim()}>{children}</div>;
 }
