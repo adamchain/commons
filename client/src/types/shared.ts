@@ -3,7 +3,7 @@
 
 // Community interest filters — final launch set (~16).
 // NOTE: internal tag ids stay stable for data compatibility. `events` is
-// relabeled "Local events" rather than renamed; `clubs` was removed.
+// relabeled "Local" rather than renamed; `clubs` was removed.
 export type InterestTag =
   | "coffee"
   | "food"
@@ -26,7 +26,7 @@ export const INTEREST_LABELS: Record<InterestTag, string> = {
   coffee: "Coffee",
   food: "Food",
   drinks: "Drinks",
-  events: "Local events",
+  events: "Local",
   night_out: "Night Out",
   music: "Music",
   books: "Books",

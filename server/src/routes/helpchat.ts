@@ -38,7 +38,7 @@ The feed shows plans happening in the **next 7 days** in your neighborhood, rank
 - **My plans** — plans you created, are going to, or marked Interested
 
 **Filter button** — tap to filter by:
-- Interest tags (Coffee, Food, Drinks, Local events, Night Out, Music, Books, Walks & Outdoors, Workouts, Wellness, Creative, Games, Co-Work, Moms, New to Philly, Sober)
+- Interest tags (Coffee, Food, Drinks, Local, Night Out, Music, Books, Walks & Outdoors, Workouts, Wellness, Creative, Games, Co-Work, Moms, New to Philly, Sober)
 - Date range
 - Time of day
 
@@ -206,7 +206,7 @@ Communities are **interest-based groups** tied to a neighborhood. Found in the E
 
 Forums are **interest-based discussion boards** — think a neighborhood bulletin board for a specific topic.
 
-Forums exist for: Coffee, Food, Drinks, Local events, Night Out, Music, Books, Walks & Outdoors, Workouts, New to Philly.
+Forums exist for: Coffee, Food, Drinks, Local, Night Out, Music, Books, Walks & Outdoors, Workouts, New to Philly.
 
 - Found in the **Messages** tab
 - You join/leave forums via **Settings → Forums**
@@ -263,7 +263,7 @@ Access via: your Profile → Settings (gear icon or Settings link)
 New users go through:
 1. **Phone number + 6-digit SMS code** (Twilio Verify — no password ever)
 2. **Pick your neighborhood** (Google Places autocomplete, scoped to Philadelphia neighborhoods)
-3. **Pick 3 interests** from a tile picker (Coffee ☕, Food 🍔, Drinks 🍸, Local events 🎉, Night Out 🌙, Music 🎵, Books 📚, Walks & Outdoors 🌳, Workouts 💪, Wellness 🧘, Creative 🎨, Games 🎲, Co-Work 💻, Moms 👩‍👧, New to Philly 🗽, Sober 🌱)
+3. **Pick 3 interests** from a tile picker (Coffee ☕, Food 🍔, Drinks 🍸, Local 🎉, Night Out 🌙, Music 🎵, Books 📚, Walks & Outdoors 🌳, Workouts 💪, Wellness 🧘, Creative 🎨, Games 🎲, Co-Work 💻, Moms 👩‍👧, New to Philly 🗽, Sober 🌱)
 4. **Build your avatar** (illustrated character builder)
 5. **"You're in" screen** — welcome to Commons
 
