@@ -8523,10 +8523,10 @@ a.action-btn--stack {
 
 .plan-card--compact .plan-card-title {
   font-family: var(--font-display);
-  font-size: var(--text-card-large);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: 1.15;
+  font-size: var(--type-display);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
   margin: 0;
 }
 
@@ -8582,6 +8582,15 @@ a.action-btn--stack {
 }
 .plan-card-flyer .plan-card-title {
   color: #fff;
+  font-size: var(--type-display);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+}
+.plan-card .cmy-header-count.plan-card-going-count {
+  color: var(--red, var(--accent));
+  font-size: var(--text-body);
+  font-weight: 700;
 }
 .plan-card-body {
   padding: var(--s-4);

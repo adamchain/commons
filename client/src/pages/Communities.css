@@ -510,7 +510,7 @@
 .cmy-header-count {
   font-size: var(--text-body);
   font-weight: 700;
-  color: var(--ink);
+  color: var(--red, var(--accent));
   line-height: 1.2;
 }
 .cmy-header-org {
@@ -592,9 +592,18 @@
 /* Detail header membership controls (Member / Leave / Join / Requested) —
    match the smaller Member pill. Scoped so list-page Create and settings
    actions keep their existing sizes. */
+.cmy-header .cmy-join-row .cmy-btn--primary {
+  background: var(--red);
+  color: var(--accent-on);
+  border: none;
+  min-height: 32px;
+  padding: 7px 16px;
+  font-size: var(--text-body);
+  font-weight: 600;
+}
 .cmy-header .cmy-member-pill,
 .cmy-header .cmy-status-pill,
-.cmy-header .cmy-join-row .cmy-btn,
+.cmy-header .cmy-join-row .cmy-btn--ghost,
 .cmy-locked-join .cmy-member-pill,
 .cmy-locked-join .cmy-status-pill,
 .cmy-locked-join .cmy-join-row .cmy-btn {

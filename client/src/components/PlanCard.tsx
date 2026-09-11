@@ -172,13 +172,11 @@ export function PlanCard({
                 </span>
               )}
               <span className="cmy-header-members-copy">
-                <span className="cmy-header-count">{peopleCountLabel}</span>
+                <span className="cmy-header-count plan-card-going-count">{peopleCountLabel}</span>
                 <span className="cmy-header-org">Organized by {plan.creator.firstName}</span>
               </span>
             </span>
-            {isHosting && !hasEnded && !isCancelled ? (
-              <span className="cmy-member-pill">Host</span>
-            ) : !isHosting && !hasEnded && !isCancelled ? (
+            {isHosting || hasEnded || isCancelled ? null : (
               <QuickJoin
                 planId={plan.id}
                 isLooking={isLooking}
@@ -186,7 +184,7 @@ export function PlanCard({
                 isFull={isFull}
                 onPlanRefresh={onPlanRefresh}
               />
-            ) : null}
+            )}
           </div>
 
           <div className="cmy-about">
@@ -398,63 +396,30 @@ function QuickJoin({
 
   if (isFull && !goingActive && !interestedActive && !isLooking) {
     return (
-      <span className="cmy-member-pill" aria-disabled="true">
+      <span className="plan-card-quick-join is-full" aria-disabled="true">
         Full
       </span>
     );
   }
 
-  const joinLabel = isLooking ? "Interested" : "I'm In";
+  const label = goingActive
+    ? "I'm in."
+    : interestedActive
+      ? "Interested ✓"
+      : isLooking
+        ? "Interested"
+        : "I'm In";
 
   return (
     <>
-      {goingActive || interestedActive ? (
-        <div
-          className="cmy-join-row"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-        >
-          <button
-            type="button"
-            className="cmy-member-pill"
-            onClick={(e) => void onTap(e)}
-            disabled={busy}
-          >
-            {goingActive ? "I'm in." : "Interested"}
-          </button>
-          <button
-            type="button"
-            className="cmy-btn cmy-btn--ghost cmy-btn--sm"
-            disabled={busy}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setShowSheet(true);
-            }}
-          >
-            Leave
-          </button>
-        </div>
-      ) : (
-        <div
-          className="cmy-join-row"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-        >
-          <button
-            type="button"
-            className="cmy-member-pill"
-            onClick={(e) => void onTap(e)}
-            disabled={busy}
-          >
-            {busy ? "…" : joinLabel}
-          </button>
-        </div>
-      )}
+      <button
+        type="button"
+        className={`plan-card-quick-join ${goingActive || interestedActive ? "is-active" : ""}`}
+        onClick={(e) => void onTap(e)}
+        disabled={busy}
+      >
+        {busy ? "…" : label}
+      </button>
       {confirm && <JoinConfirmPopup kind={confirm} onClose={() => setConfirm(null)} />}
       {showSheet &&
         createPortal(
