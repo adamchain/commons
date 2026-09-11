@@ -58,9 +58,9 @@ export function hrefForBack(state: NavFromState | null | undefined): string {
     case "search":
       return "/search";
     case "explore":
-      return "/explore";
+      return "/communities";
     case "community":
-      return state.communityId ? `/communities/${state.communityId}` : "/explore";
+      return state.communityId ? `/communities/${state.communityId}` : "/communities";
     case "network":
       return "/network";
     case "profile": {

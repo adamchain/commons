@@ -150,7 +150,7 @@ export function CreateCommunityPage() {
 
         {err && <p className="cmy-err">{err}</p>}
         <p className="cmy-hint cmy-create-note">
-          Your community goes live right away. Others can find it in Explore and join.
+          Your community goes live right away. Others can find it in Communities and join.
         </p>
         <button type="button" className="cmy-btn cmy-btn--primary cmy-btn--block" disabled={!canSubmit} onClick={submit}>
           Create community

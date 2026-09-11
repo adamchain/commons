@@ -11,7 +11,6 @@ import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format
 import { saveFeedScroll, type NavFromState } from "../lib/navState";
 import { isIdeaPlan, planHasEnded } from "../lib/planTime";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
-import "../pages/Communities.css";
 
 /**
  * Compact event card. Looking-for posts get a red left edge; confirmed
@@ -48,20 +47,34 @@ export function PlanCard({
   const interestedCount = plan.participants.interested.length;
   const totalRsvps = goingCount + interestedCount;
   const almostPlan = isLooking && !hasEnded && totalRsvps >= 2;
+  const spotsRemaining =
+    plan.capacity !== null && !hasEnded && !isCancelled
+      ? Math.max(0, plan.capacity - goingCount)
+      : null;
+  const showSpotsRemaining =
+    spotsRemaining !== null && plan.capacity !== null && spotsRemaining > 0 && spotsRemaining <= 3;
   const isFull = plan.capacity !== null && goingCount >= plan.capacity;
 
-  // Going first, then Interested — up to 4 faces, same as the community header.
-  const facepile = [...plan.participants.going, ...plan.participants.interested].slice(0, 4);
+  // Going first, then Interested — up to 3 faces so the footer stays compact.
+  const facepile = [...plan.participants.going, ...plan.participants.interested].slice(0, 3);
 
-  const peopleCountLabel = hasEnded && goingCount >= 1
-    ? `${goingCount} went`
-    : almostPlan
-      ? `${totalRsvps} interested`
-      : goingCount >= 1
-        ? `${goingCount} going`
-        : interestedCount >= 1
-          ? `${interestedCount} interested`
-          : "No one yet";
+  const footerSuffix = almostPlan
+    ? "almost a plan"
+    : hasEnded && goingCount >= 1
+      ? null
+      : isFull && !hasEnded && !isCancelled
+        ? "full"
+        : showSpotsRemaining
+          ? `${spotsRemaining} spot${spotsRemaining === 1 ? "" : "s"} left`
+          : null;
+
+  const showWentLabel = hasEnded && goingCount >= 1;
+  const showGoingLabel =
+    !almostPlan && !hasEnded && (goingCount >= 1 || interestedCount >= 1 || Boolean(footerSuffix));
+  const showInterestedLabel = almostPlan
+    ? totalRsvps >= 1
+    : !hasEnded && interestedCount > 0;
+  const showCountLabels = showWentLabel || showGoingLabel || showInterestedLabel;
 
   const openPlan = (hash?: string) => {
     if (navFrom.from === "feed") saveFeedScroll();
@@ -91,63 +104,88 @@ export function PlanCard({
         {coverImage ? (
           <div className="plan-card-flyer">
             <img src={coverImage} alt="" loading="lazy" />
-            <div className="cmy-cover-overlay">
-              {(isCancelled || hasEnded || (plan.communityId && plan.communityName)) && (
-                <div className="plan-card-kicker plan-card-kicker--on-cover">
-                  {isCancelled ? (
-                    <span className="cmy-cover-tag">Cancelled</span>
-                  ) : hasEnded ? (
-                    <span className="cmy-cover-tag">Happened</span>
-                  ) : null}
-                  {plan.communityId && plan.communityName ? (
-                    <span
-                      className="cmy-cover-tag"
-                      role="link"
-                      tabIndex={0}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        cardNavigate(`/communities/${plan.communityId}`);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          cardNavigate(`/communities/${plan.communityId}`);
-                        }
-                      }}
-                    >
-                      {plan.communityName}
-                    </span>
-                  ) : null}
-                </div>
-              )}
-              <h3 className="plan-card-title">{title}</h3>
-            </div>
           </div>
         ) : null}
         <div className="plan-card-body">
-          <div className="cmy-header-row">
-            <span
-              className="cmy-header-members"
-              role="link"
-              tabIndex={0}
-              aria-label={peopleCountLabel}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                openPlan("#guests");
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
+          <header className="plan-card-poster-row">
+            <Avatar
+              seed={plan.creator.avatarSeed}
+              style={plan.creator.avatarStyle}
+              photoDataUrl={plan.creator.avatarPhotoDataUrl}
+              params={plan.creator.avatarParams}
+              size="xs"
+            />
+            <span className="plan-card-posted-by">{plan.creator.firstName}</span>
+            {isCancelled ? (
+              <span className="plan-card-kind-pill is-cancelled">Cancelled</span>
+            ) : hasEnded ? (
+              <span className="plan-card-kind-pill is-happened">Happened</span>
+            ) : null}
+            {plan.communityId && plan.communityName ? (
+              <span
+                className="plan-card-community-pill"
+                role="link"
+                tabIndex={0}
+                onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  openPlan("#guests");
-                }
+                  cardNavigate(`/communities/${plan.communityId}`);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cardNavigate(`/communities/${plan.communityId}`);
+                  }
+                }}
+              >
+                {plan.communityName}
+              </span>
+            ) : null}
+          </header>
+          <h3 className="plan-card-title">{title}</h3>
+          <div className="plan-card-meta-row">
+            <p className="plan-card-meta-line plan-card-meta-line--single">
+              <span>{metaLine}</span>
+            </p>
+          </div>
+          {plan.description && (
+            <p className="plan-card-description">{plan.description}</p>
+          )}
+
+          {plan.flyerLinkUrl && (
+            <a
+              href={plan.flyerLinkUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="link-preview link-preview--card"
+              onClick={(e) => {
+                e.stopPropagation();
               }}
             >
+              {plan.flyerLinkPreview?.image && (
+                <img src={plan.flyerLinkPreview.image} alt="" className="link-preview-image" />
+              )}
+              <div className="link-preview-body">
+                {plan.flyerLinkPreview?.siteName && (
+                  <div className="link-preview-site">{plan.flyerLinkPreview.siteName}</div>
+                )}
+                {plan.flyerLinkPreview?.title ? (
+                  <div className="link-preview-title">{plan.flyerLinkPreview.title}</div>
+                ) : (
+                  <div className="link-preview-title">View link</div>
+                )}
+                {plan.flyerLinkPreview?.description && (
+                  <div className="link-preview-desc">{plan.flyerLinkPreview.description}</div>
+                )}
+              </div>
+            </a>
+          )}
+
+          <footer className="plan-card-footer-row">
+            <div className="plan-card-attendees">
               {facepile.length > 0 && (
-                <span className="cmy-header-avatars">
+                <div className="avatar-stack">
                   {facepile.map((person) => (
                     <button
                       key={person.id}
@@ -169,14 +207,64 @@ export function PlanCard({
                       />
                     </button>
                   ))}
-                </span>
+                </div>
               )}
-              <span className="cmy-header-members-copy">
-                <span className="cmy-header-count plan-card-going-count">{peopleCountLabel}</span>
-                <span className="cmy-header-org">Organized by {plan.creator.firstName}</span>
-              </span>
-            </span>
-            {isHosting || hasEnded || isCancelled ? null : (
+              {showCountLabels && (
+                <div className="plan-card-going-count">
+                  {showWentLabel && (
+                    <button
+                      type="button"
+                      className="plan-card-going-count--link"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openPlan("#guests");
+                      }}
+                    >
+                      {goingCount} went
+                    </button>
+                  )}
+                  {showGoingLabel && (
+                    <button
+                      type="button"
+                      className="plan-card-going-count--link"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openPlan("#guests");
+                      }}
+                    >
+                      {goingCount} <span className="plan-card-going-label">Going</span>
+                    </button>
+                  )}
+                  {showGoingLabel && showInterestedLabel && (
+                    <span className="plan-card-going-sep" aria-hidden="true">
+                      {" · "}
+                    </span>
+                  )}
+                  {showInterestedLabel && (
+                    <button
+                      type="button"
+                      className="plan-card-going-count--link"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openPlan("#guests");
+                      }}
+                    >
+                      {almostPlan ? totalRsvps : interestedCount} Interested
+                    </button>
+                  )}
+                  {footerSuffix && (showGoingLabel || showInterestedLabel) && (
+                    <span className="plan-card-going-sep">
+                      {" · "}
+                      {footerSuffix}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+            {!isHosting && !hasEnded && !isCancelled && (
               <QuickJoin
                 planId={plan.id}
                 isLooking={isLooking}
@@ -185,77 +273,7 @@ export function PlanCard({
                 onPlanRefresh={onPlanRefresh}
               />
             )}
-          </div>
-
-          <div className="cmy-about">
-            {!coverImage && (isCancelled || hasEnded || (plan.communityId && plan.communityName)) && (
-              <div className="plan-card-kicker">
-                {isCancelled ? (
-                  <span className="plan-card-kind-pill is-cancelled">Cancelled</span>
-                ) : hasEnded ? (
-                  <span className="plan-card-kind-pill is-happened">Happened</span>
-                ) : null}
-                {plan.communityId && plan.communityName ? (
-                  <span
-                    className="plan-card-community-pill"
-                    role="link"
-                    tabIndex={0}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      cardNavigate(`/communities/${plan.communityId}`);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        cardNavigate(`/communities/${plan.communityId}`);
-                      }
-                    }}
-                  >
-                    {plan.communityName}
-                  </span>
-                ) : null}
-              </div>
-            )}
-            {!coverImage && <h3 className="plan-card-title">{title}</h3>}
-            <div className="plan-card-meta-row">
-              <p className="plan-card-meta-line plan-card-meta-line--single">
-                <span>{metaLine}</span>
-              </p>
-            </div>
-            {plan.description && (
-              <p className="cmy-desc">{plan.description}</p>
-            )}
-            {plan.flyerLinkUrl && (
-              <a
-                href={plan.flyerLinkUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="link-preview link-preview--card"
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-              >
-                {plan.flyerLinkPreview?.image && (
-                  <img src={plan.flyerLinkPreview.image} alt="" className="link-preview-image" />
-                )}
-                <div className="link-preview-body">
-                  {plan.flyerLinkPreview?.siteName && (
-                    <div className="link-preview-site">{plan.flyerLinkPreview.siteName}</div>
-                  )}
-                  {plan.flyerLinkPreview?.title ? (
-                    <div className="link-preview-title">{plan.flyerLinkPreview.title}</div>
-                  ) : (
-                    <div className="link-preview-title">View link</div>
-                  )}
-                  {plan.flyerLinkPreview?.description && (
-                    <div className="link-preview-desc">{plan.flyerLinkPreview.description}</div>
-                  )}
-                </div>
-              </a>
-            )}
-          </div>
+          </footer>
         </div>
       </Link>
 

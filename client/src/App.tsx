@@ -11,7 +11,6 @@ import { needsOnboarding } from "./lib/onboarding";
 import { ChatPage } from "./pages/Chat";
 import { CreatePlanPage } from "./pages/CreatePlan";
 import { EditPlanPage } from "./pages/EditPlan";
-import { ExplorePage } from "./pages/Explore";
 import { FeedPage } from "./pages/Feed";
 import { NotificationsPage } from "./pages/Notifications";
 import { OnboardingPage } from "./pages/Onboarding";
@@ -167,7 +166,7 @@ export default function App() {
         <Route path="/login" element={<Navigate to="/onboarding" replace />} />
 
         <Route path="/" element={<Protected><FeedPage /></Protected>} />
-        <Route path="/explore" element={<Protected><ExplorePage /></Protected>} />
+        <Route path="/explore" element={<Navigate to="/communities" replace />} />
         <Route path="/search" element={<Protected><SearchPage /></Protected>} />
         <Route path="/communities" element={<Protected><CommunitiesPage /></Protected>} />
         <Route path="/communities/new" element={<Protected><CreateCommunityPage /></Protected>} />

@@ -3728,7 +3728,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0;
+  margin: 0 0 6px;
 }
 .plan-card-meta-line--single {
   display: block;
@@ -8523,11 +8523,11 @@ a.action-btn--stack {
 
 .plan-card--compact .plan-card-title {
   font-family: var(--font-display);
-  font-size: var(--type-display);
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  line-height: 1.1;
-  margin: 0;
+  font-size: var(--text-card-large);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  margin: 0 0 4px;
 }
 
 .plan-card--compact .plan-card-posted-by {
@@ -8561,83 +8561,15 @@ a.action-btn--stack {
 }
 
 .plan-card-flyer {
-  position: relative;
   margin: 0;
   height: 128px;
   aspect-ratio: auto;
-  display: flex;
-  align-items: flex-end;
   overflow: hidden;
   border-radius: 20px 20px 0 0;
   background: var(--surface-2);
 }
-.plan-card-flyer::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0.2) 60%, rgba(0, 0, 0, 0) 100%);
-}
-.plan-card-flyer .cmy-cover-overlay {
-  padding: var(--s-3) var(--s-4);
-}
-.plan-card-flyer .plan-card-title {
-  color: #fff;
-  font-size: var(--type-display);
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  line-height: 1.1;
-}
-.plan-card .cmy-header-count.plan-card-going-count {
-  color: var(--red, var(--accent));
-  font-size: var(--text-body);
-  font-weight: 700;
-}
 .plan-card-body {
-  padding: var(--s-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-2);
-}
-.plan-card .cmy-header-row {
-  flex-wrap: nowrap;
-  align-items: center;
-}
-.plan-card .cmy-about {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-2);
-}
-.plan-card-kicker {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.plan-card-kicker .plan-card-community-pill {
-  margin-left: 0;
-}
-.plan-card button.cmy-member-pill {
-  appearance: none;
-  font: inherit;
-  cursor: pointer;
-}
-.plan-card .cmy-member-pill,
-.plan-card .cmy-join-row .cmy-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  min-height: 28px;
-  padding: var(--s-1) var(--s-3);
-  font-size: 0.85rem;
-  font-weight: 700;
-  line-height: 1.2;
-}
-.plan-card .cmy-desc {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  padding: 10px 12px 10px;
 }
 .plan-card--compact.plan-card-link {
   padding: 0;
@@ -8666,8 +8598,6 @@ a.action-btn--stack {
 }
 
 .plan-card-flyer img {
-  position: absolute;
-  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;

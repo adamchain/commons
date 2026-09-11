@@ -37,7 +37,7 @@ function profileBackLabel(state: NavFromState | null): string {
     case "search":
       return "Search";
     case "explore":
-      return "Explore";
+      return "Communities";
     case "community":
       return "Community";
     case "plan":

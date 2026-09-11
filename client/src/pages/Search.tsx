@@ -60,8 +60,8 @@ export function SearchPage() {
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">
       <header className="app-header app-header--minimal">
-        <Link to="/explore" className="detail-back">
-          <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" /> Explore
+        <Link to="/communities" className="detail-back">
+          <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" /> Communities
         </Link>
       </header>
       <ScreenTitle title="Search" subtitle="Find plans and people on COMMONS" />

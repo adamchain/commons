@@ -80,7 +80,8 @@ export function BottomNav() {
       </NavLink>
 
       <NavLink
-        to="/explore"
+        to="/communities"
+        end
         className={({ isActive }) => `bottom-nav-item ${isActive ? "is-active" : ""}`}
         aria-label="Search"
       >

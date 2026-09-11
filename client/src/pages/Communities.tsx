@@ -48,7 +48,6 @@ export function CommunitiesPage() {
   const matchesCat = (c: CommunityCardDTO) => category === "all" || c.category === category;
   const mineFiltered = mine.filter(matchesCat);
   const browse = all.filter((c) => !mineIds.has(c.id)).filter(matchesCat);
-  const [hero, ...restMine] = mineFiltered;
   const catLabel = category === "all" ? null : COMMUNITY_CATEGORY_LABELS[category];
   const showBrowseEmpty = loaded && browse.length === 0 && mineFiltered.length === 0;
   const showBrowse = browse.length > 0 || showBrowseEmpty;
@@ -102,19 +101,14 @@ export function CommunitiesPage() {
         ))}
       </div>
 
-      {hero && (
+      {mineFiltered.length > 0 && (
         <section className="cmy-list-section">
-          <h2 className="cmy-list-section-title">Communities</h2>
-          <CommunityHeroCard c={hero} />
-          {restMine.length > 0 && (
-            <ul className="cmy-row-list">
-              {restMine.map((c) => (
-                <li key={c.id}>
-                  <CommunityRowCard c={c} />
-                </li>
-              ))}
-            </ul>
-          )}
+          <h2 className="cmy-list-section-title">Your communities</h2>
+          <div className="cmy-feed-grid">
+            {mineFiltered.map((c) => (
+              <CommunityFeedCard key={c.id} c={c} />
+            ))}
+          </div>
         </section>
       )}
 
@@ -141,13 +135,11 @@ export function CommunitiesPage() {
           />
         )}
         {browse.length > 0 && (
-          <ul className="cmy-browse-list">
+          <div className="cmy-feed-grid">
             {browse.map((c) => (
-              <li key={c.id}>
-                <CommunityBrowseRow c={c} onJoined={absorbJoin} />
-              </li>
+              <CommunityFeedCard key={c.id} c={c} onJoined={absorbJoin} />
             ))}
-          </ul>
+          </div>
         )}
       </section>
       )}
@@ -156,8 +148,8 @@ export function CommunitiesPage() {
   );
 }
 
-function memberMeta(c: CommunityCardDTO) {
-  return `${COMMUNITY_CATEGORY_LABELS[c.category]} · ${c.memberCount} ${c.memberCount === 1 ? "member" : "members"}`;
+function memberCountLabel(c: CommunityCardDTO) {
+  return `${c.memberCount} ${c.memberCount === 1 ? "member" : "members"}`;
 }
 
 function OrganizerAvatar({ user, size = "xs" }: { user: PublicUser; size?: "xs" | "sm" }) {
@@ -173,67 +165,41 @@ function OrganizerAvatar({ user, size = "xs" }: { user: PublicUser; size?: "xs" 
   );
 }
 
-function CommunityHeroCard({ c }: { c: CommunityCardDTO }) {
-  return (
-    <Link to={`/communities/${c.id}`} className="cmy-hero">
-      <CommunityCover coverImage={c.coverImage} category={c.category} className="cmy-hero-cover" iconSize={40} />
-      <div className="cmy-hero-shade" aria-hidden="true" />
-      <span className="cmy-joined-pill">Joined</span>
-      <div className="cmy-hero-foot">
-        <span className="cmy-hero-avatar">
-          <OrganizerAvatar user={c.organizer} size="sm" />
-        </span>
-        <div className="cmy-hero-copy">
-          <div className="cmy-hero-name">
-            {c.name}
-            {c.isFounding ? <span className="cmy-hero-founding">Founding</span> : null}
-          </div>
-          <div className="cmy-hero-meta">{memberMeta(c)}</div>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function CommunityRowCard({ c }: { c: CommunityCardDTO }) {
-  return (
-    <Link to={`/communities/${c.id}`} className="cmy-row">
-      <span className="cmy-row-thumb">
-        <CommunityCover coverImage={c.coverImage} category={c.category} iconSize={20} />
-        <span className="cmy-row-avatar">
-          <OrganizerAvatar user={c.organizer} />
-        </span>
-      </span>
-      <span className="cmy-row-info">
-        <span className="cmy-row-name">{c.name}</span>
-        <span className="cmy-row-meta">{memberMeta(c)}</span>
-      </span>
-      <span className="cmy-joined-pill cmy-joined-pill--quiet">Joined</span>
-    </Link>
-  );
-}
-
-function CommunityBrowseRow({
+function CommunityFeedCard({
   c,
   onJoined,
 }: {
   c: CommunityCardDTO;
-  onJoined: (updated: CommunityCardDTO) => void;
+  onJoined?: (updated: CommunityCardDTO) => void;
 }) {
+  const joined = c.myMembershipStatus === "active";
   return (
-    <Link to={`/communities/${c.id}`} className="cmy-browse">
-      <span className="cmy-browse-thumb">
-        <CommunityCover coverImage={c.coverImage} category={c.category} iconSize={18} />
-        <span className="cmy-row-avatar">
-          <OrganizerAvatar user={c.organizer} />
-        </span>
-      </span>
-      <span className="cmy-row-info">
-        <span className="cmy-row-name">{c.name}</span>
-        <span className="cmy-row-meta">{memberMeta(c)}</span>
-      </span>
-      <CommunityJoinLink c={c} onJoined={onJoined} />
-    </Link>
+    <div className="cmy-feed-card">
+      <Link to={`/communities/${c.id}`} className="cmy-feed-card-link">
+        <div className="cmy-feed-cover">
+          <CommunityCover
+            coverImage={c.coverImage}
+            category={c.category}
+            className="cmy-feed-cover-fill"
+            iconSize={40}
+          />
+        </div>
+        <div className="cmy-feed-body">
+          <header className="cmy-feed-poster">
+            <OrganizerAvatar user={c.organizer} />
+            <span className="cmy-feed-posted-by">{c.organizer.firstName}</span>
+            {c.isFounding ? <span className="cmy-feed-founding">Founding</span> : null}
+            {joined ? <span className="cmy-joined-pill cmy-joined-pill--quiet">Joined</span> : null}
+          </header>
+          <h3 className="cmy-feed-title">{c.name}</h3>
+          <p className="cmy-feed-meta">{COMMUNITY_CATEGORY_LABELS[c.category]}</p>
+          <footer className="cmy-feed-footer">
+            <span className="cmy-feed-count">{memberCountLabel(c)}</span>
+            {!joined && onJoined ? <CommunityJoinLink c={c} onJoined={onJoined} /> : null}
+          </footer>
+        </div>
+      </Link>
+    </div>
   );
 }
 
@@ -248,7 +214,7 @@ function CommunityJoinLink({ c, onJoined }: { c: CommunityCardDTO; onJoined: (up
   if (status === "pending") {
     return (
       <span
-        className="cmy-browse-join cmy-browse-join--pending"
+        className="cmy-feed-join cmy-feed-join--pending"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -288,7 +254,7 @@ function CommunityJoinLink({ c, onJoined }: { c: CommunityCardDTO; onJoined: (up
   }
 
   return (
-    <button type="button" className="cmy-browse-join" disabled={busy} onClick={handleClick}>
+    <button type="button" className="cmy-feed-join" disabled={busy} onClick={handleClick}>
       {busy ? "…" : c.hasScreening ? "Request" : "Join"}
     </button>
   );
