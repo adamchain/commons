@@ -91,6 +91,39 @@ export function PlanCard({
         {coverImage ? (
           <div className="plan-card-flyer">
             <img src={coverImage} alt="" loading="lazy" />
+            <div className="cmy-cover-overlay">
+              {(isCancelled || hasEnded || (plan.communityId && plan.communityName)) && (
+                <div className="plan-card-kicker plan-card-kicker--on-cover">
+                  {isCancelled ? (
+                    <span className="cmy-cover-tag">Cancelled</span>
+                  ) : hasEnded ? (
+                    <span className="cmy-cover-tag">Happened</span>
+                  ) : null}
+                  {plan.communityId && plan.communityName ? (
+                    <span
+                      className="cmy-cover-tag"
+                      role="link"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        cardNavigate(`/communities/${plan.communityId}`);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          cardNavigate(`/communities/${plan.communityId}`);
+                        }
+                      }}
+                    >
+                      {plan.communityName}
+                    </span>
+                  ) : null}
+                </div>
+              )}
+              <h3 className="plan-card-title">{title}</h3>
+            </div>
           </div>
         ) : null}
         <div className="plan-card-body">
@@ -157,7 +190,7 @@ export function PlanCard({
           </div>
 
           <div className="cmy-about">
-            {(isCancelled || hasEnded || (plan.communityId && plan.communityName)) && (
+            {!coverImage && (isCancelled || hasEnded || (plan.communityId && plan.communityName)) && (
               <div className="plan-card-kicker">
                 {isCancelled ? (
                   <span className="plan-card-kind-pill is-cancelled">Cancelled</span>
@@ -187,7 +220,7 @@ export function PlanCard({
                 ) : null}
               </div>
             )}
-            <h3 className="plan-card-title">{title}</h3>
+            {!coverImage && <h3 className="plan-card-title">{title}</h3>}
             <div className="plan-card-meta-row">
               <p className="plan-card-meta-line plan-card-meta-line--single">
                 <span>{metaLine}</span>
