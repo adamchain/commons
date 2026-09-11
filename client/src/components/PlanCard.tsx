@@ -447,7 +447,7 @@ function QuickJoin({
         >
           <button
             type="button"
-            className="cmy-btn cmy-btn--primary cmy-btn--sm"
+            className="cmy-member-pill"
             onClick={(e) => void onTap(e)}
             disabled={busy}
           >
