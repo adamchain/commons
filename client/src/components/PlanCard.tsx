@@ -11,6 +11,7 @@ import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format
 import { saveFeedScroll, type NavFromState } from "../lib/navState";
 import { isIdeaPlan, planHasEnded } from "../lib/planTime";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
+import "../pages/Communities.css";
 
 /**
  * Compact event card. Looking-for posts get a red left edge; confirmed
@@ -47,34 +48,20 @@ export function PlanCard({
   const interestedCount = plan.participants.interested.length;
   const totalRsvps = goingCount + interestedCount;
   const almostPlan = isLooking && !hasEnded && totalRsvps >= 2;
-  const spotsRemaining =
-    plan.capacity !== null && !hasEnded && !isCancelled
-      ? Math.max(0, plan.capacity - goingCount)
-      : null;
-  const showSpotsRemaining =
-    spotsRemaining !== null && plan.capacity !== null && spotsRemaining > 0 && spotsRemaining <= 3;
   const isFull = plan.capacity !== null && goingCount >= plan.capacity;
 
-  // Going first, then Interested — up to 3 faces so the footer stays compact.
-  const facepile = [...plan.participants.going, ...plan.participants.interested].slice(0, 3);
+  // Going first, then Interested — up to 4 faces, same as the community header.
+  const facepile = [...plan.participants.going, ...plan.participants.interested].slice(0, 4);
 
-  const footerSuffix = almostPlan
-    ? "almost a plan"
-    : hasEnded && goingCount >= 1
-      ? null
-      : isFull && !hasEnded && !isCancelled
-        ? "full"
-        : showSpotsRemaining
-          ? `${spotsRemaining} spot${spotsRemaining === 1 ? "" : "s"} left`
-          : null;
-
-  const showWentLabel = hasEnded && goingCount >= 1;
-  const showGoingLabel =
-    !almostPlan && !hasEnded && (goingCount >= 1 || interestedCount >= 1 || Boolean(footerSuffix));
-  const showInterestedLabel = almostPlan
-    ? totalRsvps >= 1
-    : !hasEnded && interestedCount > 0;
-  const showCountLabels = showWentLabel || showGoingLabel || showInterestedLabel;
+  const peopleCountLabel = hasEnded && goingCount >= 1
+    ? `${goingCount} went`
+    : almostPlan
+      ? `${totalRsvps} interested`
+      : goingCount >= 1
+        ? `${goingCount} going`
+        : interestedCount >= 1
+          ? `${interestedCount} interested`
+          : "No one yet";
 
   const openPlan = (hash?: string) => {
     if (navFrom.from === "feed") saveFeedScroll();
@@ -107,85 +94,27 @@ export function PlanCard({
           </div>
         ) : null}
         <div className="plan-card-body">
-          <header className="plan-card-poster-row">
-            <Avatar
-              seed={plan.creator.avatarSeed}
-              style={plan.creator.avatarStyle}
-              photoDataUrl={plan.creator.avatarPhotoDataUrl}
-              params={plan.creator.avatarParams}
-              size="xs"
-            />
-            <span className="plan-card-posted-by">{plan.creator.firstName}</span>
-            {isCancelled ? (
-              <span className="plan-card-kind-pill is-cancelled">Cancelled</span>
-            ) : hasEnded ? (
-              <span className="plan-card-kind-pill is-happened">Happened</span>
-            ) : null}
-            {plan.communityId && plan.communityName ? (
-              <span
-                className="plan-card-community-pill"
-                role="link"
-                tabIndex={0}
-                onClick={(e) => {
+          <div className="cmy-header-row">
+            <span
+              className="cmy-header-members"
+              role="link"
+              tabIndex={0}
+              aria-label={peopleCountLabel}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openPlan("#guests");
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
                   e.stopPropagation();
-                  cardNavigate(`/communities/${plan.communityId}`);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    cardNavigate(`/communities/${plan.communityId}`);
-                  }
-                }}
-              >
-                {plan.communityName}
-              </span>
-            ) : null}
-          </header>
-          <h3 className="plan-card-title">{title}</h3>
-          <div className="plan-card-meta-row">
-            <p className="plan-card-meta-line plan-card-meta-line--single">
-              <span>{metaLine}</span>
-            </p>
-          </div>
-          {plan.description && (
-            <p className="plan-card-description">{plan.description}</p>
-          )}
-
-          {plan.flyerLinkUrl && (
-            <a
-              href={plan.flyerLinkUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="link-preview link-preview--card"
-              onClick={(e) => {
-                e.stopPropagation();
+                  openPlan("#guests");
+                }
               }}
             >
-              {plan.flyerLinkPreview?.image && (
-                <img src={plan.flyerLinkPreview.image} alt="" className="link-preview-image" />
-              )}
-              <div className="link-preview-body">
-                {plan.flyerLinkPreview?.siteName && (
-                  <div className="link-preview-site">{plan.flyerLinkPreview.siteName}</div>
-                )}
-                {plan.flyerLinkPreview?.title ? (
-                  <div className="link-preview-title">{plan.flyerLinkPreview.title}</div>
-                ) : (
-                  <div className="link-preview-title">View link</div>
-                )}
-                {plan.flyerLinkPreview?.description && (
-                  <div className="link-preview-desc">{plan.flyerLinkPreview.description}</div>
-                )}
-              </div>
-            </a>
-          )}
-
-          <footer className="plan-card-footer-row">
-            <div className="plan-card-attendees">
               {facepile.length > 0 && (
-                <div className="avatar-stack">
+                <span className="cmy-header-avatars">
                   {facepile.map((person) => (
                     <button
                       key={person.id}
@@ -207,64 +136,16 @@ export function PlanCard({
                       />
                     </button>
                   ))}
-                </div>
+                </span>
               )}
-              {showCountLabels && (
-                <div className="plan-card-going-count">
-                  {showWentLabel && (
-                    <button
-                      type="button"
-                      className="plan-card-going-count--link"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        openPlan("#guests");
-                      }}
-                    >
-                      {goingCount} went
-                    </button>
-                  )}
-                  {showGoingLabel && (
-                    <button
-                      type="button"
-                      className="plan-card-going-count--link"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        openPlan("#guests");
-                      }}
-                    >
-                      {goingCount} <span className="plan-card-going-label">Going</span>
-                    </button>
-                  )}
-                  {showGoingLabel && showInterestedLabel && (
-                    <span className="plan-card-going-sep" aria-hidden="true">
-                      {" · "}
-                    </span>
-                  )}
-                  {showInterestedLabel && (
-                    <button
-                      type="button"
-                      className="plan-card-going-count--link"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        openPlan("#guests");
-                      }}
-                    >
-                      {almostPlan ? totalRsvps : interestedCount} Interested
-                    </button>
-                  )}
-                  {footerSuffix && (showGoingLabel || showInterestedLabel) && (
-                    <span className="plan-card-going-sep">
-                      {" · "}
-                      {footerSuffix}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-            {!isHosting && !hasEnded && !isCancelled && (
+              <span className="cmy-header-members-copy">
+                <span className="cmy-header-count">{peopleCountLabel}</span>
+                <span className="cmy-header-org">Organized by {plan.creator.firstName}</span>
+              </span>
+            </span>
+            {isHosting && !hasEnded && !isCancelled ? (
+              <span className="cmy-member-pill">Host</span>
+            ) : !isHosting && !hasEnded && !isCancelled ? (
               <QuickJoin
                 planId={plan.id}
                 isLooking={isLooking}
@@ -272,8 +153,78 @@ export function PlanCard({
                 isFull={isFull}
                 onPlanRefresh={onPlanRefresh}
               />
+            ) : null}
+          </div>
+
+          <div className="cmy-about">
+            {(isCancelled || hasEnded || (plan.communityId && plan.communityName)) && (
+              <div className="plan-card-kicker">
+                {isCancelled ? (
+                  <span className="plan-card-kind-pill is-cancelled">Cancelled</span>
+                ) : hasEnded ? (
+                  <span className="plan-card-kind-pill is-happened">Happened</span>
+                ) : null}
+                {plan.communityId && plan.communityName ? (
+                  <span
+                    className="plan-card-community-pill"
+                    role="link"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      cardNavigate(`/communities/${plan.communityId}`);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        cardNavigate(`/communities/${plan.communityId}`);
+                      }
+                    }}
+                  >
+                    {plan.communityName}
+                  </span>
+                ) : null}
+              </div>
             )}
-          </footer>
+            <h3 className="plan-card-title">{title}</h3>
+            <div className="plan-card-meta-row">
+              <p className="plan-card-meta-line plan-card-meta-line--single">
+                <span>{metaLine}</span>
+              </p>
+            </div>
+            {plan.description && (
+              <p className="cmy-desc">{plan.description}</p>
+            )}
+            {plan.flyerLinkUrl && (
+              <a
+                href={plan.flyerLinkUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="link-preview link-preview--card"
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+              >
+                {plan.flyerLinkPreview?.image && (
+                  <img src={plan.flyerLinkPreview.image} alt="" className="link-preview-image" />
+                )}
+                <div className="link-preview-body">
+                  {plan.flyerLinkPreview?.siteName && (
+                    <div className="link-preview-site">{plan.flyerLinkPreview.siteName}</div>
+                  )}
+                  {plan.flyerLinkPreview?.title ? (
+                    <div className="link-preview-title">{plan.flyerLinkPreview.title}</div>
+                  ) : (
+                    <div className="link-preview-title">View link</div>
+                  )}
+                  {plan.flyerLinkPreview?.description && (
+                    <div className="link-preview-desc">{plan.flyerLinkPreview.description}</div>
+                  )}
+                </div>
+              </a>
+            )}
+          </div>
         </div>
       </Link>
 
@@ -414,30 +365,63 @@ function QuickJoin({
 
   if (isFull && !goingActive && !interestedActive && !isLooking) {
     return (
-      <span className="plan-card-quick-join is-full" aria-disabled="true">
+      <span className="cmy-member-pill" aria-disabled="true">
         Full
       </span>
     );
   }
 
-  const label = goingActive
-    ? "I'm in."
-    : interestedActive
-      ? "Interested ✓"
-      : isLooking
-        ? "Interested"
-        : "I'm In";
+  const joinLabel = isLooking ? "Interested" : "I'm In";
 
   return (
     <>
-      <button
-        type="button"
-        className={`plan-card-quick-join ${goingActive || interestedActive ? "is-active" : ""}`}
-        onClick={(e) => void onTap(e)}
-        disabled={busy}
-      >
-        {busy ? "…" : label}
-      </button>
+      {goingActive || interestedActive ? (
+        <div
+          className="cmy-join-row"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        >
+          <button
+            type="button"
+            className="cmy-member-pill"
+            onClick={(e) => void onTap(e)}
+            disabled={busy}
+          >
+            {goingActive ? "I'm in." : "Interested"}
+          </button>
+          <button
+            type="button"
+            className="cmy-btn cmy-btn--ghost cmy-btn--sm"
+            disabled={busy}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowSheet(true);
+            }}
+          >
+            Leave
+          </button>
+        </div>
+      ) : (
+        <div
+          className="cmy-join-row"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        >
+          <button
+            type="button"
+            className="cmy-btn cmy-btn--primary cmy-btn--sm"
+            onClick={(e) => void onTap(e)}
+            disabled={busy}
+          >
+            {busy ? "…" : joinLabel}
+          </button>
+        </div>
+      )}
       {confirm && <JoinConfirmPopup kind={confirm} onClose={() => setConfirm(null)} />}
       {showSheet &&
         createPortal(

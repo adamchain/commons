@@ -3728,7 +3728,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 0 6px;
+  margin: 0;
 }
 .plan-card-meta-line--single {
   display: block;
@@ -8527,7 +8527,7 @@ a.action-btn--stack {
   font-weight: 700;
   letter-spacing: -0.01em;
   line-height: 1.15;
-  margin: 0 0 4px;
+  margin: 0;
 }
 
 .plan-card--compact .plan-card-posted-by {
@@ -8569,7 +8569,51 @@ a.action-btn--stack {
   background: var(--surface-2);
 }
 .plan-card-body {
-  padding: 10px 12px 10px;
+  padding: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.plan-card .cmy-header-row {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+.plan-card .cmy-about {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.plan-card-kicker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.plan-card-kicker .plan-card-community-pill {
+  margin-left: 0;
+}
+.plan-card button.cmy-member-pill {
+  appearance: none;
+  font: inherit;
+  cursor: pointer;
+}
+.plan-card .cmy-member-pill,
+.plan-card .cmy-join-row .cmy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 28px;
+  padding: var(--s-1) var(--s-3);
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.plan-card .cmy-desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .plan-card--compact.plan-card-link {
   padding: 0;

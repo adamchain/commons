@@ -549,6 +549,12 @@
   margin-top: var(--s-1);
 }
 
+.cmy-join-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
 .cmy-join-col {
   display: flex;
   flex-direction: column;
