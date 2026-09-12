@@ -484,7 +484,7 @@ function JoinControl({
   if (status === "active") {
     return (
       <div className="cmy-join-row">
-        <span className="cmy-member-pill">Member</span>
+        <span className="cmy-member-pill">Joined</span>
         {!community.isOrganizer && (
           <button type="button" className="cmy-btn cmy-btn--ghost cmy-btn--sm" disabled={busy} onClick={() => void doLeave()}>
             {busy ? "Leaving…" : "Leave"}
@@ -495,11 +495,8 @@ function JoinControl({
   }
   if (isPending) {
     return (
-      <div className="cmy-join-col">
-        <span className="cmy-status-pill">Requested</span>
-        <p className="cmy-pending-note">
-          Request sent — organizers usually respond within a day.
-        </p>
+      <div className="cmy-join-row">
+        <span className="cmy-joined-pill cmy-joined-pill--quiet">Requested</span>
       </div>
     );
   }

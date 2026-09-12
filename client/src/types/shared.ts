@@ -684,6 +684,8 @@ export interface CommunityCardDTO {
   myMembershipStatus: CommunityMemberStatus | null;
   /** True when a screening question is set (join CTA reads "Request" instead of "Join"). */
   hasScreening: boolean;
+  /** Up to 3 active members for the card facepile. */
+  memberPreview: PublicUser[];
 }
 
 /** Row in the admin "Pending communities" review queue. */

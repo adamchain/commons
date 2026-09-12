@@ -318,12 +318,22 @@
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
+button.cmy-joined-pill {
+  appearance: none;
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+.cmy-compact-join {
+  background: var(--red);
+  color: var(--accent-on);
+  border: none;
+}
 
 /* Full-bleed lead card for the first joined community. */
 .cmy-hero {
   position: relative;
   display: block;
-  height: 196px;
+  height: 240px;
   border-radius: var(--r-lg);
   overflow: hidden;
   text-decoration: none;
@@ -340,14 +350,22 @@
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.18) 48%, rgba(0, 0, 0, 0.08) 100%);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.78) 0%, rgba(0, 0, 0, 0.2) 52%, rgba(0, 0, 0, 0.06) 100%);
   pointer-events: none;
 }
-.cmy-hero .cmy-joined-pill {
+.cmy-hero-founding {
   position: absolute;
   top: 12px;
   right: 12px;
   z-index: 2;
+  font-size: var(--text-body-small);
+  font-weight: 700;
+  letter-spacing: 0;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid rgba(255, 255, 255, 0.28);
 }
 .cmy-hero-foot {
   position: absolute;
@@ -355,9 +373,13 @@
   right: 12px;
   bottom: 12px;
   z-index: 2;
+}
+.cmy-hero-copy { min-width: 0; }
+.cmy-hero-organizer {
   display: flex;
-  align-items: flex-end;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 .cmy-hero-avatar {
   flex-shrink: 0;
@@ -365,24 +387,119 @@
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
   line-height: 0;
 }
-.cmy-hero-copy { min-width: 0; }
+.cmy-hero-org-name {
+  font-size: var(--text-body-small);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+}
 .cmy-hero-name {
-  font-weight: 800;
+  font-family: var(--font-display);
+  font-weight: 700;
   font-size: var(--text-card-large);
-  letter-spacing: -0.3px;
-  line-height: 1.2;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  margin: 0;
+}
+.cmy-hero-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 10px;
+}
+.cmy-hero-members {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 8px;
 }
-.cmy-hero-founding {
-  font-size: var(--text-micro);
+.cmy-hero-members .cmy-header-avatars > * {
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25);
+}
+.cmy-hero-count {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-body-small);
   font-weight: 700;
-  letter-spacing: 0.04em;
-  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.cmy-compact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cmy-compact {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+  background: var(--card);
+  border-radius: var(--r-lg);
+  padding: 10px 12px;
+  box-shadow: var(--shadow-sm);
+}
+.cmy-compact-thumb {
+  width: 88px;
+  height: 88px;
+  border-radius: 16px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--surface-2);
+}
+.cmy-compact-thumb .cmy-cover-media {
+  width: 100%;
+  height: 100%;
+}
+.cmy-compact-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+.cmy-compact-org {
+  font-size: var(--text-body-small);
+  color: var(--faint);
+  font-weight: 400;
+}
+.cmy-compact-title {
+  font-family: var(--font-display);
+  font-size: var(--text-card-large);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  color: var(--ink);
+}
+.cmy-compact-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.cmy-compact-cat {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--text-body-small);
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
   padding: 2px 8px;
-  border-radius: var(--r-pill);
+  line-height: 1.2;
+}
+.cmy-compact-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+}
+.cmy-compact-members {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 .cmy-hero-meta {
   font-size: var(--text-body-small);

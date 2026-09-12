@@ -105,6 +105,11 @@ function toCommunityCard(
   users: Awaited<ReturnType<typeof findUsersByIds>>,
 ): CommunityCardDTO {
   const membership = store.findCommunityMembership(community.id, viewerId);
+  const active = store.listActiveCommunityMembers(community.id);
+  const ordered = [
+    ...active.filter((m) => m.userId === community.organizerId),
+    ...active.filter((m) => m.userId !== community.organizerId),
+  ];
   return {
     id: community.id,
     name: community.name,
@@ -116,6 +121,7 @@ function toCommunityCard(
     myRole: membership?.status === "active" ? membership.role : null,
     myMembershipStatus: membership?.status ?? null,
     hasScreening: !!community.screeningQuestion,
+    memberPreview: ordered.slice(0, 3).map((m) => publicFor(m.userId, users)),
   };
 }
 
@@ -123,7 +129,14 @@ async function toCommunityCards(
   communities: CommunityRecord[],
   viewerId: string,
 ): Promise<CommunityCardDTO[]> {
-  const users = await findUsersByIds(communities.map((c) => c.organizerId));
+  const ids = new Set<string>();
+  for (const c of communities) {
+    ids.add(c.organizerId);
+    for (const m of store.listActiveCommunityMembers(c.id).slice(0, 6)) {
+      ids.add(m.userId);
+    }
+  }
+  const users = await findUsersByIds([...ids]);
   return communities.map((c) => toCommunityCard(c, viewerId, users));
 }
 
