@@ -4416,6 +4416,9 @@ a.action-btn--stack {
   text-transform: none;
   margin: 0 0 9px;
 }
+.profile-section-label--inline {
+  margin: 0;
+}
 .profile-network-card {
   background: var(--surface);
   border-radius: 20px;
@@ -11456,6 +11459,9 @@ a.action-btn--stack {
 }
 
 /* Profile — "Communities" section. */
+#profile-communities {
+  scroll-margin-top: calc(var(--topbar-height, 56px) + 12px);
+}
 .profile-communities-list {
   display: flex;
   flex-direction: column;

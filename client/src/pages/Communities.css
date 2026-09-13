@@ -286,6 +286,12 @@
   border-color: var(--ink);
   font-weight: 600;
 }
+a.cmy-cat-pill--yours {
+  color: var(--red);
+  border-color: rgba(193, 59, 59, 0.35);
+  font-weight: 600;
+  text-decoration: none;
+}
 
 .cmy-joined-pill {
   flex-shrink: 0;

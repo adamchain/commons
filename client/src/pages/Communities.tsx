@@ -6,6 +6,7 @@ import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
 import { JoinConfirmPopup } from "../components/JoinConfirmPopup";
 import { EmptyCard } from "../components/ui";
+import { useAuth } from "../context/AuthContext";
 import {
   ALL_COMMUNITY_CATEGORIES,
   COMMUNITY_CATEGORY_LABELS,
@@ -18,7 +19,7 @@ import "./Communities.css";
 
 export function CommunitiesPage() {
   const navigate = useNavigate();
-  const [mine, setMine] = useState<CommunityCardDTO[]>([]);
+  const { user } = useAuth();
   const [all, setAll] = useState<CommunityCardDTO[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [category, setCategory] = useState<CommunityCategory | "all">("all");
@@ -28,12 +29,8 @@ export function CommunitiesPage() {
     let live = true;
     (async () => {
       try {
-        const [m, a] = await Promise.all([
-          api<{ communities: CommunityCardDTO[] }>("/api/communities/mine"),
-          api<{ communities: CommunityCardDTO[] }>("/api/communities"),
-        ]);
+        const a = await api<{ communities: CommunityCardDTO[] }>("/api/communities");
         if (!live) return;
-        setMine(m.communities);
         setAll(a.communities);
       } finally {
         if (live) setLoaded(true);
@@ -44,21 +41,14 @@ export function CommunitiesPage() {
     };
   }, []);
 
-  const mineIds = new Set(mine.map((c) => c.id));
   const matchesCat = (c: CommunityCardDTO) => category === "all" || c.category === category;
-  const mineFiltered = mine.filter(matchesCat);
-  const browse = all.filter((c) => !mineIds.has(c.id)).filter(matchesCat);
-  const [hero, ...restMine] = mineFiltered;
+  const browse = all.filter(matchesCat);
   const catLabel = category === "all" ? null : COMMUNITY_CATEGORY_LABELS[category];
-  const showBrowseEmpty = loaded && browse.length === 0 && mineFiltered.length === 0;
-  const showBrowse = browse.length > 0 || showBrowseEmpty;
+  const showBrowseEmpty = loaded && browse.length === 0;
 
   function absorbJoin(updated: CommunityCardDTO) {
     setAll((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-    if (updated.myMembershipStatus === "active") {
-      setMine((prev) => (prev.some((p) => p.id === updated.id) ? prev : [...prev, updated]));
-      setJoinConfirm(true);
-    }
+    if (updated.myMembershipStatus === "active") setJoinConfirm(true);
   }
 
   return (
@@ -77,7 +67,15 @@ export function CommunitiesPage() {
         </button>
       </header>
 
-      <div className="cmy-cat-pills" role="tablist" aria-label="Filter by category">
+      <div className="cmy-cat-pills">
+        {user && (
+          <Link
+            to={`/profile/${user.id}#communities`}
+            className="cmy-cat-pill cmy-cat-pill--yours"
+          >
+            Your communities
+          </Link>
+        )}
         <button
           type="button"
           role="tab"
@@ -101,21 +99,6 @@ export function CommunitiesPage() {
         ))}
       </div>
 
-      {hero && (
-        <section className="cmy-list-section">
-          <h2 className="cmy-list-section-title">Your communities</h2>
-          <CommunityHeroCard c={hero} />
-          {restMine.length > 0 && (
-            <div className="cmy-compact-list">
-              {restMine.map((c) => (
-                <CommunityCompactCard key={c.id} c={c} />
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
-      {showBrowse && (
       <section className="cmy-list-section">
         <h2 className="cmy-list-section-title">
           {catLabel ? `Browse · ${catLabel}` : "Browse"}
@@ -145,7 +128,6 @@ export function CommunitiesPage() {
           </div>
         )}
       </section>
-      )}
       {joinConfirm && <JoinConfirmPopup kind="community" onClose={() => setJoinConfirm(false)} />}
     </main>
   );
@@ -183,7 +165,7 @@ function MemberFacepile({ people }: { people: PublicUser[] }) {
   );
 }
 
-function OrganizerAvatar({ user, size = "xs" }: { user: PublicUser; size?: "xs" | "sm" }) {
+function OrganizerAvatar({ user }: { user: PublicUser }) {
   return (
     <Avatar
       seed={user.avatarSeed}
@@ -191,40 +173,8 @@ function OrganizerAvatar({ user, size = "xs" }: { user: PublicUser; size?: "xs" 
       photoDataUrl={user.avatarPhotoDataUrl}
       params={user.avatarParams}
       name={user.firstName}
-      size={size}
+      size="xs"
     />
-  );
-}
-
-function CommunityHeroCard({ c }: { c: CommunityCardDTO }) {
-  return (
-    <Link to={`/communities/${c.id}`} className="cmy-hero">
-      <CommunityCover
-        coverImage={c.coverImage}
-        category={c.category}
-        className="cmy-hero-cover"
-        iconSize={40}
-      />
-      <div className="cmy-hero-shade" aria-hidden="true" />
-      {c.isFounding ? <span className="cmy-hero-founding">Founding</span> : null}
-      <div className="cmy-hero-foot">
-        <div className="cmy-hero-copy">
-          <div className="cmy-hero-organizer">
-            <span className="cmy-hero-avatar">
-              <OrganizerAvatar user={c.organizer} size="sm" />
-            </span>
-            <span className="cmy-hero-org-name">{c.organizer.firstName}</span>
-          </div>
-          <h3 className="cmy-hero-name">{c.name}</h3>
-          <p className="cmy-hero-cats">{categoryLine(c)}</p>
-          <div className="cmy-hero-members">
-            <MemberFacepile people={c.memberPreview ?? []} />
-            <span className="cmy-hero-count">{memberCountLabel(c)}</span>
-            <span className="cmy-joined-pill cmy-joined-pill--member">Joined</span>
-          </div>
-        </div>
-      </div>
-    </Link>
   );
 }
 
@@ -244,7 +194,7 @@ function CommunityCompactCard({
       <span className="cmy-compact-body">
         <span className="cmy-compact-org">
           <span className="cmy-compact-org-avatar">
-            <OrganizerAvatar user={c.organizer} size="xs" />
+            <OrganizerAvatar user={c.organizer} />
           </span>
           <span className="cmy-compact-org-name">{c.organizer.firstName}</span>
         </span>

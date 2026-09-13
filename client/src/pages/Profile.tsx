@@ -114,12 +114,26 @@ export function ProfilePage() {
   }, [userId]);
 
   useEffect(() => {
-    if (isSelf) {
+    if (!isSelf) {
+      setCommunities([]);
+      return;
+    }
+    const loadMine = () =>
       void api<{ communities: CommunityCardDTO[] }>("/api/communities/mine")
         .then((r) => setCommunities(r.communities))
         .catch(() => setCommunities([]));
-    }
+    loadMine();
+    const onVis = () => {
+      if (document.visibilityState === "visible") loadMine();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
   }, [isSelf]);
+
+  useEffect(() => {
+    if (!isSelf || location.hash !== "#communities") return;
+    document.getElementById("profile-communities")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [isSelf, location.hash, communities.length, profile]);
 
   useEffect(() => {
     if (!isSelf) return;
@@ -494,9 +508,14 @@ export function ProfilePage() {
         <div className="profile-divider" />
       </section>
 
-      {communities.length > 0 && (
-        <section className="profile-block">
-          <h3 className="profile-section-label">Communities</h3>
+      <section className="profile-block" id="profile-communities">
+        <div className="profile-block-heading-row">
+          <h3 className="profile-section-label profile-section-label--inline">Communities</h3>
+          <Link to="/communities" className="profile-see-all-link">
+            View more →
+          </Link>
+        </div>
+        {communities.length > 0 ? (
           <div className="profile-communities-list">
             {communities.map((c) => (
                 <Link key={c.id} to={`/communities/${c.id}`} className="profile-community-row">
@@ -517,8 +536,10 @@ export function ProfilePage() {
                 </Link>
             ))}
           </div>
-        </section>
-      )}
+        ) : (
+          <p className="profile-community-meta">Join a community and it’ll show up here.</p>
+        )}
+      </section>
 
       <YourPlansBlock
         id="profile-plans-block"
