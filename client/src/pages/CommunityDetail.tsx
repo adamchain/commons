@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { MessageCircle } from "lucide-react";
+import { Calendar, MessageCircle, Users } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
@@ -153,11 +153,11 @@ export function CommunityDetailPage() {
           >
             ←
           </button>
+          {community.isFounding && <span className="cmy-cover-founding">Founding</span>}
           <div className="cmy-cover-overlay">
-            <span className="cmy-cover-tag">{catLabel}</span>
-            <div className="cmy-cover-title-row">
-              <h1 className="cmy-name">{community.name}</h1>
-              {community.isFounding && <span className="cmy-founding">★ Founding</span>}
+            <h1 className="cmy-name">{community.name}</h1>
+            <div className="cmy-cover-pills">
+              <span className="cmy-cover-tag">{catLabel}</span>
             </div>
           </div>
         </div>
@@ -171,7 +171,7 @@ export function CommunityDetailPage() {
             >
               {members.length > 0 && (
                 <span className="cmy-header-avatars">
-                  {members.slice(0, 4).map((m) => (
+                  {members.slice(0, 3).map((m) => (
                     <Avatar
                       key={m.user.id}
                       seed={m.user.avatarSeed}
@@ -187,7 +187,7 @@ export function CommunityDetailPage() {
                 <span className="cmy-header-count">
                   {community.memberCount} {community.memberCount === 1 ? "member" : "members"}
                 </span>
-                <span className="cmy-header-org">Organized by {community.organizer.firstName}</span>
+                <span className="cmy-header-org">Philadelphia</span>
               </span>
             </button>
             <JoinControl
@@ -195,6 +195,7 @@ export function CommunityDetailPage() {
               onChange={setCommunity}
               reload={load}
               onJoined={() => setJoinConfirm(true)}
+              compact
             />
           </div>
           {community.description && (
@@ -313,10 +314,11 @@ function JoinRequestsPanel({
   if (!canManage) return null;
   if (pending.length === 0) {
     return (
-      <div className="cmy-requests cmy-requests--empty">
-        <h3 className="cmy-subhead">Join requests</h3>
-        <p className="cmy-muted">No pending requests.</p>
-      </div>
+      <TabEmpty
+        icon={<Users size={24} strokeWidth={1.6} />}
+        headline="No pending requests"
+        body="When someone asks to join, they’ll show up here."
+      />
     );
   }
 
@@ -352,6 +354,26 @@ function JoinRequestsPanel({
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function TabEmpty({
+  icon,
+  headline,
+  body,
+}: {
+  icon: ReactNode;
+  headline: string;
+  body: string;
+}) {
+  return (
+    <div className="chat-empty-card" role="status">
+      <div className="chat-empty-glyph" aria-hidden>
+        {icon}
+      </div>
+      <div className="chat-empty-headline">{headline}</div>
+      <p className="chat-empty-body">{body}</p>
     </div>
   );
 }
@@ -399,14 +421,25 @@ function LockedPanel({
   reload: () => Promise<void>;
   onJoined: () => void;
 }) {
+  const pending = community.myMembership?.status === "pending";
   return (
     <section className="cmy-tabpanel">
       <div className="cmy-locked">
-        <span className="cmy-locked-icon" aria-hidden="true">🔒</span>
-        <p className="cmy-locked-text">Join to see what’s happening inside.</p>
-        <div className="cmy-locked-join">
-          <JoinControl community={community} onChange={onChange} reload={reload} onJoined={onJoined} />
-        </div>
+        {pending ? (
+          <>
+            <p className="cmy-locked-text">Request pending</p>
+            <p className="cmy-locked-sub">
+              You’ll get a notification once the organizer approves you.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="cmy-locked-text">Join to see what’s happening inside.</p>
+            <div className="cmy-locked-join">
+              <JoinControl community={community} onChange={onChange} reload={reload} onJoined={onJoined} />
+            </div>
+          </>
+        )}
       </div>
     </section>
   );
@@ -417,11 +450,13 @@ function JoinControl({
   onChange,
   reload,
   onJoined,
+  compact = false,
 }: {
   community: CommunityDTO;
   onChange: (c: CommunityDTO) => void;
   reload: () => Promise<void>;
   onJoined: () => void;
+  compact?: boolean;
 }) {
   const [asking, setAsking] = useState(false);
   const [answer, setAnswer] = useState("");
@@ -484,8 +519,8 @@ function JoinControl({
   if (status === "active") {
     return (
       <div className="cmy-join-row">
-        <span className="cmy-member-pill">Joined</span>
-        {!community.isOrganizer && (
+        <span className="cmy-joined-pill cmy-joined-pill--quiet">Joined</span>
+        {!compact && !community.isOrganizer && (
           <button type="button" className="cmy-btn cmy-btn--ghost cmy-btn--sm" disabled={busy} onClick={() => void doLeave()}>
             {busy ? "Leaving…" : "Leave"}
           </button>
@@ -541,7 +576,7 @@ function JoinControl({
     <div className="cmy-join-row">
       <button
         type="button"
-        className="cmy-btn cmy-btn--primary cmy-btn--sm"
+        className={compact ? "cmy-joined-pill cmy-compact-join" : "cmy-btn cmy-btn--primary cmy-btn--sm"}
         disabled={busy}
         onClick={() => (community.hasScreening ? setAsking(true) : void doJoin())}
       >
@@ -656,10 +691,32 @@ function BulletinTab({
   const myPending = posts.filter((p) => p.approvalStatus === "pending");
   const composerHint = community.bulletinRequiresApproval && !community.isOrganizer
     ? "Submit a post for approval…"
-    : "Post something to the group…";
+    : "Share something with the group…";
+
+  const composer = canPost ? (
+    <div className="cmy-composer-wrap">
+      {postErr && <p className="cmy-err">{postErr}</p>}
+      <div className="cmy-composer">
+        <input
+          type="text"
+          className="cmy-composer-input"
+          placeholder={composerHint}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submit();
+          }}
+        />
+        <button type="button" className="cmy-btn cmy-btn--primary cmy-btn--sm" disabled={busy || !draft.trim()} onClick={submit}>
+          {community.bulletinRequiresApproval && !community.isOrganizer ? "Submit" : "Post"}
+        </button>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <section className="cmy-tabpanel">
+      {composer}
       {community.isOrganizer && pending.length > 0 && (
         <div className="cmy-requests">
           <h3 className="cmy-subhead">Awaiting approval</h3>
@@ -713,7 +770,11 @@ function BulletinTab({
       )}
 
       {livePosts.length === 0 && pending.length === 0 && myPending.length === 0 && (
-        <p className="cmy-muted">No posts yet. Start the conversation.</p>
+        <TabEmpty
+          icon={<MessageCircle size={24} strokeWidth={1.6} />}
+          headline="No posts yet"
+          body="Start the conversation."
+        />
       )}
       <ul className="cmy-post-list">
         {livePosts.map((p) => (
@@ -820,25 +881,6 @@ function BulletinTab({
           </li>
         ))}
       </ul>
-
-      {canPost && (
-        <div className="cmy-composer">
-          {postErr && <p className="cmy-err">{postErr}</p>}
-          <input
-            type="text"
-            className="cmy-composer-input"
-            placeholder={composerHint}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submit();
-            }}
-          />
-          <button type="button" className="cmy-btn cmy-btn--primary cmy-btn--sm" disabled={busy || !draft.trim()} onClick={submit}>
-            {community.bulletinRequiresApproval && !community.isOrganizer ? "Submit" : "Post"}
-          </button>
-        </div>
-      )}
     </section>
   );
 }
@@ -868,11 +910,17 @@ function EventsTab({
   return (
     <section className="cmy-tabpanel">
       {canPost && (
-        <button type="button" className="cmy-btn cmy-btn--primary cmy-btn--block" onClick={onPostPlan}>
-          + Post a plan
+        <button type="button" className="cmy-btn cmy-btn--ghost cmy-btn--block" onClick={onPostPlan}>
+          + Post a new event
         </button>
       )}
-      {loaded && plans.length === 0 && <p className="cmy-muted">No events yet.</p>}
+      {loaded && plans.length === 0 && (
+        <TabEmpty
+          icon={<Calendar size={24} strokeWidth={1.6} />}
+          headline="No events yet"
+          body="Be the first to post a gathering for this community."
+        />
+      )}
       <div className="cmy-events">
         {plans.map((p) => (
           <PlanCard key={p.id} plan={p} onPlanRefresh={load} />
@@ -893,8 +941,11 @@ function MembersTab({
   pendingMembers: CommunityMemberDTO[];
   onCountChange: () => Promise<void>;
 }) {
+  const { user } = useAuth();
   // Real organizer only (same as P0 non-member-permissions fix — never admin).
   const canManage = community.isOrganizer;
+  const organizer = members.find((m) => m.role === "organizer") ?? members[0];
+  const rest = members.filter((m) => m.user.id !== organizer?.user.id);
   const [addQuery, setAddQuery] = useState("");
   const [addResults, setAddResults] = useState<PersonSearchResultDTO[]>([]);
   const [addBusy, setAddBusy] = useState(false);
@@ -1007,32 +1058,43 @@ function MembersTab({
         />
       )}
 
-      <h3 className="cmy-subhead">{members.length} {members.length === 1 ? "member" : "members"}</h3>
-      {members.length > 0 && (
-        <div className="cmy-members-preview" aria-hidden="true">
-          {members.slice(0, 8).map((m) => (
-            <Avatar
-              key={m.user.id}
-              seed={m.user.avatarSeed}
-              style={m.user.avatarStyle}
-              photoDataUrl={m.user.avatarPhotoDataUrl}
-              params={m.user.avatarParams}
-              size="sm"
-            />
-          ))}
-        </div>
+      {organizer && (
+        <>
+          <h3 className="cmy-subhead">Organizer</h3>
+          <ul className="cmy-member-list">
+            <li className="cmy-member-row">
+              <Link to={`/profile/${organizer.user.id}`} state={{ from: "community", communityId: community.id }} className="cmy-member-link-row">
+                <Avatar seed={organizer.user.avatarSeed} style={organizer.user.avatarStyle} photoDataUrl={organizer.user.avatarPhotoDataUrl} params={organizer.user.avatarParams} size="sm" />
+                <span className="cmy-member-name">{organizer.user.firstName} {organizer.user.lastName ?? ""}</span>
+              </Link>
+              <span className="cmy-org-badge cmy-org-badge--pill">Organizer</span>
+            </li>
+          </ul>
+        </>
       )}
+
+      <h3 className="cmy-subhead">
+        Members <span className="cmy-header-count">{members.length}</span>
+      </h3>
       <ul className="cmy-member-list">
-        {members.map((m) => (
+        {rest.map((m) => (
           <li key={m.user.id} className="cmy-member-row">
             <Link to={`/profile/${m.user.id}`} state={{ from: "community", communityId: community.id }} className="cmy-member-link-row">
               <Avatar seed={m.user.avatarSeed} style={m.user.avatarStyle} photoDataUrl={m.user.avatarPhotoDataUrl} params={m.user.avatarParams} size="sm" />
               <span className="cmy-member-name">{m.user.firstName} {m.user.lastName ?? ""}</span>
             </Link>
-            {m.role === "organizer" && <span className="cmy-org-badge">Organizer</span>}
-            {canManage && m.role !== "organizer" && (
+            {canManage && (
               <button type="button" className="cmy-icon-btn cmy-remove" onClick={() => void remove(m.user.id)} title="Remove">
                 Remove
+              </button>
+            )}
+            {user?.id === m.user.id && !community.isOrganizer && (
+              <button
+                type="button"
+                className="cmy-icon-btn cmy-remove"
+                onClick={() => void api(`/api/communities/${community.id}/leave`, { method: "POST" }).then(() => onCountChange())}
+              >
+                Leave
               </button>
             )}
           </li>

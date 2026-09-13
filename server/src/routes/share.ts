@@ -22,8 +22,8 @@ import { fileURLToPath } from "node:url";
 import { Router } from "express";
 import satori from "satori";
 import { Resvg } from "@resvg/resvg-js";
-import { store } from "../store.js";
-import type { PlanRecord } from "../store.js";
+import { coverPoolSync } from "../lib/coverCatalog.js";
+import { store, type PlanRecord } from "../store.js";
 
 export const shareRouter = Router();
 
@@ -79,7 +79,7 @@ function hashPick<T>(pool: T[], key: string): T {
 export function coverUrlFor(plan: PlanRecord): string {
   if (plan.flyerDataUrl) return plan.flyerDataUrl;
   if (plan.flyerLinkPreview?.image) return plan.flyerLinkPreview.image;
-  const curated = store.listCardImages().map((c) => c.url);
+  const curated = coverPoolSync();
   const pool = curated.length ? curated : FALLBACK_COVERS;
   return hashPick(pool, plan.id);
 }

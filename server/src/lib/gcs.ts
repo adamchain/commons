@@ -131,6 +131,18 @@ export async function uploadCardImage(
   return publicUrl(bucketName, objectPath, downloadToken);
 }
 
+/** Upload into `defaults/<Category>/` so the image shows in the categorized picker. */
+export async function uploadCoverImage(
+  buffer: Buffer,
+  contentType: string,
+  category: string,
+): Promise<string> {
+  const rawPrefix = process.env.GCS_DEFAULTS_PREFIX?.trim() || "defaults/";
+  const prefix = rawPrefix.endsWith("/") ? rawPrefix : `${rawPrefix}/`;
+  const folderName = (category.trim() || "Other").replace(/[/\\]/g, "-");
+  return uploadCardImage(buffer, contentType, `${prefix}${folderName}`);
+}
+
 /** Turn `defaults/summer-bbq.jpg` into a friendly label like "Summer Bbq". */
 function labelFromObjectName(objectName: string): string {
   const base = objectName.split("/").pop() ?? objectName;
@@ -147,7 +159,12 @@ function categoryFromObjectName(objectName: string, prefix: string): string {
   return folder.replace(/[-_]+/g, " ").trim();
 }
 
-export type CoverCatalogItem = { url: string; label: string; category: string };
+export type CoverCatalogItem = {
+  url: string;
+  label: string;
+  category: string;
+  libraryId?: string | null;
+};
 export type CoverCatalogCategory = { id: string; label: string; images: CoverCatalogItem[] };
 
 /**

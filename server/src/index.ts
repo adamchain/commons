@@ -6,6 +6,7 @@ import cors from "cors";
 import express from "express";
 import { connectMongo } from "./lib/db.js";
 import { hydrateSnapshotFromMongo } from "./hydrate.js";
+import { warmCoverCatalog } from "./lib/coverCatalog.js";
 import { adminRouter } from "./routes/admin.js";
 import { authRouter } from "./routes/auth.js";
 import { cardImagesRouter } from "./routes/cardImages.js";
@@ -153,6 +154,7 @@ async function bootstrap(): Promise<void> {
   if (promoted) console.log(`[boot] promoted ${promoted} pending communities to live`);
   await seedIfEmpty();
   startNudgeSchedulers();
+  warmCoverCatalog();
 
   app.listen(port, () => {
     console.log(`Commons API listening on http://localhost:${port}`);

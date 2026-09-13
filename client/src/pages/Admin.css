@@ -529,6 +529,16 @@
   text-overflow: ellipsis;
 }
 
+.admin-cardimg-cat {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.72rem;
+  border-radius: 6px;
+  padding: 2px 4px;
+}
+
 .admin-cardimg-del {
   position: absolute;
   top: 6px;

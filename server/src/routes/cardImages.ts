@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { store } from "../store.js";
-import { isGcsConfigured, listDefaultCatalog } from "../lib/gcs.js";
+import { buildCoverCatalog } from "../lib/coverCatalog.js";
 
 // Public read of the admin-curated event-card image library. The feed uses
 // these as stand-in cover art for plans without their own flyer. No auth — the
@@ -8,39 +7,27 @@ import { isGcsConfigured, listDefaultCatalog } from "../lib/gcs.js";
 // short list of image URLs.
 const cardImagesRouter = Router();
 
-cardImagesRouter.get("/", (_req, res) => {
-  const images = store.listCardImages().map((c) => c.url);
-  res.json({ images });
+cardImagesRouter.get("/", async (_req, res) => {
+  try {
+    const categories = await buildCoverCatalog();
+    const images = [...new Set(categories.flatMap((c) => c.images.map((i) => i.url)))];
+    res.json({ images });
+  } catch (err) {
+    console.error("[card-images] pool failed", err);
+    res.json({ images: [] });
+  }
 });
 
-// Categorized cover library for create-plan. Prefers the GCS defaults/ folders
-// (Coffee, Food, Events, …); falls back to a flat "Library" group from the
-// admin-curated store when GCS isn't configured or the folder is empty.
+// Categorized cover library for create-plan. GCS defaults/ folders plus
+// admin-uploaded rows grouped by category.
 cardImagesRouter.get("/catalog", async (_req, res) => {
   try {
-    if (isGcsConfigured()) {
-      const categories = await listDefaultCatalog();
-      if (categories.length > 0) {
-        res.json({ categories });
-        return;
-      }
-    }
+    const categories = await buildCoverCatalog();
+    res.json({ categories });
   } catch (err) {
-    console.error("[card-images] catalog GCS list failed", err);
-    // Fall through to the admin library rather than 502 — picker should still work.
+    console.error("[card-images] catalog failed", err);
+    res.json({ categories: [] });
   }
-
-  const images = store.listCardImages().map((c) => ({
-    url: c.url,
-    label: c.label ?? "Cover",
-    category: "Library",
-  }));
-  res.json({
-    categories:
-      images.length > 0
-        ? [{ id: "library", label: "Library", images }]
-        : [],
-  });
 });
 
 export { cardImagesRouter };

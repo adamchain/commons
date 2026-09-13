@@ -280,6 +280,7 @@ const CardImageSchema = new Schema<CardImageRecord>(
     id: { type: String, required: true },
     url: { type: String, required: true },
     label: { type: String },
+    category: { type: String },
     sortOrder: { type: Number, required: true, default: 0 },
     createdAt: { type: String, required: true },
   },

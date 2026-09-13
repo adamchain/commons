@@ -65,7 +65,6 @@ export function CommunitiesPage() {
     <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy-list">
       <header className="cmy-list-masthead">
         <div className="cmy-list-masthead-copy">
-          <div className="cmy-list-eyebrow">Philadelphia</div>
           <h1 className="cmy-list-title">Communities</h1>
           <p className="cmy-list-sub">Run clubs, book clubs, and the regulars — find your people.</p>
         </div>

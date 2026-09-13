@@ -2,11 +2,12 @@ import { Router } from "express";
 import type { Request, Response, NextFunction } from "express";
 import { verifySessionToken } from "../lib/jwt.js";
 import { isAdminPhone } from "../lib/adminPhones.js";
-import { isGcsConfigured, listDefaultImages, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
+import { isGcsConfigured, listDefaultCatalog, parseDataUrl, uploadCoverImage } from "../lib/gcs.js";
 import { store } from "../store.js";
 import { listAllUsers, findUserById } from "../userRepo.js";
 import { runBehaviorAgent, analyzeUserBehavior } from "../lib/behaviorAgent.js";
 import { normalizeCommunityCategory } from "../types/shared.js";
+import { buildCoverCatalog, invalidateCoverCatalogCache } from "../lib/coverCatalog.js";
 
 const adminRouter = Router();
 
@@ -347,15 +348,32 @@ const DEFAULT_CARD_IMAGES: { url: string; label: string }[] = [
   { url: "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=800&q=60", label: "Gathering" },
 ];
 
-adminRouter.get("/card-images", (_req, res) => {
-  res.json({ images: store.listCardImages(), gcsConfigured: isGcsConfigured() });
+function parseCategory(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const v = raw.trim().slice(0, 40);
+  return v || undefined;
+}
+
+adminRouter.get("/card-images", async (_req, res) => {
+  let catalog: Awaited<ReturnType<typeof buildCoverCatalog>> = [];
+  try {
+    catalog = await buildCoverCatalog();
+  } catch (err) {
+    console.error("[admin] cover catalog failed", err);
+  }
+  res.json({
+    images: store.listCardImages(),
+    catalog,
+    gcsConfigured: isGcsConfigured(),
+  });
 });
 
 // Add by external URL (stored as-is — already hosted elsewhere).
 adminRouter.post("/card-images", (req, res) => {
-  const body = (req.body ?? {}) as { url?: unknown; label?: unknown };
+  const body = (req.body ?? {}) as { url?: unknown; label?: unknown; category?: unknown };
   const url = typeof body.url === "string" ? body.url.trim() : "";
   const label = typeof body.label === "string" ? body.label.trim() : undefined;
+  const category = parseCategory(body.category);
 
   const isHttp = /^https?:\/\/\S+$/i.test(url);
   const isDataImage = /^data:image\/(png|jpe?g|gif|webp|avif);base64,/i.test(url);
@@ -368,16 +386,18 @@ adminRouter.post("/card-images", (req, res) => {
     return;
   }
 
-  const row = store.addCardImage({ url, label });
+  const row = store.addCardImage({ url, label, category });
+  invalidateCoverCatalogCache();
   res.status(201).json({ image: row });
 });
 
 // Upload a file: bytes arrive as a data URL, get pushed to GCS, and we store
 // the public URL. Falls back to inline storage when GCS isn't configured.
 adminRouter.post("/card-images/upload", async (req, res) => {
-  const body = (req.body ?? {}) as { dataUrl?: unknown; label?: unknown };
+  const body = (req.body ?? {}) as { dataUrl?: unknown; label?: unknown; category?: unknown };
   const dataUrl = typeof body.dataUrl === "string" ? body.dataUrl : "";
   const label = typeof body.label === "string" ? body.label.trim() || undefined : undefined;
+  const category = parseCategory(body.category) ?? "Other";
 
   const parsed = parseDataUrl(dataUrl);
   if (!parsed) {
@@ -387,8 +407,9 @@ adminRouter.post("/card-images/upload", async (req, res) => {
 
   if (isGcsConfigured()) {
     try {
-      const publicUrl = await uploadCardImage(parsed.buffer, parsed.contentType);
-      const row = store.addCardImage({ url: publicUrl, label });
+      const publicUrl = await uploadCoverImage(parsed.buffer, parsed.contentType, category);
+      const row = store.addCardImage({ url: publicUrl, label, category });
+      invalidateCoverCatalogCache();
       res.status(201).json({ image: row });
     } catch (err) {
       console.error("[admin] card image GCS upload failed", err);
@@ -402,8 +423,27 @@ adminRouter.post("/card-images/upload", async (req, res) => {
     res.status(413).json({ error: "GCS isn't configured, so uploads are stored inline — keep this under ~1MB." });
     return;
   }
-  const row = store.addCardImage({ url: dataUrl, label });
+  const row = store.addCardImage({ url: dataUrl, label, category });
+  invalidateCoverCatalogCache();
   res.status(201).json({ image: row });
+});
+
+adminRouter.patch("/card-images/:id", (req, res) => {
+  const body = (req.body ?? {}) as { label?: unknown; category?: unknown };
+  const patch: { label?: string | null; category?: string | null } = {};
+  if (body.label !== undefined) {
+    patch.label = typeof body.label === "string" ? body.label : null;
+  }
+  if (body.category !== undefined) {
+    patch.category = parseCategory(body.category) ?? null;
+  }
+  const row = store.updateCardImage(String(req.params.id), patch);
+  if (!row) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  invalidateCoverCatalogCache();
+  res.json({ image: row });
 });
 
 // One-click: seed the standard placeholder library. When GCS is configured, the
@@ -411,11 +451,15 @@ adminRouter.post("/card-images/upload", async (req, res) => {
 // can curate them without a deploy; otherwise we fall back to the built-in
 // stand-ins. Idempotent — skips images already present by URL.
 adminRouter.post("/card-images/seed-defaults", async (_req, res) => {
-  let defaults = DEFAULT_CARD_IMAGES;
+  let defaults: { url: string; label: string; category?: string }[] = DEFAULT_CARD_IMAGES;
   if (isGcsConfigured()) {
     try {
-      const fromBucket = await listDefaultImages();
-      if (fromBucket.length > 0) defaults = fromBucket;
+      const fromBucket = await listDefaultCatalog();
+      if (fromBucket.length > 0) {
+        defaults = fromBucket.flatMap((c) =>
+          c.images.map((img) => ({ url: img.url, label: img.label, category: img.category })),
+        );
+      }
     } catch (err) {
       console.error("[admin] listing default card images from GCS failed", err);
       res.status(502).json({ error: "Could not read the defaults folder from storage — check GCS config / permissions." });
@@ -429,6 +473,7 @@ adminRouter.post("/card-images/seed-defaults", async (_req, res) => {
     if (existing.has(def.url)) continue;
     added.push(store.addCardImage(def));
   }
+  invalidateCoverCatalogCache();
   res.json({ added: added.length, images: store.listCardImages() });
 });
 
@@ -438,6 +483,7 @@ adminRouter.delete("/card-images/:id", (req, res) => {
     res.status(404).json({ error: "Not found" });
     return;
   }
+  invalidateCoverCatalogCache();
   res.json({ ok: true });
 });
 

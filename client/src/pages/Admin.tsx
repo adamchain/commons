@@ -403,49 +403,49 @@ function Sparkline({ series, color }: { series: { date: string; count: number }[
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-type CardImage = { id: string; url: string; label?: string; sortOrder: number; createdAt: string };
+type CardImage = {
+  id: string;
+  url: string;
+  label?: string;
+  category?: string;
+  sortOrder: number;
+  createdAt: string;
+};
 
-/** Downscale + re-encode an uploaded image so the stored data URL stays small. */
-function fileToDataUrl(file: File, maxW = 1200, quality = 0.82): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Could not read file"));
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error("Could not load image"));
-      img.onload = () => {
-        const scale = Math.min(1, maxW / img.width);
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round(img.width * scale));
-        canvas.height = Math.max(1, Math.round(img.height * scale));
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return reject(new Error("Canvas unsupported"));
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
-      };
-      img.src = reader.result as string;
-    };
-    reader.readAsDataURL(file);
-  });
-}
+type CoverCatalogImage = {
+  url: string;
+  label: string;
+  category: string;
+  libraryId?: string | null;
+};
+
+type CoverCatalogCategory = { id: string; label: string; images: CoverCatalogImage[] };
+
+const COVER_CATEGORY_OPTIONS = [...new Set([...Object.values(INTEREST_LABELS), "Other", "Library"])];
 
 /**
  * Event-card image library — admins add/remove the cover art used on plan
  * cards (for plans without their own flyer) without touching the codebase.
  */
 function CardImagesManager() {
-  const [images, setImages] = useState<CardImage[] | null>(null);
+  const [catalog, setCatalog] = useState<CoverCatalogCategory[] | null>(null);
   const [gcsConfigured, setGcsConfigured] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [url, setUrl] = useState("");
   const [label, setLabel] = useState("");
+  const [category, setCategory] = useState("Other");
+  const [filter, setFilter] = useState("all");
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     try {
-      const r = await api<{ images: CardImage[]; gcsConfigured?: boolean }>("/api/admin/card-images");
-      setImages(r.images);
+      const r = await api<{
+        images: CardImage[];
+        catalog?: CoverCatalogCategory[];
+        gcsConfigured?: boolean;
+      }>("/api/admin/card-images");
+      setCatalog(r.catalog ?? []);
       setGcsConfigured(r.gcsConfigured !== false);
       setError(null);
     } catch (e) {
@@ -457,8 +457,19 @@ function CardImagesManager() {
     void load();
   }, [load]);
 
+  const allImages = useMemo(() => catalog?.flatMap((c) => c.images) ?? [], [catalog]);
+  const visible = useMemo(() => {
+    if (filter === "all") return allImages;
+    return allImages.filter((img) => img.category === filter || catalog?.find((c) => c.id === filter)?.label === img.category);
+  }, [allImages, catalog, filter]);
+
+  const categoryChoices = useMemo(() => {
+    const extra = (catalog ?? []).map((c) => c.label);
+    return [...new Set([...COVER_CATEGORY_OPTIONS, ...extra])];
+  }, [catalog]);
+
   const submit = useCallback(
-    async (payload: { url: string; label?: string }) => {
+    async (payload: { url: string; label?: string; category?: string }) => {
       setBusy(true);
       setError(null);
       try {
@@ -483,7 +494,7 @@ function CardImagesManager() {
   async function addByUrl() {
     const trimmed = url.trim();
     if (!trimmed) return;
-    await submit({ url: trimmed, label: label.trim() || undefined });
+    await submit({ url: trimmed, label: label.trim() || undefined, category });
   }
 
   async function addByFile(file: File) {
@@ -493,7 +504,7 @@ function CardImagesManager() {
       const dataUrl = await fileToDataUrl(file);
       await api<{ image: CardImage }>("/api/admin/card-images/upload", {
         method: "POST",
-        body: JSON.stringify({ dataUrl, label: label.trim() || file.name }),
+        body: JSON.stringify({ dataUrl, label: label.trim() || file.name, category }),
       });
       setLabel("");
       if (fileRef.current) fileRef.current.value = "";
@@ -528,6 +539,31 @@ function CardImagesManager() {
       invalidateCardImages();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not remove image");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setImageCategory(img: CoverCatalogImage, next: string) {
+    if (next === img.category) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (img.libraryId) {
+        await api(`/api/admin/card-images/${img.libraryId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ category: next }),
+        });
+      } else {
+        await api<{ image: CardImage }>("/api/admin/card-images", {
+          method: "POST",
+          body: JSON.stringify({ url: img.url, label: img.label, category: next }),
+        });
+      }
+      await load();
+      invalidateCardImages();
+    } catch (e) {
+      setError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Could not update category");
     } finally {
       setBusy(false);
     }
@@ -568,6 +604,19 @@ function CardImagesManager() {
             value={label}
             onChange={(e) => setLabel(e.target.value)}
           />
+          <select
+            className="admin-search"
+            style={{ margin: 0, flex: "1 1 140px" }}
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            aria-label="Category"
+          >
+            {categoryChoices.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
           <button type="button" className="admin-btn" onClick={() => void addByUrl()} disabled={busy || !url.trim()}>
             Add URL
           </button>
@@ -597,11 +646,11 @@ function CardImagesManager() {
           </p>
         ) : null}
 
-        {images === null ? (
+        {catalog === null ? (
           <p className="admin-muted" style={{ marginTop: "0.85rem" }}>
             Loading…
           </p>
-        ) : images.length === 0 ? (
+        ) : allImages.length === 0 ? (
           <div style={{ marginTop: "0.85rem", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.75rem" }}>
             <p className="admin-muted" style={{ margin: 0 }}>
               No images yet — the app falls back to its built-in stand-ins until you add some.
@@ -611,28 +660,99 @@ function CardImagesManager() {
             </button>
           </div>
         ) : (
-          <div className="admin-cardimg-grid">
-            {images.map((img) => (
-              <figure key={img.id} className="admin-cardimg">
-                <img src={img.url} alt={img.label ?? "Card image"} loading="lazy" />
-                <figcaption className="admin-cardimg-cap">{img.label ?? "—"}</figcaption>
+          <>
+            <div className="admin-chip-list" style={{ marginTop: "0.85rem" }}>
+              <button
+                type="button"
+                className={`admin-chip admin-chip-btn ${filter === "all" ? "is-on" : ""}`}
+                onClick={() => setFilter("all")}
+              >
+                All <strong>{allImages.length}</strong>
+              </button>
+              {(catalog ?? []).map((c) => (
                 <button
+                  key={c.id}
                   type="button"
-                  className="admin-cardimg-del"
-                  onClick={() => void remove(img.id)}
-                  disabled={busy}
-                  aria-label="Remove image"
-                  title="Remove"
+                  className={`admin-chip admin-chip-btn ${filter === c.label ? "is-on" : ""}`}
+                  onClick={() => setFilter(c.label)}
                 >
-                  ✕
+                  {c.label} <strong>{c.images.length}</strong>
                 </button>
-              </figure>
-            ))}
-          </div>
+              ))}
+            </div>
+            <div className="admin-cardimg-grid">
+              {visible.map((img) => (
+                <figure key={`${img.libraryId ?? "gcs"}:${img.url}`} className="admin-cardimg">
+                  <img src={img.url} alt={img.label || "Card image"} title={img.label} loading="lazy" />
+                  <figcaption className="admin-cardimg-cap">
+                    <select
+                      className="admin-cardimg-cat"
+                      value={categoryChoices.includes(img.category) ? img.category : img.category}
+                      disabled={busy}
+                      aria-label={`Category for ${img.label}`}
+                      onChange={(e) => void setImageCategory(img, e.target.value)}
+                    >
+                      {categoryChoices.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                      {!categoryChoices.includes(img.category) ? (
+                        <option value={img.category}>{img.category}</option>
+                      ) : null}
+                    </select>
+                  </figcaption>
+                  {img.libraryId ? (
+                    <button
+                      type="button"
+                      className="admin-cardimg-del"
+                      onClick={() => void remove(img.libraryId as string)}
+                      disabled={busy}
+                      aria-label="Remove image"
+                      title="Remove"
+                    >
+                      ✕
+                    </button>
+                  ) : null}
+                </figure>
+              ))}
+            </div>
+            {gcsConfigured ? (
+              <p style={{ margin: "0.85rem 0 0" }}>
+                <button type="button" className="admin-btn admin-btn--ghost" onClick={() => void seedDefaults()} disabled={busy}>
+                  Sync storage library into admin list
+                </button>
+              </p>
+            ) : null}
+          </>
         )}
       </div>
     </section>
   );
+}
+
+/** Downscale + re-encode an uploaded image so the stored data URL stays small. */
+function fileToDataUrl(file: File, maxW = 1200, quality = 0.82): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Could not read file"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Could not load image"));
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("Canvas unsupported"));
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 type AdminUserDetail = {

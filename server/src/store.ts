@@ -493,6 +493,8 @@ export interface CardImageRecord {
   id: string;
   url: string;
   label?: string;
+  /** Picker / admin grouping (e.g. "Coffee", "Night Out"). */
+  category?: string;
   sortOrder: number;
   createdAt: string;
 }
@@ -1868,16 +1870,29 @@ export const store = {
   listCardImages(): CardImageRecord[] {
     return [...snapshot.cardImages].sort((a, b) => a.sortOrder - b.sortOrder);
   },
-  addCardImage(input: { url: string; label?: string }): CardImageRecord {
+  addCardImage(input: { url: string; label?: string; category?: string }): CardImageRecord {
     const maxOrder = snapshot.cardImages.reduce((m, c) => Math.max(m, c.sortOrder), -1);
     const row: CardImageRecord = {
       id: randomUUID(),
       url: input.url,
       label: input.label?.trim() || undefined,
+      category: input.category?.trim() || undefined,
       sortOrder: maxOrder + 1,
       createdAt: new Date().toISOString(),
     };
     snapshot.cardImages.push(row);
+    persist();
+    mongoMirror.upsertCardImage(row);
+    return row;
+  },
+  updateCardImage(
+    id: string,
+    patch: { label?: string | null; category?: string | null },
+  ): CardImageRecord | undefined {
+    const row = snapshot.cardImages.find((c) => c.id === id);
+    if (!row) return undefined;
+    if (patch.label !== undefined) row.label = patch.label?.trim() || undefined;
+    if (patch.category !== undefined) row.category = patch.category?.trim() || undefined;
     persist();
     mongoMirror.upsertCardImage(row);
     return row;

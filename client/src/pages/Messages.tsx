@@ -123,9 +123,6 @@ export function MessagesPage() {
       <div className="messages-scroll">
       {tab === "interests" ? (
         <>
-          <p className="messages-tab-sub">
-            A citywide forum for interests to connect around recommendations, questions, announcements or advice
-          </p>
           {!forumsReady ? (
             <div className="feed-skeleton" aria-hidden="true">
               <div className="feed-skeleton-card" />
@@ -226,9 +223,6 @@ export function MessagesPage() {
         </div>
       ) : (
         <>
-          <p className="messages-tab-sub">
-            Group chats for the plans you&apos;re in. Coordinate the details and stay connected
-          </p>
           <div className="messages-card">
             <div className="messages-list">
               {items.map((c) => {
@@ -254,7 +248,13 @@ export function MessagesPage() {
                         <span>{preview}</span>
                       </div>
                       <div className="messages-row-meta">
-                        {c.lastMessageAt ? "Started" : "Not started yet"} · {c.participantCount}{" "}
+                        {c.communityId
+                          ? "Joined"
+                          : c.myRole === "going" || c.myRole === "hosting"
+                            ? "Going"
+                            : "Started"}
+                        {" · "}
+                        {c.participantCount}{" "}
                         {c.participantCount === 1 ? "person" : "people"}
                       </div>
                     </div>
