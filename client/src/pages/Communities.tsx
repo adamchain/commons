@@ -43,6 +43,8 @@ export function CommunitiesPage() {
 
   const matchesCat = (c: CommunityCardDTO) => category === "all" || c.category === category;
   const browse = all.filter(matchesCat);
+  const hero = browse[0] ?? null;
+  const rest = browse.slice(1);
   const catLabel = category === "all" ? null : COMMUNITY_CATEGORY_LABELS[category];
   const showBrowseEmpty = loaded && browse.length === 0;
 
@@ -100,8 +102,9 @@ export function CommunitiesPage() {
       </div>
 
       <section className="cmy-list-section">
+        {hero && <CommunityHeroCard c={hero} onJoined={absorbJoin} />}
         <h2 className="cmy-list-section-title">
-          {catLabel ? `Browse · ${catLabel}` : "Browse"}
+          {catLabel ? `More · ${catLabel}` : "More communities"}
         </h2>
         {showBrowseEmpty && (
           <EmptyCard
@@ -120,9 +123,9 @@ export function CommunitiesPage() {
             cta={{ to: "/communities/new", label: "Create a community" }}
           />
         )}
-        {browse.length > 0 && (
+        {rest.length > 0 && (
           <div className="cmy-compact-list">
-            {browse.map((c) => (
+            {rest.map((c) => (
               <CommunityCompactCard key={c.id} c={c} onJoined={absorbJoin} />
             ))}
           </div>
@@ -165,7 +168,7 @@ function MemberFacepile({ people }: { people: PublicUser[] }) {
   );
 }
 
-function OrganizerAvatar({ user }: { user: PublicUser }) {
+function OrganizerAvatar({ user, size = "xs" }: { user: PublicUser; size?: "xs" | "sm" }) {
   return (
     <Avatar
       seed={user.avatarSeed}
@@ -173,8 +176,51 @@ function OrganizerAvatar({ user }: { user: PublicUser }) {
       photoDataUrl={user.avatarPhotoDataUrl}
       params={user.avatarParams}
       name={user.firstName}
-      size="xs"
+      size={size}
     />
+  );
+}
+
+function CommunityHeroCard({
+  c,
+  onJoined,
+}: {
+  c: CommunityCardDTO;
+  onJoined: (updated: CommunityCardDTO) => void;
+}) {
+  const joined = c.myMembershipStatus === "active";
+  return (
+    <Link to={`/communities/${c.id}`} className="cmy-hero">
+      <CommunityCover
+        coverImage={c.coverImage}
+        category={c.category}
+        className="cmy-hero-cover"
+        iconSize={40}
+      />
+      <div className="cmy-hero-shade" aria-hidden="true" />
+      {c.isFounding ? <span className="cmy-hero-founding">Founding</span> : null}
+      <div className="cmy-hero-foot">
+        <div className="cmy-hero-copy">
+          <div className="cmy-hero-organizer">
+            <span className="cmy-hero-avatar">
+              <OrganizerAvatar user={c.organizer} size="sm" />
+            </span>
+            <span className="cmy-hero-org-name">{c.organizer.firstName}</span>
+          </div>
+          <h3 className="cmy-hero-name">{c.name}</h3>
+          <p className="cmy-hero-cats">{categoryLine(c)}</p>
+          <div className="cmy-hero-members">
+            <MemberFacepile people={c.memberPreview ?? []} />
+            <span className="cmy-hero-count">{memberCountLabel(c)}</span>
+            {joined ? (
+              <span className="cmy-joined-pill cmy-joined-pill--member">Joined</span>
+            ) : (
+              <CommunityJoinLink c={c} onJoined={onJoined} />
+            )}
+          </div>
+        </div>
+      </div>
+    </Link>
   );
 }
 
