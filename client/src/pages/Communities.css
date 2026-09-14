@@ -87,12 +87,19 @@
   width: 100%;
 }
 .cmy-list-section-title {
-  text-transform: none;
-  letter-spacing: 0.75px;
-  font-size: var(--text-micro);
-  color: var(--faint);
-  font-weight: 700;
+  font-family: var(--font-ui);
+  font-size: var(--type-label);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1.3;
   margin: 0;
+  padding-top: var(--s-5);
+  padding-bottom: var(--s-3);
+}
+.cmy-hero + .cmy-list-section-title {
+  padding-top: var(--s-6);
 }
 .cmy-list-title {
   font-size: var(--text-hero, 40px);

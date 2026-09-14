@@ -104,7 +104,7 @@ export function CommunitiesPage() {
       <section className="cmy-list-section">
         {hero && <CommunityHeroCard c={hero} onJoined={absorbJoin} />}
         <h2 className="cmy-list-section-title">
-          {catLabel ? `More · ${catLabel}` : "More communities"}
+          {catLabel ? `Browse · ${catLabel}` : "Browse"}
         </h2>
         {showBrowseEmpty && (
           <EmptyCard
