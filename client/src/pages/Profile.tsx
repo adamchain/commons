@@ -23,7 +23,7 @@ import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime } from "../lib/format";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import {
-  COMMUNITY_CATEGORY_LABELS,
+  communityCategoryLine,
   INTEREST_LABELS,
   type CommunityCardDTO,
   type InterestTag,
@@ -416,7 +416,7 @@ export function ProfilePage() {
                       <span className="profile-other-community-info">
                         <span className="profile-other-community-name">{c.name}</span>
                         <span className="profile-other-community-meta">
-                          {COMMUNITY_CATEGORY_LABELS[c.category]} · {c.memberCount}{" "}
+                          {communityCategoryLine(c)} · {c.memberCount}{" "}
                           {c.memberCount === 1 ? "member" : "members"}
                         </span>
                       </span>
@@ -528,7 +528,7 @@ export function ProfilePage() {
                     <span className="profile-community-name">{c.name}</span>
                     <span className="profile-community-meta">
                       {c.myRole === "organizer" ? "Organizer · " : ""}
-                      {COMMUNITY_CATEGORY_LABELS[c.category]} · {c.memberCount}{" "}
+                      {communityCategoryLine(c)} · {c.memberCount}{" "}
                       {c.memberCount === 1 ? "member" : "members"}
                     </span>
                   </span>

@@ -589,6 +589,58 @@ export function normalizeCommunityCategory(raw: string): InterestTag {
   return LEGACY_COMMUNITY_CATEGORY_MAP[raw] ?? "events";
 }
 
+export const MAX_COMMUNITY_CATEGORIES = 3;
+
+/** Parse up to 3 unique InterestTags from a posted/stored list. */
+export function parseCommunityCategories(
+  raw: unknown,
+  fallback?: string | null,
+): CommunityCategory[] {
+  const out: CommunityCategory[] = [];
+  const add = (value: unknown) => {
+    if (typeof value !== "string" || !value) return;
+    const tag = ALL_INTERESTS.includes(value as InterestTag)
+      ? (value as InterestTag)
+      : LEGACY_COMMUNITY_CATEGORY_MAP[value];
+    if (!tag || out.includes(tag)) return;
+    out.push(tag);
+  };
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      add(item);
+      if (out.length >= MAX_COMMUNITY_CATEGORIES) break;
+    }
+  }
+  if (out.length === 0 && fallback) add(fallback);
+  return out;
+}
+
+export function communityCategoriesOf(c: {
+  category: CommunityCategory;
+  categories?: CommunityCategory[] | null;
+}): CommunityCategory[] {
+  const parsed = parseCommunityCategories(c.categories, c.category);
+  return parsed.length > 0 ? parsed : [normalizeCommunityCategory(String(c.category ?? ""))];
+}
+
+export function communityCategoryLine(c: {
+  category: CommunityCategory;
+  categories?: CommunityCategory[] | null;
+}): string {
+  return communityCategoriesOf(c)
+    .map((tag) => COMMUNITY_CATEGORY_LABELS[tag])
+    .join(" • ");
+}
+
+export function toggleCommunityCategory(
+  current: CommunityCategory[],
+  tag: CommunityCategory,
+): CommunityCategory[] {
+  if (current.includes(tag)) return current.filter((c) => c !== tag);
+  if (current.length >= MAX_COMMUNITY_CATEGORIES) return current;
+  return [...current, tag];
+}
+
 export type CommunityCreationStatus = "pending" | "approved" | "rejected";
 /** Who may post to a given surface — organizer-controlled toggle. */
 export type CommunityPostingPermission = "organizer_only" | "members";
@@ -612,6 +664,8 @@ export interface CommunityDTO {
   description: string;
   coverImage: string | null;
   category: CommunityCategory;
+  /** Up to 3 tags; `category` is always the first (primary) for older clients. */
+  categories: CommunityCategory[];
   organizer: PublicUser;
   memberCount: number;
   isFounding: boolean;
@@ -674,6 +728,8 @@ export interface CommunityCardDTO {
   name: string;
   coverImage: string | null;
   category: CommunityCategory;
+  /** Up to 3 tags; `category` is always the first (primary) for older clients. */
+  categories: CommunityCategory[];
   memberCount: number;
   isFounding: boolean;
   /** Organizer identity — avatar on list/explore cards. */
@@ -694,6 +750,7 @@ export interface PendingCommunityDTO {
   name: string;
   description: string;
   category: CommunityCategory;
+  categories: CommunityCategory[];
   organizer: PublicUser;
   submittedAt: string;
   creationStatus: CommunityCreationStatus;

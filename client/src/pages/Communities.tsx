@@ -10,6 +10,8 @@ import { useAuth } from "../context/AuthContext";
 import {
   ALL_COMMUNITY_CATEGORIES,
   COMMUNITY_CATEGORY_LABELS,
+  communityCategoriesOf,
+  communityCategoryLine,
   type CommunityCardDTO,
   type CommunityCategory,
   type CommunityDTO,
@@ -41,7 +43,8 @@ export function CommunitiesPage() {
     };
   }, []);
 
-  const matchesCat = (c: CommunityCardDTO) => category === "all" || c.category === category;
+  const matchesCat = (c: CommunityCardDTO) =>
+    category === "all" || communityCategoriesOf(c).includes(category);
   const browse = all.filter(matchesCat);
   const hero = browse[0] ?? null;
   const rest = browse.slice(1);
@@ -140,13 +143,8 @@ function memberCountLabel(c: CommunityCardDTO) {
   return `${c.memberCount} ${c.memberCount === 1 ? "member" : "members"}`;
 }
 
-function categoryLabels(c: CommunityCardDTO): string[] {
-  return [COMMUNITY_CATEGORY_LABELS[c.category]];
-}
-
-/** "Local" or "Local • Music • Coffee" once a community can pick more than one. */
 function categoryLine(c: CommunityCardDTO): string {
-  return categoryLabels(c).join(" • ");
+  return communityCategoryLine(c);
 }
 
 function MemberFacepile({ people }: { people: PublicUser[] }) {

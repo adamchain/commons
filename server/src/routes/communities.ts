@@ -20,10 +20,9 @@ import {
 } from "../lib/communityAccess.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
 import {
-  ALL_COMMUNITY_CATEGORIES,
-  normalizeCommunityCategory,
+  communityCategoriesOf,
+  parseCommunityCategories,
   type CommunityCardDTO,
-  type CommunityCategory,
   type CommunityDTO,
   type CommunityMemberDTO,
   type CommunityPostDTO,
@@ -65,7 +64,8 @@ async function toCommunityDTO(
     name: community.name,
     description: community.description,
     coverImage: community.coverImage ?? null,
-    category: normalizeCommunityCategory(String(community.category ?? "")),
+    category: communityCategoriesOf(community)[0]!,
+    categories: communityCategoriesOf(community),
     organizer: organizer
       ? userToPublic(organizer)
       : { id: community.organizerId, firstName: "Organizer", neighborhoodId: null, avatarSeed: community.organizerId, avatarStyle: "avataaars" },
@@ -114,7 +114,8 @@ function toCommunityCard(
     id: community.id,
     name: community.name,
     coverImage: community.coverImage ?? null,
-    category: normalizeCommunityCategory(String(community.category ?? "")),
+    category: communityCategoriesOf(community)[0]!,
+    categories: communityCategoriesOf(community),
     memberCount: community.memberCount,
     isFounding: community.isFounding,
     organizer: organizerPublic(community.organizerId, users),
@@ -258,20 +259,23 @@ communitiesRouter.get("/mine", requireAuth, async (req, res) => {
   res.json({ communities: await toCommunityCards(list, viewerId) });
 });
 
+function parseCoverImage(raw: unknown): string | null {
+  if (typeof raw !== "string" || !raw) return null;
+  if (raw.startsWith("data:image/") && raw.length < 1_600_000) return raw;
+  if (raw.startsWith("http")) return raw.slice(0, 2048);
+  return null;
+}
+
 // POST /api/communities — create a community (goes live immediately).
 communitiesRouter.post("/", requireAuth, async (req, res) => {
   const userId = String(req.userId);
   const name = String(req.body?.name ?? "").trim().slice(0, 80);
   const description = String(req.body?.description ?? "").trim().slice(0, 2000);
-  const rawCategory = String(req.body?.category ?? "");
-  const category = normalizeCommunityCategory(rawCategory);
-  const rawCover = typeof req.body?.coverImage === "string" ? req.body.coverImage : "";
-  const coverImage =
-    rawCover.startsWith("data:image/") && rawCover.length < 1_600_000
-      ? rawCover
-      : rawCover.startsWith("http")
-        ? rawCover.slice(0, 2048)
-        : null;
+  const categories = parseCommunityCategories(
+    req.body?.categories,
+    typeof req.body?.category === "string" ? req.body.category : null,
+  );
+  const coverImage = parseCoverImage(req.body?.coverImage);
   const screeningRaw = req.body?.screeningQuestion;
   const screeningQuestion =
     typeof screeningRaw === "string" && screeningRaw.trim()
@@ -280,6 +284,14 @@ communitiesRouter.post("/", requireAuth, async (req, res) => {
 
   if (!name || !description) {
     res.status(400).json({ error: "Name and description are required" });
+    return;
+  }
+  if (!coverImage) {
+    res.status(400).json({ error: "A cover photo is required" });
+    return;
+  }
+  if (categories.length === 0) {
+    res.status(400).json({ error: "Pick at least one category (up to 3)" });
     return;
   }
   const filtered = textBlockedReason(name, description, screeningQuestion);
@@ -292,7 +304,8 @@ communitiesRouter.post("/", requireAuth, async (req, res) => {
     name,
     description,
     coverImage,
-    category,
+    category: categories[0]!,
+    categories,
     organizerId: userId,
     screeningQuestion,
     creationStatus: "approved",
@@ -344,24 +357,30 @@ communitiesRouter.patch("/:id", requireAuth, async (req, res) => {
   if (typeof req.body?.description === "string") {
     patch.description = req.body.description.trim().slice(0, 2000);
   }
-  if (
-    typeof req.body?.category === "string" &&
-    ALL_COMMUNITY_CATEGORIES.includes(req.body.category as CommunityCategory)
-  ) {
-    patch.category = req.body.category as CommunityCategory;
+  if (Array.isArray(req.body?.categories) || typeof req.body?.category === "string") {
+    const categories = parseCommunityCategories(
+      req.body?.categories,
+      typeof req.body?.category === "string" ? req.body.category : null,
+    );
+    if (categories.length === 0) {
+      res.status(400).json({ error: "Pick at least one category (up to 3)" });
+      return;
+    }
+    patch.category = categories[0]!;
+    patch.categories = categories;
   }
   if ("coverImage" in (req.body ?? {})) {
     const c = req.body.coverImage;
     if (c === null || c === "") {
-      patch.coverImage = null;
-    } else if (typeof c === "string") {
-      patch.coverImage =
-        c.startsWith("data:image/") && c.length < 1_600_000
-          ? c
-          : c.startsWith("http")
-            ? c.slice(0, 2048)
-            : community.coverImage ?? null;
+      res.status(400).json({ error: "A cover photo is required" });
+      return;
     }
+    const parsed = parseCoverImage(c);
+    if (!parsed) {
+      res.status(400).json({ error: "Couldn't use that image. Try another." });
+      return;
+    }
+    patch.coverImage = parsed;
   }
   if ("screeningQuestion" in (req.body ?? {})) {
     const s = req.body.screeningQuestion;

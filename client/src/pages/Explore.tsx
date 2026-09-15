@@ -6,7 +6,7 @@ import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
 import { JoinConfirmPopup } from "../components/JoinConfirmPopup";
 import { Label } from "../components/ui";
-import { COMMUNITY_CATEGORY_LABELS, type CommunityCardDTO, type CommunityDTO } from "../types/shared";
+import { communityCategoryLine, type CommunityCardDTO, type CommunityDTO } from "../types/shared";
 
 // Explore is locked to an editorial "Coming Soon" state for launch (no live
 // search / nearby calls) — EXCEPT the Communities rail, which is the one live
@@ -105,7 +105,7 @@ export function ExplorePage() {
                       {c.isFounding ? <span className="xpl-comm-founding">Founding</span> : null}
                     </div>
                     <div className="xpl-comm-sub">
-                      {COMMUNITY_CATEGORY_LABELS[c.category]} · {c.memberCount}{" "}
+                      {communityCategoryLine(c)} · {c.memberCount}{" "}
                       {c.memberCount === 1 ? "member" : "members"}
                     </div>
                   </div>

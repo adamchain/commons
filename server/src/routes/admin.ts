@@ -6,7 +6,7 @@ import { isGcsConfigured, listDefaultCatalog, parseDataUrl, uploadCoverImage } f
 import { store } from "../store.js";
 import { listAllUsers, findUserById } from "../userRepo.js";
 import { runBehaviorAgent, analyzeUserBehavior } from "../lib/behaviorAgent.js";
-import { normalizeCommunityCategory } from "../types/shared.js";
+import { communityCategoriesOf, normalizeCommunityCategory } from "../types/shared.js";
 import { buildCoverCatalog, invalidateCoverCatalogCache } from "../lib/coverCatalog.js";
 
 const adminRouter = Router();
@@ -503,7 +503,8 @@ adminRouter.get("/communities", async (req, res) => {
         id: c.id,
         name: c.name,
         description: c.description,
-        category: normalizeCommunityCategory(String(c.category ?? "")),
+        category: communityCategoriesOf(c)[0]!,
+        categories: communityCategoriesOf(c),
         organizer: organizer
           ? { id: organizer.id, firstName: organizer.firstName, lastName: organizer.lastName ?? "" }
           : { id: c.organizerId, firstName: "Unknown", lastName: "" },

@@ -302,6 +302,7 @@ const CommunitySchema = new Schema<CommunityRecord>(
       enum: ALL_INTERESTS,
       required: true,
     },
+    categories: { type: [String], default: undefined },
     organizerId: { type: String, required: true },
     memberCount: { type: Number, default: 1 },
     creationStatus: { type: String, enum: ["pending", "approved", "rejected"], default: "approved" },

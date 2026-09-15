@@ -12,6 +12,10 @@ import { useAuth } from "../context/AuthContext";
 import {
   ALL_COMMUNITY_CATEGORIES,
   COMMUNITY_CATEGORY_LABELS,
+  MAX_COMMUNITY_CATEGORIES,
+  communityCategoriesOf,
+  communityCategoryLine,
+  toggleCommunityCategory,
   type CommunityAccessLevel,
   type CommunityCategory,
   type CommunityDTO,
@@ -108,7 +112,7 @@ export function CommunityDetailPage() {
     );
   }
 
-  const catLabel = COMMUNITY_CATEGORY_LABELS[community.category];
+  const catLabels = communityCategoriesOf(community).map((tag) => COMMUNITY_CATEGORY_LABELS[tag]);
   const isActiveMember = community.myMembership?.status === "active";
   // isOrganizer is the real community organizer only (never a COMMONS admin).
   const showChatTab = community.chatEnabled && (isActiveMember || community.isOrganizer);
@@ -157,7 +161,9 @@ export function CommunityDetailPage() {
           <div className="cmy-cover-overlay">
             <h1 className="cmy-name">{community.name}</h1>
             <div className="cmy-cover-pills">
-              <span className="cmy-cover-tag">{catLabel}</span>
+              {catLabels.map((label) => (
+                <span key={label} className="cmy-cover-tag">{label}</span>
+              ))}
             </div>
           </div>
         </div>
@@ -1124,7 +1130,7 @@ function SettingsTab({
   const coverRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(community.name);
   const [description, setDescription] = useState(community.description);
-  const [category, setCategory] = useState<CommunityCategory>(community.category);
+  const [categories, setCategories] = useState<CommunityCategory[]>(() => communityCategoriesOf(community));
   const [screening, setScreening] = useState(community.screeningQuestion ?? "");
   const [coverImage, setCoverImage] = useState<string | null>(community.coverImage ?? null);
   const [coverBusy, setCoverBusy] = useState(false);
@@ -1145,7 +1151,7 @@ function SettingsTab({
   useEffect(() => {
     setName(community.name);
     setDescription(community.description);
-    setCategory(community.category);
+    setCategories(communityCategoriesOf(community));
     setScreening(community.screeningQuestion ?? "");
     setCoverImage(community.coverImage ?? null);
     setBulletinPermission(community.bulletinPermission);
@@ -1190,13 +1196,24 @@ function SettingsTab({
     setMsg(null);
     setErr(null);
     try {
+      if (!coverImage) {
+        setErr("A cover photo is required");
+        setBusy(false);
+        return;
+      }
+      if (categories.length === 0) {
+        setErr("Pick at least one category");
+        setBusy(false);
+        return;
+      }
       const prevCover = community.coverImage ?? null;
       const updated = await api<CommunityDTO>(`/api/communities/${community.id}`, {
         method: "PATCH",
         body: JSON.stringify({
           name,
           description,
-          category,
+          category: categories[0],
+          categories,
           screeningQuestion: screening,
           bulletinPermission,
           planPostingPermission,
@@ -1210,7 +1227,7 @@ function SettingsTab({
       onSaved(updated);
       setName(updated.name);
       setDescription(updated.description);
-      setCategory(updated.category);
+      setCategories(communityCategoriesOf(updated));
       setScreening(updated.screeningQuestion ?? "");
       setCoverImage(updated.coverImage ?? null);
       setBulletinPermission(updated.bulletinPermission);
@@ -1261,14 +1278,6 @@ function SettingsTab({
                 onClick={() => void openCoverUpload()}
               >
                 Upload
-              </button>
-              <button
-                type="button"
-                className="cmy-btn cmy-btn--ghost cmy-btn--sm"
-                disabled={coverBusy}
-                onClick={() => setCoverImage(null)}
-              >
-                Remove
               </button>
             </div>
           </div>
@@ -1327,20 +1336,29 @@ function SettingsTab({
 
         <SettingsRow
           id="category"
-          label="Category"
-          summary={COMMUNITY_CATEGORY_LABELS[category]}
+          label="Categories"
+          summary={communityCategoryLine({ category: categories[0] ?? community.category, categories }) || "Pick up to 3"}
           open={openRow === "category"}
           onToggle={() => setOpenRow((r) => (r === "category" ? null : "category"))}
         >
-          <select
-            className="cmy-input"
-            value={category}
-            onChange={(e) => setCategory(e.target.value as CommunityCategory)}
-          >
-            {ALL_COMMUNITY_CATEGORIES.map((c) => (
-              <option key={c} value={c}>{COMMUNITY_CATEGORY_LABELS[c]}</option>
-            ))}
-          </select>
+          <div className="cmy-create-cats" role="group" aria-label="Categories">
+            {ALL_COMMUNITY_CATEGORIES.map((c) => {
+              const selected = categories.includes(c);
+              const blocked = !selected && categories.length >= MAX_COMMUNITY_CATEGORIES;
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  className={`cmy-cat-pill ${selected ? "is-active" : ""}`}
+                  aria-pressed={selected}
+                  disabled={blocked}
+                  onClick={() => setCategories((prev) => toggleCommunityCategory(prev, c))}
+                >
+                  {COMMUNITY_CATEGORY_LABELS[c]}
+                </button>
+              );
+            })}
+          </div>
         </SettingsRow>
 
         <SettingsRow

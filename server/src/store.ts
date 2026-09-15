@@ -20,7 +20,7 @@ import type {
   PlanKind,
   PlanVisibility,
 } from "./types/shared.js";
-import { ALL_INTERESTS, normalizeCommunityCategory } from "./types/shared.js";
+import { ALL_INTERESTS, normalizeCommunityCategory, parseCommunityCategories } from "./types/shared.js";
 
 export interface UserRecord {
   id: string;
@@ -385,6 +385,8 @@ export interface CommunityRecord {
   description: string;
   coverImage?: string | null;
   category: CommunityCategory;
+  /** Up to 3 tags; `category` is the primary (first). Older rows may omit this. */
+  categories?: CommunityCategory[];
   organizerId: string;
   /** Denormalized count of active members (organizer included). */
   memberCount: number;
@@ -1939,9 +1941,16 @@ export const store = {
   migrateCommunityCategories(): number {
     let migrated = 0;
     for (const community of snapshot.communities) {
-      const next = normalizeCommunityCategory(String(community.category ?? ""));
-      if (community.category === next) continue;
-      this.updateCommunity(community.id, { category: next });
+      const categories = parseCommunityCategories(community.categories, community.category);
+      const category = categories[0] ?? normalizeCommunityCategory(String(community.category ?? ""));
+      const cats = categories.length > 0 ? categories : [category];
+      const samePrimary = community.category === category;
+      const sameList =
+        Array.isArray(community.categories) &&
+        community.categories.length === cats.length &&
+        community.categories.every((c, i) => c === cats[i]);
+      if (samePrimary && sameList) continue;
+      this.updateCommunity(community.id, { category, categories: cats });
       migrated += 1;
     }
     return migrated;
@@ -1962,6 +1971,7 @@ export const store = {
     description: string;
     coverImage?: string | null;
     category: CommunityCategory;
+    categories?: CommunityCategory[];
     organizerId: string;
     isFounding?: boolean;
     creationStatus?: CommunityCreationStatus;
@@ -1973,12 +1983,15 @@ export const store = {
     const now = new Date().toISOString();
     const creationStatus: CommunityCreationStatus = input.creationStatus ?? "approved";
     const approved = creationStatus === "approved";
+    const categories = parseCommunityCategories(input.categories, input.category);
+    const category = categories[0] ?? normalizeCommunityCategory(String(input.category ?? ""));
     const community: CommunityRecord = {
       id: randomUUID(),
       name: input.name,
       description: input.description,
       coverImage: input.coverImage ?? null,
-      category: normalizeCommunityCategory(String(input.category ?? "")),
+      category,
+      categories: categories.length > 0 ? categories : [category],
       organizerId: input.organizerId,
       memberCount: 1,
       creationStatus,
