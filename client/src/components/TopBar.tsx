@@ -30,6 +30,7 @@ export function TopBar() {
     pathname.startsWith("/login") ||
     pathname.startsWith("/admin") ||
     pathname === "/plans/new" ||
+    pathname === "/communities/new" ||
     pathname === "/explore" ||
     pathname.startsWith("/notifications") ||
     /^\/plans\/[^/]+(\/chat)?$/.test(pathname) ||

@@ -1168,7 +1168,7 @@ export const store = {
     const plan: PlanRecord = {
       isFlexibleLocation: false,
       planKind: "standard",
-      visibility: "everyone",
+      visibility: input.visibility ?? "everyone",
       visibilityCommunityTag: null,
       communityId: null,
       capacity: null,
@@ -1976,6 +1976,7 @@ export const store = {
     isFounding?: boolean;
     creationStatus?: CommunityCreationStatus;
     screeningQuestion?: string | null;
+    visibility?: CommunityAccessLevel;
     bulletinPermission?: CommunityPostingPermission;
     planPostingPermission?: CommunityPostingPermission;
     reviewedBy?: string | null;
@@ -2001,7 +2002,7 @@ export const store = {
       chatEnabled: true,
       bulletinEnabled: true,
       bulletinRequiresApproval: false,
-      visibility: "everyone",
+      visibility: input.visibility ?? "everyone",
       screeningQuestion: input.screeningQuestion ?? null,
       rejectionNote: null,
       submittedAt: now,

@@ -1475,3 +1475,218 @@ button.cmy-joined-pill {
   background: var(--surface-hover, var(--paper-100));
   border-color: var(--accent);
 }
+
+/* ---- Create community (2-step, same DNA as New Plan) ---- */
+.app-shell.create-plan.cmy-create {
+  padding-top: 0;
+}
+.cmy-create .create-header {
+  row-gap: 10px;
+}
+.cmy-create-title-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  white-space: normal;
+  line-height: 1.2;
+}
+.cmy-create-step {
+  font-size: var(--type-label, 10px);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  text-transform: none;
+}
+.cmy-create-progress {
+  grid-column: 1 / -1;
+  height: 3px;
+  border-radius: var(--r-pill);
+  background: var(--tan-mid, var(--paper-300));
+  overflow: hidden;
+}
+.cmy-create-progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--red);
+  border-radius: var(--r-pill);
+  transition: width 180ms var(--ease-out, ease);
+}
+.cmy-create-progress-fill--1 { width: 50%; }
+.cmy-create-progress-fill--2 { width: 100%; }
+.cmy-create-body {
+  gap: 14px;
+}
+.cmy-create-cover-cta {
+  appearance: none;
+  border: none;
+  width: 100%;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: center;
+}
+.cmy-create-cover-cta .cover-picker-sub {
+  margin-bottom: 10px;
+}
+.cmy-create-cover-cta .cover-btn {
+  pointer-events: auto;
+}
+.cmy-create-card-kicker {
+  display: block;
+  font-size: var(--type-label, 10px);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.cmy-create-name-card,
+.cmy-create-cats-card,
+.cmy-create-desc-card,
+.cmy-create-screen-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+.cmy-create .cmy-create-name {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+  font-family: var(--font-ui);
+  font-size: var(--type-title, 20px);
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.25;
+}
+.cmy-create .cmy-create-name::placeholder {
+  color: var(--faint);
+  font-weight: 500;
+}
+.cmy-create .cmy-create-name:focus {
+  outline: none;
+}
+.cmy-create-cats-head,
+.cmy-create-desc-card {
+  position: relative;
+}
+.cmy-create-cats-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.cmy-create-count {
+  font-size: var(--type-caption, 12px);
+  font-weight: 600;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.cmy-create-count--end {
+  align-self: flex-end;
+}
+.cmy-create-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cmy-create-cats .ui-chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.cmy-create-city-row {
+  gap: 10px;
+  justify-content: flex-start;
+}
+.cmy-create-city-row svg {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.cmy-create-city {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+}
+.cmy-create-city::placeholder {
+  color: var(--faint);
+  font-weight: 500;
+}
+.cmy-create-city:focus {
+  outline: none;
+}
+.cmy-create-vis-row {
+  align-items: center;
+}
+.cmy-create-vis-label {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--ink);
+}
+.cmy-create-seg {
+  flex-shrink: 0;
+  min-width: 148px;
+}
+.cmy-create .cmy-seg--active {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+.cmy-create-desc {
+  border: none;
+  background: transparent;
+  padding: 0;
+  min-height: 110px;
+  font-size: var(--text-body);
+  line-height: 1.55;
+  box-shadow: none;
+}
+.cmy-create-desc:focus {
+  outline: none;
+}
+.cmy-create-screen-card .cmy-toggle-row {
+  align-items: flex-start;
+  gap: 12px;
+}
+.cmy-create-screen-card .cmy-hint {
+  margin: 4px 0 0;
+  max-width: 42ch;
+}
+.cmy-switch {
+  appearance: none;
+  position: relative;
+  width: 44px;
+  height: 26px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--r-pill);
+  background: var(--tan-mid, var(--paper-300));
+  cursor: pointer;
+  padding: 0;
+}
+.cmy-switch.is-on {
+  background: var(--red);
+}
+.cmy-switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  transition: transform 160ms var(--ease-out, ease);
+}
+.cmy-switch.is-on .cmy-switch-knob {
+  transform: translateX(18px);
+}
+.cmy-create .btn-primary.btn-block {
+  margin-top: 4px;
+}

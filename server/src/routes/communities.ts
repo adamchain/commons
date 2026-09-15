@@ -308,6 +308,8 @@ communitiesRouter.post("/", requireAuth, async (req, res) => {
     categories,
     organizerId: userId,
     screeningQuestion,
+    visibility:
+      req.body?.visibility === "members_only" ? "members_only" : "everyone",
     creationStatus: "approved",
   });
   store.log("community_created", { communityId: community.id, organizerId: userId });
