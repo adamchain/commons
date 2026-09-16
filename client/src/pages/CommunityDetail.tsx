@@ -322,8 +322,8 @@ function JoinRequestsPanel({
     return (
       <TabEmpty
         icon={<Users size={24} strokeWidth={1.6} />}
-        headline="No pending requests"
-        body="When someone asks to join, they’ll show up here."
+        headline="Nobody at the door."
+        body="That's a good problem."
       />
     );
   }
@@ -778,8 +778,8 @@ function BulletinTab({
       {livePosts.length === 0 && pending.length === 0 && myPending.length === 0 && (
         <TabEmpty
           icon={<MessageCircle size={24} strokeWidth={1.6} />}
-          headline="No posts yet"
-          body="Start the conversation."
+          headline="It's quiet in here"
+          body="Somebody's gotta go first."
         />
       )}
       <ul className="cmy-post-list">
@@ -923,8 +923,8 @@ function EventsTab({
       {loaded && plans.length === 0 && (
         <TabEmpty
           icon={<Calendar size={24} strokeWidth={1.6} />}
-          headline="No events yet"
-          body="Be the first to post a gathering for this community."
+          headline="Nothing on the calendar."
+          body="Host something. The regulars will come."
         />
       )}
       <div className="cmy-events">
@@ -1385,7 +1385,7 @@ function SettingsTab({
           onToggle={() => setOpenRow((r) => (r === "screening" ? null : "screening"))}
         >
           <p className="cmy-hint" style={{ margin: "0 0 8px" }}>
-            Leave blank to let anyone join instantly.
+            Leave blank and anyone can walk in.
           </p>
           <textarea
             className="cmy-textarea"

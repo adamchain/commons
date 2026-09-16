@@ -357,7 +357,7 @@ function EditForm({
       </header>
       <ScreenTitle
         title="Edit plan"
-        subtitle="Most edits save as you go. Date and time go through a proposal."
+        subtitle="Date and time go through a proposal."
       />
       <nav className="edit-jump" aria-label="Jump to section">
         {EDIT_JUMP.map((s) => (
@@ -370,7 +370,6 @@ function EditForm({
       <div className="form-card">
         <section className="edit-section">
           <SectionHead id="edit-basics" label="Basics" saved={savedFlash?.section === "basics"} />
-          <p className="form-help" style={{ marginTop: 0 }}>Saves as you type.</p>
           <label className="form-question">Category</label>
           <div className="edit-cat-row">
             {resolvedTags.length > 0 ? (
@@ -722,9 +721,6 @@ function EditForm({
 
       <section className="edit-plan-actions" aria-label="Plan actions">
         <h2 className="edit-section-label">Plan actions</h2>
-        <p className="form-help" style={{ marginTop: 0 }}>
-          These aren&apos;t edits — they change who hosts or whether the plan stays on.
-        </p>
         {!plan.upForGrabsAt && !plan.cancelledAt && (
           <PutUpForGrabsControl
             plan={plan}
@@ -966,7 +962,7 @@ function PassItOnControl({
   return (
     <div>
       <p className="form-help" style={{ marginTop: 0 }}>
-        Transfer hosting to someone who&apos;s going.
+        Transfer hosting to someone who's going.
       </p>
       {!open ? (
         <button

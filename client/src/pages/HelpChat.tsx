@@ -267,9 +267,9 @@ export function HelpChatPage() {
             <div className="helpchat-empty-icon">
               <Sparkles size={28} strokeWidth={1.5} aria-hidden="true" />
             </div>
-            <h2 className="helpchat-empty-title">How can I help?</h2>
+            <h2 className="helpchat-empty-title">What's on your mind?</h2>
             <p className="helpchat-empty-sub">
-              Ask me anything about Commons — plans, chat, your profile, or how the app works.
+              Plans, chat, your profile — ask away.
             </p>
             <div className="helpchat-suggestions">
               {SUGGESTIONS.map((s) => (

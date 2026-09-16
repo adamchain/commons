@@ -123,7 +123,7 @@ export function ExplorePage() {
           </ul>
         ) : loadedComm ? (
           <div className="xpl-comm-empty">
-            <p>No communities yet — create the first one.</p>
+            <p>Empty dance floor — start one and see who shows.</p>
             <Link to="/communities/new" className="xpl-places-cta">
               Create a community
             </Link>

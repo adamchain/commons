@@ -42,7 +42,7 @@ export function SettingsPage() {
 
   const interestsSub =
     user.interests.length === 0
-      ? "Tap to pick what you’re into"
+      ? "What are you into?"
       : user.interests.map((t) => INTEREST_LABELS[t]).join(" · ");
 
   return (

@@ -44,7 +44,7 @@ export function BlockedListPage() {
       </p>
 
       {users.length === 0 ? (
-        <p className="form-help">You haven&apos;t blocked anyone.</p>
+        <p className="form-help">Nobody's on this list.</p>
       ) : (
         <div className="settings-card">
           {users.map((u) => (

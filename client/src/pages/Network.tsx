@@ -61,12 +61,12 @@ export function NetworkPage() {
         <EmptyCard
           icon={<Users size={22} strokeWidth={1.6} color="#3A6A3A" />}
           tint="#C8DDC8"
-          title="No network yet."
-          body="Meet people at plans and add them after — or invite a friend to skip straight to it."
+          title="It's just you for now."
+          body="Meet people at plans, or skip ahead and invite a friend."
           cta={{ to: "/invite", label: "Invite friends →" }}
         />
       ) : filtered.length === 0 ? (
-        <p className="form-help">No one in your network matches &ldquo;{query.trim()}&rdquo;.</p>
+        <p className="form-help">Nobody by that name.</p>
       ) : (
         <div className="profile-network-list">
           {filtered.map((u) => (

@@ -1193,7 +1193,7 @@ function InterestsStep({ me, onSave, onBack }: { me: MeDTO; onSave: (interests: 
   }
 
   return (
-    <OnboardingShell title="What are you into?" subtitle="Pick what you're into. Your feed does the rest." onBack={onBack} compact>
+    <OnboardingShell title="What are you into?" subtitle="What you're into. The feed does the rest." onBack={onBack} compact>
       <div className="interest-grid">
         {ALL_INTERESTS.map((t) => {
           const isPicked = picked.includes(t);

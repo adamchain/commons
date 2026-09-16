@@ -1166,8 +1166,8 @@ function YourPlansBlock({
           ) : (
             <p className="empty-state" style={{ marginTop: 8 }}>
               {isSelf
-                ? "No plans yet — join something from the feed or post your own."
-                : "No upcoming plans yet."}
+                ? "Quiet calendar — go join something, or post your own."
+                : "Nothing coming up."}
             </p>
           )}
 
@@ -1295,7 +1295,7 @@ function NetworkCard({ network }: { network: PublicUser[] | null }) {
       {isEmpty ? (
         <>
           <p className="profile-network-card-empty">
-            Your people aren't here yet — invite them and plan things together.
+            Your people aren't here yet — invite them.
           </p>
           <Link to="/invite" className="btn-primary btn-block profile-network-card-invite">
             Invite friends →

@@ -26,7 +26,6 @@ export function PollSheet({
       <h2 id="poll-sheet-title" className="sheet-title poll-modal-title">
         New poll
       </h2>
-      <p className="poll-modal-sub">Everyone in the chat can vote on one option.</p>
       <input
         type="text"
         className="poll-modal-question"

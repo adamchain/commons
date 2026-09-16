@@ -514,7 +514,7 @@ export function ChatPage() {
               </div>
               <div className="chat-empty-headline">It's quiet in here</div>
               <p className="chat-empty-body">
-                Be the first to say hi — a quick hello or a logistics note goes a long way.
+                Say hi — even a tiny one counts.
               </p>
             </div>
           ) : (

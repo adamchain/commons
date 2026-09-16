@@ -63,7 +63,7 @@ export function SettingsInterestsPage() {
           {returnTo.startsWith("/messages") ? "Messages" : "Settings"}
         </Link>
       </header>
-      <ScreenTitle title="Interests" subtitle="Pick what you're into. Your feed does the rest." />
+      <ScreenTitle title="Interests" subtitle="What you're into. The feed does the rest." />
 
       <div className="interest-grid">
         {ALL_INTERESTS.map((t) => {

@@ -134,11 +134,11 @@ export function NotificationsPage() {
           <div className="notif-empty-glyph" aria-hidden="true">
             <Bell size={28} strokeWidth={1.5} color="#6B5AA0" />
           </div>
-          <h2 className="notif-empty-title">{hasPlans ? "All quiet." : "Nothing yet."}</h2>
+          <h2 className="notif-empty-title">All quiet.</h2>
           <p className="notif-empty-body">
             {hasPlans
-              ? "We'll ping you when someone joins or a plan updates."
-              : "Join a plan and this is where you'll hear about it."}
+              ? "We'll nudge you when something stirs."
+              : "Go get into something — then we'll have news."}
           </p>
           {!hasPlans && (
             <div className="feed-empty-actions">

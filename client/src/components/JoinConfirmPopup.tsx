@@ -13,7 +13,7 @@ const COPY: Record<JoinConfirmKind, { title: string; sub: string; celebrate: boo
   },
   interested: {
     title: "You're Interested",
-    sub: "Soft yes — you'll get updates and join the chat.",
+    sub: "Noted — we'll keep you in the loop.",
     celebrate: true,
   },
   dropped: {

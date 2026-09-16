@@ -16,19 +16,19 @@ const STEPS: Step[] = [
   {
     id: "post",
     title: "Post a plan or float an idea",
-    body: "Tap + anytime, lock in a plan, or just drop an idea",
+    body: "The plus is yours — a plan, or just an idea.",
     slot: 2,
   },
   {
     id: "explore",
     title: "Find your people",
-    body: "Explore communities and forums — join what’s already happening.",
+    body: "Communities and forums — join what’s already happening.",
     slot: 1,
   },
   {
     id: "chats",
     title: "Talk to the city by interest",
-    body: "Chats hold your plan threads and interest forums — coordinate the details or connect with the city.",
+    body: "Plan threads and city chats by interest, all in one place.",
     slot: 3,
   },
 ];

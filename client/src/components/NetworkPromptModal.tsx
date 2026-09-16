@@ -83,7 +83,7 @@ export function NetworkPromptModal({
         </h2>
         <p className="network-prompt-body">
           You went to <strong>{prompt.planTitle}</strong> with {count} {count === 1 ? "person" : "people"}.
-          Tap anyone you'd like to add to your network.
+          Anyone you want to keep around?
         </p>
 
         <div className="network-prompt-avatars" aria-label={names}>

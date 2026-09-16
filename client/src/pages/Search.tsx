@@ -80,11 +80,11 @@ export function SearchPage() {
       </div>
 
       {!hasQuery && (
-        <p className="form-help">Try a plan title, a venue, an interest like &ldquo;Coffee&rdquo;, or a name.</p>
+        <p className="form-help">Plans, people, a vibe — type something.</p>
       )}
 
       {noResults && (
-        <p className="form-help">No matches for &ldquo;{query.trim()}&rdquo;.</p>
+        <p className="form-help">Nothing under that.</p>
       )}
 
       {results && results.people.length > 0 && (

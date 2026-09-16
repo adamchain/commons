@@ -115,13 +115,13 @@ export function CommunitiesPage() {
             tint="#C8DDC8"
             title={
               catLabel
-                ? `No ${catLabel.toLowerCase()} communities yet.`
-                : "No communities to browse yet."
+                ? `Quiet on ${catLabel.toLowerCase()}.`
+                : "Nobody's started one yet."
             }
             body={
               catLabel
-                ? "Try another category, or create one for this scene."
-                : "Be the first to create a community — run clubs, book clubs, and the regulars."
+                ? "Try another category, or start this scene."
+                : "Run clubs, book clubs, the regulars — go first."
             }
             cta={{ to: "/communities/new", label: "Create a community" }}
           />

@@ -129,7 +129,7 @@ export function InviteSheet({
             {network === null && <p className="form-help">Loading…</p>}
             {network !== null && network.length === 0 && (
               <p className="form-help">
-                You haven't added anyone yet — text the link to invite.
+                You haven't added anyone yet — text the link.
               </p>
             )}
             {network !== null && network.length > 0 && (
@@ -163,7 +163,7 @@ export function InviteSheet({
 
           {sent > 0 && (
             <p className="form-help" style={{ marginTop: 10, color: "var(--accent)" }}>
-              Sent {sent} invite{sent === 1 ? "" : "s"}. They'll get a notification.
+              Sent {sent} invite{sent === 1 ? "" : "s"}.
             </p>
           )}
           {hiddenWarn && (

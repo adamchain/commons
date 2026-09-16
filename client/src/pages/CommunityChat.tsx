@@ -168,7 +168,7 @@ export function CommunityChatPage() {
           <span aria-hidden="true" />
         </header>
         <div className="empty-state">
-          <p style={{ margin: 0 }}>Join to see this chat.</p>
+          <p style={{ margin: 0 }}>It's quiet until you're in.</p>
           <p style={{ margin: "0.75rem 0 0" }}>
             <Link to={communityHref}>Go to community</Link>
           </p>
@@ -514,7 +514,7 @@ export function CommunityChatPage() {
               </div>
               <div className="chat-empty-headline">It's quiet in here</div>
               <p className="chat-empty-body">
-                Be the first to say hi — a quick hello or a logistics note goes a long way.
+                Say hi — even a tiny one counts.
               </p>
             </div>
           ) : (

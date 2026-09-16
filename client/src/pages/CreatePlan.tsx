@@ -783,7 +783,7 @@ export function CreatePlanPage() {
         ) : coverPickerOpen ? (
           <div className="plan-detail-hero-cover-empty">
             <span className="cover-picker-title">Add a cover photo</span>
-            <span className="cover-picker-sub">Optional — library or upload</span>
+            <span className="cover-picker-sub">Optional</span>
             <div className="cover-picker-buttons">
               <button type="button" className="cover-btn" onClick={() => setShowCoverLib(true)}>
                 <ImagePlus size={16} strokeWidth={1.8} aria-hidden="true" />
@@ -888,8 +888,8 @@ export function CreatePlanPage() {
             </div>
             <p className="create-community-tag-hint">
               {communityVisibility === "public"
-                ? "Shows on the main feed with a community tag, and on the community's events board."
-                : "Only community members can see this — it won't appear on the main feed."}
+                ? "On the feed, with a community tag."
+                : "Members only — stays off the main feed."}
             </p>
           </div>
         ) : null}
@@ -1189,7 +1189,7 @@ export function CreatePlanPage() {
                   <label className="form-question">Capacity</label>
                   {!form.capacityOn && (
                     <p className="form-help" style={{ marginTop: 4 }}>
-                      Open — no cap on who can join
+                      Open house.
                     </p>
                   )}
                 </div>
@@ -1336,7 +1336,7 @@ export function CreatePlanPage() {
             </p>
             {network === null && <p className="form-help">Loading…</p>}
             {network !== null && network.length === 0 && !seededOutsideNetwork && (
-              <p className="form-help">No one in your network yet — you can still post.</p>
+              <p className="form-help">Still empty — you can post anyway.</p>
             )}
             {(network && network.length > 0) || seededOutsideNetwork ? (
               <div className="invite-people-list">
@@ -1624,8 +1624,8 @@ function IdeaForm({
             </div>
             <p className="create-community-tag-hint">
               {communityVisibility === "public"
-                ? "Shows on the main feed with a community tag, and on the community's events board."
-                : "Only community members can see this — it won't appear on the main feed."}
+                ? "On the feed, with a community tag."
+                : "Members only — stays off the main feed."}
             </p>
           </div>
         ) : null}
@@ -1928,7 +1928,7 @@ function NetworkHandPick({
     return (
       <div className="network-empty-prompt" style={{ marginTop: 8 }}>
         <p className="form-help" style={{ marginTop: 0, marginBottom: 10 }}>
-          You haven&apos;t added anyone yet — invite someone or add people you&apos;ve met.
+          Still just you — invite someone, or post anyway.
         </p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <Link to="/invite" className="btn-pill-accent" style={{ textDecoration: "none" }}>
@@ -1943,9 +1943,9 @@ function NetworkHandPick({
   }
   return (
     <div style={{ marginTop: 10 }}>
-      <p className="form-help" style={{ marginTop: 0 }}>
-        Want to narrow it down? Pick specific people — leave blank to share with everyone in your network.
-      </p>
+        <p className="form-help" style={{ marginTop: 0 }}>
+          Everyone in your network, unless you pick a few.
+        </p>
       <div className="invite-people-list">
         {network.map((u) => {
           const picked = invitedIds.has(u.id);

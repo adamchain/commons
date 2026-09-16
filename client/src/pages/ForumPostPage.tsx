@@ -194,7 +194,7 @@ export function ForumPostPage() {
           {replies.length} {replies.length === 1 ? "Reply" : "Replies"}
         </p>
         {replies.length === 0 ? (
-          <p className="form-help">No replies yet — say something.</p>
+          <p className="form-help">Quiet so far — first reply's yours.</p>
         ) : (
           replies.map((r) => (
             <div key={r.id} className="forum-reply-row">

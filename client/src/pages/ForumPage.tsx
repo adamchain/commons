@@ -283,7 +283,7 @@ export function ForumPage() {
 
       {data.posts.length === 0 ? (
         <div className="empty-state" style={{ marginTop: 16 }}>
-          <p style={{ margin: 0 }}>Nothing here yet — say hi or post a plan to get things going.</p>
+          <p style={{ margin: 0 }}>It's quiet in here — say hi, or throw a plan into the mix.</p>
         </div>
       ) : (
         <div className="forum-post-list">
@@ -303,10 +303,6 @@ export function ForumPage() {
       {planModalOpen && (
         <BottomSheet onClose={() => setPlanModalOpen(false)} labelledBy="forum-plan-title">
             <h2 id="forum-plan-title" className="sheet-title poll-modal-title">Post a {data.label} plan</h2>
-            <p className="poll-modal-sub">
-              Your plan will be tagged <strong>{data.label}</strong> and show up for everyone on COMMONS
-              with that interest — not just people in this forum thread.
-            </p>
             <div className="poll-modal-actions">
               <button type="button" className="btn-primary btn-block" onClick={confirmPostPlan}>
                 Continue

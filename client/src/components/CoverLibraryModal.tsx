@@ -105,7 +105,7 @@ export function CoverLibraryModal({
         ) : error ? (
           <p className="cover-lib-status">{error}</p>
         ) : allImages.length === 0 ? (
-          <p className="cover-lib-status">No covers yet — upload one from your camera roll.</p>
+          <p className="cover-lib-status">Empty library — upload one.</p>
         ) : (
           <div
             ref={gridRef}

@@ -132,7 +132,7 @@ export function MessagesPage() {
             <>
               {forums.length === 0 ? (
                 <p className="form-help" style={{ marginTop: 4 }}>
-                  Join an interest to unlock its citywide forum — Coffee, Workouts, and more.
+                  No forums yet — Coffee, Workouts, the city chats.
                 </p>
               ) : (
                 <div className="messages-card">
@@ -165,7 +165,7 @@ export function MessagesPage() {
                                 </span>
                               ) : (
                                 <span className="messages-row-preview--empty">
-                                  No posts yet — be the first
+                                  It's quiet in here
                                 </span>
                               )}
                             </div>
@@ -215,8 +215,8 @@ export function MessagesPage() {
           <div className="ref-empty-glyph" style={{ background: "rgba(237,229,216,0.8)" }} aria-hidden="true">
             <MessageCircle size={22} strokeWidth={1.6} color="var(--muted)" />
           </div>
-          <h2 className="ref-empty-title">Nothing in your inbox yet.</h2>
-          <p className="ref-empty-body">Join a plan and its group chat shows up here.</p>
+          <h2 className="ref-empty-title">It's quiet in here.</h2>
+          <p className="ref-empty-body">Join something and the conversation follows.</p>
           <Link to="/" className="ref-empty-cta">
             See what&apos;s happening
           </Link>

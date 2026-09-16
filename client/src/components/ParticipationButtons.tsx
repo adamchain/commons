@@ -168,15 +168,13 @@ export function ParticipationButtons({
 
   return (
     <div className={`participation ${loose ? "participation--loose" : ""}`}>
-      {!loose && (
+      {!loose && (isApproveOnly || isFull || capacity !== null) && (
         <p className="participation-hint">
           {isApproveOnly
-            ? "Application-only — tap Interested to request a spot."
+            ? "Application-only."
             : isFull
-              ? "This plan is full."
-              : capacity !== null
-                ? `${goingCount}/${capacity} spots taken — first come, first serve.`
-                : "“I'm in.” is committed. Interested is soft — both count and join the chat."}
+              ? "This one's full."
+              : `${goingCount}/${capacity} spots taken.`}
         </p>
       )}
       {!loose && (

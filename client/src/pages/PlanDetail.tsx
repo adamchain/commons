@@ -371,7 +371,7 @@ export function PlanDetailPage() {
           ) : lockCoverOpen ? (
             <div className="plan-detail-hero-cover-empty">
               <span className="cover-picker-title">Add a cover photo</span>
-              <span className="cover-picker-sub">Optional — library or upload</span>
+              <span className="cover-picker-sub">Optional</span>
               <div className="cover-picker-buttons">
                 <button type="button" className="cover-btn" onClick={() => setShowLockCoverLib(true)}>
                   <ImagePlus size={16} strokeWidth={1.8} aria-hidden="true" />
@@ -1245,8 +1245,6 @@ function ChatPreviewCard({
           <span className="plan-meta-label">Chat</span>
           {messages === null ? (
             <span className="plan-meta-sub">Loading…</span>
-          ) : hasMessages ? (
-            <span className="plan-meta-sub">Latest in the thread</span>
           ) : null}
         </div>
         <ChevronRight size={16} strokeWidth={2} color="var(--text-muted)" aria-hidden="true" />

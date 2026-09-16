@@ -75,7 +75,7 @@ export function SettingsForumsPage() {
       </header>
       <ScreenTitle
         title="Forums"
-        subtitle="Citywide conversations by interest — join or leave anytime."
+        subtitle="Citywide chats by interest."
       />
 
       {!ready ? (
@@ -83,7 +83,7 @@ export function SettingsForumsPage() {
           <div className="feed-skeleton-card" />
         </div>
       ) : forums.length === 0 ? (
-        <p className="form-help">You haven&apos;t joined any forums yet. Pick one below.</p>
+        <p className="form-help">No forums yet — pick one below.</p>
       ) : (
         <div className="settings-card settings-forums-card" style={{ marginBottom: 20 }}>
           {forums.map((f) => {

@@ -537,17 +537,17 @@ function FeedEmptyState({
   let headline: string;
   let body: string;
   if (hasFilters) {
-    headline = "Nothing matches those filters.";
-    body = "Try clearing them — there's more going on across the city.";
+    headline = "Nothing in that slice.";
+    body = "Loosen it up — more of the city is out there.";
   } else if (view === "ideas") {
-    headline = "No ideas out there yet.";
-    body = "Float something — coffee this week, a walk, whatever's on your mind.";
+    headline = "Nobody's floated one yet.";
+    body = "Coffee, a walk, whatever's rattling around.";
   } else if (hasAnyPlans) {
-    headline = "Nothing near you this week.";
+    headline = "Quiet around here.";
     body = "Be the first to post.";
   } else {
-    headline = "Nothing near you this week.";
-    body = "Be the first to post — coffee run, gallery night, pickup soccer. Anything.";
+    headline = "Quiet around here.";
+    body = "Coffee run, gallery night, pickup soccer. Anything.";
   }
 
   return (

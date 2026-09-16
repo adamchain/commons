@@ -303,8 +303,7 @@ export function CreateCommunityPage() {
                 <div>
                   <p className="cmy-create-vis-label">Screening questions</p>
                   <p className="cmy-hint">
-                    Ask prospective members a few questions before they join.
-                    Helps keep the community intentional.
+                    A few questions before they join.
                   </p>
                 </div>
                 <button

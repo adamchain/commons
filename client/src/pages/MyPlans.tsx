@@ -55,8 +55,8 @@ export function MyPlansPage() {
         <EmptyCard
           icon={<Calendar size={22} strokeWidth={1.6} color="#3A6A8A" />}
           tint="#C8DCF0"
-          title="No upcoming plans yet."
-          body="When you host or join a plan, it'll show up here."
+          title="Quiet week."
+          body="Go find something — or start one."
           cta={{ to: "/", label: "See what's happening" }}
         />
       )}
