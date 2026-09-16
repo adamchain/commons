@@ -904,7 +904,7 @@ export function CreatePlanPage() {
               ))}
             </div>
           )}
-          <div className="plan-detail-title-row">
+          <div className="plan-detail-title-row plan-detail-title-box">
             <input
               id="title"
               ref={titleInputRef}
@@ -946,6 +946,7 @@ export function CreatePlanPage() {
                 )}
               </div>
               <FlexToggle
+                variant="switch"
                 active={form.isFlexibleLocation}
                 onClick={() =>
                   setForm((f) => {
@@ -990,6 +991,7 @@ export function CreatePlanPage() {
                 )}
               </label>
               <FlexToggle
+                variant="switch"
                 active={form.isFlexibleDate}
                 onClick={() =>
                   setForm((f) => {
@@ -1028,6 +1030,7 @@ export function CreatePlanPage() {
                 )}
               </div>
               <FlexToggle
+                variant="switch"
                 active={form.isFlexibleTime}
                 onClick={() =>
                   setForm((f) => {
@@ -1814,6 +1817,7 @@ function IdeaForm({
                       )}
                     </div>
                     <FlexToggle
+                      variant="switch"
                       active={form.isFlexibleLocation}
                       onClick={() =>
                         setForm((f) => {
@@ -1975,11 +1979,30 @@ function FlexToggle({
   active,
   onClick,
   label,
+  variant = "chip",
 }: {
   active: boolean;
   onClick: (e: { preventDefault(): void }) => void;
   label: string;
+  variant?: "chip" | "switch";
 }) {
+  if (variant === "switch") {
+    return (
+      <div className="flex-switch-col">
+        <span className="flex-switch-caption">{label}</span>
+        <button
+          type="button"
+          role="switch"
+          className={`flex-switch ${active ? "is-on" : ""}`}
+          onClick={onClick}
+          aria-checked={active}
+          aria-label={label}
+        >
+          <span className="flex-switch-knob" />
+        </button>
+      </div>
+    );
+  }
   return (
     <button
       type="button"

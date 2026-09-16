@@ -1027,28 +1027,22 @@ function ParticipantsRow({
   );
 }
 
-/** Tan chip Flexible toggle — same pattern as CreatePlan's FlexToggle. */
+/** Switch Flexible toggle — same pattern as CreatePlan's FlexToggle. */
 function FlexChip({ active, onClick }: { active: boolean; onClick: () => void }) {
   return (
-    <button
-      type="button"
-      className={`flex-toggle-btn ${active ? "is-active" : ""}`}
-      onClick={onClick}
-      aria-pressed={active}
-      title="Flexible"
-    >
-      <FlexIcon />
-      <span>Flexible</span>
-    </button>
-  );
-}
-
-function FlexIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M5 12h14" />
-      <path d="m12 5 7 7-7 7" />
-    </svg>
+    <div className="flex-switch-col">
+      <span className="flex-switch-caption">Flexible</span>
+      <button
+        type="button"
+        role="switch"
+        className={`flex-switch ${active ? "is-on" : ""}`}
+        onClick={onClick}
+        aria-checked={active}
+        aria-label="Flexible"
+      >
+        <span className="flex-switch-knob" />
+      </button>
+    </div>
   );
 }
 

@@ -1106,6 +1106,12 @@ a.btn-primary[aria-disabled="true"] {
   gap: 10px;
   pointer-events: none;
 }
+/* Create flow: keep back/invite on the cover so they don't sit on Library/Upload
+   or the community banner after the hero scrolls away. */
+.plan-detail-page--create .plan-detail-hero-bar {
+  position: absolute;
+  top: calc(10px + env(safe-area-inset-top, 0px));
+}
 .plan-detail-hero-bar-actions {
   display: flex;
   align-items: center;
@@ -1168,9 +1174,10 @@ a.btn-primary[aria-disabled="true"] {
   left: 0;
   right: 0;
   bottom: 0;
+  z-index: 1;
   display: flex;
   justify-content: flex-end;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   padding: 12px 14px;
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.4));
@@ -1216,6 +1223,14 @@ a.btn-primary[aria-disabled="true"] {
 .plan-detail-page--create {
   padding-top: 0;
   padding-bottom: calc(108px + env(safe-area-inset-bottom, 0px));
+}
+.plan-detail-title-box {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  padding: 14px 16px;
 }
 .plan-detail-title-input {
   width: 100%;
@@ -3659,6 +3674,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1;
   min-width: 0;
 }
 .plan-meta-label {
@@ -6224,18 +6240,19 @@ a.action-btn--stack {
   align-items: center;
   gap: 4px;
   margin-left: auto;
-  max-width: 55%;
+  max-width: 46%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--text-body-small);
+  font-size: 11px;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 2px 8px;
   border-radius: 999px;
   color: var(--community-pink);
   background: var(--community-pink-soft);
   border: 1px solid var(--community-pink-border);
   cursor: pointer;
+  flex-shrink: 0;
 }
 /* When both a kind pill and community pill show, don't fight over margin-left:auto. */
 .plan-card-poster-row .plan-card-kind-pill + .plan-card-community-pill {
@@ -6246,11 +6263,9 @@ a.action-btn--stack {
 .plan-card-poster-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 4px;
-  /* Reserve room on the right for the floating save star so the kind pill
-     (Looking For / Cancelled / etc.) never tucks under it. */
-  padding-right: 34px;
+  padding-right: 0;
 }
 /* Past + cancelled cards also carry a "Hide" button top-right, which pushes
    the star further left — give the pill even more clearance there. */
@@ -7621,6 +7636,56 @@ a.action-btn--stack {
 .plan-meta-row--edit {
   position: relative;
   align-items: center;
+}
+.plan-meta-row--edit .flex-toggle-btn {
+  margin-top: 0;
+  flex-shrink: 0;
+}
+.flex-switch-col {
+  flex: none;
+  width: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+}
+.flex-switch-caption {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1;
+}
+.flex-switch {
+  appearance: none;
+  position: relative;
+  width: 44px;
+  height: 26px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--tan-mid, var(--paper-300));
+  cursor: pointer;
+  padding: 0;
+}
+.flex-switch.is-on {
+  background: var(--red);
+}
+.flex-switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  transition: transform 160ms ease;
+}
+.flex-switch.is-on .flex-switch-knob {
+  transform: translateX(18px);
 }
 .plan-meta-card--edit .location-autocomplete {
   width: 100%;
@@ -10799,6 +10864,9 @@ a.action-btn--stack {
 .location-row .flex-toggle-btn.is-active {
   background: var(--accent-soft);
   border-color: var(--accent);
+}
+.location-row .flex-switch-col {
+  margin-left: 8px;
 }
 
 /* Location row inside its own card. */
