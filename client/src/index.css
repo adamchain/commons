@@ -278,7 +278,7 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
   color: var(--status-on);
   background: var(--status);
-  border-radius: 22px;
+  border-radius: var(--r-control);
   padding: 5px 10px;
 }
 .pill-join {
@@ -287,7 +287,7 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--red);
   background: var(--card);
   border: 1.5px solid var(--red);
-  border-radius: 22px;
+  border-radius: var(--r-control);
   padding: 5px 10px;
 }
 
@@ -341,7 +341,7 @@ h1, h2, h3, h4, h5, h6 {
     align-items: center;
     gap: 8px;
     padding: 10px 16px;
-    border-radius: 999px;
+    border-radius: var(--r-control);
     background: var(--accent);
     color: var(--accent-on);
     font-weight: 800;
@@ -367,7 +367,7 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   background: var(--surface);
   border: 1px solid var(--border);
   font-size: var(--text-body);
@@ -478,7 +478,7 @@ h1, h2, h3, h4, h5, h6 {
   text-transform: none; /* no caps — final pass */
   letter-spacing: 0.08em;
   padding: 5px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   background: var(--accent-soft);
   color: var(--accent);
   white-space: nowrap;
@@ -531,7 +531,7 @@ h1, h2, h3, h4, h5, h6 {
 .tag-chip {
   font-size: var(--text-body-small);
   padding: 4px 9px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   background: var(--surface-2);
   color: var(--text-muted);
   text-transform: lowercase;
@@ -545,12 +545,13 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--accent-soft);
   color: var(--accent);
   padding: 6px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   font-weight: 700;
   font-size: var(--text-body-small);
 }
 
 /* ---------- Buttons (3-tier) ----------
+   Shared shape: --r-control (16px), not a stadium.
    Primary: brand red, white text — I'm In, Post plan, Post poll.
    Soft: #965252, white text — sibling next to a primary (Interested).
    Neutral: #ab9393, dark text — standalone utility (Edit, Cancel).
@@ -695,7 +696,7 @@ a.btn-primary[aria-disabled="true"] {
   padding: 6px 12px 6px 6px;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--r-control);
   color: var(--text-muted);
   font-size: var(--text-body);
   font-weight: 600;
@@ -729,7 +730,7 @@ a.btn-primary[aria-disabled="true"] {
   color: var(--accent-on);
   font-size: var(--text-body);
   padding: 15px;
-  border-radius: 16px;
+  border-radius: var(--r-control);
   border: none;
   box-shadow: none;
   font-weight: 600;
@@ -756,7 +757,7 @@ a.btn-primary[aria-disabled="true"] {
   background: var(--btn-soft);
   color: var(--btn-soft-on);
   border: none;
-  border-radius: 16px;
+  border-radius: var(--r-control);
   padding: 15px;
   font-size: var(--text-body);
   font-weight: 600;
@@ -1202,7 +1203,7 @@ a.btn-primary[aria-disabled="true"] {
   display: inline-flex;
   align-items: center;
   padding: 5px 12px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   background: rgba(var(--accent-rgb), 0.12);
   color: var(--red);
   font-size: var(--text-body-small);
@@ -1538,7 +1539,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
 
 .plan-detail-card {
   background: #FFFFFF;
-  border-radius: 16px;
+  border-radius: var(--r-control);
   padding: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
@@ -2106,7 +2107,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   letter-spacing: 0.06em;
   text-transform: none; /* no caps — final pass */
   padding: 3px 8px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   background: var(--surface-2);
   color: var(--text-muted);
 }
@@ -2583,7 +2584,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   z-index: 20;
   background: var(--accent);
   color: var(--accent-on);
-  border-radius: 999px;
+  border-radius: var(--r-control);
   padding: 14px 22px;
   font-weight: 800;
   font-size: var(--text-body);
@@ -2646,7 +2647,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   display: inline-flex;
   font-size: var(--text-body-small);
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   background: var(--accent-soft);
   color: var(--accent);
   font-weight: 700;
@@ -2812,7 +2813,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   color: var(--text-muted);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--r-control);
   cursor: pointer;
 }
 .onboarding-back:hover {
@@ -2896,7 +2897,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   flex-direction: column;
   align-items: flex-start;
   gap: 9px;
-  border-radius: 16px;
+  border-radius: var(--r-control);
   padding: 14px 12px 12px;
   background: transparent;
   border: 1.5px solid var(--tan-mid);
@@ -2952,7 +2953,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-muted);
@@ -3285,7 +3286,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   flex: 0 0 80%;
   max-width: 360px;
   background: var(--surface);
-  border-radius: 16px;
+  border-radius: var(--r-control);
   padding: 18px;
   border: 1px solid var(--border);
   display: flex;
@@ -3343,7 +3344,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   background: transparent;
   border: 1px solid var(--border);
   padding: 6px 12px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   cursor: pointer;
   color: var(--text);
 }
@@ -3562,7 +3563,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   gap: 8px;
   background: var(--card);
   border: 1.5px solid var(--tan-mid);
-  border-radius: 16px;
+  border-radius: var(--r-control);
   padding: 16px 6px 14px;
   cursor: pointer;
   color: var(--ink);
@@ -3705,7 +3706,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   gap: 12px;
   background: #FFFFFF;
   border: none;
-  border-radius: 16px;
+  border-radius: var(--r-control);
   padding: 14px 16px;
   cursor: pointer;
   color: var(--text);
@@ -3806,7 +3807,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
 .plan-actions-row {
   display: flex;
   background: #FFFFFF;
-  border-radius: 16px;
+  border-radius: var(--r-control);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   overflow: hidden;
   margin-top: 0;
@@ -4264,7 +4265,7 @@ a.action-btn--stack {
   right: 14px;
   width: 44px;
   height: 44px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4290,7 +4291,7 @@ a.action-btn--stack {
   color: var(--accent);
   background: var(--accent-soft);
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
 }
 .public-event-title {
   font-size: var(--type-display);
@@ -4311,7 +4312,7 @@ a.action-btn--stack {
   color: var(--accent);
   background: var(--accent-soft);
   padding: 6px 12px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
 }
 .public-event-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .public-event-tag {
@@ -4320,7 +4321,7 @@ a.action-btn--stack {
   background: var(--tan);
   border: none;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
 }
 .public-event-cancelled {
   margin-top: 16px;
@@ -4838,7 +4839,7 @@ a.action-btn--stack {
 }
 .profile-interest-chip {
   padding: 6px 12px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   background: var(--tan);
   color: var(--text);
   font-size: var(--text-body);
@@ -4859,7 +4860,7 @@ a.action-btn--stack {
   padding: 18px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--r-control);
 }
 
 .profile-edit-photo-row {
@@ -5028,7 +5029,7 @@ a.action-btn--stack {
   font-weight: 700;
   letter-spacing: 0;
   padding: 3px 9px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   text-transform: none;
   white-space: nowrap;
   background: transparent;
@@ -5288,7 +5289,7 @@ a.action-btn--stack {
   gap: 6px;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--r-control);
   padding: 4px 10px 4px 4px;
   cursor: pointer;
   color: var(--text);
@@ -5629,7 +5630,7 @@ a.action-btn--stack {
   align-items: center;
   gap: 12px;
   background: var(--card);
-  border-radius: 16px;
+  border-radius: var(--r-control);
   padding: 12px 14px;
   box-shadow: var(--shadow);
   text-decoration: none;
@@ -5678,7 +5679,7 @@ a.action-btn--stack {
   padding: 3px;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--r-control);
   box-sizing: border-box;
   max-width: 100%;
 }
@@ -5691,7 +5692,7 @@ a.action-btn--stack {
   white-space: nowrap;
   text-align: center;
   color: var(--text-muted);
-  border-radius: 999px;
+  border-radius: var(--r-control);
   background: transparent;
   border: none;
   line-height: 1.2;
@@ -5912,7 +5913,7 @@ a.action-btn--stack {
   align-self: center;
   margin-top: 6px;
   padding: 6px 14px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   border: 1px solid var(--accent);
   background: transparent;
   color: var(--accent);
@@ -5987,7 +5988,7 @@ a.action-btn--stack {
   gap: 4px;
   background: var(--bg);
   padding: 4px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   border: 1px solid var(--border);
   align-self: center;
 }
@@ -5995,7 +5996,7 @@ a.action-btn--stack {
   background: transparent;
   border: none;
   padding: 6px 18px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   cursor: pointer;
   color: var(--text-muted);
   font-weight: 600;
@@ -6127,7 +6128,7 @@ a.action-btn--stack {
 .community-chip {
   flex: 0 0 auto;
   padding: 6px 14px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   border: 1.5px solid var(--border);
   background: transparent;
   color: var(--text-muted);
@@ -6231,7 +6232,7 @@ a.action-btn--stack {
   letter-spacing: 0;
   text-transform: none;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
 }
 
 /* Community pill on a plan card — taps through to the community page. */
@@ -6247,7 +6248,7 @@ a.action-btn--stack {
   font-size: 11px;
   font-weight: 600;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   color: var(--community-pink);
   background: var(--community-pink-soft);
   border: 1px solid var(--community-pink-border);
@@ -6388,7 +6389,7 @@ a.action-btn--stack {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   padding: 6px 14px;
   font-size: var(--text-body-small);
   font-weight: 700;
@@ -6541,7 +6542,7 @@ a.action-btn--stack {
   letter-spacing: 0;
   text-transform: none;
   padding: 2px 9px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   transition: opacity 600ms ease;
 }
 .plan-card-just-posted-chip.is-fading {
@@ -6557,7 +6558,7 @@ a.action-btn--stack {
   display: inline-flex;
   align-items: center;
   padding: 10px 18px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   border: 1px solid var(--accent);
   background: var(--surface);
   color: var(--accent);
@@ -7080,7 +7081,7 @@ a.action-btn--stack {
 
 .coordination-banner {
   background: #FFFFFF;
-  border-radius: 16px;
+  border-radius: var(--r-control);
   padding: 16px;
   font-size: var(--text-body);
   color: var(--text-muted);
@@ -7263,7 +7264,7 @@ a.action-btn--stack {
   color: var(--text-muted);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--r-control);
   cursor: pointer;
   transition: background 120ms ease, color 120ms ease;
 }
@@ -7312,7 +7313,7 @@ a.action-btn--stack {
   color: var(--accent-on);
   background: var(--red);
   border: none;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
@@ -7407,7 +7408,7 @@ a.action-btn--stack {
   color: var(--text-muted);
   padding: 6px 12px;
   background: var(--surface-2);
-  border-radius: 999px;
+  border-radius: var(--r-control);
   border: 1px solid var(--border);
 }
 
@@ -7516,7 +7517,7 @@ a.action-btn--stack {
 .samples-card {
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--r-control);
   padding: 20px;
   text-align: center;
 }
@@ -7784,7 +7785,7 @@ a.action-btn--stack {
   gap: 10px;
   width: 100%;
   padding: 16px;
-  border-radius: 16px;
+  border-radius: var(--r-control);
   background: #FFFFFF;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   box-sizing: border-box;
@@ -8332,7 +8333,7 @@ a.action-btn--stack {
   gap: 6px;
   margin-top: 26px;
   padding: 8px 12px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--text-muted);
@@ -8451,7 +8452,7 @@ a.action-btn--stack {
   flex: 0 0 auto;
   margin: 10px 16px 0 4px;
   padding: 6px 10px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   border: 1.5px solid var(--red);
   background: transparent;
   color: var(--red);
@@ -8572,7 +8573,7 @@ a.action-btn--stack {
   background: var(--accent-soft, var(--surface-2));
   color: var(--accent);
   border: 1px solid rgba(var(--accent-rgb), 0.22);
-  border-radius: 999px;
+  border-radius: var(--r-control);
   padding: 6px 12px;
   font-size: var(--text-body-small);
   font-weight: 700;
@@ -8679,7 +8680,7 @@ a.action-btn--stack {
   gap: 10px;
   margin-top: 14px;
   padding: 8px 12px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   background: var(--surface-2);
   border: 1px solid var(--border);
 }
@@ -9009,7 +9010,7 @@ a.action-btn--stack {
   display: inline-flex;
   margin-top: 6px;
   padding: 3px 8px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   border: 1px solid var(--red);
   color: var(--red);
   font-size: var(--text-caption);
@@ -9028,7 +9029,7 @@ a.action-btn--stack {
   line-height: 1;
   cursor: pointer;
   padding: 0;
-  border-radius: 999px;
+  border-radius: var(--r-control);
 }
 .notif-row-dismiss:hover {
   color: var(--text);
@@ -9066,7 +9067,7 @@ a.action-btn--stack {
 
 .plan-cancelled-banner {
   padding: 16px;
-  border-radius: 16px;
+  border-radius: var(--r-control);
   border: 1.5px solid var(--danger);
   background: #FFFFFF;
   color: var(--danger);
@@ -9189,7 +9190,7 @@ a.action-btn--stack {
 .edit-jump-btn {
   padding: 6px 10px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--r-control);
   background: var(--card);
   color: var(--muted);
   font-size: var(--text-body-small);
@@ -9244,7 +9245,7 @@ a.action-btn--stack {
   padding: 14px;
   background: var(--tan);
   border: 1px solid var(--tan-mid);
-  border-radius: 16px;
+  border-radius: var(--r-control);
 }
 .edit-proposal-note {
   margin: 0;
@@ -9275,7 +9276,7 @@ a.action-btn--stack {
   display: inline-flex;
   align-items: center;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   background: var(--tan);
   font-size: var(--text-body-small);
   font-weight: 600;
@@ -9407,7 +9408,7 @@ a.action-btn--stack {
   padding: 6px 12px 6px 6px;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--r-control);
   cursor: pointer;
   color: var(--text);
   font-weight: 600;
@@ -9700,7 +9701,7 @@ a.action-btn--stack {
   gap: 7px;
   height: 34px;
   padding: 0 13px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   border: 1px solid transparent;
   background: var(--paper-200);
   color: var(--accent);
@@ -9902,7 +9903,7 @@ a.action-btn--stack {
 .settings-seg {
   display: inline-flex;
   background: var(--paper-200);
-  border-radius: 999px;
+  border-radius: var(--r-control);
   padding: 2px;
 }
 .settings-seg button {
@@ -9912,7 +9913,7 @@ a.action-btn--stack {
   padding: 6px 12px;
   font-size: var(--text-body-small);
   font-weight: 700;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   color: var(--text-muted);
   cursor: pointer;
 }
@@ -10042,7 +10043,7 @@ a.action-btn--stack {
 .btn-pill-ghost,
 .btn-pill-accent {
   appearance: none;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   padding: 6px 14px;
   font-size: var(--text-body);
   font-weight: 700;
@@ -10176,7 +10177,7 @@ a.action-btn--stack {
   width: 100%;
   max-width: 420px;
   background: var(--surface);
-  border-radius: 16px;
+  border-radius: var(--r-control);
   padding: 20px;
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
 }
@@ -10710,7 +10711,7 @@ a.action-btn--stack {
   align-items: center;
   gap: 7px;
   padding: 10px 16px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--text);
@@ -10749,7 +10750,7 @@ a.action-btn--stack {
 }
 .cover-chip {
   padding: 6px 12px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   background: rgba(26, 26, 46, 0.62);
   border: none;
   color: #fff;
@@ -10956,13 +10957,13 @@ a.action-btn--stack {
 .seg-toggle {
   display: inline-flex;
   padding: 3px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   background: var(--paper-200);
 }
 .seg-toggle-btn {
   padding: 6px 16px;
   border: none;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   background: transparent;
   color: var(--text-muted);
   font-size: var(--text-body);
@@ -11064,7 +11065,7 @@ a.action-btn--stack {
   font-size: var(--text-body);
   font-weight: 600;
   padding: 7px 12px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -11387,7 +11388,7 @@ a.action-btn--stack {
   display: inline-block;
   margin-left: 6px;
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   font-size: var(--text-micro);
   font-weight: 700;
   color: var(--status-on);
@@ -11726,7 +11727,7 @@ a.action-btn--stack {
 .lp-nav-cta {
   flex-shrink: 0;
   padding: 9px 18px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   background: var(--lp-ink);
   color: var(--paper-50);
   font-size: var(--text-body);
@@ -11793,7 +11794,7 @@ a.action-btn--stack {
   align-items: center;
   justify-content: center;
   padding: 13px 24px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   font-size: var(--text-body);
   font-weight: 600;
   transition: transform 120ms ease, background 160ms ease, border-color 160ms ease;
@@ -12262,7 +12263,7 @@ a.action-btn--stack {
 }
 .legal-page-tab {
   padding: 8px 16px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   border: 1px solid var(--border);
   background: var(--surface);
   font-size: var(--text-body);
@@ -12505,7 +12506,7 @@ a.action-btn--stack {
 }
 .feed-skeleton-strip,
 .feed-skeleton-card {
-  border-radius: 16px;
+  border-radius: var(--r-control);
   background: linear-gradient(90deg, var(--surface) 0%, var(--surface-2) 50%, var(--surface) 100%);
   background-size: 200% 100%;
   animation: feed-skeleton-shimmer 1.2s ease-in-out infinite;
@@ -12843,7 +12844,7 @@ a.action-btn--stack {
 
 .settings-interest-pill {
   padding: 9px 14px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   border: none;
   background: var(--tan);
   color: var(--text);
@@ -12892,7 +12893,7 @@ a.action-btn--stack {
   margin-bottom: 16px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
 }
 .network-search-wrap svg {
   width: 18px;
@@ -13007,7 +13008,7 @@ a.action-btn--stack {
 }
 .idea-starter-chip {
   padding: 7px 14px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text);
@@ -13185,7 +13186,7 @@ a.action-btn--stack {
   border: none;
   padding: 8px 16px;
   font-size: var(--text-body);
-  border-radius: 999px;
+  border-radius: var(--r-control);
   font-weight: 600;
   box-shadow: none;
 }
@@ -13550,7 +13551,7 @@ a.action-btn--stack {
   color: var(--ink);
   background: transparent;
   border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 999px;
+  border-radius: var(--r-control);
   cursor: pointer;
   text-transform: capitalize;
 }
@@ -13565,7 +13566,7 @@ a.action-btn--stack {
 /* Did this happen? */
 .did-happen-card {
   background: #FFFFFF;
-  border-radius: 16px;
+  border-radius: var(--r-control);
   padding: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
@@ -13623,7 +13624,7 @@ a.action-btn--stack {
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   font-size: var(--text-body);
   font-weight: 600;
   border: 1.5px solid transparent;
@@ -13853,7 +13854,7 @@ a.action-btn--stack {
 }
 .idea-textarea-card {
   background: #fff;
-  border-radius: 16px;
+  border-radius: var(--r-control);
   padding: 14px 16px;
   box-shadow: var(--shadow-sm);
   margin-bottom: 16px;
@@ -13912,7 +13913,7 @@ a.action-btn--stack {
   padding: 13px 16px;
   background: #fff;
   border: 1px solid #d4c8b8;
-  border-radius: 16px;
+  border-radius: var(--r-control);
   box-shadow: var(--shadow-sm);
   font-size: var(--text-body);
   font-weight: 600;
@@ -13921,7 +13922,7 @@ a.action-btn--stack {
   cursor: pointer;
 }
 .idea-accordion.is-open .idea-accordion-trigger {
-  border-radius: 16px 16px 0 0;
+  border-radius: var(--r-control) var(--r-control) 0 0;
   border-bottom-color: #ecddd0;
 }
 .idea-accordion-optional {
@@ -14384,7 +14385,7 @@ a.action-btn--stack {
   align-items: center;
   gap: 12px;
   background: var(--card);
-  border-radius: 16px;
+  border-radius: var(--r-control);
   padding: 13px 14px;
   box-shadow: var(--shadow-sm);
   text-decoration: none;

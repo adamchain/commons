@@ -10,7 +10,7 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 /**
  * Shared button. Primary = brand red; soft = #965252 sibling; secondary = #ab9393 utility.
- * Disabled uses a beige fill — never faded red/pink.
+ * Same moderately rounded corners as chips (--r-control). Disabled is beige, never faded red.
  */
 export function Button({
   variant = "primary",

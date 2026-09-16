@@ -63,6 +63,8 @@
   --r-lg: 20px;
   --r-xl: 32px;
   --r-pill: 999px;
+  /* Buttons, chips, and action pills — moderately rounded, never a stadium. */
+  --r-control: 16px;
 
   /* Type — Inter (or system sans). Body line-height 1.6–1.7. */
   --font-display: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -132,7 +134,7 @@
 
   --radius: var(--r-md);
   --radius-lg: var(--r-lg);
-  --radius-pill: var(--r-pill);
+  --radius-pill: var(--r-control);
   --max-shell: 540px;
   --max-shell-mid: 720px;
   --max-shell-wide: 1180px;

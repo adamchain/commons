@@ -40,7 +40,7 @@
 .cmy-btn {
   appearance: none;
   border: none;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   font-family: var(--font-ui);
   font-weight: 600;
   font-size: 0.95rem;
@@ -204,7 +204,7 @@
   font-size: var(--text-body-small);
   font-weight: 600;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   background: rgba(var(--accent-rgb), 0.12);
   color: var(--red);
 }
@@ -253,7 +253,7 @@
   color: var(--accent-on);
   background: var(--red);
   border: none;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
@@ -313,7 +313,7 @@ a.cmy-cat-pill--yours {
   color: #fff;
   background: rgba(255, 255, 255, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   padding: 4px 10px;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -378,7 +378,7 @@ button.cmy-joined-pill {
   background: rgba(255, 255, 255, 0.18);
   color: #fff;
   padding: 4px 10px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   border: 1px solid rgba(255, 255, 255, 0.28);
 }
 .cmy-hero-foot {
@@ -455,7 +455,7 @@ button.cmy-joined-pill {
 .cmy-compact-thumb {
   width: 72px;
   height: 72px;
-  border-radius: 16px;
+  border-radius: var(--r-control);
   overflow: hidden;
   flex-shrink: 0;
   background: var(--surface-2);
@@ -616,7 +616,7 @@ button.cmy-joined-pill {
   border: none;
   background: var(--red);
   padding: 4px 10px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   color: var(--accent-on);
   font-family: var(--font-ui);
   font-weight: 700;
@@ -696,7 +696,7 @@ button.cmy-joined-pill {
   background: rgba(255, 255, 255, 0.18);
   color: #fff;
   padding: 4px 10px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   border: 1px solid rgba(255, 255, 255, 0.28);
 }
 .cmy-cover-pills {
@@ -731,7 +731,7 @@ button.cmy-joined-pill {
   background: rgba(255, 255, 255, 0.18);
   color: #fff;
   padding: 4px 10px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -765,7 +765,7 @@ button.cmy-joined-pill {
   border: none;
   color: var(--status-on);
   padding: 2px 8px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   font-size: 0.68rem;
   font-weight: 700;
   flex-shrink: 0;
@@ -866,7 +866,7 @@ button.cmy-joined-pill {
   font-weight: 700;
   font-size: 0.85rem;
   padding: var(--s-1) var(--s-3);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   line-height: 1.2;
 }
 .cmy-status-pill {
@@ -879,7 +879,7 @@ button.cmy-joined-pill {
   font-weight: 700;
   font-size: 0.85rem;
   padding: var(--s-1) var(--s-3);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
 }
 /* Detail header membership controls (Member / Leave / Join / Requested) —
    match the smaller Member pill. Scoped so list-page Create and settings
@@ -947,7 +947,7 @@ button.cmy-joined-pill {
   font-size: 0.85rem;
   color: var(--ink);
   cursor: pointer;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
 }
 .cmy-tab--active {
   color: #fff;
@@ -1039,7 +1039,7 @@ button.cmy-joined-pill {
   background: rgba(var(--accent-rgb), 0.1);
   color: var(--red, var(--accent));
   padding: 4px 10px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   font-size: var(--text-body-small);
 }
 .cmy-subhead .cmy-header-count {
@@ -1083,7 +1083,7 @@ button.cmy-joined-pill {
 }
 .cmy-reply-composer .cmy-composer-input {
   padding: var(--s-2) var(--s-4);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   border: 1px solid var(--hairline, rgba(0,0,0,0.14));
   background: var(--surface);
 }
@@ -1383,7 +1383,7 @@ button.cmy-joined-pill {
   font-weight: 700;
   font-size: 0.8rem;
   padding: 6px 14px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   cursor: pointer;
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
@@ -1393,14 +1393,14 @@ button.cmy-joined-pill {
   border-color: var(--accent);
   color: var(--accent);
 }
-.cmy-segmented { display: flex; gap: var(--s-1); background: var(--paper-200); border-radius: var(--r-pill); padding: 3px; }
+.cmy-segmented { display: flex; gap: var(--s-1); background: var(--paper-200); border-radius: var(--r-control); padding: 3px; }
 .cmy-seg {
   flex: 1;
   appearance: none;
   border: none;
   background: transparent;
   padding: var(--s-1) var(--s-2);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-control);
   font-weight: 600;
   font-size: 0.85rem;
   color: var(--text-muted);
