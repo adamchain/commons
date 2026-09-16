@@ -6,6 +6,7 @@ import { Avatar } from "../components/Avatar";
 import { CommunityCoverThumb } from "../components/CoverThumb";
 import { BlockConfirmModal, ReportModal } from "../components/PlanSafetyMenu";
 import { PollCard } from "../components/PollCard";
+import { PollSheet } from "../components/PollSheet";
 import { useAuth } from "../context/AuthContext";
 import { sentenceCaseTitle } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
@@ -55,8 +56,6 @@ export function CommunityChatPage() {
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [attachingImage, setAttachingImage] = useState(false);
   const [pollModalOpen, setPollModalOpen] = useState(false);
-  const [pollQuestion, setPollQuestion] = useState("");
-  const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
   const [creatingPoll, setCreatingPoll] = useState(false);
   const [busyPollId, setBusyPollId] = useState<string | null>(null);
   const [pinnedPollsOpen, setPinnedPollsOpen] = useState(false);
@@ -296,10 +295,8 @@ export function CommunityChatPage() {
     }
   }
 
-  async function createPoll() {
+  async function createPoll(question: string, options: string[]) {
     if (!conv) return;
-    const question = pollQuestion.trim();
-    const options = pollOptions.map((o) => o.trim()).filter(Boolean);
     if (!question || options.length < 2) return;
     setCreatingPoll(true);
     try {
@@ -310,8 +307,6 @@ export function CommunityChatPage() {
       stickOnSend();
       setMessages((prev) => [...prev, msg]);
       setPollModalOpen(false);
-      setPollQuestion("");
-      setPollOptions(["", ""]);
     } finally {
       setCreatingPoll(false);
     }
@@ -367,8 +362,6 @@ export function CommunityChatPage() {
     }
   }
 
-  const canSubmitPoll =
-    pollQuestion.trim().length > 0 && pollOptions.filter((o) => o.trim()).length >= 2;
   const openPolls = messages.filter((m) => m.kind === "poll" && m.poll && !m.poll.closed);
 
   const visibleAvatars = conv.participants.slice(0, 3);
@@ -722,73 +715,11 @@ export function CommunityChatPage() {
       </div>
 
       {pollModalOpen && (
-        <div className="modal-backdrop" onClick={() => !creatingPoll && setPollModalOpen(false)}>
-          <div className="modal-card poll-modal" onClick={(e) => e.stopPropagation()}>
-            <h2 className="poll-modal-title">New poll</h2>
-            <p className="poll-modal-sub">Everyone in the chat can vote on one option.</p>
-            <input
-              type="text"
-              className="poll-modal-question"
-              placeholder="Ask a question…"
-              value={pollQuestion}
-              maxLength={140}
-              autoFocus
-              onChange={(e) => setPollQuestion(e.target.value)}
-            />
-            <div className="poll-modal-options">
-              {pollOptions.map((opt, i) => (
-                <div key={i} className="poll-modal-option-row">
-                  <input
-                    type="text"
-                    placeholder={`Option ${i + 1}`}
-                    value={opt}
-                    maxLength={80}
-                    onChange={(e) =>
-                      setPollOptions((prev) => prev.map((o, j) => (j === i ? e.target.value : o)))
-                    }
-                  />
-                  {pollOptions.length > 2 && (
-                    <button
-                      type="button"
-                      className="poll-modal-remove"
-                      aria-label={`Remove option ${i + 1}`}
-                      onClick={() => setPollOptions((prev) => prev.filter((_, j) => j !== i))}
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-            {pollOptions.length < 6 && (
-              <button
-                type="button"
-                className="poll-modal-add"
-                onClick={() => setPollOptions((prev) => [...prev, ""])}
-              >
-                + Add option
-              </button>
-            )}
-            <div className="poll-modal-actions">
-              <button
-                type="button"
-                className="btn-link"
-                onClick={() => setPollModalOpen(false)}
-                disabled={creatingPoll}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => void createPoll()}
-                disabled={!canSubmitPoll || creatingPoll}
-              >
-                {creatingPoll ? "Posting…" : "Post poll"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <PollSheet
+          submitting={creatingPoll}
+          onClose={() => !creatingPoll && setPollModalOpen(false)}
+          onSubmit={(question, options) => void createPoll(question, options)}
+        />
       )}
       {reportOpen && (
         <ReportModal

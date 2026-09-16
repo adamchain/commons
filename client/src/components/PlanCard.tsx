@@ -1,10 +1,11 @@
 import { useState } from "react";
 import type { MouseEvent } from "react";
-import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "./Avatar";
 import { JoinConfirmPopup, joinConfirmKind, type JoinConfirmKind } from "./JoinConfirmPopup";
+import { IdeaCoverFallback } from "./CoverThumb";
+import { BottomSheet } from "./ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
 import type { PlanDTO } from "../types/shared";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
@@ -104,6 +105,10 @@ export function PlanCard({
         {coverImage ? (
           <div className="plan-card-flyer">
             <img src={coverImage} alt="" loading="lazy" />
+          </div>
+        ) : isLooking ? (
+          <div className="plan-card-flyer">
+            <IdeaCoverFallback iconSize={42} />
           </div>
         ) : null}
         <div className="plan-card-body">
@@ -439,19 +444,12 @@ function QuickJoin({
         {busy ? "…" : label}
       </button>
       {confirm && <JoinConfirmPopup kind={confirm} onClose={() => setConfirm(null)} />}
-      {showSheet &&
-        createPortal(
-          <div
-            className="sheet-backdrop"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setShowSheet(false);
-            }}
+      {showSheet && (
+          <BottomSheet
+            onClose={() => setShowSheet(false)}
+            labelledBy="plan-card-rsvp-title"
           >
-            <div className="sheet" onClick={(e) => e.stopPropagation()}>
-              <div className="sheet-handle" />
-              <div className="sheet-title">{goingActive ? "I'm in." : "Interested"}</div>
+              <div id="plan-card-rsvp-title" className="sheet-title">{goingActive ? "I'm in." : "Interested"}</div>
               {goingActive && (
                 <button type="button" className="sheet-link" onClick={() => void setState("interested")}>
                   Switch to Interested
@@ -472,9 +470,7 @@ function QuickJoin({
               <button type="button" className="btn-link sheet-cancel" onClick={() => setShowSheet(false)}>
                 Cancel
               </button>
-            </div>
-          </div>,
-          document.body,
+          </BottomSheet>
         )}
     </>
   );

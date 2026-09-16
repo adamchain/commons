@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/http";
 import { Avatar } from "./Avatar";
+import { BottomSheet } from "./ui/BottomSheet";
 import { getPublicWebOrigin } from "../lib/platform";
 import { getActiveInviteCode } from "../lib/inviteCode";
 import type { PublicUser } from "../types/shared";
@@ -105,10 +106,9 @@ export function InviteSheet({
   }
 
   return (
-    <div className="filter-sheet-backdrop" onClick={onClose}>
-      <div className="filter-sheet invite-sheet" onClick={(e) => e.stopPropagation()}>
+    <BottomSheet onClose={onClose} labelledBy="invite-sheet-title" className="invite-sheet">
         <div className="filter-sheet-header">
-          <h2 className="filter-sheet-title">Invite people</h2>
+          <h2 id="invite-sheet-title" className="filter-sheet-title">Invite people</h2>
           <button type="button" className="btn-link" onClick={onClose}>
             Done
           </button>
@@ -189,7 +189,6 @@ export function InviteSheet({
                 : "Pick people above"}
           </button>
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   );
 }

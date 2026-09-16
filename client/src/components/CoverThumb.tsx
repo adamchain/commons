@@ -1,3 +1,4 @@
+import { Lightbulb } from "lucide-react";
 import { CommunityCover } from "./CommunityCover";
 import { pickCoverImage, useCardImages } from "../lib/cardImages";
 import type { CommunityCategory } from "../types/shared";
@@ -13,18 +14,43 @@ export function CoverThumb({
   return <img src={src} alt="" className={`cover-thumb ${className}`.trim()} loading="lazy" />;
 }
 
-/** Plan flyer if one was added, otherwise a stable library cover. */
+/** Thought-bubble/idea mark from “Just an idea” / float an idea, on a warm gradient. */
+export function IdeaCoverFallback({
+  className = "",
+  iconSize = 36,
+}: {
+  className?: string;
+  iconSize?: number;
+}) {
+  return (
+    <div className={`idea-cover-fallback ${className}`.trim()} aria-hidden="true">
+      <Lightbulb size={iconSize} strokeWidth={1.6} />
+    </div>
+  );
+}
+
+/** Plan flyer if one was added; ideas without a photo use the idea mark; otherwise a stock cover. */
 export function PlanCoverThumb({
   planId,
   flyerDataUrl,
+  isIdea = false,
   className = "",
 }: {
   planId: string;
   flyerDataUrl?: string | null;
+  isIdea?: boolean;
   className?: string;
 }) {
   const pool = useCardImages();
-  const src = flyerDataUrl || pickCoverImage(pool, planId);
+  if (flyerDataUrl) return <CoverThumb src={flyerDataUrl} className={className} />;
+  if (isIdea) {
+    return (
+      <div className={`cover-thumb-frame ${className}`.trim()}>
+        <IdeaCoverFallback iconSize={18} />
+      </div>
+    );
+  }
+  const src = pickCoverImage(pool, planId);
   return <CoverThumb src={src} className={className} />;
 }
 

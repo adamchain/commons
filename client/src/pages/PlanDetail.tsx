@@ -5,6 +5,7 @@ import { ArrowLeft, Camera, ChevronRight, Hand, ImagePlus, Pencil, Send, UserPlu
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
+import { IdeaCoverFallback } from "../components/CoverThumb";
 import { GetThereSheet } from "../components/GetThereSheet";
 import { InviteSheet } from "../components/InviteSheet";
 import { LocationAutocomplete } from "../components/LocationAutocomplete";
@@ -12,8 +13,9 @@ import { LoadingScreen } from "../components/LoadingScreen";
 import { ParticipationButtons } from "../components/ParticipationButtons";
 import { PlanSafetyMenu } from "../components/PlanSafetyMenu";
 import { ShareSheet } from "../components/ShareSheet";
+import { BottomSheet } from "../components/ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
-import { planHasEnded } from "../lib/planTime";
+import { isIdeaPlan, planHasEnded } from "../lib/planTime";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
@@ -272,11 +274,12 @@ export function PlanDetailPage() {
     }
   }
 
-  // Ideas stay image-free until the host picks one — never invent a stock
-  // cover for looking_for. Standard plans still use the library pool.
+  // Ideas without a photo use the thought-bubble fallback instead of a stock
+  // plan cover, so they stay visually distinct from confirmed plans.
   const coverSrc =
     (lockingIn ? lockFlyer : plan.flyerDataUrl) ??
     (plan.planKind === "looking_for" ? null : pickCoverImage(coverPool, plan.id));
+  const ideaCoverFallback = isIdeaPlan(plan) && !coverSrc;
   const mapsQuery = encodeURIComponent(
     [plan.location.name, plan.location.address].filter(Boolean).join(" "),
   );
@@ -342,8 +345,9 @@ export function PlanDetailPage() {
   return (
     <main className={`app-shell app-shell--wide app-shell--with-nav plan-detail-page${lockingIn ? " plan-detail-page--lock-in" : ""}`}>
       <div className="plan-detail-safe-scrim" aria-hidden="true" />
-      <div className={`plan-detail-hero${coverSrc ? "" : " plan-detail-hero--empty"}`}>
+      <div className={`plan-detail-hero${coverSrc || ideaCoverFallback ? "" : " plan-detail-hero--empty"}`}>
         {coverSrc && <img src={coverSrc} alt="" loading="lazy" />}
+        {ideaCoverFallback && <IdeaCoverFallback iconSize={56} />}
         {lockingIn && (
           coverSrc ? (
             <div className="plan-detail-hero-cover-overlay">
@@ -841,9 +845,7 @@ export function PlanDetailPage() {
         )}
 
       {showHostSheet && (
-        <div className="sheet-backdrop" onClick={() => setShowHostSheet(false)}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <div className="sheet-handle" />
+        <BottomSheet onClose={() => setShowHostSheet(false)}>
             <button
               type="button"
               className="sheet-link"
@@ -878,8 +880,7 @@ export function PlanDetailPage() {
             <button type="button" className="btn-link sheet-cancel" onClick={() => setShowHostSheet(false)}>
               Dismiss
             </button>
-          </div>
-        </div>
+        </BottomSheet>
       )}
 
       {confirmCancel && (

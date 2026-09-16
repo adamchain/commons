@@ -6,6 +6,7 @@ import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
 import { PlanSafetyMenu } from "../components/PlanSafetyMenu";
+import { BottomSheet } from "../components/ui/BottomSheet";
 import { formatRelative } from "../lib/format";
 import { resolveForumImage } from "../lib/forumImage";
 import { interestVisual } from "../lib/interestIcons";
@@ -300,23 +301,21 @@ export function ForumPage() {
       )}
 
       {planModalOpen && (
-        <div className="modal-backdrop" onClick={() => setPlanModalOpen(false)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <h2 className="poll-modal-title">Post a {data.label} plan</h2>
+        <BottomSheet onClose={() => setPlanModalOpen(false)} labelledBy="forum-plan-title">
+            <h2 id="forum-plan-title" className="sheet-title poll-modal-title">Post a {data.label} plan</h2>
             <p className="poll-modal-sub">
               Your plan will be tagged <strong>{data.label}</strong> and show up for everyone on COMMONS
               with that interest — not just people in this forum thread.
             </p>
             <div className="poll-modal-actions">
-              <button type="button" className="btn-link" onClick={() => setPlanModalOpen(false)}>
-                Cancel
-              </button>
-              <button type="button" className="btn-primary" onClick={confirmPostPlan}>
+              <button type="button" className="btn-primary btn-block" onClick={confirmPostPlan}>
                 Continue
               </button>
+              <button type="button" className="btn-secondary btn-block" onClick={() => setPlanModalOpen(false)}>
+                Cancel
+              </button>
             </div>
-          </div>
-        </div>
+        </BottomSheet>
       )}
     </main>
   );

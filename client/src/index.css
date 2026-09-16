@@ -4045,40 +4045,45 @@ a.action-btn--stack {
 }
 .plan-dropout-row .participation { margin-top: 0; }
 
-/* Sheet */
-.sheet-backdrop {
+/* Sheet — one template: handle, full-bleed to the bottom, shared radius/padding. */
+.sheet-backdrop,
+.filter-sheet-backdrop,
+.cover-lib-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: flex-end;
+  justify-content: stretch;
   /* Above the fixed bottom nav (z-index 50) so the sheet's lower buttons
      (Cancel, Copy link…) aren't hidden behind the footer bar. */
   z-index: 100;
-  /* Backdrop owns the scroll envelope so the sheet can grow past the keyboard
-     / safe-area inset without getting cut in half. */
   overflow-y: auto;
 }
-.sheet {
+.sheet,
+.filter-sheet,
+.cover-lib {
   width: 100%;
+  max-width: none;
+  margin: 0;
   background: var(--surface);
-  border-top-left-radius: 20px;
-  border-top-right-radius: 20px;
-  padding: 16px 20px calc(32px + env(safe-area-inset-bottom, 0px));
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  padding: 10px 20px calc(24px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 8px;
-  /* Allow the sheet to take the full screen if it needs to (long share / get
-     there list), with internal scrolling rather than clipping at half-height. */
-  max-height: 100dvh;
+  max-height: 92dvh;
   overflow-y: auto;
+  box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.18);
 }
 .sheet-handle {
   width: 40px;
   height: 4px;
-  background: var(--border);
+  flex-shrink: 0;
+  background: var(--faint);
+  opacity: 0.45;
   border-radius: 4px;
-  margin: 0 auto 8px;
+  margin: 4px auto 10px;
 }
 .sheet-title {
   font-weight: 700;
@@ -8212,28 +8217,7 @@ a.action-btn--stack {
   font-weight: 600;
 }
 
-/* Filter sheet (modal) */
-.filter-sheet-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 60;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-
-.filter-sheet {
-  width: 100%;
-  max-width: 560px;
-  max-height: 80vh;
-  overflow-y: auto;
-  background: var(--surface);
-  border-radius: 18px 18px 0 0;
-  padding: 18px 20px calc(20px + env(safe-area-inset-bottom, 0px));
-  box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.18);
-}
-
+/* Filter sheet header (shell shares .sheet / .filter-sheet template above). */
 .filter-sheet-header {
   display: flex;
   align-items: center;
@@ -8672,6 +8656,25 @@ a.action-btn--stack {
   object-fit: cover;
   display: block;
 }
+.idea-cover-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  background: linear-gradient(145deg, #f7ead4 0%, #f3dcc8 46%, #efd0d0 100%);
+  color: var(--red);
+}
+.plan-detail-hero > .idea-cover-fallback {
+  position: absolute;
+  inset: 0;
+}
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 
 /* Mutual friends row on someone else's profile */
 .profile-mutuals {
@@ -8772,7 +8775,7 @@ a.action-btn--stack {
 
 /* Invite sheet */
 /* Real bottom sheet: header/actions/send stay put; people list scrolls. */
-.invite-sheet.filter-sheet {
+.sheet.invite-sheet {
   display: flex;
   flex-direction: column;
   max-height: min(80vh, 100dvh);
@@ -10523,10 +10526,21 @@ a.action-btn--stack {
   font-size: var(--text-body);
   color: var(--text-muted);
 }
+.poll-sheet .ui-label {
+  margin: 4px 0 2px;
+}
 .poll-modal-question {
   width: 100%;
-  margin-bottom: 12px;
+  margin-bottom: 4px;
   font-weight: 600;
+}
+.poll-sheet input[type="text"] {
+  padding: 12px 14px;
+  border-radius: var(--r-control);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
 }
 .poll-modal-options {
   display: flex;
@@ -10563,10 +10577,14 @@ a.action-btn--stack {
 }
 .poll-modal-actions {
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
   margin-top: 18px;
+}
+.poll-sheet .btn-primary,
+.poll-modal-actions .btn-primary {
+  background: var(--red);
+  color: var(--accent-on);
 }
 
 /* ============================================================
@@ -11001,28 +11019,12 @@ a.action-btn--stack {
   color: var(--text-muted);
 }
 
-/* Cover library picker modal. */
-.cover-lib-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  background: rgba(26, 26, 46, 0.45);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-}
-.cover-lib {
-  width: 100%;
-  max-width: var(--max-shell, 540px);
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg);
-  border-radius: var(--r-xl) var(--r-xl) 0 0;
-  padding: 16px 16px max(16px, env(safe-area-inset-bottom, 16px));
+.sheet.cover-lib {
   min-height: 50vh;
+  max-height: 88dvh;
+  background: var(--bg);
+  padding-left: 16px;
+  padding-right: 16px;
 }
 .cover-lib-head {
   display: flex;

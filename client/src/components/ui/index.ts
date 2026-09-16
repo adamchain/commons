@@ -1,3 +1,4 @@
+export { BottomSheet } from "./BottomSheet";
 export { Button } from "./Button";
 export { Input, TextArea } from "./Input";
 export { Chip } from "./Chip";

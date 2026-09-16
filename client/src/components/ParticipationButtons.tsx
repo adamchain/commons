@@ -3,6 +3,7 @@ import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
 import type { JoinType, ParticipationState, PlanKind } from "../types/shared";
 import { JoinConfirmPopup, joinConfirmKind, type JoinConfirmKind } from "./JoinConfirmPopup";
+import { BottomSheet } from "./ui/BottomSheet";
 
 // API errors arrive as "<status>: <jsonBody>" — pull the friendly message out.
 function extractApiError(err: unknown): string {
@@ -214,10 +215,8 @@ export function ParticipationButtons({
       {confirm && <JoinConfirmPopup kind={confirm} onClose={() => setConfirm(null)} />}
 
       {showGoingSheet && (
-        <div className="sheet-backdrop" onClick={() => setShowGoingSheet(false)}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <div className="sheet-handle" />
-            <div className="sheet-title">I'm in.</div>
+        <BottomSheet onClose={() => setShowGoingSheet(false)} labelledBy="rsvp-going-title">
+            <div id="rsvp-going-title" className="sheet-title">I'm in.</div>
             <button type="button" className="sheet-link" onClick={() => void switchToInterested()}>
               Switch to Interested
             </button>
@@ -227,15 +226,12 @@ export function ParticipationButtons({
             <button type="button" className="btn-link sheet-cancel" onClick={() => setShowGoingSheet(false)}>
               Cancel
             </button>
-          </div>
-        </div>
+        </BottomSheet>
       )}
 
       {showInterestedSheet && (
-        <div className="sheet-backdrop" onClick={() => setShowInterestedSheet(false)}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <div className="sheet-handle" />
-            <div className="sheet-title">Interested</div>
+        <BottomSheet onClose={() => setShowInterestedSheet(false)} labelledBy="rsvp-interested-title">
+            <div id="rsvp-interested-title" className="sheet-title">Interested</div>
             {!loose && !isApproveOnly && !isFull && (
               <button type="button" className="sheet-link" onClick={() => void switchToGoing()}>
                 Switch to I&apos;m in.
@@ -252,8 +248,7 @@ export function ParticipationButtons({
             <button type="button" className="btn-link sheet-cancel" onClick={() => setShowInterestedSheet(false)}>
               Cancel
             </button>
-          </div>
-        </div>
+        </BottomSheet>
       )}
     </div>
   );

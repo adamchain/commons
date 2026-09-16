@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { api } from "../api/http";
+import { BottomSheet } from "./ui/BottomSheet";
 
 type CoverCatalogCategory = {
   id: string;
@@ -65,16 +66,9 @@ export function CoverLibraryModal({
   }
 
   return (
-    <div
-      className="cover-lib-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Choose a cover image"
-      onClick={onClose}
-    >
-      <div className="cover-lib" onClick={(e) => e.stopPropagation()}>
+    <BottomSheet onClose={onClose} labelledBy="cover-lib-title" className="cover-lib">
         <div className="cover-lib-head">
-          <span className="cover-lib-title">Choose a cover</span>
+          <span id="cover-lib-title" className="cover-lib-title">Choose a cover</span>
           <button type="button" className="cover-lib-close" onClick={onClose} aria-label="Close">
             ×
           </button>
@@ -137,8 +131,7 @@ export function CoverLibraryModal({
             )}
           </div>
         )}
-      </div>
-    </div>
+    </BottomSheet>
   );
 }
 

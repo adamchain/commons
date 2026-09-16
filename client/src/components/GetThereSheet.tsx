@@ -1,4 +1,5 @@
 import type { PlanDTO } from "../types/shared";
+import { BottomSheet } from "./ui/BottomSheet";
 
 // Deep links to the major maps + rideshare apps. PRD §17.
 //
@@ -42,10 +43,8 @@ export function GetThereSheet({ plan, onClose }: { plan: PlanDTO; onClose: () =>
   ];
 
   return (
-    <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet" onClick={(e) => e.stopPropagation()}>
-        <div className="sheet-handle" />
-        <div className="sheet-title">Get there</div>
+    <BottomSheet onClose={onClose} labelledBy="get-there-title">
+        <div id="get-there-title" className="sheet-title">Get there</div>
         <div className="sheet-destination">
           <div className="sheet-destination-name">{name}</div>
           {address && address !== name && (
@@ -58,7 +57,6 @@ export function GetThereSheet({ plan, onClose }: { plan: PlanDTO; onClose: () =>
           </a>
         ))}
         <button className="btn-link sheet-cancel" onClick={onClose}>Cancel</button>
-      </div>
-    </div>
+    </BottomSheet>
   );
 }

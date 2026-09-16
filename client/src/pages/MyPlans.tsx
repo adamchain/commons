@@ -7,7 +7,7 @@ import { LoadingScreen } from "../components/LoadingScreen";
 import { EmptyCard, Label, ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
-import { planHasEnded } from "../lib/planTime";
+import { isIdeaPlan, planHasEnded } from "../lib/planTime";
 import type { PlanDTO } from "../types/shared";
 
 /**
@@ -141,7 +141,7 @@ function PlanRow({ plan }: { plan: PlanDTO }) {
 
   return (
     <Link to={`/plans/${plan.id}`} state={{ from: "my-plans" }} className="my-plans-row">
-      <PlanCoverThumb planId={plan.id} flyerDataUrl={plan.flyerDataUrl} />
+      <PlanCoverThumb planId={plan.id} flyerDataUrl={plan.flyerDataUrl} isIdea={isIdeaPlan(plan)} />
       <span className="my-plans-row-text">
         <span className="my-plans-row-name">{sentenceCaseTitle(plan.title)}</span>
         <span className="my-plans-row-meta">{meta}</span>

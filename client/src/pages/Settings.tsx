@@ -6,6 +6,7 @@ import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { LegalContent } from "../components/LegalContent";
 import { ScreenTitle } from "../components/ui";
+import { BottomSheet } from "../components/ui/BottomSheet";
 import { LEGAL_DOCS } from "../content/legal";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -166,17 +167,15 @@ export function SettingsPage() {
 function LegalSheet({ slug, onClose }: { slug: "terms" | "privacy"; onClose: () => void }) {
   const doc = LEGAL_DOCS[slug];
   return (
-    <div className="filter-sheet-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="filter-sheet" onClick={(e) => e.stopPropagation()}>
+    <BottomSheet onClose={onClose} labelledBy="legal-sheet-title">
         <div className="filter-sheet-header">
-          <h3 className="filter-sheet-title">{doc.title}</h3>
+          <h3 id="legal-sheet-title" className="filter-sheet-title">{doc.title}</h3>
           <button type="button" className="btn-link" onClick={onClose}>
             Close
           </button>
         </div>
         <LegalContent doc={doc} hideTitle />
-      </div>
-    </div>
+    </BottomSheet>
   );
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { PlanDTO } from "../types/shared";
 import { getPublicWebOrigin } from "../lib/platform";
 import { getActiveInviteCode } from "../lib/inviteCode";
+import { BottomSheet } from "./ui/BottomSheet";
 import { API_BASE } from "../api/http";
 
 // Share sheet with a live social-card preview. The card image and the injected
@@ -119,10 +120,8 @@ export function ShareSheet({ plan, isOwn = false, onClose }: { plan: PlanDTO; is
   ];
 
   return (
-    <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet" onClick={(e) => e.stopPropagation()}>
-        <div className="sheet-handle" />
-        <div className="sheet-title">Share your plan</div>
+    <BottomSheet onClose={onClose} labelledBy="share-sheet-title">
+        <div id="share-sheet-title" className="sheet-title">Share your plan</div>
 
         {/* Live preview of the exact card friends will see. */}
         <div className="share-preview">
@@ -173,8 +172,7 @@ export function ShareSheet({ plan, isOwn = false, onClose }: { plan: PlanDTO; is
         <button className="btn-link sheet-cancel" onClick={onClose}>
           Cancel
         </button>
-      </div>
-    </div>
+    </BottomSheet>
   );
 }
 

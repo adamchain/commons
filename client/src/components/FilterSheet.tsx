@@ -1,6 +1,6 @@
-import { useEffect } from "react";
 import type { AgeRange, InterestTag, NeighborhoodDTO } from "../types/shared";
 import { ALL_AGE_RANGES, ALL_INTERESTS, AGE_RANGE_LABELS, INTEREST_LABELS } from "../types/shared";
+import { BottomSheet } from "./ui/BottomSheet";
 
 /**
  * Bottom-sheet filter for the feed. Surfaces neighborhood + interest pickers
@@ -35,14 +35,6 @@ export function FilterSheet({
   onClose: () => void;
   onClear: () => void;
 }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
   const mineSet = new Set(userHoodIds);
   const orderedHoods = [
     ...neighborhoods.filter((n) => mineSet.has(n.id)),
@@ -55,10 +47,9 @@ export function FilterSheet({
   ];
 
   return (
-    <div className="filter-sheet-backdrop" onClick={onClose}>
-      <div className="filter-sheet" onClick={(e) => e.stopPropagation()}>
+    <BottomSheet onClose={onClose} labelledBy="filter-sheet-title">
         <div className="filter-sheet-header">
-          <h2 className="filter-sheet-title">Filters</h2>
+          <h2 id="filter-sheet-title" className="filter-sheet-title">Filters</h2>
           <button type="button" className="btn-link" onClick={onClear}>
             Clear
           </button>
@@ -155,7 +146,6 @@ export function FilterSheet({
         >
           Done
         </button>
-      </div>
-    </div>
+    </BottomSheet>
   );
 }

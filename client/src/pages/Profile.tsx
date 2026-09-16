@@ -21,6 +21,7 @@ import { CommunityCoverThumb, PlanCoverThumb } from "../components/CoverThumb";
 import { ReportModal } from "../components/PlanSafetyMenu";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime } from "../lib/format";
+import { isIdeaPlan } from "../lib/planTime";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import {
   communityCategoryLine,
@@ -327,6 +328,7 @@ export function ProfilePage() {
                       <PlanCoverThumb
                         planId={p.id}
                         flyerDataUrl={p.flyerDataUrl}
+                        isIdea={isIdeaPlan(p)}
                         className="cover-thumb--sm"
                       />
                       <span className="profile-other-plan-text">
@@ -364,6 +366,7 @@ export function ProfilePage() {
                     <PlanCoverThumb
                       planId={p.id}
                       flyerDataUrl={p.flyerDataUrl}
+                      isIdea={isIdeaPlan(p)}
                       className="cover-thumb--sm"
                     />
                     <span className="profile-other-plan-body">
@@ -1136,6 +1139,7 @@ function YourPlansBlock({
                     <PlanCoverThumb
                       planId={p.id}
                       flyerDataUrl={p.flyerDataUrl}
+                      isIdea={isIdeaPlan(p)}
                       className="cover-thumb--sm"
                     />
                     <span className="profile-list-title">{p.title}</span>
