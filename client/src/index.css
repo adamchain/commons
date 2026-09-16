@@ -2845,12 +2845,14 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
 .onboarding-location-hero-gradient {
   position: absolute;
   inset: 0;
+  /* Lighter gradient to let the Philly skyline imagery shine through on both
+     the location-share and welcome screens, making them feel more premium. */
   background: linear-gradient(
     180deg,
-    rgba(26, 26, 46, 0.28) 0%,
-    rgba(26, 26, 46, 0.08) 38%,
-    rgba(26, 26, 46, 0.45) 68%,
-    rgba(26, 26, 46, 0.82) 100%
+    rgba(26, 26, 46, 0.18) 0%,
+    rgba(26, 26, 46, 0.06) 38%,
+    rgba(26, 26, 46, 0.38) 68%,
+    rgba(26, 26, 46, 0.75) 100%
   );
 }
 .onboarding-location-city {
@@ -2880,9 +2882,11 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   text-align: center;
   box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18);
 }
+/* Welcome screen ("You're in.") — slightly brighter and more saturated to make
+   the imagery feel premium and celebratory at the end of onboarding. */
 .onboarding-location-hero--welcome .onboarding-location-hero-img {
   object-position: center 18%;
-  filter: saturate(0.92) contrast(1.04);
+  filter: saturate(1.05) contrast(1.06) brightness(1.02);
 }
 
 /* Age confirmation — chip toggle, same shape/behavior as the Flexible pill. */
