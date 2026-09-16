@@ -8,6 +8,7 @@ import { NetworkPromptModal } from "../components/NetworkPromptModal";
 import { PlanCard } from "../components/PlanCard";
 import { PostSuccessSheet } from "../components/PostSuccessSheet";
 import { WeekStrip } from "../components/WeekStrip";
+import { EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { isIdeaPlan, planHasEnded } from "../lib/planTime";
 import { consumeFeedScroll } from "../lib/navState";
@@ -551,23 +552,21 @@ function FeedEmptyState({
   }
 
   return (
-    <div className="feed-empty" role="status">
-      <div className="feed-empty-glyph" aria-hidden="true">
-        <Coffee size={26} strokeWidth={1.6} color="var(--muted)" />
-      </div>
-      <h2 className="feed-empty-headline">{headline}</h2>
-      <p className="feed-empty-body">{body}</p>
-      <div className="feed-empty-actions">
-        {hasFilters ? (
-          <button type="button" className="btn-secondary" onClick={onClearFilters}>
-            Clear filters
-          </button>
-        ) : null}
-        <Link to="/plans/new" className="btn-primary">
-          {view === "ideas" ? "Share an idea" : "Post a plan"}
-        </Link>
-      </div>
-    </div>
+    <EmptyCard
+      icon={<Coffee size={22} strokeWidth={1.6} color="var(--muted)" />}
+      title={headline}
+      body={body}
+      cta={{ to: "/plans/new", label: view === "ideas" ? "Share an idea" : "Post a plan" }}
+      footer={
+        hasFilters ? (
+          <div className="feed-empty-actions">
+            <button type="button" className="btn-secondary" onClick={onClearFilters}>
+              Clear filters
+            </button>
+          </div>
+        ) : null
+      }
+    />
   );
 }
 

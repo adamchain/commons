@@ -7193,6 +7193,7 @@ a.action-btn--stack {
   gap: 10px;
   flex-wrap: wrap;
   justify-content: center;
+  margin-top: 12px;
 }
 
 /* Empty States reference page — SCREEN 11 */
@@ -7234,6 +7235,10 @@ a.action-btn--stack {
   font-weight: 700;
   color: var(--ink);
   letter-spacing: -0.3px;
+}
+.ref-empty-title--quiet {
+  font-size: var(--text-card);
+  color: var(--red);
 }
 .ref-empty-body {
   margin: 0;
@@ -8658,6 +8663,7 @@ a.action-btn--stack {
 }
 
 .plan-card-flyer {
+  position: relative;
   margin: 0;
   height: 128px;
   aspect-ratio: auto;
@@ -11252,11 +11258,14 @@ a.action-btn--stack {
   background: linear-gradient(to top, rgba(10, 10, 20, 0.82) 0%, rgba(10, 10, 20, 0.3) 55%, transparent 100%);
   pointer-events: none;
 }
-.xpl-hero-search {
+.xpl-hero-top {
   position: absolute;
   top: calc(12px + env(safe-area-inset-top, 0px));
-  right: 16px;
   z-index: 2;
+}
+.xpl-hero-top--left { left: 16px; }
+.xpl-hero-top--right { right: 16px; }
+.xpl-hero-search {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -11270,6 +11279,8 @@ a.action-btn--stack {
   font-size: var(--text-body-small);
   font-weight: 500;
   text-decoration: none;
+  font-family: inherit;
+  cursor: pointer;
 }
 .xpl-hero-copy {
   position: absolute;
@@ -11296,6 +11307,37 @@ a.action-btn--stack {
   color: #fff;
   letter-spacing: -1.4px;
   line-height: 0.92;
+}
+.xpl-hero-pad {
+  padding: 16px 16px 28px;
+}
+.interest-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.interest-glyph svg {
+  display: block;
+}
+.plan-card-interest-pill {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 1;
+}
+.cover-thumb-wrap {
+  position: relative;
+  flex-shrink: 0;
+  line-height: 0;
+}
+.cover-thumb-wrap .interest-glyph {
+  position: absolute;
+  left: -4px;
+  bottom: -4px;
+  box-shadow: 0 0 0 2px var(--bg);
 }
 
 .xpl-communities,
@@ -11513,12 +11555,34 @@ a.action-btn--stack {
   gap: 4px;
   margin-bottom: 14px;
 }
+.xpl-photo-grid--forums {
+  margin-top: 10px;
+  margin-bottom: 8px;
+}
+button.xpl-photo-tile {
+  appearance: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.xpl-photo-tile .cmy-cover-media {
+  width: 100%;
+  height: 100%;
+}
+.cmy-list--xpl .cmy-cat-pills {
+  padding: 0;
+}
 .xpl-photo-tile {
   position: relative;
+  display: block;
   height: 125px;
   border-radius: 10px;
   overflow: hidden;
   background: var(--tan);
+  text-decoration: none;
+  color: inherit;
 }
 .xpl-photo-tile img {
   width: 100%;
@@ -14137,7 +14201,7 @@ a.action-btn--stack {
 .settings-forum-icon {
   width: 42px;
   height: 42px;
-  border-radius: 13px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;

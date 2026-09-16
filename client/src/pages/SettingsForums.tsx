@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MessageCircle } from "lucide-react";
 import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
-import { ScreenTitle } from "../components/ui";
+import { EmptyCard, ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
-import { interestVisual } from "../lib/interestIcons";
+import { InterestGlyph } from "../components/InterestGlyph";
+import { photoForInterest } from "../lib/placePhotos";
 import {
   FORUM_INTERESTS,
   INTEREST_LABELS,
@@ -83,11 +84,15 @@ export function SettingsForumsPage() {
           <div className="feed-skeleton-card" />
         </div>
       ) : forums.length === 0 ? (
-        <p className="form-help">No forums yet — pick one below.</p>
+        <EmptyCard
+          icon={<MessageCircle size={22} strokeWidth={1.6} color="var(--red)" />}
+          groupChat
+          title="It's quiet in here."
+          body="Pick a forum below — Coffee, Workouts, the city chats."
+        />
       ) : (
         <div className="settings-card settings-forums-card" style={{ marginBottom: 20 }}>
           {forums.map((f) => {
-            const { Icon, iconColor, tint } = interestVisual(f.interestTag);
             return (
               <div key={f.interestTag} className="settings-forum-row">
                 <Link
@@ -95,13 +100,7 @@ export function SettingsForumsPage() {
                   state={{ from: "settings-forums" }}
                   className="settings-forum-link"
                 >
-                  <span
-                    className="settings-forum-icon"
-                    style={{ background: tint, color: iconColor }}
-                    aria-hidden="true"
-                  >
-                    <Icon size={18} strokeWidth={1.8} />
-                  </span>
+                  <InterestGlyph tag={f.interestTag} size={42} />
                   <span className="settings-forum-label">{f.label}</span>
                 </Link>
                 <button
@@ -120,28 +119,22 @@ export function SettingsForumsPage() {
 
       {available.length > 0 && (
         <div className="forum-join-more-block">
-          <label className="form-eyebrow" htmlFor="settings-join-more-forums">
-            Join more forums
-          </label>
-          <select
-            id="settings-join-more-forums"
-            className="forum-join-select"
-            value=""
-            disabled={!!busyTag}
-            onChange={(e) => {
-              const next = e.target.value as InterestTag;
-              if (next) void join(next);
-            }}
-          >
-            <option value="" disabled>
-              {busyTag ? "Joining…" : "Choose a forum…"}
-            </option>
+          <label className="form-eyebrow">Join more forums</label>
+          <div className="xpl-photo-grid xpl-photo-grid--forums">
             {available.map((t) => (
-              <option key={t} value={t}>
-                {INTEREST_LABELS[t]}
-              </option>
+              <button
+                key={t}
+                type="button"
+                className="xpl-photo-tile"
+                disabled={!!busyTag}
+                onClick={() => void join(t)}
+              >
+                <img src={photoForInterest(t)} alt="" loading="lazy" />
+                <div className="xpl-photo-tile-overlay" aria-hidden="true" />
+                <span className="xpl-photo-tile-label">{INTEREST_LABELS[t]}</span>
+              </button>
             ))}
-          </select>
+          </div>
         </div>
       )}
 

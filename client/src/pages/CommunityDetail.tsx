@@ -26,6 +26,7 @@ import {
   type PlanDTO,
   type SearchResultsDTO,
 } from "../types/shared";
+import { EmptyCard } from "../components/ui";
 import { formatRelative } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
@@ -159,6 +160,7 @@ export function CommunityDetailPage() {
           </button>
           {community.isFounding && <span className="cmy-cover-founding">Founding</span>}
           <div className="cmy-cover-overlay">
+            <div className="cmy-cover-kicker">Philadelphia</div>
             <h1 className="cmy-name">{community.name}</h1>
             <div className="cmy-cover-pills">
               {catLabels.map((label) => (
@@ -373,15 +375,7 @@ function TabEmpty({
   headline: string;
   body: string;
 }) {
-  return (
-    <div className="chat-empty-card" role="status">
-      <div className="chat-empty-glyph" aria-hidden>
-        {icon}
-      </div>
-      <div className="chat-empty-headline">{headline}</div>
-      <p className="chat-empty-body">{body}</p>
-    </div>
-  );
+  return <EmptyCard icon={icon} title={headline} body={body} />;
 }
 
 function TabButton({

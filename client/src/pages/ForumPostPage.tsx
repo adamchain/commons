@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ImagePlus } from "lucide-react";
+import { ImagePlus, MessageCircle } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
 import { PlanSafetyMenu } from "../components/PlanSafetyMenu";
+import { EmptyCard } from "../components/ui";
 import { formatRelative } from "../lib/format";
 import { resolveForumImage } from "../lib/forumImage";
 import { isNative } from "../lib/platform";
@@ -194,7 +195,12 @@ export function ForumPostPage() {
           {replies.length} {replies.length === 1 ? "Reply" : "Replies"}
         </p>
         {replies.length === 0 ? (
-          <p className="form-help">Quiet so far — first reply's yours.</p>
+          <EmptyCard
+            icon={<MessageCircle size={22} strokeWidth={1.6} color="var(--red)" />}
+            groupChat
+            title="It's quiet in here."
+            body="First reply's yours."
+          />
         ) : (
           replies.map((r) => (
             <div key={r.id} className="forum-reply-row">

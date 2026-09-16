@@ -7,18 +7,23 @@ type Props = {
   title: string;
   body: string;
   cta?: { to: string; label: string };
+  footer?: ReactNode;
   /** Only for group-chat — the sole place allowed to use rgba(193,59,59,0.08). */
   groupChat?: boolean;
   className?: string;
 };
 
-/** Shared empty-state card used across Messages, My Plans, Network, etc. */
+/**
+ * Default empty-state template: icon-in-circle, short headline, one warm line,
+ * optional CTA. Same formula as “It's quiet in here.”
+ */
 export function EmptyCard({
   icon,
   tint = "rgba(237,229,216,0.8)",
   title,
   body,
   cta,
+  footer,
   groupChat,
   className = "",
 }: Props) {
@@ -31,13 +36,14 @@ export function EmptyCard({
       >
         {icon}
       </div>
-      <h2 className="ref-empty-title">{title}</h2>
+      <h2 className={`ref-empty-title${groupChat ? " ref-empty-title--quiet" : ""}`}>{title}</h2>
       <p className="ref-empty-body">{body}</p>
       {cta && (
         <Link to={cta.to} className="ref-empty-cta">
           {cta.label}
         </Link>
       )}
+      {footer}
     </div>
   );
 }

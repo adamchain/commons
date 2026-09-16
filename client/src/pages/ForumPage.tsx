@@ -4,12 +4,13 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Heart, ImagePlus, MessageCircle } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { PhotoHero } from "../components/PhotoHero";
 import { useAuth } from "../context/AuthContext";
 import { PlanSafetyMenu } from "../components/PlanSafetyMenu";
-import { BottomSheet } from "../components/ui/BottomSheet";
+import { BottomSheet, EmptyCard } from "../components/ui";
 import { formatRelative } from "../lib/format";
 import { resolveForumImage } from "../lib/forumImage";
-import { interestVisual } from "../lib/interestIcons";
+import { photoForInterest } from "../lib/placePhotos";
 import { forumBackState, hrefForBack, type NavFromState } from "../lib/navState";
 import { isNative } from "../lib/platform";
 import type { ForumPostDTO, ForumSort, InterestTag } from "../types/shared";
@@ -147,36 +148,38 @@ export function ForumPage() {
   if (!data) {
     return (
       <main className="app-shell app-shell--mid app-shell--with-nav app-shell--with-topbar">
-        <div className="empty-state">
-          <p style={{ margin: 0 }}>Couldn't load this forum.</p>
-          <Link to="/messages?tab=interests" className="btn-primary" style={{ marginTop: 14, display: "inline-block" }}>
-            Back to Messages
-          </Link>
-        </div>
+        <EmptyCard
+          icon={<MessageCircle size={22} strokeWidth={1.6} color="var(--red)" />}
+          groupChat
+          title="It's quiet in here."
+          body="Couldn't load this forum."
+          cta={{ to: "/messages?tab=interests", label: "Back to Messages" }}
+        />
       </main>
     );
   }
 
-  const { Icon, iconColor, tint } = interestVisual(data.interestTag ?? tag);
-
   return (
-    <main className="app-shell app-shell--mid app-shell--with-nav app-shell--with-topbar forum-page">
-      <header className="forum-header">
-        <Link to={backHref} className="forum-header-back" aria-label={`Back to ${backLabel}`}>
-          <ArrowLeft size={18} strokeWidth={1.8} />
-        </Link>
-        <span className="forum-header-icon" style={{ background: tint, color: iconColor }} aria-hidden="true">
-          <Icon size={18} strokeWidth={1.8} />
-        </span>
-        <div className="forum-header-text">
-          <span className="forum-header-title">{data.label}</span>
-        </div>
-        <button type="button" className="forum-leave-btn" onClick={() => void leaveForum()} disabled={leaving}>
-          {leaving ? "Leaving…" : "Leave"}
-        </button>
-      </header>
+    <main className="app-shell app-shell--wide app-shell--with-nav xpl forum-page">
+      <PhotoHero
+        photo={photoForInterest(data.interestTag ?? tag)}
+        eyebrow="Philadelphia"
+        title={data.label}
+        topLeft={
+          <Link to={backHref} className="xpl-hero-search" aria-label={`Back to ${backLabel}`}>
+            <ArrowLeft size={14} strokeWidth={2} aria-hidden="true" />
+            {backLabel}
+          </Link>
+        }
+        topRight={
+          <button type="button" className="xpl-hero-search" onClick={() => void leaveForum()} disabled={leaving}>
+            {leaving ? "Leaving…" : "Leave"}
+          </button>
+        }
+      />
 
-      <div className="forum-toolbar">
+      <div className="xpl-hero-pad">
+        <div className="forum-toolbar">
         <div className="seg-toggle" role="group" aria-label="Sort posts">
           <button
             type="button"
@@ -198,7 +201,7 @@ export function ForumPage() {
         <button type="button" className="btn btn-primary forum-make-plan-btn" onClick={makeThisAPlan}>
           Post a Plan
         </button>
-      </div>
+        </div>
 
       <div className="forum-composer-card">
         {!composerOpen ? (
@@ -282,9 +285,12 @@ export function ForumPage() {
       </div>
 
       {data.posts.length === 0 ? (
-        <div className="empty-state" style={{ marginTop: 16 }}>
-          <p style={{ margin: 0 }}>It's quiet in here — say hi, or throw a plan into the mix.</p>
-        </div>
+        <EmptyCard
+          icon={<MessageCircle size={22} strokeWidth={1.6} color="var(--red)" />}
+          groupChat
+          title="It's quiet in here."
+          body="Say hi, or throw a plan into the mix."
+        />
       ) : (
         <div className="forum-post-list">
           {data.posts.map((post) => (
@@ -299,6 +305,8 @@ export function ForumPage() {
           ))}
         </div>
       )}
+
+      </div>
 
       {planModalOpen && (
         <BottomSheet onClose={() => setPlanModalOpen(false)} labelledBy="forum-plan-title">

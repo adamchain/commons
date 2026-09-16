@@ -15,6 +15,12 @@
 .app-shell.app-shell--with-topbar.cmy-list {
   padding-top: calc(var(--topbar-height, 56px) + 18px + env(safe-area-inset-top, 0px));
 }
+.app-shell.cmy-list--xpl {
+  padding-top: 0;
+  padding-left: 0;
+  padding-right: 0;
+  gap: 0;
+}
 
 .cmy-muted {
   color: var(--text-muted);
@@ -725,6 +731,16 @@ button.cmy-joined-pill {
   gap: 6px;
   padding: var(--s-3) var(--s-4);
   width: 100%;
+}
+.cmy-cover-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--type-label);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 .cmy-cover-tag {
   align-self: flex-start;

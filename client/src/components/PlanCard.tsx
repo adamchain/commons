@@ -5,6 +5,7 @@ import { api } from "../api/http";
 import { Avatar } from "./Avatar";
 import { JoinConfirmPopup, joinConfirmKind, type JoinConfirmKind } from "./JoinConfirmPopup";
 import { IdeaCoverFallback } from "./CoverThumb";
+import { InterestGlyph } from "./InterestGlyph";
 import { BottomSheet } from "./ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
 import type { PlanDTO } from "../types/shared";
@@ -105,10 +106,16 @@ export function PlanCard({
         {coverImage ? (
           <div className="plan-card-flyer">
             <img src={coverImage} alt="" loading="lazy" />
+            {plan.tags[0] ? (
+              <InterestGlyph tag={plan.tags[0]} size={32} className="plan-card-interest-pill" />
+            ) : null}
           </div>
         ) : isLooking ? (
           <div className="plan-card-flyer">
             <IdeaCoverFallback iconSize={42} />
+            {plan.tags[0] ? (
+              <InterestGlyph tag={plan.tags[0]} size={32} className="plan-card-interest-pill" />
+            ) : null}
           </div>
         ) : null}
         <div className="plan-card-body">

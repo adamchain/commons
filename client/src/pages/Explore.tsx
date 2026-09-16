@@ -1,30 +1,14 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { MapPin, Search } from "lucide-react";
+import { Search, Users } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
 import { JoinConfirmPopup } from "../components/JoinConfirmPopup";
-import { Label } from "../components/ui";
+import { PhotoHero } from "../components/PhotoHero";
+import { EmptyCard, Label } from "../components/ui";
+import { HERO_PHOTO, PLACE_CATEGORIES, PLACE_TILES } from "../lib/placePhotos";
 import { communityCategoryLine, type CommunityCardDTO, type CommunityDTO } from "../types/shared";
-
-// Explore is locked to an editorial "Coming Soon" state for launch (no live
-// search / nearby calls) — EXCEPT the Communities rail, which is the one live
-// element at launch. Restore the functional search + nearby version from git
-// history when the rest of Explore ships.
-
-const HERO_PHOTO = "/landing/photo-shadows.jpg";
-
-const PLACE_CATEGORIES = ["Coffee", "Food", "Drinks", "Fitness", "Parks", "Culture"] as const;
-
-const PLACE_TILES: Array<{ label: string; photo: string }> = [
-  { label: "Coffee", photo: "https://images.unsplash.com/photo-1453614512568-c4024d13c247?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=600&q=80" },
-  { label: "Food", photo: "https://images.unsplash.com/photo-1574966739987-65e38db0f7ce?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400&q=80" },
-  { label: "Drinks", photo: "https://images.unsplash.com/photo-1568644396922-5c3bfae12521?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400&q=80" },
-  { label: "Fitness", photo: "https://images.unsplash.com/photo-1603455778956-d71832eafa4e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400&q=80" },
-  { label: "Parks", photo: "https://images.unsplash.com/photo-1615373111465-965023eb989c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400&q=80" },
-  { label: "Culture", photo: "https://images.unsplash.com/photo-1518998053901-5348d3961a04?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400&q=80" },
-];
 
 export function ExplorePage() {
   const navigate = useNavigate();
@@ -52,22 +36,17 @@ export function ExplorePage() {
 
   return (
     <main className="app-shell app-shell--wide app-shell--with-nav xpl">
-      {/* Photo hero — location + Explore masthead + glass search */}
-      <header className="xpl-hero">
-        <img src={HERO_PHOTO} alt="" className="xpl-hero-img" />
-        <div className="xpl-hero-gradient" aria-hidden="true" />
-        <Link to="/search" className="xpl-hero-search">
-          <Search size={11} strokeWidth={2} aria-hidden="true" />
-          <span>Search</span>
-        </Link>
-        <div className="xpl-hero-copy">
-          <div className="xpl-hero-location">
-            <MapPin size={10} color="var(--red)" strokeWidth={2.2} aria-hidden="true" />
-            <span>Philadelphia</span>
-          </div>
-          <h1 className="xpl-hero-title">Explore</h1>
-        </div>
-      </header>
+      <PhotoHero
+        photo={HERO_PHOTO}
+        eyebrow="Philadelphia"
+        title="Explore"
+        topRight={
+          <Link to="/search" className="xpl-hero-search">
+            <Search size={11} strokeWidth={2} aria-hidden="true" />
+            <span>Search</span>
+          </Link>
+        }
+      />
 
       {/* Communities — the one live Explore element at launch */}
       <section className="xpl-communities" aria-label="Communities">
@@ -122,12 +101,14 @@ export function ExplorePage() {
             ))}
           </ul>
         ) : loadedComm ? (
-          <div className="xpl-comm-empty">
-            <p>Empty dance floor — start one and see who shows.</p>
-            <Link to="/communities/new" className="xpl-places-cta">
-              Create a community
-            </Link>
-          </div>
+          <EmptyCard
+            className="xpl-comm-empty-card"
+            icon={<Users size={22} strokeWidth={1.6} color="#3A6A3A" />}
+            tint="#C8DDC8"
+            title="It's quiet in here."
+            body="Start a community and see who shows."
+            cta={{ to: "/communities/new", label: "Create a community" }}
+          />
         ) : null}
       </section>
 

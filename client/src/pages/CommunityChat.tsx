@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, BarChart2 } from "lucide-react";
+import { ArrowLeft, BarChart2, MessageCircle } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCoverThumb } from "../components/CoverThumb";
 import { BlockConfirmModal, ReportModal } from "../components/PlanSafetyMenu";
 import { PollCard } from "../components/PollCard";
 import { PollSheet } from "../components/PollSheet";
+import { EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { sentenceCaseTitle } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
@@ -508,15 +509,12 @@ export function CommunityChatPage() {
 
         <div ref={scrollRef} className="chat-messages">
           {grouped.length === 0 ? (
-            <div className="chat-empty-card">
-              <div className="chat-empty-glyph" aria-hidden>
-                <MessageCircleIcon />
-              </div>
-              <div className="chat-empty-headline">It's quiet in here</div>
-              <p className="chat-empty-body">
-                Say hi — even a tiny one counts.
-              </p>
-            </div>
+            <EmptyCard
+              icon={<MessageCircle size={22} strokeWidth={1.6} color="var(--red)" />}
+              groupChat
+              title="It's quiet in here."
+              body="Say hi — even a tiny one counts."
+            />
           ) : (
             grouped.map((entry) => {
               if (entry.kind === "day") {
@@ -837,14 +835,6 @@ function groupMessages(msgs: MessageDTO[]): GroupedEntry[] {
     lastUserAt = date.getTime();
   }
   return out;
-}
-
-function MessageCircleIcon() {
-  return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
-    </svg>
-  );
 }
 
 function dayLabel(d: Date): string {

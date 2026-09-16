@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { BarChart2, MessageCircle } from "lucide-react";
 import { api, parseApiError } from "../api/http";
+import { InterestGlyph } from "../components/InterestGlyph";
 import { PlanCoverThumb } from "../components/CoverThumb";
-import { ScreenTitle } from "../components/ui";
+import { EmptyCard, Label, ScreenTitle } from "../components/ui";
 import { formatRelative, sentenceCaseTitle } from "../lib/format";
+import { photoForInterest } from "../lib/placePhotos";
 import {
   FORUM_INTERESTS,
   INTEREST_LABELS,
@@ -144,7 +146,7 @@ export function MessagesPage() {
                           state={MESSAGES_INTERESTS_FROM}
                           className="messages-row"
                         >
-                          <PlanCoverThumb planId={f.interestTag} />
+                          <InterestGlyph tag={f.interestTag} size={40} />
                           <div className="messages-row-body">
                             <div className="messages-row-top">
                               <span className="messages-row-title">{f.label}</span>
@@ -177,28 +179,24 @@ export function MessagesPage() {
               )}
               {availableForums.length > 0 && (
                 <div className="forum-join-more-block">
-                  <label className="form-eyebrow" htmlFor="join-more-forums">
+                  <label className="form-eyebrow">
                     {forums.length === 0 ? "Pick an interest" : "Join more forums"}
                   </label>
-                  <select
-                    id="join-more-forums"
-                    className="forum-join-select"
-                    value=""
-                    disabled={!!joiningTag}
-                    onChange={(e) => {
-                      const next = e.target.value as InterestTag;
-                      if (next) void joinForum(next);
-                    }}
-                  >
-                    <option value="" disabled>
-                      {joiningTag ? "Joining…" : "Choose a forum…"}
-                    </option>
+                  <div className="xpl-photo-grid xpl-photo-grid--forums">
                     {availableForums.map((t) => (
-                      <option key={t} value={t}>
-                        {INTEREST_LABELS[t]}
-                      </option>
+                      <button
+                        key={t}
+                        type="button"
+                        className="xpl-photo-tile"
+                        disabled={!!joiningTag}
+                        onClick={() => void joinForum(t)}
+                      >
+                        <img src={photoForInterest(t)} alt="" loading="lazy" />
+                        <div className="xpl-photo-tile-overlay" aria-hidden="true" />
+                        <span className="xpl-photo-tile-label">{INTEREST_LABELS[t]}</span>
+                      </button>
                     ))}
-                  </select>
+                  </div>
                   {joinErr && <p className="error-text" style={{ marginTop: 12 }}>{joinErr}</p>}
                 </div>
               )}
@@ -211,16 +209,14 @@ export function MessagesPage() {
           <div className="feed-skeleton-card" />
         </div>
       ) : items.length === 0 ? (
-        <div className="ref-empty-card" role="status" style={{ marginTop: 24 }}>
-          <div className="ref-empty-glyph" style={{ background: "rgba(237,229,216,0.8)" }} aria-hidden="true">
-            <MessageCircle size={22} strokeWidth={1.6} color="var(--muted)" />
-          </div>
-          <h2 className="ref-empty-title">It's quiet in here.</h2>
-          <p className="ref-empty-body">Join something and the conversation follows.</p>
-          <Link to="/" className="ref-empty-cta">
-            See what&apos;s happening
-          </Link>
-        </div>
+        <EmptyCard
+          className="ref-empty-card--inbox"
+          icon={<MessageCircle size={22} strokeWidth={1.6} color="var(--red)" />}
+          groupChat
+          title="It's quiet in here."
+          body="Join something and the conversation follows."
+          cta={{ to: "/", label: "See what's happening" }}
+        />
       ) : (
         <>
           <div className="messages-card">

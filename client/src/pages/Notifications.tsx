@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { formatRelative } from "../lib/format";
 import type { NavFromState } from "../lib/navState";
@@ -130,22 +131,17 @@ export function NotificationsPage() {
       )}
 
       {sorted.length === 0 ? (
-        <div className="notif-empty" role="status">
-          <div className="notif-empty-glyph" aria-hidden="true">
-            <Bell size={28} strokeWidth={1.5} color="#6B5AA0" />
-          </div>
-          <h2 className="notif-empty-title">All quiet.</h2>
-          <p className="notif-empty-body">
-            {hasPlans
+        <EmptyCard
+          icon={<Bell size={22} strokeWidth={1.6} color="#6B5AA0" />}
+          tint="#D8D0F0"
+          title="It's quiet in here."
+          body={
+            hasPlans
               ? "We'll nudge you when something stirs."
-              : "Go get into something — then we'll have news."}
-          </p>
-          {!hasPlans && (
-            <div className="feed-empty-actions">
-              <Link to="/" className="btn-primary">See what's happening</Link>
-            </div>
-          )}
-        </div>
+              : "Go get into something — then we'll have news."
+          }
+          cta={hasPlans ? undefined : { to: "/", label: "See what's happening" }}
+        />
       ) : (
         <section className="notif-section">
           <div className="notif-list">

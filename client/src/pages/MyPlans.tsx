@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Calendar, Star } from "lucide-react";
 import { api } from "../api/http";
 import { PlanCoverThumb } from "../components/CoverThumb";
+import { InterestGlyph } from "../components/InterestGlyph";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { EmptyCard, Label, ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
@@ -141,7 +142,10 @@ function PlanRow({ plan }: { plan: PlanDTO }) {
 
   return (
     <Link to={`/plans/${plan.id}`} state={{ from: "my-plans" }} className="my-plans-row">
-      <PlanCoverThumb planId={plan.id} flyerDataUrl={plan.flyerDataUrl} isIdea={isIdeaPlan(plan)} />
+      <span className="cover-thumb-wrap">
+        <PlanCoverThumb planId={plan.id} flyerDataUrl={plan.flyerDataUrl} isIdea={isIdeaPlan(plan)} />
+        {plan.tags[0] ? <InterestGlyph tag={plan.tags[0]} size={22} /> : null}
+      </span>
       <span className="my-plans-row-text">
         <span className="my-plans-row-name">{sentenceCaseTitle(plan.title)}</span>
         <span className="my-plans-row-meta">{meta}</span>

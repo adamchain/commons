@@ -16,6 +16,7 @@ import { PlanCoverThumb } from "../components/CoverThumb";
 import { BlockConfirmModal, ReportModal } from "../components/PlanSafetyMenu";
 import { PollCard } from "../components/PollCard";
 import { PollSheet } from "../components/PollSheet";
+import { EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
@@ -508,15 +509,12 @@ export function ChatPage() {
 
         <div ref={scrollRef} className="chat-messages">
           {grouped.length === 0 ? (
-            <div className="chat-empty-card">
-              <div className="chat-empty-glyph" aria-hidden>
-                <MessageCircle size={24} strokeWidth={1.6} />
-              </div>
-              <div className="chat-empty-headline">It's quiet in here</div>
-              <p className="chat-empty-body">
-                Say hi — even a tiny one counts.
-              </p>
-            </div>
+            <EmptyCard
+              icon={<MessageCircle size={22} strokeWidth={1.6} color="var(--red)" />}
+              groupChat
+              title="It's quiet in here."
+              body="Say hi — even a tiny one counts."
+            />
           ) : (
             grouped.map((entry) => {
               if (entry.kind === "day") {
