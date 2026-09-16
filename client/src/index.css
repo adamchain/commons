@@ -2845,8 +2845,6 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
 .onboarding-location-hero-gradient {
   position: absolute;
   inset: 0;
-  /* Lighter gradient to let the Philly skyline imagery shine through on both
-     the location-share and welcome screens, making them feel more premium. */
   background: linear-gradient(
     180deg,
     rgba(26, 26, 46, 0.18) 0%,
@@ -2882,8 +2880,6 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   text-align: center;
   box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18);
 }
-/* Welcome screen ("You're in.") — slightly brighter and more saturated to make
-   the imagery feel premium and celebratory at the end of onboarding. */
 .onboarding-location-hero--welcome .onboarding-location-hero-img {
   object-position: center 18%;
   filter: saturate(1.05) contrast(1.06) brightness(1.02);
@@ -11755,6 +11751,12 @@ button.xpl-photo-tile {
   border-radius: 14px;
   overflow: visible;
   flex-shrink: 0;
+}
+.search-community-thumb .cmy-cover-media {
+  width: 100%;
+  height: 100%;
+  border-radius: 14px;
+  overflow: hidden;
 }
 .search-community-organizer-avatar {
   position: absolute;

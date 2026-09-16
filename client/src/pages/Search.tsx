@@ -11,9 +11,8 @@ import { communityCategoryLine, type CommunityCardDTO, type PersonSearchResultDT
 const DEBOUNCE_MS = 300;
 
 /**
- * Global search — plans (title / venue / interest) and people (name),
- * respecting each person's `discoverableBySearch` toggle and blocks both
- * ways. Debounced search-as-you-type against GET /api/search?q=.
+ * Global search — plans, people, and communities.
+ * Respects `discoverableBySearch` and blocks both ways.
  */
 export function SearchPage() {
   const [query, setQuery] = useState("");
@@ -65,7 +64,7 @@ export function SearchPage() {
           <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" /> Communities
         </Link>
       </header>
-      <ScreenTitle title="Search" subtitle="Find plans and people on COMMONS" />
+      <ScreenTitle title="Search" subtitle="Plans, people, communities." />
 
       <div className="network-search-wrap">
         <SearchIcon />
@@ -73,7 +72,7 @@ export function SearchPage() {
           ref={inputRef}
           type="search"
           className="network-search-input"
-          placeholder="Search plans, venues, interests, or people"
+          placeholder="Search plans, people, or communities"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           aria-label="Search"
@@ -81,7 +80,7 @@ export function SearchPage() {
       </div>
 
       {!hasQuery && (
-        <p className="form-help">Plans, people, a vibe — type something.</p>
+        <p className="form-help">Plans, people, a community — type something.</p>
       )}
 
       {noResults && (
@@ -175,7 +174,7 @@ function CommunityRow({ community }: { community: CommunityCardDTO }) {
   const categoryText = communityCategoryLine(community);
 
   return (
-    <Link to={`/communities/${community.id}`} className="search-community-row">
+    <Link to={`/communities/${community.id}`} state={{ from: "search" }} className="search-community-row">
       <div className="search-community-thumb">
         <CommunityCover
           coverImage={community.coverImage}

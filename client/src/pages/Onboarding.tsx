@@ -537,10 +537,6 @@ export function OnboardingPage() {
  * before the member ever lands on the feed. Headline, a "here's what's
  * happening" line naming their neighborhood, and — when available — a live
  * nearby-plans stat. On web, the App Store nudge lives on this same screen.
- * 
- * Premium imagery: Full-bleed Philly skyline background with gradient overlay
- * makes this final welcome moment feel polished and elevated (matching the
- * location-share screen earlier in the flow).
  */
 function WelcomeStep({
   user,
@@ -854,9 +850,6 @@ function LocationStep({
     }
   }, [filter, sorted]);
 
-  // Premium imagery: Show full-screen Philly skyline before requesting location
-  // permission, making the location-share step feel elevated and setting the
-  // tone for the welcome screen that follows at the end of onboarding.
   if (permissionState === "idle") {
     return (
       <div className="onboarding-location-hero">
