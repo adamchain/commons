@@ -396,7 +396,7 @@ export function FeedPage() {
         {!forumSuggestionDismissed && suggestedForumTag && (
           <div className="feed-forum-suggestion" role="status">
             <span className="feed-forum-suggestion-glyph" aria-hidden="true">
-              <MessageCircle size={18} strokeWidth={1.6} />
+              <MessageCircle size={18} strokeWidth={1.8} />
             </span>
             <Link
               to={`/forums/${suggestedForumTag}`}
@@ -404,7 +404,7 @@ export function FeedPage() {
               className="feed-forum-suggestion-text"
               onClick={dismissForumSuggestion}
             >
-              New here? The {INTEREST_LABELS[suggestedForumTag]} forum is a good place to say hi →
+              New here? Come say hi in the {INTEREST_LABELS[suggestedForumTag]} forum — it's a friendly first stop →
             </Link>
             <button
               type="button"

@@ -3661,7 +3661,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: 50%;
   background: var(--tan);
   color: var(--text-muted);
   font-size: var(--text-card);
@@ -3864,18 +3864,23 @@ a.action-btn--stack {
   box-sizing: border-box;
 }
 
-/* Chat preview card on plan detail */
+/* Chat preview card on plan detail — same card + icon-circle as Date/Location */
 .chat-preview-card {
   display: block;
   color: inherit;
 }
 .chat-preview-messages-link {
-  display: block;
+  display: flex;
   text-decoration: none;
   color: inherit;
 }
 .chat-preview-messages-link:hover {
   opacity: 0.85;
+}
+.chat-preview-messages-wrap {
+  display: block;
+  padding: 0 16px 12px;
+  border-top: 1px solid var(--border);
 }
 .chat-preview-header {
   display: flex;
@@ -3894,6 +3899,7 @@ a.action-btn--stack {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  padding-top: 12px;
 }
 .chat-preview-message {
   display: flex;
@@ -3926,11 +3932,12 @@ a.action-btn--stack {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 0;
+  padding: 4px 16px 14px;
 }
 .chat-preview-compose--below-msgs {
   border-top: 1px solid var(--border);
-  padding-top: 10px;
+  padding-top: 12px;
 }
 .chat-preview-input {
   flex: 1;
@@ -5537,10 +5544,10 @@ a.action-btn--stack {
 .feed-forum-suggestion {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   background: var(--tan);
   border-radius: var(--radius-lg, 14px);
-  padding: 12px 12px 12px 14px;
+  padding: 12px 12px 12px 12px;
   margin-bottom: 16px;
 }
 .feed-forum-suggestion-glyph {
@@ -5548,7 +5555,12 @@ a.action-btn--stack {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: var(--accent);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--red);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 .feed-forum-suggestion-text {
   flex: 1;
@@ -5556,7 +5568,7 @@ a.action-btn--stack {
   font-size: var(--type-body);
   font-weight: 600;
   color: var(--text);
-  line-height: 1.35;
+  line-height: 1.4;
 }
 .feed-forum-suggestion-dismiss {
   flex-shrink: 0;
@@ -8363,13 +8375,13 @@ a.action-btn--stack {
   display: block;
 }
 
-/* Week strip — each day rendered as its own white pill card */
+/* Week strip — collapsed to a “This week” pill; expand for the day scroller */
 .week-strip {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 0;
   margin: 0;
-  padding: 0 20px 14px;
+  padding: 0;
 }
 
 /* Scrollable variant — swipe left/right through the rest of the month. */
@@ -8380,14 +8392,15 @@ a.action-btn--stack {
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  padding-bottom: 2px;
+  padding: 4px 0 2px;
+  gap: 10px;
 }
 .week-strip--scroll::-webkit-scrollbar {
   display: none;
 }
 .week-strip--scroll .week-strip-day {
   flex: 0 0 auto;
-  width: 44px;
+  width: 52px;
   padding-top: 18px;
   scroll-snap-align: start;
 }
@@ -8423,18 +8436,49 @@ a.action-btn--stack {
 
 .week-strip-wrap {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  gap: 8px;
   min-width: 0;
+  padding: 2px 16px 12px;
 }
 
 .week-strip-wrap .week-strip--scroll {
-  flex: 1;
+  flex: 1 1 100%;
   min-width: 0;
+}
+
+.week-strip-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--r-control);
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.week-strip-pill.is-open {
+  border-color: var(--red);
+  color: var(--red);
+}
+.week-strip-pill-chevron {
+  display: block;
+  flex-shrink: 0;
+  transition: transform 160ms ease;
+}
+.week-strip-pill.is-open .week-strip-pill-chevron {
+  transform: rotate(180deg);
 }
 
 .week-strip-reset {
   flex: 0 0 auto;
-  margin: 10px 16px 0 4px;
+  margin: 0;
   padding: 6px 10px;
   border-radius: var(--r-control);
   border: 1.5px solid var(--red);
@@ -12513,7 +12557,7 @@ a.action-btn--stack {
   background-size: 200% 100%;
   animation: feed-skeleton-shimmer 1.2s ease-in-out infinite;
 }
-.feed-skeleton-strip { height: 72px; }
+.feed-skeleton-strip { height: 44px; }
 .feed-skeleton-card { height: 180px; }
 @keyframes feed-skeleton-shimmer {
   0% { background-position: 100% 0; }

@@ -510,28 +510,38 @@ export function PlanDetailPage() {
               </div>
             </div>
           ) : (
-            <div className="plan-detail-whenwhere">
-              <div className="plan-detail-fact">
-                <span className="type-label">Date &amp; time</span>
-                <span className="plan-detail-fact-value">
-                  {formatWhen(plan.date, plan.time, plan.isFlexibleTime)}
-                </span>
+            <div className="plan-meta-card">
+              <div className="plan-meta-row">
+                <span className="plan-meta-icon" aria-hidden="true"><CalendarIcon /></span>
+                <div className="plan-meta-text">
+                  <span className="plan-meta-label">Date &amp; time</span>
+                  <span className="plan-meta-value">
+                    {formatWhen(plan.date, plan.time, plan.isFlexibleTime)}
+                  </span>
+                </div>
               </div>
-              <div className="plan-detail-fact">
-                <span className="type-label">Location</span>
-                {plan.isFlexibleLocation ? (
-                  <span className="plan-detail-fact-value">Flexible</span>
-                ) : (
-                  <a
-                    className="plan-detail-fact-value"
-                    href={mapsHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {plan.location.name}
-                  </a>
-                )}
-              </div>
+              {plan.isFlexibleLocation ? (
+                <div className="plan-meta-row">
+                  <span className="plan-meta-icon" aria-hidden="true"><PinIcon /></span>
+                  <div className="plan-meta-text">
+                    <span className="plan-meta-label">Location</span>
+                    <span className="plan-meta-value">Flexible</span>
+                  </div>
+                </div>
+              ) : (
+                <a
+                  className="plan-meta-row"
+                  href={mapsHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span className="plan-meta-icon" aria-hidden="true"><PinIcon /></span>
+                  <div className="plan-meta-text">
+                    <span className="plan-meta-label">Location</span>
+                    <span className="plan-meta-value">{plan.location.name}</span>
+                  </div>
+                </a>
+              )}
             </div>
           )}
           <button
@@ -1224,19 +1234,29 @@ function ChatPreviewCard({
   }
 
   return (
-    <div className="plan-detail-card chat-preview-card">
+    <div className="plan-meta-card chat-preview-card">
       <Link
         to={`/plans/${planId}/chat`}
         state={navState}
-        className="chat-preview-messages-link"
+        className="plan-meta-row chat-preview-messages-link"
       >
-        <div className="chat-preview-header">
-          <span className="chat-preview-title">Chat</span>
-          <ChevronRight size={16} strokeWidth={2} color="var(--text-muted)" aria-hidden="true" />
+        <span className="plan-meta-icon" aria-hidden="true"><ChatBubbleIcon /></span>
+        <div className="plan-meta-text">
+          <span className="plan-meta-label">Chat</span>
+          {messages === null ? (
+            <span className="plan-meta-sub">Loading…</span>
+          ) : hasMessages ? (
+            <span className="plan-meta-sub">Latest in the thread</span>
+          ) : null}
         </div>
-        {messages === null ? (
-          <span className="chat-preview-empty">Loading…</span>
-        ) : hasMessages ? (
+        <ChevronRight size={16} strokeWidth={2} color="var(--text-muted)" aria-hidden="true" />
+      </Link>
+      {hasMessages ? (
+        <Link
+          to={`/plans/${planId}/chat`}
+          state={navState}
+          className="chat-preview-messages-link chat-preview-messages-wrap"
+        >
           <div className="chat-preview-messages">
             {messages.map((msg) => (
               <div key={msg.id} className="chat-preview-message">
@@ -1261,8 +1281,8 @@ function ChatPreviewCard({
               </div>
             ))}
           </div>
-        ) : null}
-      </Link>
+        </Link>
+      ) : null}
       <div className={`chat-preview-compose${hasMessages ? " chat-preview-compose--below-msgs" : ""}`}>
         <input
           className="chat-preview-input"
