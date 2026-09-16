@@ -4,7 +4,7 @@ import { BarChart2, MessageCircle } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { InterestGlyph } from "../components/InterestGlyph";
 import { PlanCoverThumb } from "../components/CoverThumb";
-import { EmptyCard, Label, ScreenTitle } from "../components/ui";
+import { EmptyCard, ScreenTitle } from "../components/ui";
 import { formatRelative, sentenceCaseTitle } from "../lib/format";
 import { photoForInterest } from "../lib/placePhotos";
 import {

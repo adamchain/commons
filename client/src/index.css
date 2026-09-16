@@ -8720,6 +8720,7 @@ a.action-btn--stack {
   position: absolute;
   inset: 0;
 }
+.plan-detail-hero img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -11728,6 +11729,97 @@ button.xpl-photo-tile {
 }
 .search-person-row:hover {
   background: var(--surface-2);
+}
+.search-community-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  color: inherit;
+}
+.search-community-row:hover {
+  background: var(--surface-hover);
+}
+.search-community-thumb {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  overflow: visible;
+  flex-shrink: 0;
+}
+.search-community-organizer-avatar {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--surface);
+  line-height: 0;
+  z-index: 1;
+}
+.search-community-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.search-community-organizer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-body-small);
+  color: var(--faint);
+  font-weight: 400;
+}
+.search-community-organizer-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-community-name {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--ink);
+  letter-spacing: -0.2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-community-meta {
+  font-size: var(--text-body-small);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-community-joined-pill {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 26px;
+  border: none;
+  background: var(--red);
+  padding: 4px 10px;
+  border-radius: var(--r-control);
+  color: var(--accent-on);
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: var(--text-body-small);
+  white-space: nowrap;
+  line-height: 1;
+}
+.search-communities-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 .search-person-info {
   display: flex;

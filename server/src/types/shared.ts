@@ -718,6 +718,7 @@ export interface PersonSearchResultDTO {
 export interface SearchResultsDTO {
   plans: PlanDTO[];
   people: PersonSearchResultDTO[];
+  communities: CommunityCardDTO[];
 }
 
 export type ReportReason = "harassment" | "spam" | "inappropriate" | "safety" | "other";

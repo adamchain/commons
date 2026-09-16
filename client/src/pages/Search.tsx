@@ -3,9 +3,10 @@ import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { CommunityCover } from "../components/CommunityCover";
 import { PlanCard } from "../components/PlanCard";
 import { Label, ScreenTitle } from "../components/ui";
-import type { PersonSearchResultDTO, SearchResultsDTO } from "../types/shared";
+import { communityCategoryLine, type CommunityCardDTO, type PersonSearchResultDTO, type SearchResultsDTO } from "../types/shared";
 
 const DEBOUNCE_MS = 300;
 
@@ -37,7 +38,7 @@ export function SearchPage() {
     debounceRef.current = setTimeout(() => {
       void api<SearchResultsDTO>(`/api/search?q=${encodeURIComponent(q)}`)
         .then(setResults)
-        .catch(() => setResults({ plans: [], people: [] }))
+        .catch(() => setResults({ plans: [], people: [], communities: [] }))
         .finally(() => setLoading(false));
     }, DEBOUNCE_MS);
     return () => {
@@ -50,12 +51,12 @@ export function SearchPage() {
     if (!q) return;
     void api<SearchResultsDTO>(`/api/search?q=${encodeURIComponent(q)}`)
       .then(setResults)
-      .catch(() => undefined);
+      .catch(() => setResults({ plans: [], people: [], communities: [] }));
   };
 
   const hasQuery = query.trim().length > 0;
   const noResults =
-    hasQuery && !loading && results !== null && results.plans.length === 0 && results.people.length === 0;
+    hasQuery && !loading && results !== null && results.plans.length === 0 && results.people.length === 0 && results.communities.length === 0;
 
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">
@@ -85,6 +86,17 @@ export function SearchPage() {
 
       {noResults && (
         <p className="form-help">Nothing under that.</p>
+      )}
+
+      {results && results.communities.length > 0 && (
+        <section className="profile-block" style={{ marginTop: hasQuery ? 4 : 0 }}>
+          <Label>Communities</Label>
+          <div className="search-communities-list">
+            {results.communities.map((c) => (
+              <CommunityRow key={c.id} community={c} />
+            ))}
+          </div>
+        </section>
       )}
 
       {results && results.people.length > 0 && (
@@ -154,5 +166,45 @@ function ChevronRight() {
     <svg className="search-person-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="m9 6 6 6-6 6" />
     </svg>
+  );
+}
+
+function CommunityRow({ community }: { community: CommunityCardDTO }) {
+  const joined = community.myMembershipStatus === "active";
+  const memberCountLabel = `${community.memberCount} ${community.memberCount === 1 ? "member" : "members"}`;
+  const categoryText = communityCategoryLine(community);
+
+  return (
+    <Link to={`/communities/${community.id}`} className="search-community-row">
+      <div className="search-community-thumb">
+        <CommunityCover
+          coverImage={community.coverImage}
+          category={community.category}
+          iconSize={28}
+        />
+        <span className="search-community-organizer-avatar">
+          <Avatar
+            seed={community.organizer.avatarSeed}
+            style={community.organizer.avatarStyle}
+            photoDataUrl={community.organizer.avatarPhotoDataUrl}
+            params={community.organizer.avatarParams}
+            name={community.organizer.firstName}
+            size="xs"
+          />
+        </span>
+      </div>
+      <span className="search-community-info">
+        <span className="search-community-organizer">
+          <span className="search-community-organizer-name">{community.organizer.firstName}</span>
+        </span>
+        <span className="search-community-name">{community.name}</span>
+        <span className="search-community-meta">
+          {categoryText} · {memberCountLabel}
+        </span>
+      </span>
+      {joined && (
+        <span className="search-community-joined-pill">Joined</span>
+      )}
+    </Link>
   );
 }

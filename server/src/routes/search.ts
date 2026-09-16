@@ -2,15 +2,17 @@ import { Router } from "express";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { isOnboardingFinished } from "../lib/onboarding.js";
 import { store, type UserRecord } from "../store.js";
-import { findUserById } from "../userRepo.js";
-import { INTEREST_LABELS, type InterestTag } from "../types/shared.js";
+import { findUserById, findUsersByIds } from "../userRepo.js";
+import { INTEREST_LABELS, COMMUNITY_CATEGORY_LABELS, type InterestTag, type CommunityCategory } from "../types/shared.js";
 import { planSummary, planVisibleToViewer, userToPublic } from "./plans.js";
-import type { PersonSearchResultDTO, SearchResultsDTO } from "../types/shared.js";
+import { communityCategoriesOf } from "../types/shared.js";
+import type { PersonSearchResultDTO, SearchResultsDTO, CommunityCardDTO, PublicUser } from "../types/shared.js";
 
 export const searchRouter = Router();
 
 const PLAN_LIMIT = 25;
 const PEOPLE_LIMIT = 20;
+const COMMUNITY_LIMIT = 15;
 
 /** Every plan id the user has any relationship to — hosted, going, or interested. */
 function planIdsForUser(userId: string): Set<string> {
@@ -18,6 +20,44 @@ function planIdsForUser(userId: string): Set<string> {
   for (const p of store.listPlansByCreator(userId)) ids.add(p.id);
   for (const part of store.listParticipationsForUser(userId)) ids.add(part.planId);
   return ids;
+}
+
+function publicFor(uid: string, users: Map<string, Awaited<ReturnType<typeof findUserById>>>): PublicUser {
+  const u = users.get(uid);
+  return u
+    ? userToPublic(u)
+    : { id: uid, firstName: "Former member", neighborhoodId: null, avatarSeed: uid, avatarStyle: "avataaars" };
+}
+
+function toCommunityCard(
+  community: ReturnType<typeof store.findCommunityById>,
+  viewerId: string,
+  users: Awaited<ReturnType<typeof findUsersByIds>>,
+): CommunityCardDTO | null {
+  if (!community) return null;
+  const membership = store.findCommunityMembership(community.id, viewerId);
+  const active = store.listActiveCommunityMembers(community.id);
+  const ordered = [
+    ...active.filter((m) => m.userId === community.organizerId),
+    ...active.filter((m) => m.userId !== community.organizerId),
+  ];
+  const organizer = users.get(community.organizerId);
+  return {
+    id: community.id,
+    name: community.name,
+    coverImage: community.coverImage ?? null,
+    category: communityCategoriesOf(community)[0]!,
+    categories: communityCategoriesOf(community),
+    memberCount: community.memberCount,
+    isFounding: community.isFounding,
+    organizer: organizer
+      ? userToPublic(organizer)
+      : { id: community.organizerId, firstName: "Organizer", neighborhoodId: null, avatarSeed: community.organizerId, avatarStyle: "avataaars" },
+    myRole: membership?.status === "active" ? membership.role : null,
+    myMembershipStatus: membership?.status ?? null,
+    hasScreening: !!community.screeningQuestion,
+    memberPreview: ordered.slice(0, 3).map((m) => publicFor(m.userId, users)),
+  };
 }
 
 // GET /api/search?q=<query> — global search: plans by title/venue/interest,
@@ -35,7 +75,7 @@ searchRouter.get("/", requireAuth, async (req, res) => {
   }
   const q = String(req.query.q ?? "").trim().toLowerCase();
   if (!q) {
-    res.json({ plans: [], people: [] } satisfies SearchResultsDTO);
+    res.json({ plans: [], people: [], communities: [] } satisfies SearchResultsDTO);
     return;
   }
 
@@ -95,6 +135,34 @@ searchRouter.get("/", requireAuth, async (req, res) => {
     return a.user.firstName.localeCompare(b.user.firstName);
   });
 
-  const result: SearchResultsDTO = { plans, people };
+  // ---- Communities: name or category ----
+  const matchingCategories = (Object.entries(COMMUNITY_CATEGORY_LABELS) as Array<[CommunityCategory, string]>)
+    .filter(([, label]) => label.toLowerCase().includes(q))
+    .map(([cat]) => cat);
+  const communityCandidates = store.listApprovedCommunities().filter((c) => {
+    if (store.isBlockedEitherWay(userId, c.organizerId)) return false;
+    const nameMatch = c.name.toLowerCase().includes(q);
+    const catMatch = matchingCategories.length > 0 && communityCategoriesOf(c).some((cat) => matchingCategories.includes(cat));
+    return nameMatch || catMatch;
+  });
+  // Sort by member count (most popular first), then alphabetical.
+  communityCandidates.sort((a, b) => {
+    if (a.memberCount !== b.memberCount) return b.memberCount - a.memberCount;
+    return a.name.localeCompare(b.name);
+  });
+  const communityUserIds = new Set<string>();
+  for (const c of communityCandidates.slice(0, COMMUNITY_LIMIT)) {
+    communityUserIds.add(c.organizerId);
+    for (const m of store.listActiveCommunityMembers(c.id).slice(0, 3)) {
+      communityUserIds.add(m.userId);
+    }
+  }
+  const communityUsers = await findUsersByIds([...communityUserIds]);
+  const communities = communityCandidates
+    .slice(0, COMMUNITY_LIMIT)
+    .map((c) => toCommunityCard(c, userId, communityUsers))
+    .filter((c): c is CommunityCardDTO => c !== null);
+
+  const result: SearchResultsDTO = { plans, people, communities };
   res.json(result);
 });
