@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { CommunityStatusPill } from "../components/CommunityStatusPill";
 import { CommunityCoverThumb, PlanCoverThumb } from "../components/CoverThumb";
 import { ReportModal } from "../components/PlanSafetyMenu";
 import { useAuth } from "../context/AuthContext";
@@ -419,10 +420,12 @@ export function ProfilePage() {
                       <span className="profile-other-community-info">
                         <span className="profile-other-community-name">{c.name}</span>
                         <span className="profile-other-community-meta">
+                          {c.myRole === "organizer" ? "Organizer · " : ""}
                           {communityCategoryLine(c)} · {c.memberCount}{" "}
                           {c.memberCount === 1 ? "member" : "members"}
                         </span>
                       </span>
+                      <CommunityStatusPill status={c.myMembershipStatus} />
                       <ChevronRight size={13} strokeWidth={1.6} className="profile-other-community-chevron" aria-hidden="true" />
                     </Link>
                 ))}
@@ -535,6 +538,7 @@ export function ProfilePage() {
                       {c.memberCount === 1 ? "member" : "members"}
                     </span>
                   </span>
+                  <CommunityStatusPill status={c.myMembershipStatus} />
                   <ChevronRight size={13} strokeWidth={1.6} className="profile-community-chevron" aria-hidden="true" />
                 </Link>
             ))}

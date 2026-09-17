@@ -4,6 +4,7 @@ import { Users } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
+import { CommunityStatusPill } from "../components/CommunityStatusPill";
 import { JoinConfirmPopup } from "../components/JoinConfirmPopup";
 import { EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
@@ -171,7 +172,6 @@ function CommunityHeroCard({
   c: CommunityCardDTO;
   onJoined: (updated: CommunityCardDTO) => void;
 }) {
-  const joined = c.myMembershipStatus === "active";
   return (
     <Link to={`/communities/${c.id}`} className="cmy-hero">
       <CommunityCover
@@ -195,11 +195,7 @@ function CommunityHeroCard({
           <div className="cmy-hero-members">
             <MemberFacepile people={c.memberPreview ?? []} />
             <span className="cmy-hero-count">{memberCountLabel(c)}</span>
-            {joined ? (
-              <span className="cmy-joined-pill cmy-joined-pill--member">Joined</span>
-            ) : (
-              <CommunityJoinLink c={c} onJoined={onJoined} />
-            )}
+            <CommunityJoinLink c={c} onJoined={onJoined} />
           </div>
         </div>
       </div>
@@ -214,7 +210,6 @@ function CommunityCompactCard({
   c: CommunityCardDTO;
   onJoined?: (updated: CommunityCardDTO) => void;
 }) {
-  const joined = c.myMembershipStatus === "active";
   return (
     <Link to={`/communities/${c.id}`} className="cmy-compact">
       <span className="cmy-compact-thumb">
@@ -234,10 +229,10 @@ function CommunityCompactCard({
             <MemberFacepile people={c.memberPreview ?? []} />
             <span className="cmy-feed-count">{memberCountLabel(c)}</span>
           </span>
-          {joined || !onJoined ? (
-            <span className="cmy-joined-pill cmy-joined-pill--quiet cmy-joined-pill--member">Joined</span>
-          ) : (
+          {onJoined ? (
             <CommunityJoinLink c={c} onJoined={onJoined} />
+          ) : (
+            <CommunityStatusPill status={c.myMembershipStatus} />
           )}
         </span>
       </span>
@@ -252,21 +247,8 @@ function CommunityJoinLink({ c, onJoined }: { c: CommunityCardDTO; onJoined: (up
   const [busy, setBusy] = useState(false);
   const status = c.myMembershipStatus;
 
-  if (status === "active") {
-    return <span className="cmy-joined-pill cmy-joined-pill--quiet cmy-joined-pill--member">Joined</span>;
-  }
-  if (status === "pending") {
-    return (
-      <span
-        className="cmy-joined-pill cmy-joined-pill--quiet"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-      >
-        Requested
-      </span>
-    );
+  if (status === "active" || status === "pending") {
+    return <CommunityStatusPill status={status} />;
   }
 
   async function handleClick(e: MouseEvent) {

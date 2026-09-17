@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
+import { CommunityStatusPill } from "../components/CommunityStatusPill";
 import { PlanCard } from "../components/PlanCard";
 import { Label, ScreenTitle } from "../components/ui";
 import { communityCategoryLine, type CommunityCardDTO, type PersonSearchResultDTO, type SearchResultsDTO } from "../types/shared";
@@ -169,7 +170,6 @@ function ChevronRight() {
 }
 
 function CommunityRow({ community }: { community: CommunityCardDTO }) {
-  const joined = community.myMembershipStatus === "active";
   const memberCountLabel = `${community.memberCount} ${community.memberCount === 1 ? "member" : "members"}`;
   const categoryText = communityCategoryLine(community);
 
@@ -201,9 +201,7 @@ function CommunityRow({ community }: { community: CommunityCardDTO }) {
           {categoryText} · {memberCountLabel}
         </span>
       </span>
-      {joined && (
-        <span className="search-community-joined-pill">Joined</span>
-      )}
+      <CommunityStatusPill status={community.myMembershipStatus} />
     </Link>
   );
 }

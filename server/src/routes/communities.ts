@@ -242,7 +242,8 @@ communitiesRouter.get("/", requireAuth, async (req, res) => {
   res.json({ communities: await toCommunityCards(list, viewerId) });
 });
 
-// GET /api/communities/mine — communities the viewer belongs to / organizes.
+// GET /api/communities/mine — communities the viewer organizes, is an active
+// member of, or has a pending join request for (`myMembershipStatus` distinguishes).
 communitiesRouter.get("/mine", requireAuth, async (req, res) => {
   const viewerId = String(req.userId);
   const memberships = store.listCommunityMembershipsForUser(viewerId);
