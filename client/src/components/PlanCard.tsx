@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "./Avatar";
 import { JoinConfirmPopup, joinConfirmKind, type JoinConfirmKind } from "./JoinConfirmPopup";
-import { IdeaCoverFallback } from "./CoverThumb";
+import { IdeaCoverFallback, planPhotoUrl } from "./CoverThumb";
 import { InterestGlyph } from "./InterestGlyph";
 import { BottomSheet } from "./ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
@@ -32,8 +32,8 @@ export function PlanCard({
   const isLooking = isIdeaPlan(plan);
   const coverPool = useCardImages();
   const coverImage =
-    plan.flyerDataUrl ??
-    (plan.planKind === "looking_for" ? null : pickCoverImage(coverPool, plan.id));
+    planPhotoUrl(plan) ??
+    (isIdeaPlan(plan) ? null : pickCoverImage(coverPool, plan.id));
   const isCancelled = Boolean(plan.cancelledAt);
   const hasEnded = !isCancelled && planHasEnded(plan);
   const { user } = useAuth();

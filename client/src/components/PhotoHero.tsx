@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import { MapPin } from "lucide-react";
+import { IdeaCoverFallback } from "./CoverThumb";
 
 /**
  * Explore masthead: full-bleed photo, small-caps eyebrow, bold headline.
+ * Interests without a photo use the idea mark on a warm gradient.
  */
 export function PhotoHero({
   photo,
@@ -12,7 +14,7 @@ export function PhotoHero({
   topLeft,
   topRight,
 }: {
-  photo: string;
+  photo?: string | null;
   eyebrow: string;
   title: string;
   pin?: boolean;
@@ -21,7 +23,11 @@ export function PhotoHero({
 }) {
   return (
     <header className="xpl-hero">
-      <img src={photo} alt="" className="xpl-hero-img" />
+      {photo ? (
+        <img src={photo} alt="" className="xpl-hero-img" />
+      ) : (
+        <IdeaCoverFallback className="xpl-hero-img" iconSize={48} />
+      )}
       <div className="xpl-hero-gradient" aria-hidden="true" />
       {topLeft ? <div className="xpl-hero-top xpl-hero-top--left">{topLeft}</div> : null}
       {topRight ? <div className="xpl-hero-top xpl-hero-top--right">{topRight}</div> : null}

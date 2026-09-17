@@ -75,10 +75,11 @@ function hashPick<T>(pool: T[], key: string): T {
   return pool[h % pool.length];
 }
 
-/** Resolve a cover source for the plan (flyer → link-preview → curated → fallback). */
+/** Resolve a cover source for the plan (flyer → link-preview → curated). Ideas without a photo stay empty. */
 export function coverUrlFor(plan: PlanRecord): string {
   if (plan.flyerDataUrl) return plan.flyerDataUrl;
   if (plan.flyerLinkPreview?.image) return plan.flyerLinkPreview.image;
+  if (plan.planKind === "looking_for" && !plan.lockedAt) return "";
   const curated = coverPoolSync();
   const pool = curated.length ? curated : FALLBACK_COVERS;
   return hashPick(pool, plan.id);
@@ -87,6 +88,7 @@ export function coverUrlFor(plan: PlanRecord): string {
 /** Fetch a remote/curated cover and inline it as a data URI. Returns null on failure. */
 async function coverDataUri(plan: PlanRecord): Promise<string | null> {
   const src = coverUrlFor(plan);
+  if (!src) return null;
   if (src.startsWith("data:")) return src;
   try {
     const controller = new AbortController();
@@ -268,7 +270,7 @@ function buildTree(
 
   const layers: unknown[] = [];
 
-  // Background: cover photo, or a brand gradient if none loaded.
+  // Background: cover photo, warm idea gradient, or brand gradient if none loaded.
   if (cover) {
     layers.push({
       type: "img",
@@ -280,10 +282,13 @@ function buildTree(
       },
     });
   } else {
+    const idea = plan.planKind === "looking_for" && !plan.lockedAt;
     layers.push(
       h("div", {
         position: "absolute", top: 0, left: 0, width: OG_WIDTH, height: OG_HEIGHT,
-        background: "linear-gradient(135deg, #1A1A2E 0%, #C13B3B 100%)",
+        background: idea
+          ? "linear-gradient(145deg, #f7ead4 0%, #f3dcc8 46%, #efd0d0 100%)"
+          : "linear-gradient(135deg, #1A1A2E 0%, #C13B3B 100%)",
       })
     );
   }
@@ -355,6 +360,8 @@ function cacheKey(plan: PlanRecord, going: number, interested: number): string {
     plan.time,
     plan.location?.name,
     plan.flyerDataUrl ? `f${plan.flyerDataUrl.length}` : plan.flyerLinkPreview?.image ?? "",
+    plan.planKind ?? "",
+    plan.lockedAt ?? "",
     plan.hostEmoji ?? "",
     plan.cancelledAt ?? "",
   ].join("|");

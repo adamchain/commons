@@ -4,6 +4,7 @@ import { api, parseApiError } from "../api/http";
 import { formatPhoneInput, formatPlanDate, formatPlanTime } from "../lib/format";
 import { INTEREST_EMOJI, INTEREST_LABELS, type PublicPlanDTO } from "../types/shared";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { IdeaCoverFallback } from "../components/CoverThumb";
 import wordmark from "../assets/wordmark.png";
 
 // Public, unauthenticated landing for a shared plan link. This is what someone
@@ -91,7 +92,7 @@ export function PublicEventPage() {
     <div className="public-event">
       <div className="public-event-card">
         <div className={`public-event-hero ${showCover ? "" : "public-event-hero--empty"}`}>
-          {showCover && (
+          {showCover ? (
             <img
               className="public-event-hero-img"
               src={plan.coverImage}
@@ -99,6 +100,8 @@ export function PublicEventPage() {
               referrerPolicy="no-referrer"
               onError={() => setCoverFailed(true)}
             />
+          ) : (
+            <IdeaCoverFallback iconSize={52} />
           )}
           <span className="public-event-hero-badge" aria-hidden="true">
             {plan.hostEmoji || "✨"}

@@ -20,7 +20,7 @@ import {
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityStatusPill } from "../components/CommunityStatusPill";
-import { CommunityCoverThumb, PlanCoverThumb } from "../components/CoverThumb";
+import { CommunityCoverThumb, PlanCoverThumb, planPhotoUrl } from "../components/CoverThumb";
 import { ReportModal } from "../components/PlanSafetyMenu";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
@@ -353,7 +353,7 @@ export function ProfilePage() {
                     >
                       <PlanCoverThumb
                         planId={p.id}
-                        flyerDataUrl={p.flyerDataUrl}
+                        flyerDataUrl={planPhotoUrl(p)}
                         isIdea={isIdeaPlan(p)}
                         className="cover-thumb--sm"
                       />
@@ -391,7 +391,7 @@ export function ProfilePage() {
                   >
                     <PlanCoverThumb
                       planId={p.id}
-                      flyerDataUrl={p.flyerDataUrl}
+                      flyerDataUrl={planPhotoUrl(p)}
                       isIdea={isIdeaPlan(p)}
                       className="cover-thumb--sm"
                     />
@@ -1151,7 +1151,7 @@ function YourPlansBlock({
                   >
                     <PlanCoverThumb
                       planId={p.id}
-                      flyerDataUrl={p.flyerDataUrl}
+                      flyerDataUrl={planPhotoUrl(p)}
                       isIdea={isIdeaPlan(p)}
                       className="cover-thumb--sm"
                     />
@@ -1210,7 +1210,8 @@ function YourPlansBlock({
                   >
                       <PlanCoverThumb
                         planId={p.id}
-                        flyerDataUrl={p.flyerDataUrl}
+                        flyerDataUrl={planPhotoUrl(p)}
+                        isIdea={isIdeaPlan(p)}
                         className="cover-thumb--sm"
                       />
                       <span className="profile-plan-text">

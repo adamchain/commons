@@ -5,7 +5,7 @@ import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { EmptyCard, ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
-import { InterestGlyph } from "../components/InterestGlyph";
+import { InterestCover } from "../components/CoverThumb";
 import {
   FORUM_INTERESTS,
   INTEREST_LABELS,
@@ -99,7 +99,7 @@ export function SettingsForumsPage() {
                   state={{ from: "settings-forums" }}
                   className="settings-forum-link"
                 >
-                  <InterestGlyph tag={f.interestTag} size={42} />
+                  <InterestCover tag={f.interestTag} />
                   <span className="settings-forum-label">{f.label}</span>
                 </Link>
                 <button

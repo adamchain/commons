@@ -114,7 +114,8 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
       unreadCount: conv ? msgs.filter((m) => !m.readBy.includes(userId)).length : 0,
       participantCount,
       myRole,
-      coverImage: plan.flyerDataUrl ?? null,
+      coverImage: plan.flyerDataUrl ?? plan.flyerLinkPreview?.image ?? null,
+      isIdea: plan.planKind === "looking_for" && !plan.lockedAt,
     });
   }
 

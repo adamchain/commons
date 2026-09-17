@@ -1,7 +1,16 @@
 import { Lightbulb } from "lucide-react";
 import { CommunityCover } from "./CommunityCover";
 import { pickCoverImage, useCardImages } from "../lib/cardImages";
+import { photoForInterest } from "../lib/placePhotos";
 import type { CommunityCategory } from "../types/shared";
+
+/** Host-supplied cover: uploaded flyer, or the image from an attached link. */
+export function planPhotoUrl(plan: {
+  flyerDataUrl?: string | null;
+  flyerLinkPreview?: { image?: string | null } | null;
+}): string | null {
+  return plan.flyerDataUrl || plan.flyerLinkPreview?.image || null;
+}
 
 /** Small photo tile for list rows (profile, messages, my plans). */
 export function CoverThumb({
@@ -25,6 +34,25 @@ export function IdeaCoverFallback({
   return (
     <div className={`idea-cover-fallback ${className}`.trim()} aria-hidden="true">
       <Lightbulb size={iconSize} strokeWidth={1.6} />
+    </div>
+  );
+}
+
+/** Interest/forum tile: real photo when we have one, otherwise the idea mark. */
+export function InterestCover({
+  tag,
+  className = "",
+  iconSize = 18,
+}: {
+  tag: string | null | undefined;
+  className?: string;
+  iconSize?: number;
+}) {
+  const photo = photoForInterest(tag);
+  if (photo) return <CoverThumb src={photo} className={className} />;
+  return (
+    <div className={`cover-thumb-frame ${className}`.trim()}>
+      <IdeaCoverFallback iconSize={iconSize} />
     </div>
   );
 }
@@ -54,7 +82,7 @@ export function PlanCoverThumb({
   return <CoverThumb src={src} className={className} />;
 }
 
-/** Community cover photo, or the category pattern when none is set. */
+/** Community cover photo, editorial interest photo, or the category pattern. */
 export function CommunityCoverThumb({
   coverImage,
   category,

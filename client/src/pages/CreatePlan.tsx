@@ -17,6 +17,7 @@ import { FLEXIBLE_DATE_PLACEHOLDER } from "../lib/planTime";
 import { formatPlaceAddress, formatPlanDate, formatPlanTime } from "../lib/format";
 import { Avatar } from "../components/Avatar";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
+import { IdeaCoverFallback } from "../components/CoverThumb";
 import { LocationAutocomplete } from "../components/LocationAutocomplete";
 import { useAuth } from "../context/AuthContext";
 import type { NavFromState } from "../lib/navState";
@@ -916,6 +917,9 @@ export function CreatePlanPage() {
             onClick={() => setPendingPath("idea")}
             aria-pressed={pendingPath === "idea"}
           >
+            <span className="path-picker-mark" aria-hidden="true">
+              <IdeaCoverFallback iconSize={22} />
+            </span>
             <span className="path-picker-title">Just an idea</span>
             <span className="path-picker-sub">
               A casual thought — see who&apos;s down before committing to anything.

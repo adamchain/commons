@@ -36,7 +36,8 @@ const BY_TAG: Record<string, string> = {
   sober: BY_LABEL.coffee,
 };
 
-export function photoForInterest(tag: string | null | undefined): string {
-  if (!tag) return HERO_PHOTO;
-  return BY_TAG[tag] ?? BY_LABEL[tag.toLowerCase()] ?? HERO_PHOTO;
+/** Editorial photo for an interest, or null when we don't have one. */
+export function photoForInterest(tag: string | null | undefined): string | null {
+  if (!tag) return null;
+  return BY_TAG[tag] ?? BY_LABEL[tag.toLowerCase()] ?? null;
 }

@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronRight, Hand, Pencil, Send, UserPlus, X } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
-import { IdeaCoverFallback } from "../components/CoverThumb";
+import { IdeaCoverFallback, planPhotoUrl } from "../components/CoverThumb";
 import { GetThereSheet } from "../components/GetThereSheet";
 import { InviteSheet } from "../components/InviteSheet";
 import { LoadingScreen } from "../components/LoadingScreen";
@@ -193,8 +193,8 @@ export function PlanDetailPage() {
   // Ideas without a photo use the thought-bubble fallback instead of a stock
   // plan cover, so they stay visually distinct from confirmed plans.
   const coverSrc =
-    plan.flyerDataUrl ??
-    (plan.planKind === "looking_for" ? null : pickCoverImage(coverPool, plan.id));
+    planPhotoUrl(plan) ??
+    (isIdeaPlan(plan) ? null : pickCoverImage(coverPool, plan.id));
   const ideaCoverFallback = isIdeaPlan(plan) && !coverSrc;
   const mapsQuery = encodeURIComponent(
     [plan.location.name, plan.location.address].filter(Boolean).join(" "),

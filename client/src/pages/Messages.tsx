@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { BarChart2, MessageCircle } from "lucide-react";
 import { api, parseApiError } from "../api/http";
-import { InterestGlyph } from "../components/InterestGlyph";
-import { PlanCoverThumb } from "../components/CoverThumb";
+import { InterestCover, PlanCoverThumb } from "../components/CoverThumb";
 import { EmptyCard, ScreenTitle } from "../components/ui";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { Button } from "../components/ui/Button";
@@ -147,7 +146,7 @@ export function MessagesPage() {
                           state={MESSAGES_INTERESTS_FROM}
                           className="messages-row messages-row--forum"
                         >
-                          <InterestGlyph tag={f.interestTag} size={40} />
+                          <InterestCover tag={f.interestTag} />
                           <div className="messages-row-body">
                             <div className="messages-row-top">
                               <span className="messages-row-title">{f.label}</span>
@@ -231,6 +230,7 @@ export function MessagesPage() {
                     <PlanCoverThumb
                       planId={c.communityId || c.planId}
                       flyerDataUrl={c.coverImage}
+                      isIdea={Boolean(c.isIdea)}
                     />
                     <div className="messages-row-body">
                       <div className="messages-row-top">

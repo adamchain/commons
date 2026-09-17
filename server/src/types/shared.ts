@@ -269,6 +269,8 @@ export interface ConversationSummaryDTO {
   communityName?: string;
   /** Plan flyer / community cover when one exists. */
   coverImage?: string | null;
+  /** Unlocked looking-for plan — thumb uses the idea mark, not a stock cover. */
+  isIdea?: boolean;
 }
 
 /** One option in a poll, with the ids of everyone who picked it. */

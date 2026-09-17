@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { interestVisual } from "../lib/interestIcons";
+import { photoForInterest } from "../lib/placePhotos";
 import type { CommunityCategory } from "../types/shared";
 import "./CommunityCover.css";
 
@@ -12,7 +13,7 @@ type Props = {
   children?: ReactNode;
 };
 
-/** Cover photo, or a category-tinted icon/pattern when the community has none. */
+/** Cover photo, editorial interest photo, or a category mark when none exist. */
 export function CommunityCover({
   coverImage,
   category,
@@ -22,10 +23,11 @@ export function CommunityCover({
 }: Props) {
   const vis = interestVisual(category);
   const Icon = vis.Icon;
+  const photo = coverImage || photoForInterest(category);
   return (
     <div className={`cmy-cover-media ${className}`.trim()}>
-      {coverImage ? (
-        <img src={coverImage} alt="" className="cmy-cover-media-img" loading="lazy" />
+      {photo ? (
+        <img src={photo} alt="" className="cmy-cover-media-img" loading="lazy" />
       ) : (
         <div
           className="cmy-cover-fallback"

@@ -3517,6 +3517,15 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   position: relative;
   z-index: 0;
 }
+.path-picker-mark {
+  display: block;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
 .path-picker-card--idea {
   background: var(--card);
   border: 2px solid transparent;
@@ -4372,9 +4381,13 @@ a.action-btn--stack {
   background: linear-gradient(135deg, #f2704b 0%, #e8552f 55%, #c23a18 100%);
 }
 .public-event-hero--empty {
-  background: linear-gradient(135deg, #f2704b 0%, #e8552f 55%, #c23a18 100%);
+  background: linear-gradient(145deg, #f7ead4 0%, #f3dcc8 46%, #efd0d0 100%);
 }
 .public-event-hero-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.public-event-hero > .idea-cover-fallback {
+  position: absolute;
+  inset: 0;
+}
 .public-event-hero-badge {
   position: absolute;
   top: 14px;
@@ -11370,6 +11383,9 @@ a.action-btn--stack {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+.xpl-hero > .idea-cover-fallback {
+  min-height: 100%;
 }
 .xpl-hero-gradient {
   position: absolute;
