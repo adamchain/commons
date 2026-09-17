@@ -14668,6 +14668,7 @@ button.xpl-photo-tile {
   display: flex;
   gap: 8px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 .profile-other-cta {
   flex: 1;

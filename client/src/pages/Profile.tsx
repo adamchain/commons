@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   Ban,
+  CalendarPlus,
   Camera,
   Check,
   ChevronRight,
@@ -12,6 +13,7 @@ import {
   MessageCircle,
   MoreHorizontal,
   Share2,
+  UserMinus,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -89,7 +91,7 @@ export function ProfilePage() {
   const navFrom = (location.state as NavFromState | null) ?? null;
   const backHref = hrefForBack(navFrom);
   const backLabel = profileBackLabel(navFrom);
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const [profile, setProfile] = useState<ProfilePayload | null>(null);
   const [network, setNetwork] = useState<PublicUser[] | null>(null);
   const [communities, setCommunities] = useState<CommunityCardDTO[]>([]);
@@ -189,6 +191,21 @@ export function ProfilePage() {
     setActionSheetOpen(false);
   }
 
+  async function removeFromNetwork() {
+    if (!profile) return;
+    try {
+      const r = await api<{ me: MeDTO }>("/api/auth/friend-remove", {
+        method: "POST",
+        body: JSON.stringify({ userId: profile.user.id }),
+      });
+      setUser(r.me);
+      reloadProfile();
+    } catch {
+      /* swallow */
+    }
+    setActionSheetOpen(false);
+  }
+
   async function reportProfile() {
     setActionSheetOpen(false);
     setReportOpen(true);
@@ -269,19 +286,26 @@ export function ProfilePage() {
           </div>
 
           <div className="profile-other-ctas">
-            <FriendButton profile={profile} onUpdated={reloadProfile} variant="other" />
+            {!profile.network.inMyNetwork && (
+              <FriendButton profile={profile} onUpdated={reloadProfile} variant="other" />
+            )}
             <Link
-              to={
-                profile.sharedPlanId
-                  ? `/plans/${profile.sharedPlanId}/chat`
-                  : `/plans/new?inviteUser=${encodeURIComponent(profile.user.id)}&inviteName=${encodeURIComponent(profile.user.firstName)}`
-              }
-              state={profile.sharedPlanId ? { from: "profile", profileUserId: userId } : undefined}
-              className="profile-other-cta profile-other-cta--message"
+              to={`/plans/new?inviteUser=${encodeURIComponent(profile.user.id)}&inviteName=${encodeURIComponent(profile.user.firstName)}`}
+              className="profile-other-cta profile-other-cta--primary"
             >
-              <MessageCircle size={13} strokeWidth={1.8} aria-hidden="true" />
-              Message
+              <CalendarPlus size={13} strokeWidth={1.8} aria-hidden="true" />
+              Make a Plan
             </Link>
+            {profile.sharedPlanId && (
+              <Link
+                to={`/plans/${profile.sharedPlanId}/chat`}
+                state={{ from: "profile", profileUserId: userId }}
+                className="profile-other-cta profile-other-cta--message"
+              >
+                <MessageCircle size={13} strokeWidth={1.8} aria-hidden="true" />
+                Message
+              </Link>
+            )}
           </div>
 
           {profile.network.mutualCount > 0 && mutualLabel && (
@@ -437,8 +461,10 @@ export function ProfilePage() {
         {actionSheetOpen && (
           <ProfileActionSheet
             firstName={firstName}
+            inNetwork={profile.network.inMyNetwork}
             onShare={() => void shareProfile()}
             onReport={() => void reportProfile()}
+            onRemoveFromNetwork={() => void removeFromNetwork()}
             onBlock={blockFromSheet}
             onClose={() => setActionSheetOpen(false)}
           />
@@ -622,14 +648,18 @@ function OtherProfileNav({
  *  iOS WebView for ~30s and never fires the request. */
 function ProfileActionSheet({
   firstName,
+  inNetwork,
   onShare,
   onReport,
+  onRemoveFromNetwork,
   onBlock,
   onClose,
 }: {
   firstName: string;
+  inNetwork: boolean;
   onShare: () => void;
   onReport: () => void;
+  onRemoveFromNetwork: () => void;
   onBlock: () => Promise<void>;
   onClose: () => void;
 }) {
@@ -712,6 +742,12 @@ function ProfileActionSheet({
               <Share2 size={16} strokeWidth={1.8} aria-hidden="true" />
               Share profile
             </button>
+            {inNetwork && (
+              <button type="button" className="profile-action-row" onClick={onRemoveFromNetwork}>
+                <UserMinus size={16} strokeWidth={1.8} aria-hidden="true" />
+                Remove from network
+              </button>
+            )}
             <button type="button" className="profile-action-row is-danger" onClick={onReport}>
               <Flag size={16} strokeWidth={1.8} aria-hidden="true" />
               Report {firstName}
