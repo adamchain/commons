@@ -9,8 +9,6 @@ import {
   Globe,
   ImagePlus,
   MapPin,
-  Pin,
-  Tag,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -1663,10 +1661,12 @@ function IdeaForm({
   onCommunityVisibilityChange: (v: "public" | "community_only") => void;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [coverPickerOpen, setCoverPickerOpen] = useState(false);
   const [dateMode, setDateMode] = useState<IdeaDateMode>(form.isFlexibleDate ? "anytime" : "specific");
   const [placeholderIdx] = useState(() => Math.floor(Math.random() * IDEA_PLACEHOLDERS.length));
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const detailsRef = useRef<HTMLDivElement>(null);
+  const ideaDateRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (attemptedSubmit && !form.title.trim()) {
@@ -1802,30 +1802,50 @@ function IdeaForm({
         {titleMissing && <p className="luma-inline-error">Add a few words about the idea.</p>}
 
         {form.flyerDataUrl ? (
-          <div className="idea-photo-preview">
-            <img src={form.flyerDataUrl} alt="" />
-            <div className="idea-photo-preview-actions">
+          <div className="cover-picker cover-picker--filled idea-cover-picker">
+            <img className="cover-picker-img" src={form.flyerDataUrl} alt="" />
+            <div className="cover-picker-overlay">
               <button type="button" className="cover-chip" onClick={onOpenLibrary}>
                 Library
               </button>
               <button type="button" className="cover-chip" onClick={onOpenFlyer}>
                 Upload
               </button>
-              <button type="button" className="cover-chip" onClick={onClearFlyer}>
+              <button
+                type="button"
+                className="cover-chip"
+                onClick={() => {
+                  onClearFlyer();
+                  setCoverPickerOpen(false);
+                }}
+              >
                 Remove
               </button>
             </div>
           </div>
-        ) : (
-          <div className="idea-photo-actions">
-            <button type="button" className="idea-photo-upload" onClick={onOpenLibrary}>
-              <ImagePlus size={15} strokeWidth={1.8} aria-hidden="true" />
-              <span>Choose from library</span>
-            </button>
-            <button type="button" className="idea-photo-upload" onClick={onOpenFlyer}>
-              <span>Upload your own</span>
-            </button>
+        ) : coverPickerOpen ? (
+          <div className="cover-picker idea-cover-picker">
+            <span className="cover-picker-title">Add a cover photo</span>
+            <span className="cover-picker-sub">Optional</span>
+            <div className="cover-picker-buttons">
+              <button type="button" className="cover-btn" onClick={onOpenLibrary}>
+                <ImagePlus size={16} strokeWidth={1.8} aria-hidden="true" />
+                Library
+              </button>
+              <button type="button" className="cover-btn" onClick={onOpenFlyer}>
+                Upload
+              </button>
+            </div>
           </div>
+        ) : (
+          <button
+            type="button"
+            className="idea-photo-upload"
+            onClick={() => setCoverPickerOpen(true)}
+          >
+            <Camera size={16} strokeWidth={1.8} aria-hidden="true" />
+            Add a cover photo (optional)
+          </button>
         )}
 
         <p className="form-eyebrow">Settings</p>
@@ -1876,166 +1896,144 @@ function IdeaForm({
 
           {detailsOpen && (
             <div className="idea-accordion-panel" ref={detailsRef}>
-              <div className="idea-detail-row">
-                <span className="idea-detail-well" style={{ background: "#D8D0F0", color: "#7A5BA0" }} aria-hidden="true">
-                  <Calendar size={14} strokeWidth={1.8} />
-                </span>
-                <div className="idea-detail-body">
-                  <div className="seg-toggle idea-date-toggle" role="group" aria-label="When">
-                    <button
-                      type="button"
-                      className={`seg-toggle-btn ${dateMode === "specific" ? "is-active" : ""}`}
-                      onClick={() => selectDateMode("specific")}
-                      aria-pressed={dateMode === "specific"}
-                    >
-                      A day
-                    </button>
-                    <button
-                      type="button"
-                      className={`seg-toggle-btn ${dateMode === "week" ? "is-active" : ""}`}
-                      onClick={() => selectDateMode("week")}
-                      aria-pressed={dateMode === "week"}
-                    >
-                      This week
-                    </button>
-                    <button
-                      type="button"
-                      className={`seg-toggle-btn ${dateMode === "anytime" ? "is-active" : ""}`}
-                      onClick={() => selectDateMode("anytime")}
-                      aria-pressed={dateMode === "anytime"}
-                    >
-                      Anytime
-                    </button>
-                  </div>
-                  {dateMode === "specific" && (
-                    <div className="idea-date-input-row">
-                      <input
-                        type="date"
-                        className="luma-input idea-date-input"
-                        min={today()}
-                        value={form.date}
-                        aria-invalid={Boolean(dateError)}
-                        onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-                        onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
-                      />
-                      {dateError && <p className="luma-inline-error">{dateError}</p>}
+              <div className="plan-meta-card plan-meta-card--edit">
+                <div className="plan-meta-row plan-meta-row--edit idea-when-row">
+                  <span className="plan-meta-icon" aria-hidden="true"><Calendar size={18} strokeWidth={1.8} /></span>
+                  <div className="plan-meta-text">
+                    <div className="idea-when-value">
+                      <span className="plan-meta-label">When</span>
+                      {dateMode === "specific" ? (
+                        <>
+                          <span className={`plan-meta-value ${!form.date ? "is-placeholder" : ""}`}>
+                            {form.date ? formatPlanDate(form.date) : "Pick a day"}
+                          </span>
+                          <input
+                            ref={ideaDateRef}
+                            id="idea-date"
+                            className="plan-meta-native-input"
+                            type="date"
+                            min={today()}
+                            value={form.date}
+                            aria-invalid={Boolean(dateError)}
+                            onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                            onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
+                          />
+                        </>
+                      ) : (
+                        <span className={`plan-meta-value ${dateMode === "anytime" ? "is-placeholder" : ""}`}>
+                          {dateMode === "week" ? "This week" : "Anytime"}
+                        </span>
+                      )}
                     </div>
-                  )}
+                    <div className="seg-toggle idea-date-toggle" role="group" aria-label="When">
+                      <button
+                        type="button"
+                        className={`seg-toggle-btn ${dateMode === "specific" ? "is-active" : ""}`}
+                        onClick={() => selectDateMode("specific")}
+                        aria-pressed={dateMode === "specific"}
+                      >
+                        A day
+                      </button>
+                      <button
+                        type="button"
+                        className={`seg-toggle-btn ${dateMode === "week" ? "is-active" : ""}`}
+                        onClick={() => selectDateMode("week")}
+                        aria-pressed={dateMode === "week"}
+                      >
+                        This week
+                      </button>
+                      <button
+                        type="button"
+                        className={`seg-toggle-btn ${dateMode === "anytime" ? "is-active" : ""}`}
+                        onClick={() => selectDateMode("anytime")}
+                        aria-pressed={dateMode === "anytime"}
+                      >
+                        Anytime
+                      </button>
+                    </div>
+                    {dateError && <p className="luma-inline-error">{dateError}</p>}
+                  </div>
                 </div>
-              </div>
-
-              <div className="idea-detail-row">
-                <span className="idea-detail-well" style={{ background: "#C8DCF0", color: "#5B8FBF" }} aria-hidden="true">
-                  <MapPin size={14} strokeWidth={1.8} />
-                </span>
-                <div className="idea-detail-body">
-                  <div className="location-row">
-                    <div className="location-row-main">
-                      {!form.isFlexibleLocation ? (
-                        <PlacePicker
-                          value={form.locationName}
+                <div className="plan-meta-row plan-meta-row--edit">
+                  <span className="plan-meta-icon" aria-hidden="true"><MapPin size={18} strokeWidth={1.8} /></span>
+                  <div className="plan-meta-text">
+                    <span className="plan-meta-label">Venue</span>
+                    {form.isFlexibleLocation ? (
+                      <span className="plan-meta-value is-placeholder">Flexible location</span>
+                    ) : (
+                      <>
+                        <LocationAutocomplete
+                          name={form.locationName}
                           address={form.locationAddress}
-                          placeholder="Neighbourhood, venue, or vibe"
-                          onChange={(name) =>
+                          placeholder="Add a venue"
+                          onChange={(v) => {
                             setForm((f) => ({
                               ...f,
-                              locationName: name,
-                              locationAddress: "",
-                              locationLat: undefined,
-                              locationLng: undefined,
-                              locationPlaceId: undefined,
-                            }))
-                          }
-                          onSelect={(p) =>
-                            setForm((f) => ({
-                              ...f,
-                              locationName: p.name,
-                              locationAddress: p.address,
-                              locationLat: p.lat,
-                              locationLng: p.lng,
-                              locationPlaceId: p.placeId,
+                              locationName: v.name,
+                              locationAddress: v.address,
+                              locationLat: v.lat,
+                              locationLng: v.lng,
                               isFlexibleLocation: false,
-                            }))
-                          }
-                          onClear={() =>
-                            setForm((f) => ({
+                            }));
+                          }}
+                        />
+                        {form.locationAddress && form.locationAddress !== form.locationName ? (
+                          <span className="plan-meta-sub">{formatPlaceAddress(form.locationAddress)}</span>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                  <FlexToggle
+                    variant="switch"
+                    active={form.isFlexibleLocation}
+                    onClick={() =>
+                      setForm((f) => {
+                        const next = !f.isFlexibleLocation;
+                        return next
+                          ? {
                               ...f,
+                              isFlexibleLocation: true,
                               locationName: "",
                               locationAddress: "",
                               locationLat: undefined,
                               locationLng: undefined,
                               locationPlaceId: undefined,
-                            }))
-                          }
-                          onFieldFocus={(el) => scrollFieldIntoView(el)}
-                        />
-                      ) : (
-                        <span className="luma-flex-text location-row-flex-text">Flexible location</span>
-                      )}
-                    </div>
-                    <FlexToggle
-                      variant="switch"
-                      active={form.isFlexibleLocation}
-                      onClick={() =>
-                        setForm((f) => {
-                          const next = !f.isFlexibleLocation;
-                          return next
-                            ? {
-                                ...f,
-                                isFlexibleLocation: true,
-                                locationName: "",
-                                locationAddress: "",
-                                locationLat: undefined,
-                                locationLng: undefined,
-                                locationPlaceId: undefined,
-                              }
-                            : { ...f, isFlexibleLocation: false };
-                        })
-                      }
-                      label="Flexible"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="idea-detail-row idea-detail-row--top">
-                <span className="idea-detail-well" style={{ background: "#F5E4C8", color: "#B8864A" }} aria-hidden="true">
-                  <Pin size={14} strokeWidth={1.8} />
-                </span>
-                <div className="idea-detail-body">
-                  <textarea
-                    className="idea-detail-input"
-                    placeholder="Anything else worth knowing?"
-                    value={form.description}
-                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                    onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
-                    rows={3}
+                            }
+                          : { ...f, isFlexibleLocation: false };
+                      })
+                    }
+                    label="Flexible"
                   />
                 </div>
               </div>
 
-              <div className="idea-detail-row idea-detail-row--tags">
-                <span className="idea-detail-well" style={{ background: "#F0D8D8", color: "#A05B5B" }} aria-hidden="true">
-                  <Tag size={14} strokeWidth={1.8} />
-                </span>
-                <div className="idea-detail-body">
-                  <div className="idea-interest-grid" role="group" aria-label="Interest tags">
-                    {ALL_INTERESTS.map((tag) => {
-                      const selected = form.vibes.includes(tag);
-                      return (
-                        <button
-                          key={tag}
-                          type="button"
-                          className={`idea-interest-pill ${selected ? "is-selected" : ""}`}
-                          onClick={() => toggleVibe(tag)}
-                          aria-pressed={selected}
-                        >
-                          {INTEREST_LABELS[tag]}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+              <div className="plan-detail-card plan-detail-card--composer idea-notes-card">
+                <textarea
+                  className="plan-detail-desc-input"
+                  placeholder="Anything else worth knowing?"
+                  value={form.description}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                  onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
+                  rows={3}
+                />
+              </div>
+
+              <p className="form-eyebrow">Category <span className="form-eyebrow-optional">— optional</span></p>
+              <div className="idea-interest-grid" role="group" aria-label="Interest tags">
+                {ALL_INTERESTS.map((tag) => {
+                  const selected = form.vibes.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      className={`idea-interest-pill ${selected ? "is-selected" : ""}`}
+                      onClick={() => toggleVibe(tag)}
+                      aria-pressed={selected}
+                    >
+                      {INTEREST_LABELS[tag]}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

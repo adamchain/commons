@@ -14255,19 +14255,63 @@ button.xpl-photo-tile {
   overflow: hidden;
   box-shadow: var(--shadow-sm);
 }
-/* Inside Settings card — drop standalone accordion chrome; just continue the card. */
+.idea-form > .form-eyebrow {
+  margin: 4px 0 8px;
+}
+.idea-form .settings-card {
+  margin-bottom: 20px;
+  overflow: visible;
+}
 .settings-card .idea-accordion-panel {
   background: transparent;
   border: none;
   border-top: 1px solid var(--border);
   border-radius: 0;
   box-shadow: none;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 14px 16px;
 }
-.idea-form > .form-eyebrow {
-  margin: 4px 0 8px;
-}
-.idea-form .settings-card {
+.idea-cover-picker {
   margin-bottom: 20px;
+}
+.idea-when-row {
+  align-items: flex-start;
+}
+.idea-when-row .plan-meta-icon {
+  margin-top: 2px;
+}
+.idea-when-value {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.idea-form .idea-date-toggle {
+  width: 100%;
+  margin: 8px 0 0;
+}
+.idea-form .idea-date-toggle .seg-toggle-btn {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: var(--text-body-small);
+  text-align: center;
+  white-space: nowrap;
+}
+.idea-notes-card {
+  margin: 0;
+  background: var(--bg);
+  box-shadow: none;
+  border: 1px solid var(--border);
+}
+.idea-accordion-panel .plan-meta-card {
+  margin-bottom: 0;
+}
+.idea-accordion-panel .form-eyebrow {
+  margin: 4px 0 0;
 }
 .idea-detail-row {
   display: flex;
