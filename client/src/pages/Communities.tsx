@@ -5,10 +5,8 @@ import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
 import { JoinConfirmPopup } from "../components/JoinConfirmPopup";
-import { PhotoHero } from "../components/PhotoHero";
 import { EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
-import { HERO_PHOTO } from "../lib/placePhotos";
 import {
   ALL_COMMUNITY_CATEGORIES,
   COMMUNITY_CATEGORY_LABELS,
@@ -22,7 +20,6 @@ import {
 import "./Communities.css";
 
 export function CommunitiesPage() {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [all, setAll] = useState<CommunityCardDTO[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -59,23 +56,7 @@ export function CommunitiesPage() {
   }
 
   return (
-    <main className="app-shell app-shell--wide app-shell--with-nav xpl cmy-list cmy-list--xpl">
-      <PhotoHero
-        photo={HERO_PHOTO}
-        eyebrow="Philadelphia"
-        title="Communities"
-        topRight={
-          <button
-            type="button"
-            className="xpl-hero-search"
-            onClick={() => navigate("/communities/new")}
-          >
-            Create
-          </button>
-        }
-      />
-
-      <div className="xpl-communities">
+    <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy-list">
       <div className="cmy-cat-pills">
         {user && (
           <Link
@@ -131,14 +112,13 @@ export function CommunitiesPage() {
           />
         )}
         {rest.length > 0 && (
-          <div className="xpl-photo-grid cmy-photo-grid">
+          <div className="cmy-compact-list">
             {rest.map((c) => (
-              <CommunityPhotoTile key={c.id} c={c} />
+              <CommunityCompactCard key={c.id} c={c} onJoined={absorbJoin} />
             ))}
           </div>
         )}
       </section>
-      </div>
       {joinConfirm && <JoinConfirmPopup kind="community" onClose={() => setJoinConfirm(false)} />}
     </main>
   );
@@ -227,12 +207,40 @@ function CommunityHeroCard({
   );
 }
 
-function CommunityPhotoTile({ c }: { c: CommunityCardDTO }) {
+function CommunityCompactCard({
+  c,
+  onJoined,
+}: {
+  c: CommunityCardDTO;
+  onJoined?: (updated: CommunityCardDTO) => void;
+}) {
+  const joined = c.myMembershipStatus === "active";
   return (
-    <Link to={`/communities/${c.id}`} className="xpl-photo-tile">
-      <CommunityCover coverImage={c.coverImage} category={c.category} iconSize={28} />
-      <div className="xpl-photo-tile-overlay" aria-hidden="true" />
-      <span className="xpl-photo-tile-label">{c.name}</span>
+    <Link to={`/communities/${c.id}`} className="cmy-compact">
+      <span className="cmy-compact-thumb">
+        <CommunityCover coverImage={c.coverImage} category={c.category} iconSize={22} />
+      </span>
+      <span className="cmy-compact-body">
+        <span className="cmy-compact-org">
+          <span className="cmy-compact-org-avatar">
+            <OrganizerAvatar user={c.organizer} />
+          </span>
+          <span className="cmy-compact-org-name">{c.organizer.firstName}</span>
+        </span>
+        <span className="cmy-compact-title">{c.name}</span>
+        <span className="cmy-compact-cats">{categoryLine(c)}</span>
+        <span className="cmy-compact-footer">
+          <span className="cmy-compact-members">
+            <MemberFacepile people={c.memberPreview ?? []} />
+            <span className="cmy-feed-count">{memberCountLabel(c)}</span>
+          </span>
+          {joined || !onJoined ? (
+            <span className="cmy-joined-pill cmy-joined-pill--quiet cmy-joined-pill--member">Joined</span>
+          ) : (
+            <CommunityJoinLink c={c} onJoined={onJoined} />
+          )}
+        </span>
+      </span>
     </Link>
   );
 }

@@ -8380,7 +8380,7 @@ a.action-btn--stack {
   display: block;
 }
 
-/* Week strip — collapsed to a “This week” pill; expand for the day scroller */
+/* Week strip — horizontal day scroller */
 .week-strip {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -8441,7 +8441,7 @@ a.action-btn--stack {
 
 .week-strip-wrap {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -8449,36 +8449,8 @@ a.action-btn--stack {
 }
 
 .week-strip-wrap .week-strip--scroll {
-  flex: 1 1 100%;
+  flex: 1 1 auto;
   min-width: 0;
-}
-
-.week-strip-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border-radius: var(--r-control);
-  border: 1.5px solid var(--border);
-  background: var(--surface);
-  color: var(--ink);
-  font-size: var(--text-body);
-  font-weight: 600;
-  line-height: 1.2;
-  cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-}
-.week-strip-pill.is-open {
-  border-color: var(--red);
-  color: var(--red);
-}
-.week-strip-pill-chevron {
-  display: block;
-  flex-shrink: 0;
-  transition: transform 160ms ease;
-}
-.week-strip-pill.is-open .week-strip-pill-chevron {
-  transform: rotate(180deg);
 }
 
 .week-strip-reset {
@@ -11571,9 +11543,6 @@ button.xpl-photo-tile {
 .xpl-photo-tile .cmy-cover-media {
   width: 100%;
   height: 100%;
-}
-.cmy-list--xpl .cmy-cat-pills {
-  padding: 0;
 }
 .xpl-photo-tile {
   position: relative;

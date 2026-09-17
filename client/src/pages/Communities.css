@@ -15,12 +15,6 @@
 .app-shell.app-shell--with-topbar.cmy-list {
   padding-top: calc(var(--topbar-height, 56px) + 18px + env(safe-area-inset-top, 0px));
 }
-.app-shell.cmy-list--xpl {
-  padding-top: 0;
-  padding-left: 0;
-  padding-right: 0;
-  gap: 0;
-}
 
 .cmy-muted {
   color: var(--text-muted);
