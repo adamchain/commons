@@ -458,51 +458,52 @@ export function ProfilePage() {
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar profile-shell">
       <section className="profile-hero">
-        <div className="profile-hero-top">
-          <div className="profile-hero-main">
-            <Link
-              to={`/profile/${userId}/edit`}
-              className="profile-hero-avatar-btn"
-              aria-label="Update profile photo"
-            >
-              <Avatar
-                seed={profile.user.avatarSeed}
-                style={profile.user.avatarStyle}
-                photoDataUrl={profile.user.avatarPhotoDataUrl}
-                params={profile.user.avatarParams}
-                name={profile.user.firstName}
-                size="xl"
-              />
-              <span className="profile-hero-avatar-edit" aria-hidden="true">
-                <Camera size={12} strokeWidth={2} />
-              </span>
-            </Link>
-            <div className="profile-hero-text">
-              <div className="profile-name">{displayName}</div>
-              {profile.user.bio && (
-                <p className="profile-bio">{profile.user.bio}</p>
-              )}
-              {profile.neighborhood && (
-                <div className="profile-meta-line">
-                  <MapPin size={11} strokeWidth={1.8} aria-hidden="true" />
-                  {profile.neighborhood.name}
-                </div>
-              )}
+        <div className="profile-hero-main">
+          <Link
+            to={`/profile/${userId}/edit`}
+            className="profile-hero-avatar-btn"
+            aria-label="Update profile photo"
+          >
+            <Avatar
+              seed={profile.user.avatarSeed}
+              style={profile.user.avatarStyle}
+              photoDataUrl={profile.user.avatarPhotoDataUrl}
+              params={profile.user.avatarParams}
+              name={profile.user.firstName}
+              size="xl"
+            />
+            <span className="profile-hero-avatar-edit" aria-hidden="true">
+              <Camera size={11} strokeWidth={2} />
+            </span>
+          </Link>
+          <div className="profile-hero-text">
+            <div className="profile-name">{displayName}</div>
+            {profile.neighborhood && (
+              <div className="profile-meta-line">
+                <MapPin size={11} strokeWidth={1.8} aria-hidden="true" />
+                {profile.neighborhood.name}
+              </div>
+            )}
+            {profile.user.bio && (
+              <p className="profile-bio">{profile.user.bio}</p>
+            )}
+            <div className="profile-hero-stats-row">
               <div className="profile-stats profile-stats--inline" aria-label="Profile stats">
                 <div className="profile-stat">
                   <span className="profile-stat-num">{profile.stats.hosted}</span>
                   <span className="profile-stat-label">Started</span>
                 </div>
+                <span className="profile-stat-divider" aria-hidden="true" />
                 <div className="profile-stat">
                   <span className="profile-stat-num">{profile.stats.joined}</span>
                   <span className="profile-stat-label">Joined</span>
                 </div>
               </div>
+              <Link to={`/profile/${userId}/edit`} className="profile-edit-btn">
+                Edit
+              </Link>
             </div>
           </div>
-          <Link to={`/profile/${userId}/edit`} className="profile-edit-btn">
-            Edit
-          </Link>
         </div>
         <SocialPills
           isSelf
@@ -515,14 +516,9 @@ export function ProfilePage() {
       </section>
 
       <section className="profile-block" id="profile-communities">
-        <div className="profile-block-heading-row">
-          <h3 className="profile-section-label profile-section-label--inline">Communities</h3>
-          <Link to="/communities" className="profile-see-all-link">
-            View more →
-          </Link>
-        </div>
+        <h3 className="profile-section-label">Communities</h3>
         {communities.length > 0 ? (
-          <div className="profile-communities-list">
+          <div className="profile-plan-card">
             {communities.map((c) => (
                 <Link key={c.id} to={`/communities/${c.id}`} className="profile-community-row">
                   <CommunityCoverThumb
@@ -538,8 +534,10 @@ export function ProfilePage() {
                       {c.memberCount === 1 ? "member" : "members"}
                     </span>
                   </span>
-                  <CommunityStatusPill status={c.myMembershipStatus} />
-                  <ChevronRight size={13} strokeWidth={1.6} className="profile-community-chevron" aria-hidden="true" />
+                  {c.myMembershipStatus === "pending" && (
+                    <CommunityStatusPill status={c.myMembershipStatus} />
+                  )}
+                  <ChevronRight size={16} strokeWidth={1.6} className="profile-community-chevron" aria-hidden="true" />
                 </Link>
             ))}
           </div>
@@ -786,7 +784,6 @@ function SocialPills({
             aria-label={`@${handle} on ${label}`}
           >
             <Icon />
-            <span className="social-pill-handle">@{handle}</span>
           </a>
         ) : (
           <button
@@ -1146,9 +1143,11 @@ function YourPlansBlock({
                       isIdea={isIdeaPlan(p)}
                       className="cover-thumb--sm"
                     />
-                    <span className="profile-list-title">{p.title}</span>
-                    <span className="profile-list-when">
-                      {formatPlanDate(p.date, { isFlexibleDate: p.isFlexibleDate })}
+                    <span className="profile-plan-text">
+                      <span className="profile-list-title">{p.title}</span>
+                      <span className="profile-list-when">
+                        {formatPlanDate(p.date, { isFlexibleDate: p.isFlexibleDate })}
+                      </span>
                     </span>
                     <span className={`profile-plan-chip ${badge.className}`}>
                       {badge.label}
@@ -1202,8 +1201,10 @@ function YourPlansBlock({
                         flyerDataUrl={p.flyerDataUrl}
                         className="cover-thumb--sm"
                       />
-                      <span className="profile-list-title">{p.title}</span>
-                      <span className="profile-list-when">{formatPlanDate(p.date)}</span>
+                      <span className="profile-plan-text">
+                        <span className="profile-list-title">{p.title}</span>
+                        <span className="profile-list-when">{formatPlanDate(p.date)}</span>
+                      </span>
                     </Link>
                   ))}
                 </div>
