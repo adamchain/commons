@@ -7216,6 +7216,26 @@ a.action-btn--stack {
   margin: 0;
 }
 
+.idea-lock-card-title {
+  margin: 0 0 6px;
+  font-weight: 700;
+  font-size: var(--text-body);
+  color: var(--ink);
+}
+.idea-lock-card-copy {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-body);
+}
+.idea-lock-card-link {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+}
+
 .plan-description-quote {
   font-style: italic;
 }
@@ -7744,7 +7764,7 @@ a.action-btn--stack {
 /* Two classes so this beats .app-shell--with-nav and the last cards can
    scroll above the fixed Lock it in bar + bottom nav. */
 .app-shell--with-nav.plan-detail-page--lock-in {
-  padding-bottom: calc(var(--nav-height, 58px) + 148px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(var(--nav-height, 58px) + 80px + env(safe-area-inset-bottom, 0px));
 }
 .plan-meta-card--edit {
   overflow: visible;

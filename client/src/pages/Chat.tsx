@@ -350,6 +350,8 @@ export function ChatPage() {
   const inviteNames = others.map((p) => p.firstName).join(",");
   // fromPlanId carries this plan's crew + chat history into the new event.
   const replanHref = `/plans/new?fromPlanId=${planId}&title=${encodeURIComponent(plan.title)}&inviteUserIds=${encodeURIComponent(inviteIds)}&inviteNames=${encodeURIComponent(inviteNames)}`;
+  const canLockIdea = conv.isHost && isIdeaPlan(plan) && !plan.cancelledAt && !planConcluded;
+  const lockHref = `/plans/new?lockFromId=${planId}`;
 
   return (
     <main ref={shellRef} className="app-shell app-shell--chat">
@@ -450,6 +452,18 @@ export function ChatPage() {
             )}
           </div>
         </Link>
+
+        {canLockIdea && (
+          <Link to={lockHref} className="chat-replan-cta chat-replan-cta--primary">
+            <span className="chat-replan-text">
+              <strong>Lock it in</strong>
+              <span>Take this to Make a Plan. Interested people come along.</span>
+            </span>
+            <span className="chat-replan-arrow" aria-hidden="true">
+              <ChevronRight size={16} strokeWidth={2} />
+            </span>
+          </Link>
+        )}
 
         {planConcluded && others.length > 0 && (
           <Link to={replanHref} className="chat-replan-cta chat-replan-cta--primary">
@@ -658,12 +672,12 @@ export function ChatPage() {
                     Add a poll
                   </button>
                   <Link
-                    to={replanHref}
+                    to={canLockIdea ? lockHref : replanHref}
                     role="menuitem"
                     className="chat-composer-menu-link"
                     onClick={() => setComposerMenuOpen(false)}
                   >
-                    Make a plan
+                    {canLockIdea ? "Lock it in" : "Make a plan"}
                   </Link>
                   <button
                     type="button"

@@ -930,15 +930,22 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
 
   // Looking For lifecycle: only the original poster can lock the plan in.
   // Other interested folks coordinate via the group chat; the creator stays
-  // the host through the whole lifecycle. For confirmed plans (already locked
-  // once), only the current host can re-lock to edit details.
+  // the host through the whole lifecycle. Confirmed plans are edited via PATCH.
   const isLookingFor = (plan.planKind ?? "standard") === "looking_for";
   if (plan.creatorId !== userId) {
     res.status(403).json({
       error: isLookingFor
         ? "Only the original poster can lock this in"
-        : "Only the host can edit a confirmed plan",
+        : "Only the host can lock this in",
     });
+    return;
+  }
+  if (plan.lockedAt) {
+    res.status(400).json({ error: "This plan is already locked in" });
+    return;
+  }
+  if (!isLookingFor) {
+    res.status(400).json({ error: "Only an idea can be locked in" });
     return;
   }
 
@@ -954,10 +961,47 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
   const dateInput = String(req.body?.date ?? "").trim();
   const time = String(req.body?.time ?? "").trim();
   const isFlexibleTime = Boolean(req.body?.isFlexibleTime);
+  const title = String(req.body?.title ?? "").trim();
+  const description = req.body?.description !== undefined
+    ? String(req.body.description).trim()
+    : undefined;
+  const tagsInput = Array.isArray(req.body?.tags) ? (req.body.tags as unknown[]) : null;
+  const tags = tagsInput
+    ? Array.from(
+        new Set(
+          tagsInput
+            .map((t) => String(t))
+            .filter((t): t is InterestTag => ALL_INTERESTS.includes(t as InterestTag)),
+        ),
+      )
+    : undefined;
+  const rawVis = req.body?.visibility !== undefined ? String(req.body.visibility) : "";
+  const visibility = (["everyone", "community", "network"].includes(rawVis)
+    ? rawVis
+    : undefined) as PlanVisibility | undefined;
+  const capacity =
+    req.body?.capacity === null
+      ? null
+      : typeof req.body?.capacity === "number"
+        ? req.body.capacity
+        : undefined;
+  const joinType = req.body?.joinType === "approve" || req.body?.joinType === "open"
+    ? (req.body.joinType as JoinType)
+    : undefined;
+  const inviteUserIds: string[] = Array.isArray(req.body?.inviteUserIds)
+    ? (req.body.inviteUserIds as unknown[]).map(String).filter(Boolean)
+    : [];
 
   if (!locationName || !dateInput) {
     res.status(400).json({ error: "Add a venue and date to lock in" });
     return;
+  }
+  if (title) {
+    const filtered = textBlockedReason(title, description);
+    if (filtered) {
+      res.status(400).json({ error: filtered });
+      return;
+    }
   }
 
   // Optional cover chosen at lock-in (upload or library). Null clears; omit
@@ -989,9 +1033,24 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
     date: dateInput,
     time: isFlexibleTime ? "" : time,
     isFlexibleTime,
+    isFlexibleDate: false,
     isFlexibleLocation: false,
     ...flyerPatch,
   };
+  if (title) patch.title = title;
+  if (description !== undefined) patch.description = description;
+  if (tags) patch.tags = tags;
+  if (visibility) patch.visibility = visibility;
+  if (capacity !== undefined) patch.capacity = capacity;
+  if (joinType) patch.joinType = joinType;
+  if (req.body?.neighborhoodId !== undefined) {
+    const hood = store.resolveNeighborhoodId(String(req.body.neighborhoodId ?? "").trim());
+    if (hood) patch.neighborhoodId = hood;
+  }
+  if (req.body?.hostEmoji !== undefined) {
+    const hostEmoji = String(req.body.hostEmoji ?? "").trim();
+    if (hostEmoji) patch.hostEmoji = hostEmoji;
+  }
   store.updatePlan(planId, patch);
 
   const updated = store.findPlanById(planId)!;
@@ -1010,6 +1069,35 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
   );
 
   await notifyInterestedPlanLocked(updated, hostName);
+
+  const creator = store.findUserById(updated.creatorId);
+  const creatorNet = new Set(creator?.networkIds ?? []);
+  const isNetworkOnly = (updated.visibility ?? "everyone") === "network";
+  for (const id of inviteUserIds) {
+    if (id === userId) continue;
+    if (store.isBlockedEitherWay(userId, id)) continue;
+    const existing = store.findParticipation(planId, id);
+    if (existing) {
+      void emit({
+        userId: id,
+        kind: "planInvite",
+        body: `${hostName} locked in "${updated.title}" — you're invited`,
+        planId,
+        dedupKey: `planLockedInvite:${planId}:${id}`,
+      });
+      continue;
+    }
+    const hidden = isNetworkOnly && id !== updated.creatorId && !creatorNet.has(id);
+    void emit({
+      userId: id,
+      kind: "planInvite",
+      body: hidden
+        ? `${hostName} invited you to "${updated.title}" — it's private to ${hostName}'s network, so add them to see it`
+        : `${hostName} invited you to "${updated.title}"`,
+      planId,
+      dedupKey: `planInvite:${planId}:${id}`,
+    });
+  }
 
   res.json(await planSummary(updated, userId));
 });

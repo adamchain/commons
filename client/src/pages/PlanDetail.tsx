@@ -1,14 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Camera, ChevronRight, Hand, ImagePlus, Pencil, Send, UserPlus, X } from "lucide-react";
+import { ArrowLeft, ChevronRight, Hand, Pencil, Send, UserPlus, X } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
-import { CoverLibraryModal } from "../components/CoverLibraryModal";
 import { IdeaCoverFallback } from "../components/CoverThumb";
 import { GetThereSheet } from "../components/GetThereSheet";
 import { InviteSheet } from "../components/InviteSheet";
-import { LocationAutocomplete } from "../components/LocationAutocomplete";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { ParticipationButtons } from "../components/ParticipationButtons";
 import { PlanSafetyMenu } from "../components/PlanSafetyMenu";
@@ -17,11 +15,8 @@ import { BottomSheet } from "../components/ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
 import { isIdeaPlan, planHasEnded } from "../lib/planTime";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
-import { fileToResizedDataUrl } from "../lib/imageResize";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
 import { hrefForBack, type NavFromState } from "../lib/navState";
-import { pickPhotoNative } from "../lib/photoPicker";
-import { isNative } from "../lib/platform";
 import { INTEREST_LABELS, type ConversationDTO, type MessageDTO, type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
 
 /** Same "set parts + · flexible" convention as the feed card — never show a
@@ -43,17 +38,6 @@ export function PlanDetailPage() {
   const [showShare, setShowShare] = useState(false);
   const [showGetThere, setShowGetThere] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
-  const [lockVenue, setLockVenue] = useState("");
-  const [lockVenueAddr, setLockVenueAddr] = useState("");
-  const [lockLat, setLockLat] = useState<number | undefined>();
-  const [lockLng, setLockLng] = useState<number | undefined>();
-  const [lockDate, setLockDate] = useState("");
-  const [lockTime, setLockTime] = useState("19:00");
-  const [lockFlexTime, setLockFlexTime] = useState(false);
-  const [lockFlyer, setLockFlyer] = useState<string | null>(null);
-  const [lockBusy, setLockBusy] = useState(false);
-  const [showLockCoverLib, setShowLockCoverLib] = useState(false);
-  const [lockCoverOpen, setLockCoverOpen] = useState(false);
   const [showGuestsModal, setShowGuestsModal] = useState(false);
   const [grabsError, setGrabsError] = useState<string | null>(null);
   const [grabsBusy, setGrabsBusy] = useState(false);
@@ -64,10 +48,6 @@ export function PlanDetailPage() {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
-  const lockFormRef = useRef<HTMLDivElement | null>(null);
-  const lockFlyerRef = useRef<HTMLInputElement | null>(null);
-  const lockDateRef = useRef<HTMLInputElement | null>(null);
-  const lockTimeRef = useRef<HTMLInputElement | null>(null);
   const coverPool = useCardImages();
 
   const load = async () => {
@@ -97,27 +77,6 @@ export function PlanDetailPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [showGuestsModal, location.hash, location.pathname, navigate, navFrom]);
-
-  useEffect(() => {
-    if (!plan) return;
-    const locName = plan.location.name;
-    setLockVenue(locName === "Flexible location" ? "" : locName);
-    setLockVenueAddr(plan.location.address ?? "");
-    setLockLat(plan.location.lat);
-    setLockLng(plan.location.lng);
-    // plan.date is stored as a plain "YYYY-MM-DD" string (never a full
-    // timestamp) — slice defensively but don't round-trip it through `new
-    // Date()`, which parses bare date strings as UTC and can shift the day
-    // by one depending on the viewer's timezone.
-    setLockDate(
-      plan.isFlexibleDate || plan.date.startsWith("2099-12-31") ? "" : plan.date.slice(0, 10),
-    );
-    // Flexible time means genuinely empty — not a "19:00" placeholder — so
-    // the field reads correctly if the host un-flexes it.
-    setLockTime(plan.time && !plan.isFlexibleTime ? plan.time : "");
-    setLockFlexTime(plan.isFlexibleTime);
-    setLockFlyer(plan.flyerDataUrl ?? null);
-  }, [plan?.id, plan?.date, plan?.lockedAt, plan?.isFlexibleTime, plan?.isFlexibleLocation, plan?.flyerDataUrl]);
 
   // Fetch the last 2 user messages for the inline chat preview.
   useEffect(() => {
@@ -175,9 +134,7 @@ export function PlanDetailPage() {
   // Looking-For lifecycle: only the original poster can lock the plan in.
   // Other interested folks coordinate via the group chat until the host
   // commits to a venue + day.
-  const canLock = !plan.lockedAt && isHosting;
-  const lockingIn =
-    !isPast && canLock && (plan.isFlexibleTime || plan.isFlexibleLocation || isLookingFor);
+  const canLock = !plan.lockedAt && isHosting && isLookingFor && !isPast && !plan.cancelledAt;
   const canChat =
     isHosting || plan.myState === "going" || plan.myState === "interested";
 
@@ -233,52 +190,10 @@ export function PlanDetailPage() {
     }
   }
 
-  async function openLockFlyerPicker() {
-    if (isNative()) {
-      try {
-        const dataUrl = await pickPhotoNative({ maxPx: 1024, quality: 0.85 });
-        if (dataUrl) setLockFlyer(dataUrl);
-      } catch {
-        /* user canceled */
-      }
-      return;
-    }
-    lockFlyerRef.current?.click();
-  }
-
-  async function lockIn() {
-    if (!lockVenue.trim() || !lockDate) return;
-    setLockBusy(true);
-    try {
-      await api<PlanDTO>(`/api/plans/${id}/lock`, {
-        method: "POST",
-        body: JSON.stringify({
-          location: {
-            name: lockVenue.trim(),
-            address: lockVenueAddr.trim() || lockVenue.trim(),
-            lat: lockLat,
-            lng: lockLng,
-          },
-          date: lockDate,
-          time: lockFlexTime ? "" : lockTime || "19:00",
-          isFlexibleTime: lockFlexTime,
-          // Explicit null clears; a chosen upload/library URL persists.
-          flyerDataUrl: lockFlyer,
-        }),
-      });
-      // Reload rather than trust the response shape — the group chat also
-      // gets an automatic "locked in" system line server-side, so a full
-      // refetch keeps the chat entry count and everything else in sync.
-      await load();
-    } finally {
-      setLockBusy(false);
-    }
-  }
-
   // Ideas without a photo use the thought-bubble fallback instead of a stock
   // plan cover, so they stay visually distinct from confirmed plans.
   const coverSrc =
-    (lockingIn ? lockFlyer : plan.flyerDataUrl) ??
+    plan.flyerDataUrl ??
     (plan.planKind === "looking_for" ? null : pickCoverImage(coverPool, plan.id));
   const ideaCoverFallback = isIdeaPlan(plan) && !coverSrc;
   const mapsQuery = encodeURIComponent(
@@ -299,34 +214,6 @@ export function PlanDetailPage() {
   const peoplePreviewMax = 4;
   const planPeoplePreview = planPeople.slice(0, peoplePreviewMax);
 
-  const lockDisabled = lockBusy || !lockVenue.trim() || !lockDate;
-  const lockHint = !lockVenue.trim()
-    ? "Add a venue to continue"
-    : !lockDate
-      ? "Pick a day to continue"
-      : null;
-
-  const lockFlyerInput = (
-    <input
-      ref={lockFlyerRef}
-      type="file"
-      accept="image/*"
-      style={{ display: "none" }}
-      onChange={(e) => {
-        const f = e.target.files?.[0];
-        if (f) {
-          void fileToResizedDataUrl(f)
-            .then((dataUrl) => {
-              setLockFlyer(dataUrl);
-              setLockCoverOpen(true);
-            })
-            .catch(() => undefined);
-        }
-        if (lockFlyerRef.current) lockFlyerRef.current.value = "";
-      }}
-    />
-  );
-
   function closeGuestsModal() {
     setShowGuestsModal(false);
     if (location.hash === "#guests") {
@@ -344,53 +231,11 @@ export function PlanDetailPage() {
   }
 
   return (
-    <main className={`app-shell app-shell--wide app-shell--with-nav plan-detail-page${lockingIn ? " plan-detail-page--lock-in" : ""}`}>
+    <main className={`app-shell app-shell--wide app-shell--with-nav plan-detail-page${canLock ? " plan-detail-page--lock-in" : ""}`}>
       <div className="plan-detail-safe-scrim" aria-hidden="true" />
       <div className={`plan-detail-hero${coverSrc || ideaCoverFallback ? "" : " plan-detail-hero--empty"}`}>
         {coverSrc && <img src={coverSrc} alt="" loading="lazy" />}
         {ideaCoverFallback && <IdeaCoverFallback iconSize={56} />}
-        {lockingIn && (
-          coverSrc ? (
-            <div className="plan-detail-hero-cover-overlay">
-              <button type="button" className="cover-chip" onClick={() => setShowLockCoverLib(true)}>
-                Library
-              </button>
-              <button type="button" className="cover-chip" onClick={() => void openLockFlyerPicker()}>
-                Upload
-              </button>
-              <button
-                type="button"
-                className="cover-chip"
-                onClick={() => {
-                  setLockFlyer(null);
-                  setLockCoverOpen(false);
-                }}
-              >
-                Remove
-              </button>
-            </div>
-          ) : lockCoverOpen ? (
-            <div className="plan-detail-hero-cover-empty">
-              <span className="cover-picker-title">Add a cover photo</span>
-              <span className="cover-picker-sub">Optional</span>
-              <div className="cover-picker-buttons">
-                <button type="button" className="cover-btn" onClick={() => setShowLockCoverLib(true)}>
-                  <ImagePlus size={16} strokeWidth={1.8} aria-hidden="true" />
-                  Library
-                </button>
-                <button type="button" className="cover-btn" onClick={() => void openLockFlyerPicker()}>
-                  Upload
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button type="button" className="plan-detail-hero-cover-cta" onClick={() => setLockCoverOpen(true)}>
-              <Camera size={18} strokeWidth={1.8} aria-hidden="true" />
-              Add a cover photo (optional)
-            </button>
-          )
-        )}
-        {lockingIn && lockFlyerInput}
         <div className="plan-detail-hero-bar">
           <button
             type="button"
@@ -479,112 +324,39 @@ export function PlanDetailPage() {
                   : `${interestedCount} interested`}
             </span>
           </button>
-          {lockingIn ? (
-            <div ref={lockFormRef} className="plan-meta-card plan-meta-card--edit">
-              <div className="plan-meta-row plan-meta-row--edit">
+          <div className="plan-meta-card">
+            <div className="plan-meta-row">
+              <span className="plan-meta-icon" aria-hidden="true"><CalendarIcon /></span>
+              <div className="plan-meta-text">
+                <span className="plan-meta-label">Date &amp; time</span>
+                <span className="plan-meta-value">
+                  {formatWhen(plan.date, plan.time, plan.isFlexibleTime)}
+                </span>
+              </div>
+            </div>
+            {plan.isFlexibleLocation ? (
+              <div className="plan-meta-row">
                 <span className="plan-meta-icon" aria-hidden="true"><PinIcon /></span>
                 <div className="plan-meta-text">
-                  <span className="plan-meta-label">Venue</span>
-                  <LocationAutocomplete
-                    name={lockVenue}
-                    address={lockVenueAddr}
-                    placeholder="Add a venue"
-                    onChange={(v) => {
-                      setLockVenue(v.name);
-                      setLockVenueAddr(v.address);
-                      setLockLat(v.lat);
-                      setLockLng(v.lng);
-                    }}
-                  />
+                  <span className="plan-meta-label">Location</span>
+                  <span className="plan-meta-value">Flexible</span>
                 </div>
               </div>
-              <div
-                className="plan-meta-row plan-meta-row--edit"
-                style={{ cursor: "pointer" }}
-                onClick={() => {
-                  const inp = lockDateRef.current;
-                  if (!inp) return;
-                  try { (inp as HTMLInputElement & { showPicker(): void }).showPicker(); }
-                  catch { inp.focus(); }
-                }}
+            ) : (
+              <a
+                className="plan-meta-row"
+                href={mapsHref}
+                target="_blank"
+                rel="noopener noreferrer"
               >
-                <span className="plan-meta-icon" aria-hidden="true"><CalendarIcon /></span>
+                <span className="plan-meta-icon" aria-hidden="true"><PinIcon /></span>
                 <div className="plan-meta-text">
-                  <span className="plan-meta-label">Day</span>
-                  <span className={`plan-meta-value ${!lockDate ? "is-placeholder" : ""}`}>
-                    {lockDate ? formatPlanDate(lockDate) : "Pick a day"}
-                  </span>
-                  <input
-                    ref={lockDateRef}
-                    id="lock-date"
-                    className="plan-meta-native-input"
-                    type="date"
-                    value={lockDate}
-                    min={new Date().toISOString().slice(0, 10)}
-                    onChange={(e) => setLockDate(e.target.value)}
-                  />
+                  <span className="plan-meta-label">Location</span>
+                  <span className="plan-meta-value">{plan.location.name}</span>
                 </div>
-              </div>
-              <div className="plan-meta-row plan-meta-row--edit">
-                <span className="plan-meta-icon" aria-hidden="true"><ClockIcon /></span>
-                <label className="plan-meta-text" htmlFor={lockFlexTime ? undefined : "lock-time"}>
-                  <span className="plan-meta-label">Time</span>
-                  <span className={`plan-meta-value ${lockFlexTime || !lockTime ? "is-placeholder" : ""}`}>
-                    {lockFlexTime
-                      ? "Flexible time"
-                      : lockTime
-                        ? formatPlanTime(lockTime, false)
-                        : "Pick a time"}
-                  </span>
-                  {!lockFlexTime && (
-                    <input
-                      ref={lockTimeRef}
-                      id="lock-time"
-                      className="plan-meta-native-input"
-                      type="time"
-                      value={lockTime}
-                      onChange={(e) => setLockTime(e.target.value)}
-                    />
-                  )}
-                </label>
-                <FlexChip active={lockFlexTime} onClick={() => setLockFlexTime((v) => !v)} />
-              </div>
-            </div>
-          ) : (
-            <div className="plan-meta-card">
-              <div className="plan-meta-row">
-                <span className="plan-meta-icon" aria-hidden="true"><CalendarIcon /></span>
-                <div className="plan-meta-text">
-                  <span className="plan-meta-label">Date &amp; time</span>
-                  <span className="plan-meta-value">
-                    {formatWhen(plan.date, plan.time, plan.isFlexibleTime)}
-                  </span>
-                </div>
-              </div>
-              {plan.isFlexibleLocation ? (
-                <div className="plan-meta-row">
-                  <span className="plan-meta-icon" aria-hidden="true"><PinIcon /></span>
-                  <div className="plan-meta-text">
-                    <span className="plan-meta-label">Location</span>
-                    <span className="plan-meta-value">Flexible</span>
-                  </div>
-                </div>
-              ) : (
-                <a
-                  className="plan-meta-row"
-                  href={mapsHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <span className="plan-meta-icon" aria-hidden="true"><PinIcon /></span>
-                  <div className="plan-meta-text">
-                    <span className="plan-meta-label">Location</span>
-                    <span className="plan-meta-value">{plan.location.name}</span>
-                  </div>
-                </a>
-              )}
-            </div>
-          )}
+              </a>
+            )}
+          </div>
         </header>
 
         <button
@@ -614,6 +386,19 @@ export function PlanDetailPage() {
           <span className="host-row-chevron" aria-hidden="true">›</span>
         </button>
 
+        {canLock && (
+          <div className="plan-detail-card idea-lock-card">
+            <p className="idea-lock-card-title">Let&rsquo;s test this mechanism together</p>
+            <p className="idea-lock-card-copy">
+              Coordinate in the chat, then lock in a venue, day, and time. Everyone who&rsquo;s
+              interested is invited automatically.
+            </p>
+            <Link to={`/plans/new?lockFromId=${plan.id}`} className="idea-lock-card-link">
+              Take this to Make a Plan
+            </Link>
+          </div>
+        )}
+
         {plan.description && (
           <div className="plan-detail-card">
             {plan.planKind === "looking_for" ? (
@@ -624,7 +409,7 @@ export function PlanDetailPage() {
           </div>
         )}
 
-        {!isPast && canChat && (isLookingFor || !lockingIn) && (
+        {!isPast && canChat && (
           <ChatPreviewCard
             planId={plan.id}
             messages={chatPreview}
@@ -744,7 +529,7 @@ export function PlanDetailPage() {
           </div>
         )}
 
-        {isHosting && !isPast && !lockingIn && !plan.cancelledAt && (
+        {isHosting && !isPast && !canLock && !plan.cancelledAt && (
           <button
             type="button"
             className="plan-edit-row plan-detail-card"
@@ -801,31 +586,15 @@ export function PlanDetailPage() {
           )}
       </div>
 
-      {lockingIn && (
+      {canLock && (
         <div className="lock-in-cta-bar">
-          <button
-            type="button"
-            className="btn-primary btn-block"
-            disabled={lockDisabled}
-            onClick={() => void lockIn()}
-          >
-            {lockBusy ? "Saving…" : "Lock it in"}
-          </button>
-          {lockHint && <p className="lock-in-cta-hint">{lockHint}</p>}
+          <Link to={`/plans/new?lockFromId=${plan.id}`} className="btn-primary btn-block">
+            Lock it in
+          </Link>
         </div>
       )}
 
       {showShare && <ShareSheet plan={plan} isOwn={isHosting} onClose={() => setShowShare(false)} />}
-      {showLockCoverLib && (
-        <CoverLibraryModal
-          onPick={(url) => {
-            setLockFlyer(url);
-            setLockCoverOpen(true);
-            setShowLockCoverLib(false);
-          }}
-          onClose={() => setShowLockCoverLib(false)}
-        />
-      )}
       {showGetThere && <GetThereSheet plan={plan} onClose={() => setShowGetThere(false)} />}
       {showInvite && (
         <InviteSheet planId={plan.id} planTitle={plan.title} onClose={() => setShowInvite(false)} />
@@ -1053,29 +822,6 @@ function ParticipantsRow({
   );
 }
 
-/** Switch Flexible toggle — same pattern as CreatePlan's FlexToggle. */
-function FlexChip({ active, onClick }: { active: boolean; onClick: () => void }) {
-  return (
-    <div className="flex-switch-col">
-      <span className="flex-switch-caption">Flexible</span>
-      <button
-        type="button"
-        role="switch"
-        className={`flex-switch ${active ? "is-on" : ""}`}
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          onClick();
-        }}
-        aria-checked={active}
-        aria-label="Flexible"
-      >
-        <span className="flex-switch-knob" />
-      </button>
-    </div>
-  );
-}
-
 function PlanGuests({
   plan,
   userId,
@@ -1176,15 +922,6 @@ function CalendarIcon() {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="3" y="5" width="18" height="16" rx="2" />
       <path d="M8 3v4M16 3v4M3 9h18" />
-    </svg>
-  );
-}
-
-function ClockIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 2" />
     </svg>
   );
 }

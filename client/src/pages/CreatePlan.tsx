@@ -111,10 +111,11 @@ export function CreatePlanPage() {
   // crew + group chat forward via fromPlanId (handled server-side on create).
   const prefillTitle = searchParams.get("title") ?? "";
   const fromPlanId = searchParams.get("fromPlanId");
+  const lockFromId = searchParams.get("lockFromId");
   // 0.9 — arriving here to recreate a past plan (either "Host another like
   // this" or "Do it again") should send Back to that plan, not into a blank
   // New Plan flow.
-  const backToSourceId = hostAgainFrom ?? fromPlanId ?? null;
+  const backToSourceId = hostAgainFrom ?? lockFromId ?? fromPlanId ?? null;
   const prefillTagParam = searchParams.get("tag");
   const inviteUserId = searchParams.get("inviteUser");
   const inviteUserName = searchParams.get("inviteName");
@@ -191,7 +192,7 @@ export function CreatePlanPage() {
   const [submitting, setSubmitting] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [editReady, setEditReady] = useState(!editingPlanId);
+  const [editReady, setEditReady] = useState(!editingPlanId && !lockFromId);
   const originalWhen = useRef<{
     date: string;
     time: string;
@@ -203,6 +204,7 @@ export function CreatePlanPage() {
   type Path = "choose" | "plan" | "idea";
   const [path, setPath] = useState<Path>(
     editingPlanId ||
+    lockFromId ||
     inviteUserId ||
       inviteUserIds.length > 0 ||
       prefillTitle ||
@@ -301,6 +303,7 @@ export function CreatePlanPage() {
     for (const id of inviteUserIds) seed.add(id);
     return seed;
   });
+  const [lockCrew, setLockCrew] = useState<PublicUser[]>([]);
   const flyerRef = useRef<HTMLInputElement>(null);
   const [showCoverLib, setShowCoverLib] = useState(false);
   const [coverPickerOpen, setCoverPickerOpen] = useState(false);
@@ -339,6 +342,17 @@ export function CreatePlanPage() {
     });
   };
 
+  const inviteNetwork = useMemo(() => {
+    const seen = new Set<string>();
+    const out: PublicUser[] = [];
+    for (const u of [...lockCrew, ...(network ?? [])]) {
+      if (!u.id || seen.has(u.id)) continue;
+      seen.add(u.id);
+      out.push(u);
+    }
+    return out;
+  }, [lockCrew, network]);
+
   useEffect(() => {
     const first = user?.neighborhoodIds?.[0] ?? user?.neighborhoodId;
     if (first && !form.neighborhoodId) {
@@ -351,7 +365,7 @@ export function CreatePlanPage() {
   // fall back to ?fromPlanId= so a lost state still seeds the form.
   useEffect(() => {
     const seedId = hostAgainFrom ?? fromPlanId;
-    if (!seedId || editingPlanId) return;
+    if (!seedId || editingPlanId || lockFromId) return;
     let alive = true;
     void api<PlanDTO>(`/api/plans/${seedId}`)
       .then((prev) => {
@@ -383,7 +397,7 @@ export function CreatePlanPage() {
     return () => {
       alive = false;
     };
-  }, [hostAgainFrom, fromPlanId, inviteUserId, inviteUserIds, editingPlanId]);
+  }, [hostAgainFrom, fromPlanId, inviteUserId, inviteUserIds, editingPlanId, lockFromId]);
 
   useEffect(() => {
     if (!editingPlanId || !user) return;
@@ -450,6 +464,68 @@ export function CreatePlanPage() {
     };
   }, [editingPlanId, user, navigate]);
 
+  useEffect(() => {
+    if (!lockFromId || !user) return;
+    let alive = true;
+    setEditReady(false);
+    void api<PlanDTO>(`/api/plans/${lockFromId}`)
+      .then((prev) => {
+        if (!alive) return;
+        if (prev.creator.id !== user.id || prev.lockedAt) {
+          navigate(`/plans/${lockFromId}`, { replace: true });
+          return;
+        }
+        const vibeIds = Array.from(
+          new Set(VIBE_OPTIONS.filter((o) => prev.tags.includes(o.tag)).map((o) => o.id)),
+        );
+        const flexDate = Boolean(prev.isFlexibleDate) || prev.date.startsWith("2099-12-31");
+        setForm((f) => ({
+          ...f,
+          title: prev.title,
+          locationName: prev.isFlexibleLocation ? "" : prev.location.name,
+          locationAddress: prev.isFlexibleLocation ? "" : prev.location.address,
+          locationLat: prev.isFlexibleLocation ? undefined : prev.location.lat,
+          locationLng: prev.isFlexibleLocation ? undefined : prev.location.lng,
+          locationPlaceId: prev.isFlexibleLocation ? undefined : prev.location.placeId,
+          neighborhoodId: prev.neighborhoodId || f.neighborhoodId,
+          date: flexDate ? today() : prev.date.slice(0, 10),
+          time: prev.isFlexibleTime ? defaultPlanTime() : (prev.time || defaultPlanTime()),
+          isFlexibleTime: false,
+          isFlexibleDate: false,
+          isFlexibleLocation: false,
+          vibes: vibeIds.length ? vibeIds : f.vibes,
+          description: prev.description ?? "",
+          visibility: prev.visibility,
+          capacityOn: prev.capacity !== null,
+          capacity: prev.capacity !== null ? String(prev.capacity) : f.capacity,
+          joinType: prev.joinType,
+          flyerDataUrl: prev.flyerDataUrl ?? null,
+        }));
+        const crew = [
+          ...prev.participants.going,
+          ...prev.participants.interested,
+        ].filter((p) => p.id !== user.id);
+        setLockCrew(crew);
+        setInvitedIds((ids) => {
+          const next = new Set(ids);
+          for (const p of crew) next.add(p.id);
+          return next;
+        });
+        if (prev.capacity !== null) setShowMore(true);
+        setPath("plan");
+        setEditReady(true);
+      })
+      .catch(() => {
+        if (alive) {
+          setError("Couldn't load that idea.");
+          setEditReady(true);
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, [lockFromId, user, navigate]);
+
   const resolvedTags = useMemo<InterestTag[]>(() => {
     const set = new Set<InterestTag>();
     for (const id of form.vibes) {
@@ -469,21 +545,27 @@ export function CreatePlanPage() {
   // so it re-evaluates live as the host edits; re-checked on submit.
   // F.6 — a wholly missing date folds into this same inline message rather
   // than only surfacing in a bottom banner.
-  const dateError = !form.isFlexibleDate && !form.date
+  const dateError = lockFromId && (!form.date || form.isFlexibleDate)
+    ? "Pick a day to lock in."
+    : !form.isFlexibleDate && !form.date
     ? "Add a day or mark it flexible."
     : !form.isFlexibleDate && form.date && form.date < today()
       ? "Pick today or a future date."
       : null;
   // Exact time/location are the default path — Flexible is opt-in, so an
   // empty field without that toggle is an error (not an implied flexible).
-  const timeError = !dateError && !form.isFlexibleDate && !form.isFlexibleTime && !form.time
+  const timeError = lockFromId && (form.isFlexibleTime || !form.time)
+    ? "Pick a time to lock in."
+    : !dateError && !form.isFlexibleDate && !form.isFlexibleTime && !form.time
     ? "Add a time or mark it flexible."
     : !dateError && !form.isFlexibleDate && !form.isFlexibleTime && form.date === today() && form.time
       ? form.time < nowTime()
         ? "That time is in the past — pick a later time."
         : null
       : null;
-  const locationError = !form.isFlexibleLocation && !form.locationName.trim()
+  const locationError = lockFromId && !form.locationName.trim()
+    ? "Add a venue to lock in."
+    : !form.isFlexibleLocation && !form.locationName.trim()
     ? "Add a location or mark it flexible."
     : null;
   const capacityNum = form.capacityOn ? Number(form.capacity) : null;
@@ -664,9 +746,48 @@ export function CreatePlanPage() {
     }
   };
 
+  const lockPlan = async () => {
+    if (!lockFromId) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      await api(`/api/plans/${lockFromId}/lock`, {
+        method: "POST",
+        body: JSON.stringify({
+          title: form.title.trim(),
+          description: form.description.trim(),
+          tags: resolvedTags,
+          neighborhoodId: form.neighborhoodId || undefined,
+          location: {
+            name: form.locationName.trim(),
+            address: form.locationAddress.trim() || form.locationName.trim(),
+            lat: form.locationLat,
+            lng: form.locationLng,
+            placeId: form.locationPlaceId,
+          },
+          date: form.date,
+          time: form.isFlexibleTime ? "" : form.time,
+          isFlexibleTime: form.isFlexibleTime,
+          visibility: form.visibility,
+          capacity: capacityNum,
+          joinType: form.joinType,
+          flyerDataUrl: form.flyerDataUrl ?? null,
+          hostEmoji: VIBE_OPTIONS.find((o) => o.id === form.vibes[0])?.emoji ?? "✨",
+          inviteUserIds: [...invitedIds],
+        }),
+      });
+      navigate(`/plans/${lockFromId}`);
+    } catch (err) {
+      setError(parseApiError(err) || "Couldn't lock this in — try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const runSubmit = async () => {
     if (!validate()) return;
-    if (editingPlanId) await savePlan();
+    if (lockFromId) await lockPlan();
+    else if (editingPlanId) await savePlan();
     else await postPlan();
   };
 
@@ -746,7 +867,7 @@ export function CreatePlanPage() {
     }
   };
 
-  if (editingPlanId && !editReady) {
+  if ((editingPlanId || lockFromId) && !editReady) {
     return (
       <main className="app-shell app-shell--mid">
         <header className="app-header app-header--minimal app-header--sticky">
@@ -908,7 +1029,7 @@ export function CreatePlanPage() {
     );
   }
 
-  const invitedPeople = (network ?? []).filter((u) => invitedIds.has(u.id));
+  const invitedPeople = inviteNetwork.filter((u) => invitedIds.has(u.id));
   const selectedInterests = form.vibes
     .map((id) => VIBE_OPTIONS.find((o) => o.id === id)?.tag)
     .filter((t): t is InterestTag => Boolean(t));
@@ -983,8 +1104,24 @@ export function CreatePlanPage() {
       </div>
 
       <div className="plan-detail-body">
-      {(inviteUserId && inviteUserName) || inviteNames.length > 0 ? (
+      {(inviteUserId && inviteUserName) || inviteNames.length > 0 || lockFromId ? (
         <div className="create-plan-invite-banner" role="note">
+          {lockFromId ? (
+            <>
+              Locking in this idea
+              {lockCrew.length > 0 ? (
+                <>
+                  {" "}· Inviting{" "}
+                  <strong>{lockCrew[0].firstName}</strong>
+                  {lockCrew.length > 1 ? ` + ${lockCrew.length - 1} more` : ""}{" "}
+                  who showed interest
+                </>
+              ) : (
+                <> · Interested people will be invited automatically</>
+              )}
+            </>
+          ) : (
+            <>
           Inviting{" "}
           <strong>
             {inviteUserName ?? inviteNames[0]}
@@ -998,6 +1135,8 @@ export function CreatePlanPage() {
           {form.visibility === "network"
             ? "Visible to your network"
             : "Visible to everyone on COMMONS"}
+            </>
+          )}
         </div>
       ) : null}
 
@@ -1104,6 +1243,7 @@ export function CreatePlanPage() {
                   </>
                 )}
               </div>
+              {!lockFromId && (
               <FlexToggle
                 variant="switch"
                 active={form.isFlexibleLocation}
@@ -1125,6 +1265,7 @@ export function CreatePlanPage() {
                 }
                 label="Flexible"
               />
+              )}
             </div>
             <div ref={dateCardRef} className="plan-meta-row plan-meta-row--edit">
               <span className="plan-meta-icon" aria-hidden="true"><Calendar size={18} strokeWidth={1.8} /></span>
@@ -1149,6 +1290,7 @@ export function CreatePlanPage() {
                   />
                 )}
               </label>
+              {!lockFromId && (
               <FlexToggle
                 variant="switch"
                 active={form.isFlexibleDate}
@@ -1169,6 +1311,7 @@ export function CreatePlanPage() {
                 }
                 label="Flexible"
               />
+              )}
             </div>
             <div className="plan-meta-row plan-meta-row--edit">
               <span className="plan-meta-icon" aria-hidden="true"><Clock size={18} strokeWidth={1.8} /></span>
@@ -1193,6 +1336,7 @@ export function CreatePlanPage() {
                   />
                 )}
               </label>
+              {!lockFromId && (
               <FlexToggle
                 variant="switch"
                 active={form.isFlexibleTime}
@@ -1206,6 +1350,7 @@ export function CreatePlanPage() {
                 }
                 label="Flexible"
               />
+              )}
             </div>
           </div>
           {(attemptedSubmit && locationError) || dateError || timeError ? (
@@ -1253,7 +1398,7 @@ export function CreatePlanPage() {
         {showInvitePicker && (
           <div className="plan-detail-card">
             <p className="form-question" style={{ marginTop: 0 }}>Invite from your network</p>
-            <NetworkHandPick network={network} invitedIds={invitedIds} onToggle={toggleInvited} />
+            <NetworkHandPick network={inviteNetwork} invitedIds={invitedIds} onToggle={toggleInvited} />
           </div>
         )}
 
@@ -1316,7 +1461,7 @@ export function CreatePlanPage() {
           {form.visibility === "network" && (
             <div className="settings-handpick">
               <NetworkHandPick
-                network={network}
+                network={inviteNetwork}
                 invitedIds={invitedIds}
                 onToggle={toggleInvited}
               />
@@ -1555,10 +1700,14 @@ export function CreatePlanPage() {
             {submitting
               ? editingPlanId
                 ? "Saving…"
-                : "Posting…"
+                : lockFromId
+                  ? "Locking in…"
+                  : "Posting…"
               : editingPlanId
                 ? "Save"
-                : "Post it"}
+                : lockFromId
+                  ? "Lock it in"
+                  : "Post it"}
           </button>
         </div>
       </form>
@@ -2198,283 +2347,3 @@ function ChevronIcon({ open }: { open: boolean }) {
     </svg>
   );
 }
-
-interface PlaceHit {
-  placeId: string;
-  name: string;
-  address: string;
-  /** e.g. "Fishtown" — parsed server-side from Places address components. */
-  neighborhood?: string;
-  lat?: number;
-  lng?: number;
-}
-
-/**
- * Google-Places-backed venue picker. Free-text typing is kept as a custom
- * venue name (onChange); choosing a suggestion fills name + address + coords
- * (onSelect). Falls back gracefully to plain text when Places isn't configured.
- */
-function PlacePicker({
-  value,
-  address,
-  onChange,
-  onSelect,
-  onClear,
-  placeholder,
-  autoFocusOnMount = false,
-  onFieldFocus,
-}: {
-  value: string;
-  address: string;
-  onChange: (name: string) => void;
-  onSelect: (p: { name: string; address: string; lat?: number; lng?: number; placeId?: string }) => void;
-  onClear: () => void;
-  placeholder?: string;
-  autoFocusOnMount?: boolean;
-  onFieldFocus?: (el: HTMLElement) => void;
-}) {
-  const [results, setResults] = useState<PlaceHit[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [focused, setFocused] = useState(false);
-  const [searched, setSearched] = useState(false);
-  const [errored, setErrored] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const blurRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  // Seed true when a venue is already filled (e.g. prefilled from Explore) so
-  // we don't auto-search and pop the dropdown on mount.
-  const skipNextSearch = useRef(value.trim().length >= 2);
-
-  useEffect(() => {
-    if (!autoFocusOnMount || value.trim()) return;
-    const t = setTimeout(() => inputRef.current?.focus(), 50);
-    return () => clearTimeout(t);
-  }, [autoFocusOnMount, value]);
-
-  useEffect(() => {
-    if (skipNextSearch.current) {
-      skipNextSearch.current = false;
-      return;
-    }
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    abortRef.current?.abort();
-    const q = value.trim();
-    if (q.length < 2) {
-      setResults([]);
-      setSearched(false);
-      setLoading(false);
-      setErrored(false);
-      return;
-    }
-    setLoading(true);
-    setErrored(false);
-    debounceRef.current = setTimeout(() => {
-      const controller = new AbortController();
-      abortRef.current = controller;
-      void (async () => {
-        const coversQuery = (name: string) => {
-          const n = name.trim().toLowerCase();
-          const needle = q.toLowerCase();
-          if (!n) return false;
-          if (n.includes(needle)) return true;
-          const words = needle.split(/\s+/).filter((w) => w.length > 1);
-          return words.length > 0 && words.every((w) => n.includes(w));
-        };
-        let merged: PlaceHit[] = [];
-        try {
-          const g = await api<{
-            predictions: Array<{
-              placeId: string;
-              name: string;
-              address: string;
-              neighborhood?: string;
-              lat?: number;
-              lng?: number;
-            }>;
-          }>(`/api/places/autocomplete?q=${encodeURIComponent(q)}`, { signal: controller.signal });
-          if (controller.signal.aborted) return;
-          merged = g.predictions ?? [];
-          if (merged.length && merged.some((p) => coversQuery(p.name))) {
-            setResults(merged);
-            setErrored(false);
-            setSearched(true);
-            setLoading(false);
-            return;
-          }
-        } catch (err) {
-          if ((err as { name?: string })?.name === "AbortError") return;
-        }
-
-        try {
-          const r = await api<{ results: PlaceHit[] }>(
-            `/api/places/search?q=${encodeURIComponent(q)}`,
-            { signal: controller.signal },
-          );
-          if (controller.signal.aborted) return;
-          const extra = r.results ?? [];
-          const seen = new Set(merged.map((p) => p.placeId));
-          merged = [...merged, ...extra.filter((p) => p.placeId && !seen.has(p.placeId))];
-          setResults(merged);
-          setErrored(false);
-        } catch (err) {
-          if ((err as { name?: string })?.name === "AbortError") return;
-          if (merged.length) {
-            setResults(merged);
-            setErrored(false);
-          } else {
-            setResults([]);
-            setErrored(true);
-          }
-        } finally {
-          if (!controller.signal.aborted) {
-            setSearched(true);
-            setLoading(false);
-          }
-        }
-      })();
-    }, 220);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [value]);
-
-  // Clean up timers / in-flight search on unmount.
-  useEffect(() => () => {
-    if (blurRef.current) clearTimeout(blurRef.current);
-    abortRef.current?.abort();
-  }, []);
-
-  const choose = (p: PlaceHit) => {
-    skipNextSearch.current = true;
-    // Bind immediately so validation / submit see a real location even if
-    // Place Details is slow or fails. Autocomplete hits often lack lat/lng —
-    // enrich from Details after the field is already set.
-    const fallbackName =
-      (p.name && p.name.trim()) ||
-      (p.address && p.address.split(",")[0]?.trim()) ||
-      value.trim();
-    const fallbackAddress = (p.address && p.address.trim()) || fallbackName;
-    onSelect({
-      name: fallbackName,
-      address: fallbackAddress,
-      lat: p.lat,
-      lng: p.lng,
-      placeId: p.placeId,
-    });
-    setResults([]);
-    setSearched(false);
-    setFocused(false);
-
-    if (p.placeId && !p.placeId.startsWith("osm-") && (p.lat == null || p.lng == null)) {
-      void api<{ name: string; address: string; lat?: number; lng?: number }>(
-        `/api/places/details?placeId=${encodeURIComponent(p.placeId)}`,
-      )
-        .then((d) => {
-          // First onSelect already consumed skipNextSearch — set it again so
-          // the enrichment update doesn't kick off another autocomplete search.
-          skipNextSearch.current = true;
-          onSelect({
-            name: (d.name && d.name.trim()) || fallbackName,
-            address: (d.address && d.address.trim()) || fallbackAddress,
-            lat: d.lat,
-            lng: d.lng,
-            placeId: p.placeId,
-          });
-        })
-        .catch(() => {
-          /* already bound above */
-        });
-    }
-  };
-
-  const hasPickedAddress = Boolean(address && address !== value);
-  // Visibility is gated on focus (not a separate flag that can desync), so the
-  // list stays put while you read it instead of flickering on every keystroke.
-  const showDropdown = focused && value.trim().length >= 2;
-
-  const dropdown = showDropdown ? (
-    <ul className="place-picker-results" role="listbox">
-      {loading && results.length === 0 && <li className="place-picker-empty">Searching…</li>}
-      {!loading && errored && (
-        <li className="place-picker-empty">
-          Venue search is unavailable — we'll use "{value.trim()}" as the venue.
-        </li>
-      )}
-      {!loading && !errored && searched && results.length === 0 && (
-        <li className="place-picker-empty">No matches — we'll use "{value.trim()}" as the venue.</li>
-      )}
-      {results.map((p) => (
-        <li key={p.placeId}>
-          <button
-            type="button"
-            className="place-picker-result"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              choose(p);
-            }}
-          >
-            <span className="place-picker-result-name">{p.name}</span>
-            {(p.neighborhood || p.address) && (
-              <span className="place-picker-result-addr">{p.neighborhood ?? p.address}</span>
-            )}
-          </button>
-        </li>
-      ))}
-    </ul>
-  ) : null;
-
-  return (
-    <div className="place-picker">
-      <div className="place-picker-field">
-        <PinIcon />
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder={placeholder ?? "Search a venue or type your own"}
-          value={value}
-          onChange={(e) => {
-            setFocused(true);
-            onChange(e.target.value);
-          }}
-          onFocus={(e) => {
-            setFocused(true);
-            onFieldFocus?.(e.currentTarget);
-          }}
-          onBlur={() => {
-            // Delay so a result tap (mousedown) registers before we hide.
-            blurRef.current = setTimeout(() => setFocused(false), 180);
-          }}
-          autoComplete="off"
-        />
-        {value && (
-          <button
-            type="button"
-            className="place-picker-clear"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => {
-              onClear();
-              setResults([]);
-              setSearched(false);
-            }}
-            aria-label="Clear place"
-          >
-            ×
-          </button>
-        )}
-      </div>
-      {hasPickedAddress && !showDropdown && <p className="place-picker-chosen">📍 {address}</p>}
-      {dropdown}
-    </div>
-  );
-}
-
-function PinIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-      <circle cx="12" cy="10" r="3" />
-    </svg>
-  );
-}
-
