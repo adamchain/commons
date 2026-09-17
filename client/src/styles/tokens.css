@@ -114,12 +114,12 @@
   --btn-soft-on: #ffffff;
   --btn-neutral: #ab9393;
   --btn-neutral-hover: #9a8282;
-  --btn-neutral-on: var(--ink);
+  --btn-neutral-on: #ffffff;
   /* Disabled: lighter than --btn-neutral, closer to --bg beige — never faded red. */
   --btn-disabled: #e4dcd4;
   --btn-disabled-on: #b4a59a;
   --status: #ab9393;
-  --status-on: #3f3333;
+  --status-on: #ffffff;
   --success: #2f8f55;
   --success-bg: #e8f5ee;
   --success-border: #b5dcc6;

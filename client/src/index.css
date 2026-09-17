@@ -580,7 +580,7 @@ h1, h2, h3, h4, h5, h6 {
    Shared shape: --r-control (16px), not a stadium.
    Primary: brand red, white text — I'm In, Post plan, Post poll.
    Soft: #965252, white text — sibling next to a primary (Interested).
-   Neutral: #ab9393, dark text — standalone utility (Edit, Cancel).
+   Neutral: #ab9393, white text — standalone utility (Edit, Cancel).
    Disabled: beige, never a faded/pink red. */
 
 .btn,
@@ -3996,7 +3996,7 @@ a.action-btn--stack {
   min-width: 0;
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 22px;
+  border-radius: var(--r-control);
   padding: 9px 14px;
   color: var(--ink);
   font-size: var(--text-body);
@@ -4464,7 +4464,7 @@ a.action-btn--stack {
 .profile-edit-btn {
   flex-shrink: 0;
   border: 1.5px solid var(--tan-mid);
-  border-radius: 22px;
+  border-radius: var(--r-control);
   padding: 8px 16px;
   font-size: var(--text-body-small);
   font-weight: 600;
@@ -4534,7 +4534,7 @@ a.action-btn--stack {
 .profile-network-slot {
   width: 44px;
   height: 44px;
-  border-radius: 22px;
+  border-radius: 50%;
   border: 1.5px dashed var(--tan-mid);
   display: flex;
   align-items: center;
@@ -4743,7 +4743,7 @@ a.action-btn--stack {
    Display Zoom (320pt). Shrink instead; ellipsis
    only if Bold Text still can't fit. */
 .segmented.segmented-feed-view button {
-  border-radius: 22px;
+  border-radius: var(--r-control);
   padding: 7px 10px;
   background: var(--tan-mid);
   border: none;
@@ -4777,13 +4777,13 @@ a.action-btn--stack {
   font-weight: 400;
   font-size: var(--text-body-small);
   padding: 7px 14px;
-  border-radius: 22px;
+  border-radius: var(--r-control);
 }
 .page-filter-count {
   min-width: 14px;
   height: 14px;
   padding: 0 3px;
-  font-size: 8px;
+  font-size: var(--type-label);
   font-weight: 600;
   border-radius: 8px;
   background: var(--red);
@@ -4841,7 +4841,7 @@ a.action-btn--stack {
   font-weight: 600;
   color: var(--text-muted);
   background: var(--surface-2);
-  border-radius: 999px;
+  border-radius: var(--r-control);
 }
 .feed-past-chevron {
   width: 16px;
@@ -5125,7 +5125,7 @@ a.action-btn--stack {
   font-weight: 600;
   letter-spacing: 0;
   padding: 8px 14px;
-  border-radius: 999px;
+  border-radius: var(--r-control);
   text-transform: none;
   white-space: nowrap;
   background: transparent;
@@ -5799,7 +5799,7 @@ a.action-btn--stack {
   white-space: nowrap;
   text-align: center;
   color: var(--text-muted);
-  border-radius: 999px;
+  border-radius: var(--r-control);
   background: transparent;
   border: none;
   line-height: 1.2;
@@ -5927,7 +5927,7 @@ a.action-btn--stack {
   border: none;
   background: rgba(0, 0, 0, 0.62);
   color: #fff;
-  font-size: 14px;
+  font-size: var(--type-body);
   line-height: 1;
   display: inline-flex;
   align-items: center;
@@ -5943,7 +5943,7 @@ a.action-btn--stack {
   min-width: 0;
   background: var(--card);
   border: none;
-  border-radius: 22px;
+  border-radius: var(--r-control);
   padding: 10px 15px;
   color: var(--ink);
   font-size: var(--text-body);
@@ -6352,7 +6352,7 @@ a.action-btn--stack {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: var(--type-label);
   font-weight: 600;
   padding: 2px 8px;
   border-radius: var(--r-control);
@@ -6615,7 +6615,7 @@ a.action-btn--stack {
 
 .plan-card-kind-pill.is-confirmed::before {
   content: "●";
-  font-size: 8px;
+  font-size: var(--type-label);
 }
 
 .plan-card-kind-pill.is-looking::before {
@@ -6937,7 +6937,7 @@ a.action-btn--stack {
 }
 .avatar-crop-title {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--type-title);
 }
 .avatar-crop-sub {
   margin: 0;
@@ -7039,7 +7039,7 @@ a.action-btn--stack {
   align-items: center;
   gap: 6px;
   padding: 7px 12px;
-  border-radius: 22px;
+  border-radius: var(--r-control);
   border: 1px solid rgba(0, 0, 0, 0.18);
   background: transparent;
   color: var(--ink);
@@ -7360,7 +7360,7 @@ a.action-btn--stack {
   display: inline-block;
   margin-top: 16px;
   background: var(--red);
-  border-radius: 22px;
+  border-radius: var(--r-control);
   padding: 10px 22px;
   font-size: var(--text-body-small);
   font-weight: 600;
@@ -7808,7 +7808,7 @@ a.action-btn--stack {
   gap: 4px;
 }
 .flex-switch-caption {
-  font-size: 10px;
+  font-size: var(--type-label);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -8330,7 +8330,7 @@ a.action-btn--stack {
   align-items: center;
   gap: 6px;
   padding: 7px 14px;
-  border-radius: 22px;
+  border-radius: var(--r-control);
   background: var(--tan-mid);
   border: none;
   color: var(--muted);
@@ -8366,7 +8366,7 @@ a.action-btn--stack {
   border-radius: 8px;
   background: var(--red);
   color: #fff;
-  font-size: 8px;
+  font-size: var(--type-label);
   font-weight: 600;
 }
 
@@ -11379,7 +11379,7 @@ a.action-btn--stack {
   align-items: center;
   gap: 6px;
   padding: 7px 13px;
-  border-radius: 22px;
+  border-radius: var(--r-control);
   background: rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -11490,7 +11490,7 @@ a.action-btn--stack {
   display: inline-flex;
   align-items: center;
   padding: 8px 14px;
-  border-radius: 22px;
+  border-radius: var(--r-control);
   background: var(--red);
   color: #fff;
   font-size: var(--text-body-small);
@@ -11503,7 +11503,7 @@ a.action-btn--stack {
   font-weight: 600;
   color: var(--red);
   border: 1.5px solid var(--red);
-  border-radius: 22px;
+  border-radius: var(--r-control);
   padding: 4px 10px;
 }
 
@@ -11601,7 +11601,7 @@ a.action-btn--stack {
   min-height: 26px;
   padding: 4px 10px;
   border: none;
-  border-radius: 22px;
+  border-radius: var(--r-control);
   font-size: var(--text-body-small);
   font-weight: 700;
   line-height: 1;
@@ -11647,7 +11647,7 @@ a.action-btn--stack {
   color: var(--ink);
   background: transparent;
   border: 1px solid rgba(0, 0, 0, 0.13);
-  border-radius: 22px;
+  border-radius: var(--r-control);
   padding: 7px 14px;
   cursor: pointer;
 }
@@ -11911,7 +11911,7 @@ button.xpl-photo-tile {
 }
 .search-community-name {
   font-weight: 700;
-  font-size: 16px;
+  font-size: var(--type-title);
   color: var(--ink);
   letter-spacing: -0.2px;
   overflow: hidden;
@@ -12794,7 +12794,7 @@ button.xpl-photo-tile {
   text-align: left;
 }
 .legal-consent-panel .legal-doc-title {
-  font-size: 18px;
+  font-size: var(--type-title);
 }
 .legal-consent-scrollhint {
   position: sticky;
@@ -13721,7 +13721,7 @@ button.xpl-photo-tile {
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
-  font-size: 16px;
+  font-size: var(--type-body);
   line-height: 1;
   cursor: pointer;
 }
@@ -13842,7 +13842,7 @@ button.xpl-photo-tile {
   gap: 8px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 22px;
+  border-radius: var(--r-control);
   padding: 8px 10px;
   box-shadow: var(--shadow-card);
 }
@@ -13900,7 +13900,7 @@ button.xpl-photo-tile {
   color: var(--muted);
   background: transparent;
   border: none;
-  border-radius: 12px;
+  border-radius: var(--r-control);
   cursor: pointer;
   text-transform: capitalize;
 }
@@ -14105,7 +14105,7 @@ button.xpl-photo-tile {
   align-items: center;
   gap: 6px;
   padding: 7px 12px;
-  border-radius: 22px;
+  border-radius: var(--r-control);
   font-size: var(--text-body-small);
   font-weight: 400;
   color: var(--muted);
@@ -14400,7 +14400,7 @@ button.xpl-photo-tile {
 }
 .idea-interest-pill {
   padding: 6px 12px;
-  border-radius: 22px;
+  border-radius: var(--r-control);
   font-size: var(--text-body-small);
   font-weight: 500;
   color: #7a7a8a;
@@ -14416,7 +14416,7 @@ button.xpl-photo-tile {
 .idea-primary-cta {
   margin-top: 0;
   padding: 15px !important;
-  border-radius: 28px !important;
+  border-radius: var(--r-control) !important;
   background: var(--red) !important;
   color: var(--accent-on) !important;
   font-size: var(--text-body) !important;
@@ -14677,7 +14677,7 @@ button.xpl-photo-tile {
   justify-content: center;
   gap: 6px;
   padding: 11px 0;
-  border-radius: 22px;
+  border-radius: var(--r-control);
   font-size: var(--text-body);
   font-weight: 600;
   text-decoration: none;
@@ -14914,7 +14914,7 @@ button.xpl-photo-tile {
   width: calc(100% - 32px);
   margin: 12px 16px 0;
   padding: 14px;
-  border-radius: 22px;
+  border-radius: var(--r-control);
   border: none;
   background: var(--bg);
   font-size: var(--text-body);
@@ -15167,7 +15167,7 @@ button.xpl-photo-tile {
   flex: 1;
   resize: none;
   border: 1.5px solid var(--border);
-  border-radius: 22px;
+  border-radius: var(--r-control);
   padding: 10px 16px;
   font-size: var(--text-body);
   line-height: 1.4;

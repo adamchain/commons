@@ -18,22 +18,22 @@
 
 .cmy-muted {
   color: var(--text-muted);
-  font-size: 0.95rem;
+  font-size: var(--type-body);
   padding: var(--s-3) 0;
 }
 .cmy-err {
   color: var(--signal-600);
-  font-size: 0.88rem;
+  font-size: var(--type-body);
   margin: var(--s-1) 0 0;
 }
 .cmy-saved {
   color: var(--ink-600);
-  font-size: 0.88rem;
+  font-size: var(--type-body);
 }
 .cmy-hint {
   color: var(--text-subtle);
   font-style: normal;
-  font-size: 0.82rem;
+  font-size: var(--type-caption);
 }
 
 /* ---- Buttons ---- */
@@ -43,7 +43,7 @@
   border-radius: var(--r-control);
   font-family: var(--font-ui);
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: var(--type-body);
   padding: var(--s-2) var(--s-5);
   cursor: pointer;
   transition: filter 0.15s ease, background 0.15s ease;
@@ -64,7 +64,7 @@
   color: var(--btn-disabled-on);
   filter: none;
 }
-.cmy-btn--sm { padding: var(--s-1) var(--s-3); font-size: 0.85rem; }
+.cmy-btn--sm { padding: var(--s-1) var(--s-3); font-size: var(--type-caption); }
 .cmy-btn--block { width: 100%; }
 
 /* ---- List page ---- */
@@ -123,7 +123,7 @@
 }
 .cmy-list-sub {
   color: var(--text-muted);
-  font-size: 0.95rem;
+  font-size: var(--type-body);
   margin: var(--s-1) 0 0;
   max-width: 34ch;
 }
@@ -283,7 +283,7 @@
   color: var(--ink);
   background: var(--surface);
   border: 1px solid rgba(0, 0, 0, 0.13);
-  border-radius: 22px;
+  border-radius: var(--r-control);
   padding: 7px 14px;
   cursor: pointer;
 }
@@ -499,7 +499,7 @@ button.cmy-joined-pill {
 }
 .cmy-compact-title {
   font-family: var(--font-display);
-  font-size: 16px;
+  font-size: var(--type-title);
   font-weight: 700;
   letter-spacing: -0.01em;
   line-height: 1.2;
@@ -640,7 +640,7 @@ button.cmy-joined-pill {
   color: var(--community-pink);
   border-radius: var(--r-md);
   padding: var(--s-2) var(--s-3);
-  font-size: 0.88rem;
+  font-size: var(--type-body);
   font-weight: 600;
 }
 .cmy-review-banner--warn {
@@ -663,7 +663,7 @@ button.cmy-joined-pill {
   z-index: 5;
   width: 44px;
   height: 44px;
-  border-radius: 22px;
+  border-radius: 50%;
   background: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -742,7 +742,7 @@ button.cmy-joined-pill {
   color: #fff;
   padding: 4px 10px;
   border-radius: var(--r-control);
-  font-size: 0.7rem;
+  font-size: var(--type-label);
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: none; /* sentence case — no caps */
@@ -756,7 +756,7 @@ button.cmy-joined-pill {
 }
 .cmy-title-row { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
 .cmy-name {
-  font-size: clamp(1.6rem, 5vw, 2rem);
+  font-size: var(--type-display);
   font-weight: 800;
   letter-spacing: -0.6px;
   line-height: 1.1;
@@ -766,7 +766,7 @@ button.cmy-joined-pill {
 .cmy-cover-overlay .cmy-name {
   color: #fff;
   font-family: var(--font-display);
-  font-size: var(--text-card-large);
+  font-size: var(--type-display);
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -776,7 +776,7 @@ button.cmy-joined-pill {
   color: var(--status-on);
   padding: 2px 8px;
   border-radius: var(--r-control);
-  font-size: 0.68rem;
+  font-size: var(--type-label);
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -827,8 +827,8 @@ button.cmy-joined-pill {
 .cmy-header-avatars { display: inline-flex; flex-shrink: 0; }
 .cmy-header-avatars > * + * { margin-left: -8px; }
 .cmy-header-avatars > * { box-shadow: 0 0 0 2px var(--surface, #fff); border-radius: 50%; }
-.cmy-header-meta { color: var(--text-muted); font-size: 0.85rem; }
-.cmy-meta { color: var(--text-muted); font-size: 0.9rem; display: flex; gap: var(--s-2); align-items: center; }
+.cmy-header-meta { color: var(--text-muted); font-size: var(--type-caption); }
+.cmy-meta { color: var(--text-muted); font-size: var(--type-body); display: flex; gap: var(--s-2); align-items: center; }
 .cmy-dot { color: var(--text-subtle); }
 .cmy-about {
   margin-top: var(--s-1);
@@ -846,7 +846,7 @@ button.cmy-joined-pill {
   gap: 6px;
   color: var(--community-pink);
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: var(--type-body);
   text-decoration: none;
   margin-top: var(--s-1);
 }
@@ -874,7 +874,7 @@ button.cmy-joined-pill {
   border: 1px solid var(--community-pink-border);
   color: var(--community-pink);
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: var(--type-caption);
   padding: var(--s-1) var(--s-3);
   border-radius: var(--r-control);
   line-height: 1.2;
@@ -887,7 +887,7 @@ button.cmy-joined-pill {
   border: 1px solid var(--hairline, rgba(0, 0, 0, 0.1));
   color: var(--ink-700, var(--ink));
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: var(--type-caption);
   padding: var(--s-1) var(--s-3);
   border-radius: var(--r-control);
 }
@@ -915,18 +915,18 @@ button.cmy-joined-pill {
   box-sizing: border-box;
   min-height: 28px;
   padding: var(--s-1) var(--s-3);
-  font-size: 0.85rem;
+  font-size: var(--type-caption);
   font-weight: 700;
   line-height: 1.2;
 }
 .cmy-pending-note {
   margin: 0;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: var(--r-control);
   background: rgba(196, 70, 70, 0.06);
   border: 1px solid rgba(196, 70, 70, 0.14);
   color: var(--ink-700, var(--ink));
-  font-size: 0.88rem;
+  font-size: var(--type-body);
   line-height: 1.4;
   text-align: left;
 }
@@ -954,7 +954,7 @@ button.cmy-joined-pill {
   padding: 8px 14px;
   font-family: var(--font-ui);
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: var(--type-caption);
   color: var(--ink);
   cursor: pointer;
   border-radius: var(--r-control);
@@ -970,7 +970,7 @@ button.cmy-joined-pill {
 .cmy-tab-badge {
   background: var(--community-pink);
   color: #fff;
-  font-size: 0.65rem;
+  font-size: var(--type-label);
   font-weight: 700;
   line-height: 1;
   padding: 3px 6px;
@@ -990,8 +990,8 @@ button.cmy-joined-pill {
   border-radius: var(--r-lg);
 }
 .cmy-locked-icon { font-size: 1.4rem; }
-.cmy-locked-text { margin: 0; font-size: 0.92rem; font-weight: 700; color: var(--ink-700); }
-.cmy-locked-sub { margin: 0; font-size: 0.88rem; color: var(--text-muted); line-height: 1.4; }
+.cmy-locked-text { margin: 0; font-size: var(--type-body); font-weight: 700; color: var(--ink-700); }
+.cmy-locked-sub { margin: 0; font-size: var(--type-body); color: var(--text-muted); line-height: 1.4; }
 .cmy-locked-join {
   margin-top: var(--s-2);
   display: flex;
@@ -1017,7 +1017,7 @@ button.cmy-joined-pill {
 .cmy-post--pinned { border: 1px solid var(--community-pink-border); }
 .cmy-post--pending { border: 1px dashed var(--hairline, rgba(0, 0, 0, 0.15)); background: var(--paper-50, #fafafa); }
 .cmy-pending-badge {
-  font-size: 0.72rem;
+  font-size: var(--type-label);
   font-weight: 700;
   color: var(--text-subtle);
   white-space: nowrap;
@@ -1026,20 +1026,20 @@ button.cmy-joined-pill {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 0.72rem;
+  font-size: var(--type-label);
   font-weight: 700;
   color: var(--community-pink);
   white-space: nowrap;
 }
 .cmy-post-head { display: flex; align-items: center; gap: var(--s-2); }
-.cmy-post-name { font-weight: 600; color: var(--ink-900); font-size: 0.94rem; }
-.cmy-post-time { color: var(--text-subtle); font-size: 0.78rem; margin-left: auto; white-space: nowrap; }
-.cmy-post-body { color: var(--ink-700); font-size: 0.95rem; line-height: 1.5; margin: 0; white-space: pre-wrap; }
+.cmy-post-name { font-weight: 600; color: var(--ink-900); font-size: var(--type-body); }
+.cmy-post-time { color: var(--text-subtle); font-size: var(--type-caption); margin-left: auto; white-space: nowrap; }
+.cmy-post-body { color: var(--ink-700); font-size: var(--type-body); line-height: 1.5; margin: 0; white-space: pre-wrap; }
 .cmy-post-image { width: 100%; border-radius: var(--r-md); }
 .cmy-post-actions { display: flex; gap: var(--s-1); }
 .cmy-org-badge {
   color: var(--community-pink);
-  font-size: 0.72rem;
+  font-size: var(--type-label);
   font-weight: 700;
   letter-spacing: 0.01em;
   text-transform: none; /* no caps — final pass */
@@ -1060,13 +1060,13 @@ button.cmy-joined-pill {
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: var(--type-body);
   color: var(--text-muted);
   padding: 2px 6px;
   border-radius: var(--r-sm);
 }
 .cmy-icon-btn:hover { background: var(--surface-hover, var(--paper-200)); }
-.cmy-remove { font-size: 0.8rem; font-weight: 600; color: var(--signal-600); }
+.cmy-remove { font-size: var(--type-caption); font-weight: 600; color: var(--signal-600); }
 
 .cmy-composer {
   display: flex;
@@ -1081,7 +1081,7 @@ button.cmy-joined-pill {
   flex: 1;
   min-width: 0;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--type-body);
   padding: 6px 4px;
   border-radius: 0;
   border: none;
@@ -1151,7 +1151,7 @@ button.cmy-joined-pill {
 .cmy-members-preview > * { box-shadow: 0 0 0 2px var(--surface, #fff); border-radius: 50%; }
 
 /* ---- Members ---- */
-.cmy-subhead { font-size: 0.8rem; text-transform: none; /* no caps — final pass */ letter-spacing: 0.06em; color: var(--text-subtle); font-weight: 700; margin: var(--s-2) 0 0; }
+.cmy-subhead { font-size: var(--type-caption); text-transform: none; /* no caps — final pass */ letter-spacing: 0.06em; color: var(--text-subtle); font-weight: 700; margin: var(--s-2) 0 0; }
 .cmy-member-row { display: flex; align-items: center; gap: var(--s-2); }
 .cmy-member-link, .cmy-member-link-row {
   display: inline-flex;
@@ -1163,7 +1163,7 @@ button.cmy-joined-pill {
   color: inherit;
 }
 .cmy-member-link-row:hover .cmy-member-name { color: var(--community-pink); }
-.cmy-member-name { font-weight: 600; color: var(--ink-900); font-size: 0.95rem; flex: 1; }
+.cmy-member-name { font-weight: 600; color: var(--ink-900); font-size: var(--type-body); flex: 1; }
 .cmy-members-tools {
   display: flex;
   align-items: center;
@@ -1173,7 +1173,7 @@ button.cmy-joined-pill {
 .cmy-add-member { display: flex; flex-direction: column; gap: var(--s-2); }
 .cmy-add-member-results { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-2); }
 .cmy-cover-upload { display: flex; flex-direction: column; gap: var(--s-2); }
-.cmy-field-label { font-weight: 600; font-size: 0.9rem; color: var(--ink-800); }
+.cmy-field-label { font-weight: 600; font-size: var(--type-body); color: var(--ink-800); }
 .cmy-cover-preview {
   position: relative;
   height: 140px;
@@ -1241,12 +1241,12 @@ button.cmy-joined-pill {
   border-radius: var(--r-pill);
   background: var(--community-pink);
   color: var(--paper-50);
-  font-size: 0.75rem;
+  font-size: var(--type-caption);
   font-weight: 700;
   vertical-align: middle;
 }
 .cmy-request { display: flex; flex-direction: column; gap: var(--s-2); }
-.cmy-answer { margin: 0; color: var(--ink-700); font-size: 0.9rem; font-style: italic; }
+.cmy-answer { margin: 0; color: var(--ink-700); font-size: var(--type-body); font-style: italic; }
 
 /* ---- Events ---- */
 .cmy-events { display: flex; flex-direction: column; gap: var(--s-3); }
@@ -1256,7 +1256,7 @@ button.cmy-joined-pill {
 .cmy-create-head { gap: var(--s-2); }
 .cmy-create-kicker {
   margin: 0;
-  font-size: var(--type-label, 0.72rem);
+  font-size: var(--type-label);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1334,11 +1334,11 @@ button.cmy-joined-pill {
 }
 .cmy-settings-row-label {
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: var(--type-body);
   color: var(--ink-900);
 }
 .cmy-settings-row-summary {
-  font-size: 0.82rem;
+  font-size: var(--type-caption);
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1357,10 +1357,10 @@ button.cmy-joined-pill {
   gap: var(--s-2);
 }
 .cmy-field { display: flex; flex-direction: column; gap: var(--s-1); }
-.cmy-field > span { font-weight: 600; font-size: 0.9rem; color: var(--ink-800); }
+.cmy-field > span { font-weight: 600; font-size: var(--type-body); color: var(--ink-800); }
 .cmy-input, .cmy-textarea {
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--type-body);
   padding: var(--s-2) var(--s-3);
   border-radius: var(--r-md);
   border: 1px solid var(--hairline, rgba(0,0,0,0.14));
@@ -1380,7 +1380,7 @@ button.cmy-joined-pill {
   justify-content: space-between;
   font-weight: 600;
   color: var(--ink-800);
-  font-size: 0.9rem;
+  font-size: var(--type-body);
 }
 /* Tan chip toggle — mirrors the Flexible pill pattern from CreatePlan (.flex-toggle-btn),
    used instead of a checkbox for on/off settings like group chat. */
@@ -1391,7 +1391,7 @@ button.cmy-joined-pill {
   color: var(--text-muted);
   font-family: var(--font-ui);
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: var(--type-caption);
   padding: 6px 14px;
   border-radius: var(--r-control);
   cursor: pointer;
@@ -1412,7 +1412,7 @@ button.cmy-joined-pill {
   padding: var(--s-1) var(--s-2);
   border-radius: var(--r-control);
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: var(--type-caption);
   color: var(--text-muted);
   cursor: pointer;
 }
@@ -1440,14 +1440,14 @@ button.cmy-joined-pill {
 }
 .cmy-danger-title {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: var(--type-body);
   font-weight: 700;
   color: var(--ink-900);
 }
 .cmy-danger-copy {
   margin: 0;
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: var(--type-body);
   line-height: 1.4;
 }
 .cmy-danger-actions {
@@ -1477,7 +1477,7 @@ button.cmy-joined-pill {
   color: var(--ink-900);
   font-family: var(--font-ui);
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: var(--type-body);
   cursor: pointer;
   text-align: left;
 }
@@ -1502,7 +1502,7 @@ button.cmy-joined-pill {
   line-height: 1.2;
 }
 .cmy-create-step {
-  font-size: var(--type-label, 10px);
+  font-size: var(--type-label);
   font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--muted);
@@ -1544,7 +1544,7 @@ button.cmy-joined-pill {
 }
 .cmy-create-card-kicker {
   display: block;
-  font-size: var(--type-label, 10px);
+  font-size: var(--type-label);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1566,7 +1566,7 @@ button.cmy-joined-pill {
   padding: 0;
   box-shadow: none;
   font-family: var(--font-ui);
-  font-size: var(--type-title, 20px);
+  font-size: var(--type-title);
   font-weight: 600;
   color: var(--ink);
   line-height: 1.25;
@@ -1589,7 +1589,7 @@ button.cmy-joined-pill {
   gap: 8px;
 }
 .cmy-create-count {
-  font-size: var(--type-caption, 12px);
+  font-size: var(--type-caption);
   font-weight: 600;
   color: var(--muted);
   flex-shrink: 0;
