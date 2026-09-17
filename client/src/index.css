@@ -7702,8 +7702,10 @@ a.action-btn--stack {
 }
 
 /* ---- Lock in a Just an Idea (same details screen) ---- */
-.plan-detail-page--lock-in {
-  padding-bottom: calc(var(--nav-height, 58px) + 108px + env(safe-area-inset-bottom, 0px));
+/* Two classes so this beats .app-shell--with-nav and the last cards can
+   scroll above the fixed Lock it in bar + bottom nav. */
+.app-shell--with-nav.plan-detail-page--lock-in {
+  padding-bottom: calc(var(--nav-height, 58px) + 148px + env(safe-area-inset-bottom, 0px));
 }
 .plan-meta-card--edit {
   overflow: visible;
@@ -7730,6 +7732,13 @@ a.action-btn--stack {
 .plan-meta-row--edit .flex-toggle-btn {
   margin-top: 0;
   flex-shrink: 0;
+}
+.plan-meta-row--edit .flex-switch-col {
+  align-self: center;
+  margin-top: 0;
+}
+.plan-meta-row--edit label.plan-meta-text {
+  margin-bottom: 0;
 }
 .flex-switch-col {
   flex: none;

@@ -67,6 +67,7 @@ export function PlanDetailPage() {
   const lockFormRef = useRef<HTMLDivElement | null>(null);
   const lockFlyerRef = useRef<HTMLInputElement | null>(null);
   const lockDateRef = useRef<HTMLInputElement | null>(null);
+  const lockTimeRef = useRef<HTMLInputElement | null>(null);
   const coverPool = useCardImages();
 
   const load = async () => {
@@ -444,6 +445,40 @@ export function PlanDetailPage() {
               />
             )}
           </div>
+          <button
+            type="button"
+            className="plan-detail-people"
+            onClick={() => setShowGuestsModal(true)}
+            aria-label={
+              planPeople.length === 0
+                ? "No one yet. View who's going"
+                : `${goingCount} going${interestedCount > 0 ? `, ${interestedCount} interested` : ""}. View who's going`
+            }
+          >
+            {planPeoplePreview.length > 0 && (
+              <span className="avatar-stack">
+                {planPeoplePreview.map((person) => (
+                  <span key={person.id} className="avatar-stack-link">
+                    <Avatar
+                      seed={person.avatarSeed}
+                      style={person.avatarStyle}
+                      photoDataUrl={person.avatarPhotoDataUrl}
+                      params={person.avatarParams}
+                      name={person.firstName}
+                      size="sm"
+                    />
+                  </span>
+                ))}
+              </span>
+            )}
+            <span className="plan-detail-people-count">
+              {planPeople.length === 0
+                ? "No one yet"
+                : goingCount > 0
+                  ? `${goingCount} going`
+                  : `${interestedCount} interested`}
+            </span>
+          </button>
           {lockingIn ? (
             <div ref={lockFormRef} className="plan-meta-card plan-meta-card--edit">
               <div className="plan-meta-row plan-meta-row--edit">
@@ -492,20 +527,26 @@ export function PlanDetailPage() {
               </div>
               <div className="plan-meta-row plan-meta-row--edit">
                 <span className="plan-meta-icon" aria-hidden="true"><ClockIcon /></span>
-                <div className="plan-meta-text plan-meta-text--time">
+                <label className="plan-meta-text" htmlFor={lockFlexTime ? undefined : "lock-time"}>
                   <span className="plan-meta-label">Time</span>
-                  {lockFlexTime ? (
-                    <span className="plan-meta-value is-placeholder">Flexible time</span>
-                  ) : (
+                  <span className={`plan-meta-value ${lockFlexTime || !lockTime ? "is-placeholder" : ""}`}>
+                    {lockFlexTime
+                      ? "Flexible time"
+                      : lockTime
+                        ? formatPlanTime(lockTime, false)
+                        : "Pick a time"}
+                  </span>
+                  {!lockFlexTime && (
                     <input
+                      ref={lockTimeRef}
                       id="lock-time"
-                      className="plan-meta-time-input"
+                      className="plan-meta-native-input"
                       type="time"
                       value={lockTime}
                       onChange={(e) => setLockTime(e.target.value)}
                     />
                   )}
-                </div>
+                </label>
                 <FlexChip active={lockFlexTime} onClick={() => setLockFlexTime((v) => !v)} />
               </div>
             </div>
@@ -544,40 +585,6 @@ export function PlanDetailPage() {
               )}
             </div>
           )}
-          <button
-            type="button"
-            className="plan-detail-people"
-            onClick={() => setShowGuestsModal(true)}
-            aria-label={
-              planPeople.length === 0
-                ? "No one yet. View who's going"
-                : `${goingCount} going${interestedCount > 0 ? `, ${interestedCount} interested` : ""}. View who's going`
-            }
-          >
-            {planPeoplePreview.length > 0 && (
-              <span className="avatar-stack">
-                {planPeoplePreview.map((person) => (
-                  <span key={person.id} className="avatar-stack-link">
-                    <Avatar
-                      seed={person.avatarSeed}
-                      style={person.avatarStyle}
-                      photoDataUrl={person.avatarPhotoDataUrl}
-                      params={person.avatarParams}
-                      name={person.firstName}
-                      size="sm"
-                    />
-                  </span>
-                ))}
-              </span>
-            )}
-            <span className="plan-detail-people-count">
-              {planPeople.length === 0
-                ? "No one yet"
-                : goingCount > 0
-                  ? `${goingCount} going`
-                  : `${interestedCount} interested`}
-            </span>
-          </button>
         </header>
 
         <button
@@ -587,6 +594,14 @@ export function PlanDetailPage() {
             navigate(`/profile/${plan.creator.id}`, { state: { from: "plan", planId: plan.id } })
           }
         >
+          <Avatar
+            seed={plan.creator.avatarSeed}
+            style={plan.creator.avatarStyle}
+            photoDataUrl={plan.creator.avatarPhotoDataUrl}
+            params={plan.creator.avatarParams}
+            name={plan.creator.firstName}
+            size="sm"
+          />
           <span className="host-row-text">
             <span className="host-row-label">Started by</span>
             <strong>
@@ -754,7 +769,7 @@ export function PlanDetailPage() {
             >
               <div className="modal-card" onClick={(e) => e.stopPropagation()}>
                 <div className="plan-guests-modal-head">
-                  <h2 id="pass-hosting-title">Pass hosting</h2>
+                  <h2 id="pass-hosting-title">Transfer Hosting</h2>
                   <button
                     type="button"
                     className="plan-guests-modal-close"
@@ -873,7 +888,7 @@ export function PlanDetailPage() {
                   setConfirmCancel(false);
                 }}
               >
-                Pass hosting
+                Transfer Hosting
               </button>
             )}
             <button
@@ -1047,7 +1062,11 @@ function FlexChip({ active, onClick }: { active: boolean; onClick: () => void })
         type="button"
         role="switch"
         className={`flex-switch ${active ? "is-on" : ""}`}
-        onClick={onClick}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClick();
+        }}
         aria-checked={active}
         aria-label="Flexible"
       >
@@ -1430,13 +1449,13 @@ function PassHostingControl({
         }}
       >
         <Hand size={14} strokeWidth={1.8} aria-hidden="true" />
-        Pass hosting
+        Transfer Hosting
       </button>
     );
   }
 
   return (
-    <div className="plan-pass-hosting" role="group" aria-label="Pass hosting">
+    <div className="plan-pass-hosting" role="group" aria-label="Transfer Hosting">
       {canGrabs && (
         <button
           type="button"
