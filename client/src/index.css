@@ -1251,13 +1251,32 @@ a.btn-primary[aria-disabled="true"] {
   padding-top: 0;
   padding-bottom: calc(108px + env(safe-area-inset-bottom, 0px));
 }
+.create-plan-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 12px;
+  background: var(--bg);
+}
+.create-plan-topbar .detail-back {
+  min-height: 44px;
+  padding: 10px 0;
+}
+.create-plan-topbar-invite {
+  color: var(--red);
+  font-weight: 600;
+}
 .plan-detail-title-box {
   width: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-card);
-  padding: 14px 16px;
+  padding: 18px 20px;
 }
 .plan-detail-title-input {
   width: 100%;
@@ -1289,6 +1308,9 @@ a.btn-primary[aria-disabled="true"] {
   font: inherit;
   font-size: var(--text-body);
   line-height: 1.45;
+}
+.plan-detail-card--composer {
+  padding: 18px 20px;
 }
 .plan-detail-title-row {
   display: flex;
@@ -3440,9 +3462,10 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
 }
 .path-picker-header.app-header--sticky {
   top: 0;
+  z-index: 21;
   margin-left: -15px;
   margin-right: -15px;
-  padding: calc(10px + env(safe-area-inset-top, 0px)) 15px 12px;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 15px 14px;
   background: var(--bg);
   background-image: none;
 }
@@ -3456,7 +3479,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
 }
 .idea-form-page .brand,
 .path-picker-page .path-picker-intent-head {
-  padding-top: 4px;
+  padding-top: 12px;
 }
 .chat-header-menu-leave,
 .forum-leave-btn,
@@ -3766,6 +3789,9 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
 .host-row.plan-detail-card {
   margin-bottom: 0;
   width: 100%;
+}
+.host-row .avatar {
+  flex-shrink: 0;
 }
 .plan-card-meta-row {
   display: flex;
@@ -7684,7 +7710,22 @@ a.action-btn--stack {
 }
 .plan-meta-row--edit {
   position: relative;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
   align-items: center;
+  column-gap: 12px;
+  padding: 16px 18px;
+}
+.plan-meta-row--edit .plan-meta-text {
+  position: relative;
+  min-width: 0;
+  gap: 4px;
+}
+.plan-meta-row--edit .plan-meta-value,
+.plan-meta-row--edit .plan-meta-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .plan-meta-row--edit .flex-toggle-btn {
   margin-top: 0;
@@ -7743,7 +7784,8 @@ a.action-btn--stack {
   width: 100%;
   border: none;
   background: transparent;
-  padding: 0;
+  padding: 2px 0;
+  min-height: 24px;
   font-size: var(--text-card);
   font-weight: 600;
   color: var(--ink);
@@ -7758,12 +7800,13 @@ a.action-btn--stack {
 }
 .plan-meta-native-input {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   opacity: 0;
-  pointer-events: none;
-  overflow: hidden;
+  cursor: pointer;
   border: none;
+  background: transparent;
 }
 .plan-meta-text--time {
   flex: 1;

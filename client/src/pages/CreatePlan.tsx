@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { FLEXIBLE_DATE_PLACEHOLDER } from "../lib/planTime";
-import { formatPlanDate } from "../lib/format";
+import { formatPlaceAddress, formatPlanDate, formatPlanTime } from "../lib/format";
 import { Avatar } from "../components/Avatar";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
 import { LocationAutocomplete } from "../components/LocationAutocomplete";
@@ -735,30 +735,25 @@ export function CreatePlanPage() {
   }
 
   const invitedPeople = (network ?? []).filter((u) => invitedIds.has(u.id));
-  const createPeople = [
-    ...(user
-      ? [{
-          id: user.id,
-          firstName: user.firstName,
-          avatarSeed: user.avatarSeed,
-          avatarStyle: user.avatarStyle,
-          avatarPhotoDataUrl: user.avatarPhotoDataUrl,
-          avatarParams: user.avatarParams,
-        }]
-      : []),
-    ...invitedPeople.filter((u) => u.id !== user?.id),
-  ];
-  const peoplePreviewMax = 4;
-  const createPeoplePreview = createPeople.slice(0, peoplePreviewMax);
-  const createPeopleOthers = Math.max(0, createPeople.length - peoplePreviewMax);
   const selectedInterests = form.vibes
     .map((id) => VIBE_OPTIONS.find((o) => o.id === id)?.tag)
     .filter((t): t is InterestTag => Boolean(t));
 
   return (
     <main className="app-shell app-shell--wide plan-detail-page plan-detail-page--create">
+      <header className="create-plan-topbar">
+        <button type="button" className="detail-back" onClick={leaveCreatePlan}>
+          <ArrowLeft size={13} strokeWidth={2} aria-hidden="true" /> Back
+        </button>
+        <button
+          type="button"
+          className="detail-back create-plan-topbar-invite"
+          onClick={() => setShowInvitePicker(true)}
+        >
+          <UserPlus size={13} strokeWidth={2} aria-hidden="true" /> Invite
+        </button>
+      </header>
       <form id="create-plan-form" onSubmit={submit}>
-      <div className="plan-detail-safe-scrim" aria-hidden="true" />
       <div className={`plan-detail-hero${form.flyerDataUrl ? "" : " plan-detail-hero--empty"}`}>
         {form.flyerDataUrl && <img src={form.flyerDataUrl} alt="" />}
         {form.flyerDataUrl ? (
@@ -811,21 +806,6 @@ export function CreatePlanPage() {
             if (flyerRef.current) flyerRef.current.value = "";
           }}
         />
-        <div className="plan-detail-hero-bar">
-          <button type="button" className="plan-detail-hero-btn" aria-label="Back" onClick={backFromForm}>
-            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
-          </button>
-          <div className="plan-detail-hero-bar-actions">
-            <button
-              type="button"
-              className="plan-detail-hero-btn"
-              aria-label="Invite"
-              onClick={() => setShowInvitePicker(true)}
-            >
-              <UserPlus size={18} strokeWidth={2} aria-hidden="true" />
-            </button>
-          </div>
-        </div>
       </div>
 
       <div className="plan-detail-body">
@@ -928,21 +908,26 @@ export function CreatePlanPage() {
                 {form.isFlexibleLocation ? (
                   <span className="plan-meta-value is-placeholder">Flexible location</span>
                 ) : (
-                  <LocationAutocomplete
-                    name={form.locationName}
-                    address={form.locationAddress}
-                    placeholder="Add a venue"
-                    onChange={(v) => {
-                      setForm((f) => ({
-                        ...f,
-                        locationName: v.name,
-                        locationAddress: v.address,
-                        locationLat: v.lat,
-                        locationLng: v.lng,
-                        isFlexibleLocation: false,
-                      }));
-                    }}
-                  />
+                  <>
+                    <LocationAutocomplete
+                      name={form.locationName}
+                      address={form.locationAddress}
+                      placeholder="Add a venue"
+                      onChange={(v) => {
+                        setForm((f) => ({
+                          ...f,
+                          locationName: v.name,
+                          locationAddress: v.address,
+                          locationLat: v.lat,
+                          locationLng: v.lng,
+                          isFlexibleLocation: false,
+                        }));
+                      }}
+                    />
+                    {form.locationAddress && form.locationAddress !== form.locationName ? (
+                      <span className="plan-meta-sub">{formatPlaceAddress(form.locationAddress)}</span>
+                    ) : null}
+                  </>
                 )}
               </div>
               <FlexToggle
@@ -1013,14 +998,19 @@ export function CreatePlanPage() {
             </div>
             <div className="plan-meta-row plan-meta-row--edit">
               <span className="plan-meta-icon" aria-hidden="true"><Clock size={18} strokeWidth={1.8} /></span>
-              <div className="plan-meta-text plan-meta-text--time">
+              <label className="plan-meta-text" htmlFor="time">
                 <span className="plan-meta-label">Time</span>
-                {form.isFlexibleTime ? (
-                  <span className="plan-meta-value is-placeholder">Flexible time</span>
-                ) : (
+                <span className={`plan-meta-value ${form.isFlexibleTime || !form.time ? "is-placeholder" : ""}`}>
+                  {form.isFlexibleTime
+                    ? "Flexible time"
+                    : form.time
+                      ? formatPlanTime(form.time, false)
+                      : "Pick a time"}
+                </span>
+                {!form.isFlexibleTime && (
                   <input
                     id="time"
-                    className="plan-meta-time-input"
+                    className="plan-meta-native-input"
                     type="time"
                     min={!form.isFlexibleDate && form.date === today() ? nowTime() : undefined}
                     value={form.time}
@@ -1028,7 +1018,7 @@ export function CreatePlanPage() {
                     onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
                   />
                 )}
-              </div>
+              </label>
               <FlexToggle
                 variant="switch"
                 active={form.isFlexibleTime}
@@ -1047,46 +1037,36 @@ export function CreatePlanPage() {
           {(attemptedSubmit && locationError) || dateError || timeError ? (
             <p className="luma-inline-error">{locationError || dateError || timeError}</p>
           ) : null}
-          <button
-            type="button"
-            className="plan-detail-people"
-            onClick={() => setShowInvitePicker(true)}
-            aria-label="Who's going"
-          >
-            {createPeoplePreview.length > 0 && (
-              <span className="avatar-stack">
-                {createPeoplePreview.map((person) => (
-                  <span key={person.id} className="avatar-stack-link">
-                    <Avatar
-                      seed={person.avatarSeed}
-                      style={person.avatarStyle}
-                      photoDataUrl={person.avatarPhotoDataUrl}
-                      params={person.avatarParams}
-                      name={person.firstName}
-                      size="sm"
-                    />
-                  </span>
-                ))}
-              </span>
-            )}
-            <span className="plan-detail-people-count">
-              {createPeople.length === 0
-                ? "No one yet"
-                : createPeopleOthers > 0
-                  ? `+ ${createPeopleOthers} ${createPeopleOthers === 1 ? "other" : "others"}`
-                  : null}
-            </span>
-          </button>
         </header>
 
-        <div className="host-row plan-detail-card">
+        <button
+          type="button"
+          className="host-row plan-detail-card"
+          onClick={() => setShowInvitePicker(true)}
+        >
+          {user && (
+            <Avatar
+              seed={user.avatarSeed}
+              style={user.avatarStyle}
+              photoDataUrl={user.avatarPhotoDataUrl}
+              params={user.avatarParams}
+              name={user.firstName}
+              size="sm"
+            />
+          )}
           <span className="host-row-text">
             <span className="host-row-label">Started by</span>
-            <strong>you</strong>
+            <strong>
+              you
+              {invitedPeople.length > 0
+                ? ` · ${invitedPeople.length} invited`
+                : ""}
+            </strong>
           </span>
-        </div>
+          <span className="host-row-chevron" aria-hidden="true">›</span>
+        </button>
 
-        <div className="plan-detail-card">
+        <div className="plan-detail-card plan-detail-card--composer">
           <textarea
             id="description"
             className="plan-detail-desc-input"
@@ -1187,11 +1167,6 @@ export function CreatePlanPage() {
               <div className="form-row-flex">
                 <div className="form-row-flex-main">
                   <label className="form-question">Capacity</label>
-                  {!form.capacityOn && (
-                    <p className="form-help" style={{ marginTop: 4 }}>
-                      Open house.
-                    </p>
-                  )}
                 </div>
                 <FlexToggle
                   active={form.capacityOn}
