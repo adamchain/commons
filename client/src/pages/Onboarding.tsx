@@ -78,8 +78,7 @@ type Step =
   | "profile"
   | "age"
   | "legal"
-  | "welcome"
-  | "download";
+  | "welcome";
 
 /**
  * Handoff from the public event page (PublicEventPage). When a logged-out
@@ -139,10 +138,10 @@ export function OnboardingPage() {
   });
 
   // If a logged-in, already-onboarded user lands here, move them on (to the
-  // event they came from, or home). Skip on the "download" step — that's the
-  // deliberate post-completion app nudge, which navigates on its own.
+  // event they came from, or home). Skip on the "welcome" step — that's the
+  // one-time final screen, which navigates on its own.
   useEffect(() => {
-    if (user && !needsOnboarding(user) && step !== "download" && step !== "welcome")
+    if (user && !needsOnboarding(user) && step !== "welcome")
       navigate(redirectTo, { replace: true });
   }, [user, step, redirectTo, navigate]);
 
@@ -500,16 +499,13 @@ export function OnboardingPage() {
             }),
           });
           // Set the step BEFORE refreshUser resolves so the completion guard
-          // above sees "welcome" (or "download") and doesn't redirect out from
-          // under it.
+          // above sees "welcome" and doesn't redirect out from under it.
           const uid = user?.id;
           if (uid && !hasSeenWelcome(uid)) {
             setStep("welcome");
-          } else if (!isNative()) {
-            setStep("download");
-          }
-          await refreshUser();
-          if (uid && hasSeenWelcome(uid) && isNative()) {
+            await refreshUser();
+          } else {
+            await refreshUser();
             navigate(redirectTo, { replace: true });
           }
         }}
@@ -517,6 +513,7 @@ export function OnboardingPage() {
     );
   }
   if (step === "welcome") {
+    if (!user) return null;
     return (
       <WelcomeStep
         user={user}
@@ -528,17 +525,13 @@ export function OnboardingPage() {
       />
     );
   }
-  if (step === "download") {
-    return <DownloadAppStep redirectTo={redirectTo} onContinue={() => navigate(redirectTo, { replace: true })} />;
-  }
   return null;
 }
 
 /**
- * F.1 — one-time warm interstitial shown right after onboarding completes,
- * before the member ever lands on the feed. Headline, a "here's what's
- * happening" line naming their neighborhood, and — when available — a live
- * nearby-plans stat. On web, the App Store nudge lives on this same screen.
+ * The one final screen after onboarding: "You're in." plus, on web, the
+ * App Store nudge. Previously a second "You're in." / "Get the app." screen
+ * followed this one.
  */
 function WelcomeStep({
   user,
@@ -606,35 +599,6 @@ function WelcomeStep({
         )}
       </div>
     </div>
-  );
-}
-
-/**
- * Final web step: nudge the freshly-onboarded member to install the iOS app.
- * Commons runs natively on iOS, so web signups (including the shared-event
- * funnel) land here before continuing to the event or feed. Skippable — the web
- * app keeps working for anyone who'd rather stay in the browser.
- */
-function DownloadAppStep({ redirectTo, onContinue }: { redirectTo: string; onContinue: () => void }) {
-  const goingToEvent = redirectTo.startsWith("/plans/");
-  return (
-    <OnboardingShell
-      title="Get the app."
-      subtitle="Commons lives on your phone."
-    >
-      <div className="download-app">
-        {APP_STORE_URL ? (
-          <a className="btn-primary btn-block" href={APP_STORE_URL} target="_blank" rel="noopener noreferrer">
-             Download for iPhone
-          </a>
-        ) : (
-          <div className="download-app-soon">iPhone app coming soon — we'll text you the link.</div>
-        )}
-        <button className="btn-link btn-block" type="button" onClick={onContinue}>
-          {goingToEvent ? "Continue to the event on web →" : "Continue on the web →"}
-        </button>
-      </div>
-    </OnboardingShell>
   );
 }
 
