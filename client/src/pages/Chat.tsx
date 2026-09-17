@@ -12,13 +12,12 @@ import {
 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
-import { PlanCoverThumb } from "../components/CoverThumb";
 import { BlockConfirmModal, ReportModal } from "../components/PlanSafetyMenu";
 import { PollCard } from "../components/PollCard";
 import { PollSheet } from "../components/PollSheet";
 import { EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
-import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
+import { sentenceCaseTitle } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import { pickPhotoNative } from "../lib/photoPicker";
@@ -149,9 +148,8 @@ export function ChatPage() {
     return (
       <main className="app-shell app-shell--chat">
         <header className="app-header app-header--minimal chat-header-bar chat-header-bar--thread app-header--sticky">
-          <Link to={backHref} className="detail-back chat-back-link">
-            <ArrowLeft size={13} strokeWidth={2.2} aria-hidden="true" />
-            {backLabel}
+          <Link to={backHref} className="detail-back chat-back-link" aria-label={backLabel}>
+            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
           </Link>
           <div className="chat-thread-title">Chat</div>
           <span aria-hidden="true" />
@@ -336,8 +334,6 @@ export function ChatPage() {
 
   const openPolls = messages.filter((m) => m.kind === "poll" && m.poll && !m.poll.closed);
 
-  const visibleAvatars = conv.participants.slice(0, 3);
-  const overflowCount = Math.max(0, conv.participants.length - visibleAvatars.length);
   const participantLabel =
     conv.participants.length === 1 ? "1 person" : `${conv.participants.length} people`;
 
@@ -356,11 +352,18 @@ export function ChatPage() {
   return (
     <main ref={shellRef} className="app-shell app-shell--chat">
       <header className="app-header app-header--minimal chat-header-bar chat-header-bar--thread app-header--sticky">
-        <Link to={backHref} className="detail-back chat-back-link">
-          <ArrowLeft size={13} strokeWidth={2.2} aria-hidden="true" />
-          {backLabel}
+        <Link to={backHref} className="detail-back chat-back-link" aria-label={backLabel}>
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </Link>
-        <div className="chat-thread-title">{sentenceCaseTitle(plan.title)}</div>
+        <Link
+          to={`/plans/${planId}`}
+          state={planLinkState}
+          className="chat-thread-heading"
+          aria-label={`Open ${sentenceCaseTitle(plan.title)}`}
+        >
+          <div className="chat-thread-title">{sentenceCaseTitle(plan.title)}</div>
+          <div className="chat-thread-sub">{participantLabel}</div>
+        </Link>
         <div className="chat-header-menu-wrap" ref={headerMenuRef}>
           <button
             type="button"
@@ -418,41 +421,6 @@ export function ChatPage() {
       </header>
 
       <div className="chat-shell">
-        <Link
-          to={`/plans/${planId}`}
-          state={planLinkState}
-          className="chat-header-card chat-header-card--compact"
-          aria-label="Open plan details"
-        >
-          <PlanCoverThumb
-            planId={plan.id}
-            flyerDataUrl={plan.flyerDataUrl}
-            isIdea={isIdeaPlan(plan)}
-            className="cover-thumb--sm"
-          />
-          <div className="chat-header-text">
-            <div className="chat-header-meta">
-              {formatPlanDate(plan.date)} · {formatPlanTime(plan.time, plan.isFlexibleTime)} · {participantLabel}
-            </div>
-          </div>
-          <div className="chat-header-avatars" aria-hidden>
-            {visibleAvatars.map((p) => (
-              <span key={p.id} className="chat-header-avatar">
-                <Avatar
-                  seed={p.avatarSeed}
-                  style={p.avatarStyle}
-                  photoDataUrl={p.avatarPhotoDataUrl}
-                  params={p.avatarParams}
-                  size="sm"
-                />
-              </span>
-            ))}
-            {overflowCount > 0 && (
-              <span className="chat-header-avatar-more">+{overflowCount}</span>
-            )}
-          </div>
-        </Link>
-
         {canLockIdea && (
           <Link to={lockHref} className="chat-replan-cta chat-replan-cta--primary">
             <span className="chat-replan-text">

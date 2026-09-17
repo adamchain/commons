@@ -4655,7 +4655,7 @@ a.action-btn--stack {
   grid-template-columns: 44px 1fr auto;
   align-items: center;
   column-gap: 12px;
-  padding: 14px 16px;
+  padding: 8px 14px;
   background: transparent;
   border: none;
   border-bottom: 1px solid var(--border);
@@ -4705,8 +4705,7 @@ a.action-btn--stack {
   color: var(--ink);
 }
 .messages-row-preview--empty {
-  color: var(--faint);
-  font-style: italic;
+  color: var(--muted);
 }
 .messages-tab-sub {
   font-size: var(--text-body-small);
@@ -12984,20 +12983,33 @@ button.xpl-photo-tile {
   background: var(--surface-2);
 }
 
+.chat-thread-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+}
 .chat-thread-title {
-  flex: 1;
+  width: 100%;
   text-align: center;
   font-weight: 700;
   font-size: var(--text-body);
   letter-spacing: -0.02em;
-  padding: 0 8px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.chat-thread-sub {
+  font-size: var(--text-body-small);
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.3;
+}
 .chat-header-bar--thread {
   display: grid;
-  grid-template-columns: minmax(72px, auto) 1fr minmax(40px, auto);
+  grid-template-columns: 40px 1fr 40px;
   align-items: center;
   gap: 8px;
 }
@@ -13107,7 +13119,6 @@ button.xpl-photo-tile {
   font-weight: 600;
   font-size: var(--text-body);
   color: var(--ink);
-  max-width: 195px;
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -13490,7 +13501,7 @@ button.xpl-photo-tile {
   cursor: pointer;
 }
 .messages-row--forum {
-  padding: 8px 16px;
+  padding: 8px 14px;
 }
 
 .forum-leave-btn {
@@ -13876,28 +13887,28 @@ button.xpl-photo-tile {
 /* Messages Plans / Interests tab switcher */
 .messages-tabs {
   display: flex;
-  gap: 8px;
-  margin: 0 0 16px;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 12px;
   width: 100%;
 }
 .messages-tab {
   appearance: none;
-  padding: 8px 18px;
+  padding: 8px 16px;
   font-size: var(--text-body);
   font-weight: 500;
-  color: var(--ink);
+  color: var(--muted);
   background: transparent;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: var(--r-control);
+  border: none;
+  border-radius: 12px;
   cursor: pointer;
   text-transform: capitalize;
 }
 .messages-tab.is-active {
-  color: var(--ink);
+  color: var(--red);
   font-weight: 600;
   background: var(--surface);
-  border-color: transparent;
-  box-shadow: var(--shadow-card);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 /* Did this happen? */

@@ -5,7 +5,7 @@ import { api, parseApiError } from "../api/http";
 import { InterestGlyph } from "../components/InterestGlyph";
 import { PlanCoverThumb } from "../components/CoverThumb";
 import { EmptyCard, ScreenTitle } from "../components/ui";
-import { formatRelative, sentenceCaseTitle } from "../lib/format";
+import { sentenceCaseTitle } from "../lib/format";
 import {
   FORUM_INTERESTS,
   INTEREST_LABELS,
@@ -22,8 +22,8 @@ function previewLooksLikePoll(text: string | null | undefined): boolean {
 }
 
 function cleanPreview(text: string | null | undefined): string {
-  if (!text) return "No messages yet";
-  return text.replace(/📊\s*/g, "").trim() || "No messages yet";
+  if (!text) return "No messages yet — say hi";
+  return text.replace(/📊\s*/g, "").trim() || "No messages yet — say hi";
 }
 
 export function MessagesPage() {
@@ -233,9 +233,6 @@ export function MessagesPage() {
                     <div className="messages-row-body">
                       <div className="messages-row-top">
                         <span className="messages-row-title">{title}</span>
-                        {c.lastMessageAt && (
-                          <span className="messages-row-time">{formatRelative(c.lastMessageAt)}</span>
-                        )}
                       </div>
                       <div className="messages-row-preview">
                         {isPoll && <BarChart2 size={14} strokeWidth={1.8} />}
@@ -244,9 +241,11 @@ export function MessagesPage() {
                       <div className="messages-row-meta">
                         {c.communityId
                           ? "Joined"
-                          : c.myRole === "going" || c.myRole === "hosting"
-                            ? "Going"
-                            : "Started"}
+                          : c.myRole === "hosting"
+                            ? "Started"
+                            : c.myRole === "going"
+                              ? "Going"
+                              : "Interested"}
                         {" · "}
                         {c.participantCount}{" "}
                         {c.participantCount === 1 ? "person" : "people"}
