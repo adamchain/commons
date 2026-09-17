@@ -81,7 +81,7 @@ export function SearchPage() {
       </div>
 
       {!hasQuery && (
-        <p className="form-help">Plans, people, a community — type something.</p>
+        <p className="form-help">Plans, people, a community.</p>
       )}
 
       {noResults && (

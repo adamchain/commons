@@ -260,7 +260,7 @@ export function CommunityChatPage() {
 
   async function leaveChat() {
     if (!conv) return;
-    if (!window.confirm("Leave this chat? It'll disappear from your Messages. You stay in the community.")) return;
+    if (!window.confirm("Leave this chat? It leaves the inbox. You're still in.")) return;
     try {
       await api(`/api/conversations/${conv.id}/leave`, { method: "POST" });
       navigate("/messages");
@@ -331,7 +331,7 @@ export function CommunityChatPage() {
 
   async function closePoll(messageId: string) {
     if (!conv) return;
-    if (!window.confirm("Close this poll? Results will be final and voting stops.")) return;
+    if (!window.confirm("Close this poll? Votes lock in.")) return;
     setBusyPollId(messageId);
     try {
       const updated = await api<MessageDTO>(
@@ -348,7 +348,7 @@ export function CommunityChatPage() {
 
   async function reopenPoll(messageId: string) {
     if (!conv) return;
-    if (!window.confirm("Reopen this poll? Voting starts again and results unlock.")) return;
+    if (!window.confirm("Reopen this poll?")) return;
     setBusyPollId(messageId);
     try {
       const updated = await api<MessageDTO>(

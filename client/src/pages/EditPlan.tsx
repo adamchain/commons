@@ -961,9 +961,6 @@ function PassItOnControl({
 
   return (
     <div>
-      <p className="form-help" style={{ marginTop: 0 }}>
-        Transfer hosting to someone who's going.
-      </p>
       {!open ? (
         <button
           type="button"

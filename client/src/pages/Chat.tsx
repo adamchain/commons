@@ -302,7 +302,7 @@ export function ChatPage() {
 
   async function closePoll(messageId: string) {
     if (!conv) return;
-    if (!window.confirm("Close this poll? Results will be final and voting stops.")) return;
+    if (!window.confirm("Close this poll? Votes lock in.")) return;
     setBusyPollId(messageId);
     try {
       const updated = await api<MessageDTO>(
@@ -319,7 +319,7 @@ export function ChatPage() {
 
   async function reopenPoll(messageId: string) {
     if (!conv) return;
-    if (!window.confirm("Reopen this poll? Voting starts again and results unlock.")) return;
+    if (!window.confirm("Reopen this poll?")) return;
     setBusyPollId(messageId);
     try {
       const updated = await api<MessageDTO>(
@@ -718,7 +718,7 @@ export function ChatPage() {
               {planConcluded ? "Remove from inbox?" : "Leave this chat?"}
             </h2>
             <p className="sheet-copy">
-              It&apos;ll disappear from Messages. You stay on the plan.
+              Leaves the inbox. You&apos;re still on the plan.
             </p>
             {leaveErr && <p className="error-text">{leaveErr}</p>}
             <div className="sheet-actions">

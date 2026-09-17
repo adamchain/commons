@@ -314,7 +314,7 @@ export function OnboardingPage() {
             ? "Local dev: the server prints the code in its terminal — check the API console."
             : smsConfigured === true || authMode === "verify"
               ? "You'll get a text with your verification code (Twilio Verify). Message rates may apply."
-              : "We'll text you a code to verify your number."}
+              : "We'll text a code."}
         </p>
       </OnboardingShell>
     );
@@ -620,7 +620,7 @@ function DownloadAppStep({ redirectTo, onContinue }: { redirectTo: string; onCon
   return (
     <OnboardingShell
       title="Get the app."
-      subtitle="Commons lives on your phone. Get the app for notifications when plans fill up, chat, and one-tap RSVPs."
+      subtitle="Commons lives on your phone."
     >
       <div className="download-app">
         {APP_STORE_URL ? (
@@ -891,7 +891,7 @@ function LocationStep({
   return (
     <OnboardingShell
       title="Where do you spend time?"
-      subtitle={coords ? "Pick your neighborhoods — we’ll show you what’s happening nearby." : "Pick every area that fits — we’ll personalize your feed."}
+      subtitle={coords ? "Wherever you actually hang." : "Every corner that counts."}
       onBack={onBack}
     >
       <input
@@ -1068,7 +1068,7 @@ function LegalConsentStep({
             ? "Now read the Privacy Policy."
             : read.privacy
               ? "Now read the Terms of Service."
-              : "Open and scroll to the bottom of each document to continue."}
+              : "Open each, scroll to the bottom."}
         </p>
       )}
 
@@ -1278,7 +1278,7 @@ function ProfileStep({
   const canContinue = Boolean(firstName.trim() && lastName.trim() && photo);
 
   return (
-    <OnboardingShell title="Put a face to your name." subtitle="Add a photo and your name to continue." onBack={onBack}>
+    <OnboardingShell title="Put a face to your name." subtitle="That's all we need." onBack={onBack}>
       <div className="profile-avatar-preview">
         <button
           type="button"
@@ -1352,8 +1352,8 @@ function ProfileStep({
       {!canContinue && (
         <p className="onboarding-fineprint">
           {!firstName.trim() || !lastName.trim()
-            ? "Add your first and last name to continue."
-            : "Add a photo to continue — a real picture, not a placeholder."}
+            ? "First and last, please."
+            : "A real picture — not a placeholder."}
         </p>
       )}
 

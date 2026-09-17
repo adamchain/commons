@@ -153,7 +153,7 @@ export function ForumPage() {
           icon={<MessageCircle size={22} strokeWidth={1.6} color="var(--red)" />}
           groupChat
           title="It's quiet in here."
-          body="Couldn't load this forum."
+          body="This one's not talking."
           cta={{ to: "/messages?tab=interests", label: "Back to Messages" }}
         />
       </main>

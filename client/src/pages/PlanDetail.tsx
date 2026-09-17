@@ -388,10 +388,9 @@ export function PlanDetailPage() {
 
         {canLock && (
           <div className="plan-detail-card idea-lock-card">
-            <p className="idea-lock-card-title">Let&rsquo;s test this mechanism together</p>
+            <p className="idea-lock-card-title">Ready to make this real?</p>
             <p className="idea-lock-card-copy">
-              Coordinate in the chat, then lock in a venue, day, and time. Everyone who&rsquo;s
-              interested is invited automatically.
+              Pick a place and a time. Anyone interested comes along.
             </p>
             <Link to={`/plans/new?lockFromId=${plan.id}`} className="idea-lock-card-link">
               Take this to Make a Plan

@@ -156,7 +156,7 @@ export function PublicEventPage() {
                 {busy ? "Sending…" : "Join & RSVP"}
               </button>
               <p className="onboarding-fineprint">
-                We'll text you a code to verify your number. New to Commons? You'll set up your profile next.
+                We&apos;ll text a code.
               </p>
             </div>
           )}

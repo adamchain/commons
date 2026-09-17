@@ -168,8 +168,7 @@ export function InviteSheet({
           )}
           {hiddenWarn && (
             <p className="form-help" style={{ marginTop: 6 }}>
-              Heads up: this plan is limited to your network, so anyone you invited who
-              hasn't added you won't see it until they do.
+              Not in your network yet — they won&apos;t see this until they are.
             </p>
           )}
         </div>
@@ -186,7 +185,7 @@ export function InviteSheet({
               ? "Sending…"
               : picked.size > 0
                 ? `Send to ${picked.size} ${picked.size === 1 ? "person" : "people"}`
-                : "Pick people above"}
+                : "Pick someone"}
           </button>
         </div>
     </BottomSheet>

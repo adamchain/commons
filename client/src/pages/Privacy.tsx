@@ -45,7 +45,7 @@ export function PrivacyPage() {
             <div className="settings-row-body" style={{ paddingLeft: 0 }}>
               <div className="settings-row-title">Discoverable by name search</div>
               <div className="settings-row-sub" style={{ whiteSpace: "normal" }}>
-                Let other members find your profile by searching your name
+                Show up when someone searches your name.
               </div>
             </div>
             <label className="pref-toggle">

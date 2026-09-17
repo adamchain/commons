@@ -13,7 +13,7 @@ const COPY: Record<JoinConfirmKind, { title: string; sub: string; celebrate: boo
   },
   interested: {
     title: "You're Interested",
-    sub: "Noted — we'll keep you in the loop.",
+    sub: "We'll keep you posted.",
     celebrate: true,
   },
   dropped: {
@@ -23,7 +23,7 @@ const COPY: Record<JoinConfirmKind, { title: string; sub: string; celebrate: boo
   },
   community: {
     title: "You're In",
-    sub: "Welcome — you're a member now.",
+    sub: "Make yourself at home.",
     celebrate: true,
   },
 };

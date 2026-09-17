@@ -545,7 +545,7 @@ function FeedEmptyState({
     body = "Coffee, a walk, whatever's rattling around.";
   } else if (hasAnyPlans) {
     headline = "Quiet around here.";
-    body = "Be the first to post.";
+    body = "The floor's yours.";
   } else {
     headline = "Quiet around here.";
     body = "Coffee run, gallery night, pickup soccer. Anything.";

@@ -134,7 +134,7 @@ export function MessagesPage() {
             <>
               {forums.length === 0 ? (
                 <p className="form-help" style={{ marginTop: 4 }}>
-                  No forums yet — Coffee, Workouts, the city chats.
+                  No forums yet. Coffee, workouts, the city chats.
                 </p>
               ) : (
                 <div className="messages-card">
@@ -213,7 +213,7 @@ export function MessagesPage() {
           icon={<MessageCircle size={22} strokeWidth={1.6} color="var(--red)" />}
           groupChat
           title="It's quiet in here."
-          body="Join something and the conversation follows."
+          body="Join something. The chat finds you."
           cta={{ to: "/", label: "See what's happening" }}
         />
       ) : (
@@ -306,7 +306,7 @@ export function MessagesPage() {
         >
             <h2 id="dismiss-chat-title" className="sheet-title">Remove from inbox?</h2>
             <p className="sheet-copy">
-              This chat will disappear from Messages. You can still open it from the plan or community page.
+              Leaves the inbox. The plan&apos;s still there.
             </p>
             {dismissErr && <p className="error-text">{dismissErr}</p>}
             <div className="sheet-actions">

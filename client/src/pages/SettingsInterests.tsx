@@ -36,7 +36,7 @@ export function SettingsInterestsPage() {
 
   async function save() {
     if (picked.length < 2) {
-      setError("Pick at least two so we can shape your feed.");
+      setError("Pick at least two.");
       return;
     }
     setBusy(true);

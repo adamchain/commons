@@ -922,7 +922,7 @@ export function CreatePlanPage() {
             </span>
             <span className="path-picker-title">Just an idea</span>
             <span className="path-picker-sub">
-              A casual thought — see who&apos;s down before committing to anything.
+              A thought. That&apos;s enough.
             </span>
           </button>
           <button
@@ -933,7 +933,7 @@ export function CreatePlanPage() {
           >
             <span className="path-picker-title">Make a plan</span>
             <span className="path-picker-sub">
-              Know what you want to do. Set the details, post it, and see who&apos;s in.
+              Time, place, who&apos;s in.
             </span>
           </button>
         </div>
@@ -1121,7 +1121,7 @@ export function CreatePlanPage() {
                   who showed interest
                 </>
               ) : (
-                <> · Interested people will be invited automatically</>
+                <> · Anyone interested comes along</>
               )}
             </>
           ) : (
@@ -1150,8 +1150,8 @@ export function CreatePlanPage() {
           <strong>{communityName ?? "your community"}</strong>
           {" "}members ·{" "}
           {communityVisibility === "community_only"
-            ? "Only members can see this"
-            : "Also shows on the main feed"}
+            ? "Members only"
+            : "On the feed"}
         </div>
       ) : null}
 
@@ -1159,7 +1159,7 @@ export function CreatePlanPage() {
         <div className="create-plan-invite-banner" role="note">
           Tagged{" "}
           <strong>{VIBE_OPTIONS.find((o) => o.tag === fromForumTag)?.label ?? fromForumTag}</strong>
-          {" "}— everyone with that interest will see this plan in their feed.
+          {" "}— that crowd will see it.
         </div>
       ) : null}
 
@@ -1185,8 +1185,8 @@ export function CreatePlanPage() {
             </div>
             <p className="create-community-tag-hint">
               {communityVisibility === "public"
-                ? "On the feed, with a community tag."
-                : "Members only — stays off the main feed."}
+                ? "On the feed."
+                : "Just members."}
             </p>
           </div>
         ) : null}
@@ -1629,8 +1629,7 @@ export function CreatePlanPage() {
           <section className="form-section">
             <label className="form-question">Invite from your network</label>
             <p className="form-help">
-              {inviteUserName ? <><strong>{inviteUserName}</strong> is already added. </> : null}
-              Pick anyone else you want in on this.
+              {inviteUserName ? <><strong>{inviteUserName}</strong> is already in.</> : "Anyone else?"}
             </p>
             {network === null && <p className="form-help">Loading…</p>}
             {network !== null && network.length === 0 && !seededOutsideNetwork && (
@@ -1890,7 +1889,7 @@ function IdeaForm({
           <div className="idea-form-title-block">
             <h1 className="idea-form-title">Just an Idea</h1>
             <p className="idea-form-sub">
-              Just a thought. See who&apos;s down. No plan too big or small.
+              Toss it out. See who bites.
             </p>
           </div>
 
@@ -1908,8 +1907,8 @@ function IdeaForm({
               <strong>{communityName ?? "your community"}</strong>
               {" "}members ·{" "}
               {communityVisibility === "community_only"
-                ? "Only members can see this"
-                : "Also shows on the main feed"}
+                ? "Members only"
+                : "On the feed"}
             </div>
           ) : null}
         {communityId ? (
@@ -1934,8 +1933,8 @@ function IdeaForm({
             </div>
             <p className="create-community-tag-hint">
               {communityVisibility === "public"
-                ? "On the feed, with a community tag."
-                : "Members only — stays off the main feed."}
+                ? "On the feed."
+                : "Just members."}
             </p>
           </div>
         ) : null}
@@ -2251,9 +2250,6 @@ function NetworkHandPick({
   }
   return (
     <div style={{ marginTop: 10 }}>
-        <p className="form-help" style={{ marginTop: 0 }}>
-          Everyone in your network, unless you pick a few.
-        </p>
       <div className="invite-people-list">
         {network.map((u) => {
           const picked = invitedIds.has(u.id);

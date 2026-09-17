@@ -28,7 +28,7 @@ const STEPS: Step[] = [
   {
     id: "chats",
     title: "Talk to the city by interest",
-    body: "Plan threads and city chats by interest, all in one place.",
+    body: "Plan threads and city chats. One inbox.",
     slot: 3,
   },
 ];

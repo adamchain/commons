@@ -427,14 +427,14 @@ function LockedPanel({
       <div className="cmy-locked">
         {pending ? (
           <>
-            <p className="cmy-locked-text">Request pending</p>
+            <p className="cmy-locked-text">Request pending.</p>
             <p className="cmy-locked-sub">
-              You’ll get a notification once the organizer approves you.
+              Hang tight — they&apos;ll see you.
             </p>
           </>
         ) : (
           <>
-            <p className="cmy-locked-text">Join to see what’s happening inside.</p>
+            <p className="cmy-locked-text">It&apos;s quiet until you&apos;re in.</p>
             <div className="cmy-locked-join">
               <JoinControl community={community} onChange={onChange} reload={reload} onJoined={onJoined} />
             </div>
@@ -772,7 +772,7 @@ function BulletinTab({
       {livePosts.length === 0 && pending.length === 0 && myPending.length === 0 && (
         <TabEmpty
           icon={<MessageCircle size={24} strokeWidth={1.6} />}
-          headline="It's quiet in here"
+          headline="It's quiet in here."
           body="Somebody's gotta go first."
         />
       )}
@@ -1410,7 +1410,7 @@ function SettingsTab({
             />
           </div>
           <div className="cmy-field" style={{ marginTop: 12 }}>
-            <span>Who can see inside <em className="cmy-hint">(name, cover, and description stay public)</em></span>
+            <span>Who&apos;s inside</span>
             <Segmented
               value={visibility}
               onChange={setVisibility}

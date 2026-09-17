@@ -136,7 +136,7 @@ function EditProfileForm({
   return (
     <section className="profile-edit-panel">
       <label className="form-question">Profile photo</label>
-      <p className="form-help">A real photo — so people know who they&apos;re meeting.</p>
+      <p className="form-help">A real face helps.</p>
 
       <div className="profile-edit-photo-row">
         <Avatar
@@ -220,7 +220,7 @@ function EditProfileForm({
       <label className="form-question" style={{ marginTop: 14 }}>
         Neighborhoods
       </label>
-      <p className="form-help">Where you spend time — shapes your Home feed and new plans.</p>
+      <p className="form-help">Where you actually hang.</p>
       <input
         className="onboarding-input"
         placeholder="Search neighborhoods…"
@@ -273,7 +273,6 @@ function EditProfileForm({
       <label className="form-question" style={{ marginTop: 14 }}>
         Socials
       </label>
-      <p className="form-help">Optional — shown on your profile for everyone to see.</p>
 
       <label className="form-question" htmlFor="profile-edit-ig" style={{ marginTop: 10 }}>
         Instagram
@@ -303,7 +302,7 @@ function EditProfileForm({
         <div className="settings-row-body" style={{ paddingLeft: 0 }}>
           <div className="settings-row-title">Public profile</div>
           <div className="settings-row-sub" style={{ whiteSpace: "normal" }}>
-            Let people find you by name in search
+            Show up when someone searches your name.
           </div>
         </div>
         <label className="pref-toggle">

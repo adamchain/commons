@@ -347,9 +347,7 @@ export function ProfilePage() {
           <section className="profile-other-section">
             <h3 className="profile-other-section-label">Upcoming Plans</h3>
             <p className="profile-social-locked">
-              Add them to your network to see their other plans. Plans you&apos;re
-              both going to stay visible here — sharing a plan doesn&apos;t unlock
-              the rest of their calendar.
+              You&apos;re on this one together. The rest of their calendar takes a connection.
             </p>
             {profile.upcoming.length > 0 && (
               <div className="profile-other-plans" style={{ marginTop: 12 }}>
@@ -1193,7 +1191,7 @@ function YourPlansBlock({
             <p className="empty-state" style={{ marginTop: 8 }}>
               {isSelf
                 ? "Quiet calendar — go join something, or post your own."
-                : "Nothing coming up."}
+                : "Quiet over here."}
             </p>
           )}
 

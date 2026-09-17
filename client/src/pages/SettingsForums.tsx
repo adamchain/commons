@@ -87,7 +87,7 @@ export function SettingsForumsPage() {
           icon={<MessageCircle size={22} strokeWidth={1.6} color="var(--red)" />}
           groupChat
           title="It's quiet in here."
-          body="Pick a forum below — Coffee, Workouts, the city chats."
+          body="Coffee, workouts, the city chats — pick one."
         />
       ) : (
         <div className="settings-card settings-forums-card" style={{ marginBottom: 20 }}>

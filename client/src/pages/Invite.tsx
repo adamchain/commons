@@ -64,7 +64,7 @@ export function InvitePage() {
         title="Invite your friends"
         subtitle={
           <>
-            You&apos;ve got <strong>{remaining}</strong> code{remaining === 1 ? "" : "s"} left. Each one gets one person in.
+            {remaining} left. One person each.
           </>
         }
       />
