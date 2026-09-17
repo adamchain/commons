@@ -6,7 +6,6 @@ import { LoadingScreen } from "../components/LoadingScreen";
 import { EmptyCard, ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { InterestGlyph } from "../components/InterestGlyph";
-import { photoForInterest } from "../lib/placePhotos";
 import {
   FORUM_INTERESTS,
   INTEREST_LABELS,
@@ -15,7 +14,7 @@ import {
 } from "../types/shared";
 
 /**
- * Forum membership editor — joined forums with Leave, plus chips to join more.
+ * Forum membership editor — joined forums with Leave, plus a dropdown to join more.
  */
 export function SettingsForumsPage() {
   const { user } = useAuth();
@@ -119,22 +118,28 @@ export function SettingsForumsPage() {
 
       {available.length > 0 && (
         <div className="forum-join-more-block">
-          <label className="form-eyebrow">Join more forums</label>
-          <div className="xpl-photo-grid xpl-photo-grid--forums">
+          <label className="form-eyebrow" htmlFor="settings-join-more-forums">
+            Join more forums
+          </label>
+          <select
+            id="settings-join-more-forums"
+            className="forum-join-select"
+            value=""
+            disabled={!!busyTag}
+            onChange={(e) => {
+              const next = e.target.value as InterestTag;
+              if (next) void join(next);
+            }}
+          >
+            <option value="" disabled>
+              {busyTag ? "Joining…" : "Choose a forum…"}
+            </option>
             {available.map((t) => (
-              <button
-                key={t}
-                type="button"
-                className="xpl-photo-tile"
-                disabled={!!busyTag}
-                onClick={() => void join(t)}
-              >
-                <img src={photoForInterest(t)} alt="" loading="lazy" />
-                <div className="xpl-photo-tile-overlay" aria-hidden="true" />
-                <span className="xpl-photo-tile-label">{INTEREST_LABELS[t]}</span>
-              </button>
+              <option key={t} value={t}>
+                {INTEREST_LABELS[t]}
+              </option>
             ))}
-          </div>
+          </select>
         </div>
       )}
 

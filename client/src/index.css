@@ -13481,9 +13481,16 @@ button.xpl-photo-tile {
 .forum-join-more-block {
   margin-top: 16px;
 }
+.forum-join-more-block .form-eyebrow {
+  display: block;
+  margin: 0 0 16px;
+}
 .forum-join-select {
   width: 100%;
   cursor: pointer;
+}
+.messages-row--forum {
+  padding: 8px 16px;
 }
 
 .forum-leave-btn {

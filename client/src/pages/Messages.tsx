@@ -6,7 +6,6 @@ import { InterestGlyph } from "../components/InterestGlyph";
 import { PlanCoverThumb } from "../components/CoverThumb";
 import { EmptyCard, ScreenTitle } from "../components/ui";
 import { formatRelative, sentenceCaseTitle } from "../lib/format";
-import { photoForInterest } from "../lib/placePhotos";
 import {
   FORUM_INTERESTS,
   INTEREST_LABELS,
@@ -144,7 +143,7 @@ export function MessagesPage() {
                           key={f.interestTag}
                           to={`/forums/${f.interestTag}`}
                           state={MESSAGES_INTERESTS_FROM}
-                          className="messages-row"
+                          className="messages-row messages-row--forum"
                         >
                           <InterestGlyph tag={f.interestTag} size={40} />
                           <div className="messages-row-body">
@@ -152,11 +151,6 @@ export function MessagesPage() {
                               <span className="messages-row-title">{f.label}</span>
                               {f.hasUnread && (
                                 <span className="messages-row-unread-dot" aria-label="Unread" />
-                              )}
-                              {f.latestPost && (
-                                <span className="messages-row-time">
-                                  {formatRelative(f.latestPost.createdAt)}
-                                </span>
                               )}
                             </div>
                             <div className="messages-row-preview">
@@ -179,24 +173,28 @@ export function MessagesPage() {
               )}
               {availableForums.length > 0 && (
                 <div className="forum-join-more-block">
-                  <label className="form-eyebrow">
+                  <label className="form-eyebrow" htmlFor="join-more-forums">
                     {forums.length === 0 ? "Pick an interest" : "Join more forums"}
                   </label>
-                  <div className="xpl-photo-grid xpl-photo-grid--forums">
+                  <select
+                    id="join-more-forums"
+                    className="forum-join-select"
+                    value=""
+                    disabled={!!joiningTag}
+                    onChange={(e) => {
+                      const next = e.target.value as InterestTag;
+                      if (next) void joinForum(next);
+                    }}
+                  >
+                    <option value="" disabled>
+                      {joiningTag ? "Joining…" : "Choose a forum…"}
+                    </option>
                     {availableForums.map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        className="xpl-photo-tile"
-                        disabled={!!joiningTag}
-                        onClick={() => void joinForum(t)}
-                      >
-                        <img src={photoForInterest(t)} alt="" loading="lazy" />
-                        <div className="xpl-photo-tile-overlay" aria-hidden="true" />
-                        <span className="xpl-photo-tile-label">{INTEREST_LABELS[t]}</span>
-                      </button>
+                      <option key={t} value={t}>
+                        {INTEREST_LABELS[t]}
+                      </option>
                     ))}
-                  </div>
+                  </select>
                   {joinErr && <p className="error-text" style={{ marginTop: 12 }}>{joinErr}</p>}
                 </div>
               )}
