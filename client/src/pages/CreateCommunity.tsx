@@ -3,8 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Camera, ImagePlus, MapPin } from "lucide-react";
 import { api } from "../api/http";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
+import { LegalContent } from "../components/LegalContent";
 import { Button } from "../components/ui/Button";
 import { Chip } from "../components/ui/Chip";
+import { BottomSheet } from "../components/ui/BottomSheet";
+import {
+  ORGANIZER_GUIDELINE_ASKS,
+  ORGANIZER_GUIDELINE_TOOLS,
+} from "../content/communityGuidelines";
+import { LEGAL_DOCS } from "../content/legal";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
@@ -22,7 +29,7 @@ import "./Communities.css";
 export function CreateCommunityPage() {
   const navigate = useNavigate();
   const coverRef = useRef<HTMLInputElement>(null);
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [categories, setCategories] = useState<CommunityCategory[]>([]);
@@ -33,13 +40,14 @@ export function CreateCommunityPage() {
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [coverBusy, setCoverBusy] = useState(false);
   const [showCoverLib, setShowCoverLib] = useState(false);
+  const [legalSheet, setLegalSheet] = useState<"terms" | "privacy" | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const canStep1 =
     name.trim().length > 0 && Boolean(coverImage) && categories.length > 0 && !coverBusy;
-  const canSubmit =
-    canStep1 && description.trim().length > 0 && !busy;
+  const canStep2 = canStep1 && description.trim().length > 0;
+  const canSubmit = canStep2 && !busy;
 
   async function applyCoverFile(file: File) {
     setCoverBusy(true);
@@ -70,13 +78,31 @@ export function CreateCommunityPage() {
     coverRef.current?.click();
   }
 
-  function goNext() {
-    if (!canStep1) {
-      setErr("Add a name, cover photo, and at least one category.");
+  function goBack() {
+    if (step === 1) {
+      navigate(-1);
       return;
     }
     setErr(null);
-    setStep(2);
+    setStep(step === 3 ? 2 : 1);
+  }
+
+  function goNext() {
+    if (step === 1) {
+      if (!canStep1) {
+        setErr("Add a name, cover photo, and at least one category.");
+        return;
+      }
+      setErr(null);
+      setStep(2);
+      return;
+    }
+    if (!canStep2) {
+      setErr("Add a description.");
+      return;
+    }
+    setErr(null);
+    setStep(3);
   }
 
   async function submit() {
@@ -130,24 +156,20 @@ export function CreateCommunityPage() {
   );
 
   return (
-    <main className="app-shell app-shell--with-nav create-plan cmy cmy-create">
+    <main className="app-shell create-plan cmy cmy-create">
       <header className="app-header app-header--sticky create-header">
-        <button
-          type="button"
-          className="detail-back"
-          onClick={() => (step === 2 ? setStep(1) : navigate(-1))}
-        >
+        <button type="button" className="detail-back" onClick={goBack}>
           <ArrowLeft size={13} strokeWidth={2} aria-hidden="true" /> Back
         </button>
         <div className="create-header-title cmy-create-title-block">
           <span>New community</span>
-          <span className="cmy-create-step">Step {step} of 2</span>
+          <span className="cmy-create-step">Step {step} of 3</span>
         </div>
-        {step === 1 ? (
+        {step < 3 ? (
           <button
             type="button"
             className="create-header-post"
-            disabled={!canStep1}
+            disabled={step === 1 ? !canStep1 : !canStep2}
             onClick={goNext}
           >
             Next
@@ -281,7 +303,7 @@ export function CreateCommunityPage() {
               </div>
             </div>
           </>
-        ) : (
+        ) : step === 2 ? (
           <>
             <label className="luma-card cmy-create-desc-card">
               <span className="cmy-create-card-kicker">Description</span>
@@ -328,13 +350,50 @@ export function CreateCommunityPage() {
               ) : null}
             </div>
 
-            <Button
-              variant="primary"
-              block
-              disabled={!canSubmit}
-              onClick={() => void submit()}
-            >
-              {busy ? "Creating…" : "Create community"}
+            <Button variant="primary" block disabled={!canStep2} onClick={goNext}>
+              Next
+            </Button>
+          </>
+        ) : (
+          <>
+            <div className="cmy-guidelines">
+              <h1 className="guidelines-heading">COMMONS Community Guidelines</h1>
+              <p className="cmy-guidelines-intro">A few things we ask of every organizer.</p>
+              <ul className="guidelines-list">
+                {ORGANIZER_GUIDELINE_ASKS.map((item) => (
+                  <li key={item.title}>
+                    <div>
+                      <strong>{item.title}</strong>
+                      <p>{item.body}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <h2 className="cmy-guidelines-tools-heading">What you&apos;re working with</h2>
+              <ul className="guidelines-list">
+                {ORGANIZER_GUIDELINE_TOOLS.map((item) => (
+                  <li key={item.title}>
+                    <div>
+                      <strong>{item.title}</strong>
+                      <p>{item.body}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <p className="cmy-guidelines-agree">
+                By creating a community, you agree to these guidelines and our{" "}
+                <button type="button" className="btn-link" onClick={() => setLegalSheet("terms")}>
+                  Terms of Service
+                </button>{" "}
+                and{" "}
+                <button type="button" className="btn-link" onClick={() => setLegalSheet("privacy")}>
+                  Privacy Policy
+                </button>
+                .
+              </p>
+            </div>
+            <Button variant="primary" block disabled={!canSubmit} onClick={() => void submit()}>
+              {busy ? "Creating…" : "I agree"}
             </Button>
           </>
         )}
@@ -351,6 +410,22 @@ export function CreateCommunityPage() {
           onClose={() => setShowCoverLib(false)}
         />
       )}
+      {legalSheet && <LegalSheet slug={legalSheet} onClose={() => setLegalSheet(null)} />}
     </main>
+  );
+}
+
+function LegalSheet({ slug, onClose }: { slug: "terms" | "privacy"; onClose: () => void }) {
+  const doc = LEGAL_DOCS[slug];
+  return (
+    <BottomSheet onClose={onClose} labelledBy="cmy-legal-sheet-title">
+      <div className="filter-sheet-header">
+        <h3 id="cmy-legal-sheet-title" className="filter-sheet-title">{doc.title}</h3>
+        <button type="button" className="btn-link" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      <LegalContent doc={doc} hideTitle />
+    </BottomSheet>
   );
 }

@@ -1486,9 +1486,10 @@ button.cmy-joined-pill {
   border-color: var(--accent);
 }
 
-/* ---- Create community (2-step, same DNA as New Plan) ---- */
+/* ---- Create community (3-step, same DNA as New Plan) ---- */
 .app-shell.create-plan.cmy-create {
   padding-top: 0;
+  padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
 }
 .cmy-create .create-header {
   row-gap: 10px;
@@ -1522,8 +1523,9 @@ button.cmy-joined-pill {
   border-radius: var(--r-pill);
   transition: width 180ms var(--ease-out, ease);
 }
-.cmy-create-progress-fill--1 { width: 50%; }
-.cmy-create-progress-fill--2 { width: 100%; }
+.cmy-create-progress-fill--1 { width: 33%; }
+.cmy-create-progress-fill--2 { width: 66%; }
+.cmy-create-progress-fill--3 { width: 100%; }
 .cmy-create-body {
   gap: 14px;
 }
@@ -1699,4 +1701,39 @@ button.cmy-joined-pill {
 }
 .cmy-create .btn-primary.btn-block {
   margin-top: 4px;
+}
+.cmy-guidelines {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cmy-guidelines-intro {
+  margin: -4px 0 0;
+  text-align: center;
+  font-size: var(--text-body);
+  line-height: 1.45;
+  color: var(--muted);
+}
+.cmy-guidelines-tools-heading {
+  margin: 6px 0 0;
+  font-family: var(--font-display);
+  font-size: var(--type-title);
+  font-weight: 700;
+  color: var(--ink);
+}
+.cmy-guidelines-agree {
+  margin: 2px 0 0;
+  text-align: center;
+  font-size: var(--type-caption);
+  line-height: 1.5;
+  color: var(--muted);
+}
+.cmy-guidelines-agree .btn-link {
+  display: inline;
+  padding: 0;
+  font-size: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }

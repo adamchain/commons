@@ -50,6 +50,7 @@ export function BottomNav() {
     pathname.startsWith("/onboarding") ||
     pathname.startsWith("/login") ||
     pathname === "/plans/new" ||
+    pathname === "/communities/new" ||
     pathname.match(/^\/plans\/[^/]+\/edit$/) ||
     pathname.match(/^\/plans\/[^/]+\/chat$/) ||
     pathname.match(/^\/communities\/[^/]+\/chat$/) ||
