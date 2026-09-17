@@ -64,13 +64,24 @@ function profileBackLabel(state: NavFromState | null): string {
   }
 }
 
+type ProfilePastPlan = {
+  id: string;
+  title: string;
+  date: string;
+  wentCount: number;
+  flyerDataUrl?: string;
+  flyerLinkPreview?: { image?: string | null } | null;
+  planKind: PlanDTO["planKind"];
+  lockedAt: string | null;
+};
+
 interface ProfilePayload {
   user: PublicUser;
   interests: InterestTag[];
   neighborhood: { id: string; name: string; metro: string } | null;
   stats: { hosted: number; joined: number };
   upcoming: PlanDTO[];
-  past: Array<{ id: string; title: string; date: string; wentCount: number; flyerDataUrl?: string }>;
+  past: ProfilePastPlan[];
   sharedPlanId: string | null;
   /** Null until viewer earns visibility (shared completed plan or in network). */
   socialLinks: { instagram?: string; tiktok?: string } | null;
@@ -1090,7 +1101,7 @@ function YourPlansBlock({
 }: {
   id?: string;
   upcoming: PlanDTO[];
-  past: Array<{ id: string; title: string; date: string; wentCount: number; flyerDataUrl?: string }>;
+  past: ProfilePastPlan[];
   isSelf: boolean;
   profileUserId: string;
   view: "list" | "calendar";
