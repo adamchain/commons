@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronRight, Hand, Pencil, Send, UserPlus, X } from "lucide-react";
 import { api, parseApiError } from "../api/http";
@@ -12,6 +11,7 @@ import { ParticipationButtons } from "../components/ParticipationButtons";
 import { PlanSafetyMenu } from "../components/PlanSafetyMenu";
 import { ShareSheet } from "../components/ShareSheet";
 import { BottomSheet } from "../components/ui/BottomSheet";
+import { Button } from "../components/ui/Button";
 import { useAuth } from "../context/AuthContext";
 import { isIdeaPlan, planHasEnded } from "../lib/planTime";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
@@ -543,18 +543,13 @@ export function PlanDetailPage() {
           </button>
         )}
 
-        {!isPast && isHosting && !plan.cancelledAt && showPassHosting &&
-          createPortal(
-            <div
-              className="modal-backdrop"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="pass-hosting-title"
-              onClick={() => setShowPassHosting(false)}
-            >
-              <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        {!isPast && isHosting && !plan.cancelledAt && showPassHosting && (
+          <BottomSheet
+            onClose={() => setShowPassHosting(false)}
+            labelledBy="pass-hosting-title"
+          >
                 <div className="plan-guests-modal-head">
-                  <h2 id="pass-hosting-title">Transfer Hosting</h2>
+                  <h2 id="pass-hosting-title" className="filter-sheet-title">Transfer Hosting</h2>
                   <button
                     type="button"
                     className="plan-guests-modal-close"
@@ -580,10 +575,8 @@ export function PlanDetailPage() {
                   }}
                   onClose={() => setShowPassHosting(false)}
                 />
-              </div>
-            </div>,
-            document.body,
-          )}
+          </BottomSheet>
+        )}
       </div>
 
       {canLock && (
@@ -599,18 +592,10 @@ export function PlanDetailPage() {
       {showInvite && (
         <InviteSheet planId={plan.id} planTitle={plan.title} onClose={() => setShowInvite(false)} />
       )}
-      {showGuestsModal &&
-        createPortal(
-          <div
-            className="modal-backdrop"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="plan-guests-modal-title"
-            onClick={closeGuestsModal}
-          >
-            <div className="modal-card plan-guests-modal" onClick={(e) => e.stopPropagation()}>
+      {showGuestsModal && (
+        <BottomSheet onClose={closeGuestsModal} labelledBy="plan-guests-modal-title">
               <div className="plan-guests-modal-head">
-                <h2 id="plan-guests-modal-title">People</h2>
+                <h2 id="plan-guests-modal-title" className="filter-sheet-title">People</h2>
                 <button
                   type="button"
                   className="plan-guests-modal-close"
@@ -633,10 +618,8 @@ export function PlanDetailPage() {
                   variant="modal"
                 />
               </div>
-            </div>
-          </div>,
-          document.body,
-        )}
+        </BottomSheet>
+      )}
 
       {showHostSheet && (
         <BottomSheet onClose={() => setShowHostSheet(false)}>
@@ -678,30 +661,35 @@ export function PlanDetailPage() {
       )}
 
       {confirmCancel && (
-        <div
-          className="modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="cancel-plan-title"
-          onClick={() => {
+        <BottomSheet
+          onClose={() => {
             if (!cancelBusy) {
               setConfirmCancel(false);
               setCancelError(null);
             }
           }}
+          closeDisabled={cancelBusy}
+          labelledBy="cancel-plan-title"
         >
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <h4 id="cancel-plan-title" style={{ marginTop: 0 }}>
+            <h2 id="cancel-plan-title" className="sheet-title">
               Cancel this plan?
-            </h4>
-            <p style={{ marginTop: 0 }}>
+            </h2>
+            <p className="sheet-copy">
               Cancel &ldquo;{plan.title}&rdquo;? Everyone who RSVP&apos;d will be notified.
             </p>
             {cancelError && <p className="error-text">{cancelError}</p>}
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button
-                type="button"
-                className="btn-link"
+            <div className="sheet-actions">
+              <Button
+                variant="primary"
+                block
+                disabled={cancelBusy}
+                onClick={() => void cancelPlan()}
+              >
+                {cancelBusy ? "Cancelling…" : "Cancel plan"}
+              </Button>
+              <Button
+                variant="secondary"
+                block
                 disabled={cancelBusy}
                 onClick={() => {
                   setConfirmCancel(false);
@@ -709,19 +697,9 @@ export function PlanDetailPage() {
                 }}
               >
                 Keep plan
-              </button>
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={cancelBusy}
-                onClick={() => void cancelPlan()}
-                style={{ background: "var(--danger)" }}
-              >
-                {cancelBusy ? "Cancelling…" : "Cancel plan"}
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
+        </BottomSheet>
       )}
     </main>
   );

@@ -16,6 +16,8 @@ import { getCurrentCoords } from "../lib/geolocate";
 import { hasOnboardingPhoto, needsOnboarding, safePostAuthPath } from "../lib/onboarding";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { LegalContent } from "../components/LegalContent";
+import { BottomSheet } from "../components/ui/BottomSheet";
+import { Button } from "../components/ui/Button";
 import { LEGAL_DOCS } from "../content/legal";
 import wordmark from "../assets/wordmark.png";
 import phillySkyline from "../assets/philly-skyline.jpg";
@@ -1146,16 +1148,9 @@ function LegalDocModal({
   }, [doc.slug]);
 
   return (
-    <div className="legal-modal-backdrop" onClick={onClose}>
-      <div
-        className="legal-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label={doc.title}
-        onClick={(e) => e.stopPropagation()}
-      >
+    <BottomSheet onClose={onClose} labelledBy="legal-modal-title">
         <div className="legal-modal-header">
-          <h3 className="legal-modal-title">{doc.title}</h3>
+          <h3 id="legal-modal-title" className="legal-modal-title">{doc.title}</h3>
           <button type="button" className="legal-modal-close" onClick={onClose} aria-label="Close">
             ✕
           </button>
@@ -1164,19 +1159,20 @@ function LegalDocModal({
           <LegalContent doc={doc} hideTitle />
           {!atBottom && <div className="legal-consent-scrollhint">Scroll to continue ↓</div>}
         </div>
-        <button
-          type="button"
-          className="btn-primary btn-block"
-          disabled={!atBottom}
-          onClick={() => {
-            onReadComplete();
-            onClose();
-          }}
-        >
-          {atBottom ? "I've read this" : "Scroll to the bottom"}
-        </button>
-      </div>
-    </div>
+        <div className="sheet-actions">
+          <Button
+            variant="primary"
+            block
+            disabled={!atBottom}
+            onClick={() => {
+              onReadComplete();
+              onClose();
+            }}
+          >
+            {atBottom ? "I've read this" : "Scroll to the bottom"}
+          </Button>
+        </div>
+    </BottomSheet>
   );
 }
 

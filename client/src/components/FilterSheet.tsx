@@ -1,6 +1,7 @@
 import type { AgeRange, InterestTag, NeighborhoodDTO } from "../types/shared";
 import { ALL_AGE_RANGES, ALL_INTERESTS, AGE_RANGE_LABELS, INTEREST_LABELS } from "../types/shared";
 import { BottomSheet } from "./ui/BottomSheet";
+import { Button } from "./ui/Button";
 
 /**
  * Bottom-sheet filter for the feed. Surfaces neighborhood + interest pickers
@@ -138,14 +139,11 @@ export function FilterSheet({
           </div>
         </div>
 
-        <button
-          type="button"
-          className="btn-primary btn-block"
-          style={{ marginTop: 18 }}
-          onClick={onClose}
-        >
-          Done
-        </button>
+        <div className="sheet-actions">
+          <Button variant="primary" block onClick={onClose}>
+            Done
+          </Button>
+        </div>
     </BottomSheet>
   );
 }

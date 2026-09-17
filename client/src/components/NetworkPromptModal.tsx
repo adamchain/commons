@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { createPortal } from "react-dom";
 import { api } from "../api/http";
 import { Avatar } from "./Avatar";
 import { useAuth } from "../context/AuthContext";
 import type { MeDTO, NetworkPromptDTO } from "../types/shared";
+import { BottomSheet } from "./ui/BottomSheet";
+import { Button } from "./ui/Button";
 
 /**
  * Post-plan network seed prompt. Fires after a plan's end time passes for
@@ -22,7 +23,6 @@ export function NetworkPromptModal({
 }) {
   const { setUser } = useAuth();
   const [busy, setBusy] = useState(false);
-  // Default: no one selected — the user chooses who to keep.
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const count = prompt.others.length;
@@ -71,14 +71,15 @@ export function NetworkPromptModal({
 
   const selectedCount = selected.size;
 
-  // Rendered through a portal to <body> so the fixed overlay covers the whole
-  // viewport. Rendering it inline in the Feed traps it inside the pull-to-refresh
-  // transform container, which re-anchors `position: fixed` and pushes the modal
-  // to the bottom of the (scrollable) feed instead of over the screen.
-  return createPortal(
-    <div className="network-prompt-overlay" role="dialog" aria-modal="true" aria-labelledby="network-prompt-title">
-      <div className="network-prompt-card">
-        <h2 id="network-prompt-title" className="network-prompt-title">
+  return (
+    <BottomSheet
+      onClose={() => {
+        if (!busy) void dismiss();
+      }}
+      closeDisabled={busy}
+      labelledBy="network-prompt-title"
+    >
+        <h2 id="network-prompt-title" className="sheet-title network-prompt-title">
           Stay connected?
         </h2>
         <p className="network-prompt-body">
@@ -106,10 +107,10 @@ export function NetworkPromptModal({
           })}
         </div>
 
-        <div className="network-prompt-actions">
-          <button
-            type="button"
-            className="btn-primary btn-block"
+        <div className="sheet-actions">
+          <Button
+            variant="primary"
+            block
             disabled={busy || selectedCount === 0}
             onClick={() => void addSelected()}
           >
@@ -118,13 +119,11 @@ export function NetworkPromptModal({
               : selectedCount === 0
                 ? "Select someone to add"
                 : `Add ${selectedCount} to my network`}
-          </button>
-          <button type="button" className="btn-link btn-block" disabled={busy} onClick={() => void dismiss()}>
+          </Button>
+          <Button variant="secondary" block disabled={busy} onClick={() => void dismiss()}>
             Not now
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>,
-    document.body,
+    </BottomSheet>
   );
 }

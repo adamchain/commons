@@ -8,6 +8,7 @@ import { PhotoHero } from "../components/PhotoHero";
 import { useAuth } from "../context/AuthContext";
 import { PlanSafetyMenu } from "../components/PlanSafetyMenu";
 import { BottomSheet, EmptyCard } from "../components/ui";
+import { Button } from "../components/ui/Button";
 import { formatRelative } from "../lib/format";
 import { resolveForumImage } from "../lib/forumImage";
 import { photoForInterest } from "../lib/placePhotos";
@@ -310,14 +311,14 @@ export function ForumPage() {
 
       {planModalOpen && (
         <BottomSheet onClose={() => setPlanModalOpen(false)} labelledBy="forum-plan-title">
-            <h2 id="forum-plan-title" className="sheet-title poll-modal-title">Post a {data.label} plan</h2>
-            <div className="poll-modal-actions">
-              <button type="button" className="btn-primary btn-block" onClick={confirmPostPlan}>
+            <h2 id="forum-plan-title" className="sheet-title">Post a {data.label} plan</h2>
+            <div className="sheet-actions">
+              <Button variant="primary" block onClick={confirmPostPlan}>
                 Continue
-              </button>
-              <button type="button" className="btn-secondary btn-block" onClick={() => setPlanModalOpen(false)}>
+              </Button>
+              <Button variant="secondary" block onClick={() => setPlanModalOpen(false)}>
                 Cancel
-              </button>
+              </Button>
             </div>
         </BottomSheet>
       )}

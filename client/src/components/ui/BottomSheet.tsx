@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type PointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 /**
@@ -9,15 +9,19 @@ export function BottomSheet({
   children,
   onClose,
   labelledBy,
+  ariaLabel,
   className = "",
   closeDisabled = false,
 }: {
   children: ReactNode;
   onClose: () => void;
   labelledBy?: string;
+  ariaLabel?: string;
   className?: string;
   closeDisabled?: boolean;
 }) {
+  const ignoreUntil = useRef(Date.now() + 450);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !closeDisabled) onClose();
@@ -31,20 +35,26 @@ export function BottomSheet({
     };
   }, [onClose, closeDisabled]);
 
+  function onBackdropPointerDown(e: PointerEvent<HTMLDivElement>) {
+    if (e.target !== e.currentTarget) return;
+    if (closeDisabled) return;
+    if (Date.now() < ignoreUntil.current) return;
+    onClose();
+  }
+
   return createPortal(
     <div
       className="sheet-backdrop"
       role="presentation"
-      onClick={() => {
-        if (!closeDisabled) onClose();
-      }}
+      onPointerDown={onBackdropPointerDown}
     >
       <div
         className={`sheet ${className}`.trim()}
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}
-        onClick={(e) => e.stopPropagation()}
+        aria-label={labelledBy ? undefined : ariaLabel}
+        onPointerDown={(e) => e.stopPropagation()}
       >
         <div className="sheet-handle" aria-hidden="true" />
         {children}

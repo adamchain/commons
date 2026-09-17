@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Button } from "./ui/Button";
-import { Label } from "./ui/Label";
 
 export function PollSheet({
   onClose,
@@ -21,9 +20,8 @@ export function PollSheet({
       onClose={onClose}
       closeDisabled={submitting}
       labelledBy="poll-sheet-title"
-      className="poll-sheet"
     >
-      <h2 id="poll-sheet-title" className="sheet-title poll-modal-title">
+      <h2 id="poll-sheet-title" className="sheet-title">
         New poll
       </h2>
       <input
@@ -35,7 +33,7 @@ export function PollSheet({
         autoFocus
         onChange={(e) => setQuestion(e.target.value)}
       />
-      <Label>Options</Label>
+      <div className="sheet-section-label">Options</div>
       <div className="poll-modal-options">
         {options.map((opt, i) => (
           <div key={i} className="poll-modal-option-row">
@@ -70,7 +68,7 @@ export function PollSheet({
           + Add option
         </button>
       )}
-      <div className="poll-modal-actions">
+      <div className="sheet-actions">
         <Button
           variant="primary"
           block

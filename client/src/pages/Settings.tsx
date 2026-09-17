@@ -7,6 +7,7 @@ import { LoadingScreen } from "../components/LoadingScreen";
 import { LegalContent } from "../components/LegalContent";
 import { ScreenTitle } from "../components/ui";
 import { BottomSheet } from "../components/ui/BottomSheet";
+import { Button } from "../components/ui/Button";
 import { LEGAL_DOCS } from "../content/legal";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -289,18 +290,15 @@ function DeleteAccountRow({ onSignedOut }: { onSignedOut: () => void }) {
         Delete account
       </button>
       {showDelete && (
-        <div
-          className="modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-account-title"
-          onClick={() => !deleting && setShowDelete(false)}
+        <BottomSheet
+          onClose={() => !deleting && setShowDelete(false)}
+          closeDisabled={deleting}
+          labelledBy="delete-account-title"
         >
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <h4 id="delete-account-title" style={{ marginTop: 0 }}>
+            <h2 id="delete-account-title" className="sheet-title">
               Delete your account?
-            </h4>
-            <p style={{ marginTop: 0 }}>
+            </h2>
+            <p className="sheet-copy">
               This is permanent. Your plans will be cancelled, your network connections
               will be removed, and you'll be signed out. Type <strong>delete</strong> to confirm.
             </p>
@@ -311,30 +309,27 @@ function DeleteAccountRow({ onSignedOut }: { onSignedOut: () => void }) {
               onChange={(e) => setConfirmText(e.target.value)}
               placeholder="delete"
               disabled={deleting}
-              style={{ width: "100%", marginBottom: 12 }}
             />
             {deleteError && <p className="error-text">{deleteError}</p>}
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button
-                type="button"
-                className="btn-link"
+            <div className="sheet-actions">
+              <Button
+                variant="primary"
+                block
+                onClick={() => void doDelete()}
+                disabled={!canDelete || deleting}
+              >
+                {deleting ? "Deleting…" : "Delete my account"}
+              </Button>
+              <Button
+                variant="secondary"
+                block
                 onClick={() => setShowDelete(false)}
                 disabled={deleting}
               >
                 Cancel
-              </button>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => void doDelete()}
-                disabled={!canDelete || deleting}
-                style={{ background: "var(--danger)" }}
-              >
-                {deleting ? "Deleting…" : "Delete my account"}
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
+        </BottomSheet>
       )}
     </>
   );

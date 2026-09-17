@@ -5,6 +5,8 @@ import { api, parseApiError } from "../api/http";
 import { InterestGlyph } from "../components/InterestGlyph";
 import { PlanCoverThumb } from "../components/CoverThumb";
 import { EmptyCard, ScreenTitle } from "../components/ui";
+import { BottomSheet } from "../components/ui/BottomSheet";
+import { Button } from "../components/ui/Button";
 import { sentenceCaseTitle } from "../lib/format";
 import {
   FORUM_INTERESTS,
@@ -297,33 +299,30 @@ export function MessagesPage() {
       </div>
 
       {dismissTarget && (
-        <div
-          className="modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => !dismissBusy && setDismissTarget(null)}
+        <BottomSheet
+          onClose={() => !dismissBusy && setDismissTarget(null)}
+          closeDisabled={dismissBusy}
+          labelledBy="dismiss-chat-title"
         >
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <h4 style={{ marginTop: 0 }}>Remove from inbox?</h4>
-            <p style={{ marginTop: 0 }}>
+            <h2 id="dismiss-chat-title" className="sheet-title">Remove from inbox?</h2>
+            <p className="sheet-copy">
               This chat will disappear from Messages. You can still open it from the plan or community page.
             </p>
             {dismissErr && <p className="error-text">{dismissErr}</p>}
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button type="button" className="btn-link" disabled={dismissBusy} onClick={() => setDismissTarget(null)}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn-primary"
+            <div className="sheet-actions">
+              <Button
+                variant="primary"
+                block
                 disabled={dismissBusy}
                 onClick={() => void dismissPastChat(dismissTarget)}
               >
                 {dismissBusy ? "Removing…" : "Remove"}
-              </button>
+              </Button>
+              <Button variant="secondary" block disabled={dismissBusy} onClick={() => setDismissTarget(null)}>
+                Cancel
+              </Button>
             </div>
-          </div>
-        </div>
+        </BottomSheet>
       )}
     </main>
   );

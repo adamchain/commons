@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { Ban, Flag, MoreVertical } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { api, parseApiError } from "../api/http";
 import { useAuth } from "../context/AuthContext";
 import { REPORT_REASON_OPTIONS, type ReportReason } from "../types/shared";
+import { BottomSheet } from "./ui/BottomSheet";
+import { Button } from "./ui/Button";
 
 /**
  * Subtle ⋮ next to a plan/idea title. Report opens a modal that lands in the
@@ -177,38 +178,35 @@ export function ReportModal({
     }
   }
 
-  return createPortal(
-    <div
-      className="modal-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="report-modal-title"
-      onClick={() => {
+  return (
+    <BottomSheet
+      onClose={() => {
         if (!busy) onClose();
       }}
+      closeDisabled={busy}
+      labelledBy="report-modal-title"
     >
-      <div className="modal-card plan-report-modal" onClick={(e) => e.stopPropagation()}>
         {sent ? (
           <>
-            <h4 id="report-modal-title" style={{ marginTop: 0 }}>
+            <h2 id="report-modal-title" className="sheet-title">
               Thanks for the report
-            </h4>
-            <p style={{ marginTop: 0 }}>
+            </h2>
+            <p className="sheet-copy">
               Our team reviews every report within 24 hours. If it violates our Terms, we remove
               the content and eject the person who posted it. You can also block them so they
               disappear from your feed immediately.
             </p>
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button type="button" className="btn-primary" onClick={onClose}>
+            <div className="sheet-actions">
+              <Button variant="primary" block onClick={onClose}>
                 Done
-              </button>
+              </Button>
             </div>
           </>
         ) : (
           <>
-            <h4 id="report-modal-title" style={{ marginTop: 0 }}>
+            <h2 id="report-modal-title" className="sheet-title">
               Report {targetFirstName || "this person"}
-            </h4>
+            </h2>
             <p className="plan-report-sub">
               {planTitle
                 ? `This is about “${planTitle}”. `
@@ -243,19 +241,17 @@ export function ReportModal({
               placeholder="Add context if it helps"
             />
             {error && <p className="error-text">{error}</p>}
-            <div className="plan-report-actions">
-              <button type="button" className="btn-primary" disabled={busy} onClick={() => void submit()}>
+            <div className="sheet-actions">
+              <Button variant="primary" block disabled={busy} onClick={() => void submit()}>
                 {busy ? "Sending…" : "Submit report"}
-              </button>
-              <button type="button" className="btn-link" disabled={busy} onClick={onClose}>
+              </Button>
+              <Button variant="secondary" block disabled={busy} onClick={onClose}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </>
         )}
-      </div>
-    </div>,
-    document.body,
+    </BottomSheet>
   );
 }
 
@@ -286,42 +282,31 @@ export function BlockConfirmModal({
     }
   }
 
-  return createPortal(
-    <div
-      className="modal-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="block-modal-title"
-      onClick={() => {
+  return (
+    <BottomSheet
+      onClose={() => {
         if (!busy) onClose();
       }}
+      closeDisabled={busy}
+      labelledBy="block-modal-title"
     >
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <h4 id="block-modal-title" style={{ marginTop: 0 }}>
+        <h2 id="block-modal-title" className="sheet-title">
           Block {name}?
-        </h4>
-        <p style={{ marginTop: 0 }}>
+        </h2>
+        <p className="sheet-copy">
           You won&apos;t be able to message each other, invite each other to plans, or follow
           each other. Their content is removed from your feed immediately, and COMMONS is
           notified so we can review it.
         </p>
         {error && <p className="error-text">{error}</p>}
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button type="button" className="btn-link" disabled={busy} onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={busy}
-            onClick={() => void confirm()}
-            style={{ background: "var(--danger)" }}
-          >
+        <div className="sheet-actions">
+          <Button variant="primary" block disabled={busy} onClick={() => void confirm()}>
             {busy ? "Blocking…" : "Block User"}
-          </button>
+          </Button>
+          <Button variant="secondary" block disabled={busy} onClick={onClose}>
+            Cancel
+          </Button>
         </div>
-      </div>
-    </div>,
-    document.body,
+    </BottomSheet>
   );
 }

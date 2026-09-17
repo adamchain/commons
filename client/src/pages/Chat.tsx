@@ -16,6 +16,8 @@ import { BlockConfirmModal, ReportModal } from "../components/PlanSafetyMenu";
 import { PollCard } from "../components/PollCard";
 import { PollSheet } from "../components/PollSheet";
 import { EmptyCard } from "../components/ui";
+import { BottomSheet } from "../components/ui/BottomSheet";
+import { Button } from "../components/ui/Button";
 import { useAuth } from "../context/AuthContext";
 import { sentenceCaseTitle } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
@@ -707,28 +709,27 @@ export function ChatPage() {
       )}
 
       {confirmLeave && (
-        <div
-          className="modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => !leaveBusy && setConfirmLeave(false)}
+        <BottomSheet
+          onClose={() => !leaveBusy && setConfirmLeave(false)}
+          closeDisabled={leaveBusy}
+          labelledBy="leave-chat-title"
         >
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <h4 style={{ marginTop: 0 }}>{planConcluded ? "Remove from inbox?" : "Leave this chat?"}</h4>
-            <p style={{ marginTop: 0 }}>
+            <h2 id="leave-chat-title" className="sheet-title">
+              {planConcluded ? "Remove from inbox?" : "Leave this chat?"}
+            </h2>
+            <p className="sheet-copy">
               It&apos;ll disappear from Messages. You stay on the plan.
             </p>
             {leaveErr && <p className="error-text">{leaveErr}</p>}
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button type="button" className="btn-link" disabled={leaveBusy} onClick={() => setConfirmLeave(false)}>
-                Cancel
-              </button>
-              <button type="button" className="btn-primary" disabled={leaveBusy} onClick={() => void leaveChat()}>
+            <div className="sheet-actions">
+              <Button variant="primary" block disabled={leaveBusy} onClick={() => void leaveChat()}>
                 {leaveBusy ? "Removing…" : planConcluded ? "Remove" : "Leave chat"}
-              </button>
+              </Button>
+              <Button variant="secondary" block disabled={leaveBusy} onClick={() => setConfirmLeave(false)}>
+                Cancel
+              </Button>
             </div>
-          </div>
-        </div>
+        </BottomSheet>
       )}
       {reportOpen && (
         <ReportModal

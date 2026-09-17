@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -22,6 +22,7 @@ import { Avatar } from "../components/Avatar";
 import { CommunityStatusPill } from "../components/CommunityStatusPill";
 import { CommunityCoverThumb, PlanCoverThumb } from "../components/CoverThumb";
 import { ReportModal } from "../components/PlanSafetyMenu";
+import { BottomSheet } from "../components/ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanTime } from "../lib/format";
 import { isIdeaPlan } from "../lib/planTime";
@@ -663,25 +664,9 @@ function ProfileActionSheet({
   onBlock: () => Promise<void>;
   onClose: () => void;
 }) {
-  const ignoreUntil = useRef(0);
   const [confirmingBlock, setConfirmingBlock] = useState(false);
   const [blocking, setBlocking] = useState(false);
   const [blockError, setBlockError] = useState<string | null>(null);
-  useEffect(() => {
-    ignoreUntil.current = Date.now() + 450;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  function dismissBackdrop(e: ReactPointerEvent<HTMLDivElement>) {
-    if (e.target !== e.currentTarget) return;
-    if (Date.now() < ignoreUntil.current) return;
-    if (blocking) return;
-    onClose();
-  }
 
   async function confirmBlock() {
     setBlocking(true);
@@ -694,20 +679,13 @@ function ProfileActionSheet({
     }
   }
 
-  return createPortal(
-    <div
-      className="profile-action-overlay"
-      role="presentation"
-      onPointerDown={dismissBackdrop}
+  return (
+    <BottomSheet
+      onClose={onClose}
+      closeDisabled={blocking}
+      ariaLabel={confirmingBlock ? `Block ${firstName}` : "Profile actions"}
+      className="profile-action-sheet sheet--flush"
     >
-      <div
-        className="profile-action-sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-label={confirmingBlock ? `Block ${firstName}` : "Profile actions"}
-        onPointerDown={(e) => e.stopPropagation()}
-      >
-        <div className="profile-action-handle" aria-hidden="true" />
         {confirmingBlock ? (
           <>
             <p className="profile-action-confirm-copy">
@@ -765,9 +743,7 @@ function ProfileActionSheet({
             </button>
           </>
         )}
-      </div>
-    </div>,
-    document.body,
+    </BottomSheet>
   );
 }
 
