@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   Calendar,
@@ -97,6 +97,9 @@ export function CreatePlanPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const location = useLocation();
+  const { id: routePlanId } = useParams();
+  const editingPlanId =
+    routePlanId && location.pathname.endsWith("/edit") ? routePlanId : null;
   // "Host another like this →" on a past plan's card navigates here with
   // { hostAgainFrom: planId } in nav state — prefill from that plan below.
   const hostAgainFrom = (location.state as { hostAgainFrom?: string } | null)?.hostAgainFrom ?? null;
@@ -190,10 +193,18 @@ export function CreatePlanPage() {
   const [submitting, setSubmitting] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editReady, setEditReady] = useState(!editingPlanId);
+  const originalWhen = useRef<{
+    date: string;
+    time: string;
+    isFlexibleTime: boolean;
+    isFlexibleDate: boolean;
+  } | null>(null);
   // Step 1 — user picks Make a plan (full form) vs Just an idea (loose, looking_for).
   // Skipped automatically when arriving with an invite seed or community tag.
   type Path = "choose" | "plan" | "idea";
   const [path, setPath] = useState<Path>(
+    editingPlanId ||
     inviteUserId ||
       inviteUserIds.length > 0 ||
       prefillTitle ||
@@ -209,6 +220,10 @@ export function CreatePlanPage() {
   const navigate = useNavigate();
 
   const leaveCreatePlan = () => {
+    if (editingPlanId) {
+      navigate(`/plans/${editingPlanId}`);
+      return;
+    }
     if (backToSourceId) {
       navigate(`/plans/${backToSourceId}`);
       return;
@@ -338,7 +353,7 @@ export function CreatePlanPage() {
   // fall back to ?fromPlanId= so a lost state still seeds the form.
   useEffect(() => {
     const seedId = hostAgainFrom ?? fromPlanId;
-    if (!seedId) return;
+    if (!seedId || editingPlanId) return;
     let alive = true;
     void api<PlanDTO>(`/api/plans/${seedId}`)
       .then((prev) => {
@@ -370,7 +385,72 @@ export function CreatePlanPage() {
     return () => {
       alive = false;
     };
-  }, [hostAgainFrom, fromPlanId, inviteUserId, inviteUserIds]);
+  }, [hostAgainFrom, fromPlanId, inviteUserId, inviteUserIds, editingPlanId]);
+
+  useEffect(() => {
+    if (!editingPlanId || !user) return;
+    let alive = true;
+    setEditReady(false);
+    void api<PlanDTO>(`/api/plans/${editingPlanId}`)
+      .then((prev) => {
+        if (!alive) return;
+        if (user && prev.creator.id !== user.id) {
+          navigate(`/plans/${editingPlanId}`, { replace: true });
+          return;
+        }
+        const vibeIds = Array.from(
+          new Set(VIBE_OPTIONS.filter((o) => prev.tags.includes(o.tag)).map((o) => o.id)),
+        );
+        const proposal = prev.pendingTimeProposal;
+        const flexDate = Boolean(prev.isFlexibleDate) || prev.date.startsWith("2099-12-31");
+        const formFlexTime = Boolean(proposal?.isFlexibleTime ?? prev.isFlexibleTime);
+        const formFlexDate = proposal
+          ? proposal.date.startsWith("2099-12-31")
+          : flexDate;
+        originalWhen.current = {
+          date: flexDate ? FLEXIBLE_DATE_PLACEHOLDER : prev.date.slice(0, 10),
+          time: prev.time || "",
+          isFlexibleTime: Boolean(prev.isFlexibleTime),
+          isFlexibleDate: flexDate,
+        };
+        setForm((f) => ({
+          ...f,
+          title: prev.title,
+          locationName: prev.isFlexibleLocation ? "" : prev.location.name,
+          locationAddress: prev.isFlexibleLocation ? "" : prev.location.address,
+          locationLat: prev.isFlexibleLocation ? undefined : prev.location.lat,
+          locationLng: prev.isFlexibleLocation ? undefined : prev.location.lng,
+          locationPlaceId: prev.isFlexibleLocation ? undefined : prev.location.placeId,
+          neighborhoodId: prev.neighborhoodId || f.neighborhoodId,
+          date: formFlexDate ? today() : (proposal?.date ?? prev.date).slice(0, 10),
+          time: formFlexTime ? defaultPlanTime() : (proposal?.time || prev.time || defaultPlanTime()),
+          isFlexibleTime: formFlexTime,
+          isFlexibleDate: formFlexDate,
+          isFlexibleLocation: Boolean(prev.isFlexibleLocation),
+          vibes: vibeIds.length ? vibeIds : f.vibes,
+          description: prev.description ?? "",
+          visibility: prev.visibility,
+          capacityOn: prev.capacity !== null,
+          capacity: prev.capacity !== null ? String(prev.capacity) : f.capacity,
+          joinType: prev.joinType,
+          flyerDataUrl: prev.flyerDataUrl ?? null,
+          flyerLinkUrl: prev.flyerLinkUrl ?? "",
+          flyerLinkPreview: prev.flyerLinkPreview ?? null,
+        }));
+        if (prev.capacity !== null || prev.flyerLinkUrl) setShowMore(true);
+        setPath("plan");
+        setEditReady(true);
+      })
+      .catch(() => {
+        if (alive) {
+          setError("Couldn't load that plan.");
+          setEditReady(true);
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, [editingPlanId, user, navigate]);
 
   const resolvedTags = useMemo<InterestTag[]>(() => {
     const set = new Set<InterestTag>();
@@ -517,9 +597,79 @@ export function CreatePlanPage() {
     }
   };
 
+  const savePlan = async () => {
+    if (!editingPlanId) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      await api(`/api/plans/${editingPlanId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          title: form.title.trim(),
+          description: form.description.trim(),
+          tags: resolvedTags,
+          neighborhoodId: form.neighborhoodId || undefined,
+          location: {
+            name: form.locationName.trim(),
+            address: form.locationAddress.trim() || form.locationName.trim(),
+            lat: form.locationLat,
+            lng: form.locationLng,
+          },
+          isFlexibleLocation: form.isFlexibleLocation,
+          isFlexibleDate: form.isFlexibleDate,
+          visibility: form.visibility,
+          capacity: capacityNum,
+          joinType: form.joinType,
+          flyerDataUrl: form.flyerDataUrl ?? null,
+          flyerLinkUrl: form.flyerLinkUrl.trim() || null,
+          flyerLinkPreview: form.flyerLinkPreview ?? null,
+          hostEmoji: VIBE_OPTIONS.find((o) => o.id === form.vibes[0])?.emoji ?? "✨",
+        }),
+      });
+      const nextDate = form.isFlexibleDate ? FLEXIBLE_DATE_PLACEHOLDER : form.date;
+      const nextTime = form.isFlexibleTime || form.isFlexibleDate ? "" : form.time;
+      const nextFlexTime = form.isFlexibleTime || form.isFlexibleDate;
+      const prev = originalWhen.current;
+      const whenChanged =
+        !prev ||
+        prev.date !== nextDate ||
+        prev.time !== nextTime ||
+        prev.isFlexibleTime !== nextFlexTime ||
+        prev.isFlexibleDate !== form.isFlexibleDate;
+      if (whenChanged) {
+        await api(`/api/plans/${editingPlanId}/propose-time`, {
+          method: "POST",
+          body: JSON.stringify({
+            date: nextDate,
+            time: nextTime,
+            isFlexibleTime: nextFlexTime,
+          }),
+        });
+        await api(`/api/plans/${editingPlanId}/apply-time`, { method: "POST" });
+      }
+      const inviteList = [...invitedIds];
+      if (inviteList.length > 0) {
+        try {
+          await api(`/api/plans/${editingPlanId}/invite`, {
+            method: "POST",
+            body: JSON.stringify({ userIds: inviteList }),
+          });
+        } catch {
+          /* already on the plan, or they can invite from detail */
+        }
+      }
+      navigate(`/plans/${editingPlanId}`);
+    } catch (err) {
+      setError(parseApiError(err) || "Couldn't save — try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const runSubmit = async () => {
     if (!validate()) return;
-    await postPlan();
+    if (editingPlanId) await savePlan();
+    else await postPlan();
   };
 
   const submit = (event?: FormEvent) => {
@@ -597,6 +747,32 @@ export function CreatePlanPage() {
       setLinkBusy(false);
     }
   };
+
+  if (editingPlanId && !editReady) {
+    return (
+      <main className="app-shell app-shell--mid">
+        <header className="app-header app-header--minimal app-header--sticky">
+          <button type="button" className="detail-back" onClick={leaveCreatePlan}>
+            <ArrowLeft size={13} strokeWidth={2} aria-hidden="true" /> Back
+          </button>
+        </header>
+        <p>Loading…</p>
+      </main>
+    );
+  }
+
+  if (editingPlanId && editReady && !originalWhen.current) {
+    return (
+      <main className="app-shell app-shell--mid">
+        <header className="app-header app-header--minimal app-header--sticky">
+          <button type="button" className="detail-back" onClick={leaveCreatePlan}>
+            <ArrowLeft size={13} strokeWidth={2} aria-hidden="true" /> Back
+          </button>
+        </header>
+        <p className="error-text">{error ?? "Couldn't load that plan."}</p>
+      </main>
+    );
+  }
 
   if (path === "choose") {
     const firstName = user?.firstName || "there";
@@ -1364,7 +1540,7 @@ export function CreatePlanPage() {
           </div>
         )}
 
-        {!effectiveCommunityId ? (
+        {!effectiveCommunityId && !editingPlanId ? (
           <p className="create-communities-footer">
             <strong>Communities</strong>{" "}
             <Link to="/communities" className="visibility-option-pill">
@@ -1378,7 +1554,13 @@ export function CreatePlanPage() {
 
         <div className="lock-in-cta-bar lock-in-cta-bar--flush">
           <button type="submit" className="btn-primary btn-block" disabled={submitting}>
-            {submitting ? "Posting…" : "Post it"}
+            {submitting
+              ? editingPlanId
+                ? "Saving…"
+                : "Posting…"
+              : editingPlanId
+                ? "Save"
+                : "Post it"}
           </button>
         </div>
       </form>

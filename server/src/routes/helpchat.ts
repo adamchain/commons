@@ -65,7 +65,7 @@ Tap the **+** button (center of bottom nav) or the Create button at the top of t
 
 After posting, the plan appears live in the feed immediately.
 
-To **edit** a plan you created: open the plan → tap the ⋯ menu (top-right) → Edit plan.
+To **edit** a plan you created: open the plan → Edit plan. You'll land on the same form you used to create it.
 To **cancel** a plan: open the plan → tap the ⋯ menu → Cancel plan.
 
 ---

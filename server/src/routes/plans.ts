@@ -616,6 +616,9 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
   if (req.body?.isFlexibleLocation !== undefined) {
     patch.isFlexibleLocation = Boolean(req.body.isFlexibleLocation);
   }
+  if (req.body?.isFlexibleDate !== undefined) {
+    patch.isFlexibleDate = Boolean(req.body.isFlexibleDate);
+  }
   if (req.body?.visibility !== undefined) {
     const raw = String(req.body.visibility);
     if (["everyone", "community", "network"].includes(raw)) {

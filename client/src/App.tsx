@@ -10,7 +10,6 @@ import { listenForDeepLinks } from "./lib/deepLinks";
 import { needsOnboarding } from "./lib/onboarding";
 import { ChatPage } from "./pages/Chat";
 import { CreatePlanPage } from "./pages/CreatePlan";
-import { EditPlanPage } from "./pages/EditPlan";
 import { FeedPage } from "./pages/Feed";
 import { NotificationsPage } from "./pages/Notifications";
 import { OnboardingPage } from "./pages/Onboarding";
@@ -179,7 +178,7 @@ export default function App() {
         <Route path="/my-plans" element={<Protected><MyPlansPage /></Protected>} />
         <Route path="/empty-states" element={<Protected><EmptyStatesPage /></Protected>} />
         <Route path="/plans/new" element={<Protected><CreatePlanPage /></Protected>} />
-        <Route path="/plans/:id/edit" element={<Protected><EditPlanPage /></Protected>} />
+        <Route path="/plans/:id/edit" element={<Protected><CreatePlanPage /></Protected>} />
         <Route path="/plans/:id" element={<PlanRoute />} />
         <Route path="/plans/:planId/chat" element={<Protected><ChatPage /></Protected>} />
         <Route path="/network" element={<Protected><NetworkPage /></Protected>} />
