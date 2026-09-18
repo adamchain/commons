@@ -8115,6 +8115,16 @@ a.action-btn--stack {
   font-weight: inherit;
   text-decoration: none;
 }
+.plan-card-going-count--link-interested,
+.plan-card-going-count--link-interested:hover,
+.plan-card-going-count--link-interested:focus {
+  color: var(--muted);
+  font-weight: 600;
+}
+.plan-card-going-count--link-interested .plan-card-interested-label {
+  color: inherit;
+  font-weight: inherit;
+}
 .plan-card-going-count--link:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;

@@ -245,14 +245,14 @@ export function PlanCard({
                   {showInterestedLabel && (
                     <button
                       type="button"
-                      className="plan-card-going-count--link"
+                      className="plan-card-going-count--link plan-card-going-count--link-interested"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         openPlan("#guests");
                       }}
                     >
-                      {interestedCount} Interested
+                      {interestedCount} <span className="plan-card-interested-label">Interested</span>
                     </button>
                   )}
                   {footerSuffix && (showGoingLabel || showInterestedLabel) && (
