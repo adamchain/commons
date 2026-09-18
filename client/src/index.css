@@ -7545,6 +7545,12 @@ a.action-btn--stack {
   background: var(--red);
   color: var(--accent-on);
 }
+.plan-card-quick-join.is-interested,
+.plan-card-quick-join.is-interested:hover:not(:disabled),
+.plan-card-quick-join.is-interested.is-active {
+  background: var(--btn-soft);
+  color: var(--btn-soft-on);
+}
 .plan-card-quick-join.is-full,
 .plan-card-quick-join:disabled {
   color: var(--btn-disabled-on);

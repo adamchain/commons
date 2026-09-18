@@ -165,6 +165,9 @@ export function ParticipationButtons({
   const loose = planKind === "looking_for";
   const isFull = !isHosting && capacity !== null && goingCount >= capacity && !goingActive;
   const isApproveOnly = !isHosting && joinType === "approve" && !goingActive;
+  // Full plans can't take another Going RSVP, but anyone can waitlist as
+  // Interested and tap I'm In later if a spot opens.
+  const waitlistOnly = isFull && !goingActive;
 
   return (
     <div className={`participation ${loose ? "participation--loose" : ""}`}>
@@ -173,11 +176,11 @@ export function ParticipationButtons({
           {isApproveOnly
             ? "Application-only."
             : isFull
-              ? "This one's full."
+              ? "This one's full — tap Interested in case a spot opens."
               : `${goingCount}/${capacity} spots taken.`}
         </p>
       )}
-      {!loose && (!isFull || goingActive) && (
+      {!loose && !waitlistOnly && (
         <button
           type="button"
           className={`btn-going ${goingActive ? "is-active" : ""}`}
@@ -230,7 +233,7 @@ export function ParticipationButtons({
             <div id="rsvp-interested-title" className="sheet-title">Interested</div>
             {!loose && !isApproveOnly && !isFull && (
               <button type="button" className="sheet-link" onClick={() => void switchToGoing()}>
-                Switch to I&apos;m in.
+                Switch to I&apos;m In
               </button>
             )}
             <button

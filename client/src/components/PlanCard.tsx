@@ -393,6 +393,8 @@ function QuickJoin({
     }
   }
 
+  const joinAsWaitlist = Boolean(isFull) && !goingActive;
+
   async function onTap(e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -402,16 +404,16 @@ function QuickJoin({
       return;
     }
     if (interestedActive) {
-      // Soft state — open sheet to drop or upgrade to I'm In.
+      // Soft state — open sheet to drop, or upgrade to I'm In if a spot opened.
       setShowSheet(true);
       return;
     }
-    await setState(isLooking || isFull ? "interested" : "going");
+    await setState(isLooking || joinAsWaitlist ? "interested" : "going");
   }
 
   const label = goingActive
     ? "I'm In"
-    : interestedActive || isLooking || isFull
+    : interestedActive || isLooking || joinAsWaitlist
       ? "Interested"
       : "I'm In";
 
@@ -419,7 +421,9 @@ function QuickJoin({
     <>
       <button
         type="button"
-        className={`plan-card-quick-join ${goingActive || interestedActive ? "is-active" : ""}`}
+        className={`plan-card-quick-join ${goingActive ? "is-active" : ""} ${
+          interestedActive || isLooking || joinAsWaitlist ? "is-interested" : ""
+        }`}
         onClick={(e) => void onTap(e)}
         disabled={busy}
       >
@@ -439,7 +443,7 @@ function QuickJoin({
               )}
               {interestedActive && !isLooking && !isFull && (
                 <button type="button" className="sheet-link" onClick={() => void setState("going")}>
-                  Switch to I&apos;m in.
+                  Switch to I&apos;m In
                 </button>
               )}
               <button
