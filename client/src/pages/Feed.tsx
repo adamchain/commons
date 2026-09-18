@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Coffee, MessageCircle } from "lucide-react";
+import { Coffee, MessageCircle, SlidersHorizontal } from "lucide-react";
 import { api } from "../api/http";
 import { FilterSheet } from "../components/FilterSheet";
 import { InviteSheet } from "../components/InviteSheet";
@@ -10,7 +10,7 @@ import { PostSuccessSheet } from "../components/PostSuccessSheet";
 import { WeekStrip } from "../components/WeekStrip";
 import { EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
-import { isIdeaPlan, planHasEnded } from "../lib/planTime";
+import { FLEXIBLE_DATE_PLACEHOLDER, isIdeaPlan, planHasEnded } from "../lib/planTime";
 import { consumeFeedScroll } from "../lib/navState";
 import { useNeighborhoods } from "../lib/useNeighborhoods";
 import { FORUM_INTERESTS, INTEREST_LABELS } from "../types/shared";
@@ -331,16 +331,23 @@ export function FeedPage() {
     // Past plans never appear in the main feed.
     list = list.filter((p) => !p.cancelledAt && !planHasEnded(p));
 
-    const upcoming: PlanDTO[] = [];
+    const dated: PlanDTO[] = [];
+    const anytimeIdeas: PlanDTO[] = [];
     const ideas: PlanDTO[] = [];
     for (const p of list) {
       if (isIdeaPlan(p)) ideas.push(p);
-      else upcoming.push(p);
+      const dateUnset = p.isFlexibleDate || p.date.startsWith(FLEXIBLE_DATE_PLACEHOLDER);
+      if (isIdeaPlan(p) && dateUnset) anytimeIdeas.push(p);
+      else dated.push(p);
     }
-    upcoming.sort((a, b) => `${a.date}T${a.time || "23:59"}`.localeCompare(`${b.date}T${b.time || "23:59"}`));
+    dated.sort((a, b) => `${a.date}T${a.time || "23:59"}`.localeCompare(`${b.date}T${b.time || "23:59"}`));
+    anytimeIdeas.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
     ideas.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
 
-    const active = view === "ideas" ? ideas : upcoming;
+    // Ideas tab is ideas-only. Plans tab includes Just an Idea posts too —
+    // dated ideas sit in the timeline; anytime ideas stay up top so 2099
+    // placeholders don't bury them.
+    const active = view === "ideas" ? ideas : [...anytimeIdeas, ...dated];
     // A just-posted plan is pinned to the very top regardless of its date, so
     // the user immediately sees what they created.
     if (justPostedId) {
@@ -436,17 +443,17 @@ export function FeedPage() {
             >
               Ideas
             </button>
-            <button
-              type="button"
-              className={activeFilterCount > 0 ? "is-active" : ""}
-              onClick={() => setFilterOpen(true)}
-              aria-label="Filter plans"
-              aria-pressed={activeFilterCount > 0}
-            >
-              Filters
-              {activeFilterCount > 0 && <span className="page-filter-count">{activeFilterCount}</span>}
-            </button>
           </div>
+          <button
+            type="button"
+            className={`feed-filter-btn ${activeFilterCount > 0 ? "is-active" : ""}`}
+            onClick={() => setFilterOpen(true)}
+            aria-label={activeFilterCount > 0 ? `Filters, ${activeFilterCount} active` : "Filters"}
+            aria-pressed={activeFilterCount > 0}
+          >
+            <SlidersHorizontal size={16} strokeWidth={2} />
+            {activeFilterCount > 0 && <span className="page-filter-count">{activeFilterCount}</span>}
+          </button>
         </div>
 
         {networkPrompt && (

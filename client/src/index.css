@@ -4790,7 +4790,7 @@ a.action-btn--stack {
 }
 .feed-toolbar .segmented-feed-view {
   margin: 0;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   display: flex;
   flex-direction: row;
   gap: 6px;
@@ -4803,23 +4803,18 @@ a.action-btn--stack {
   margin: 0 20px 14px;
 }
 /* Form `.segmented button` uses min-width: 120px + wrap so Create/Edit plan
-   toggles can stack. The feed keeps Plans / Ideas / Filters on one
-   nowrap row, so that floor makes the pills overflow on iPhone SE and
-   Display Zoom (320pt). Shrink instead; ellipsis
-   only if Bold Text still can't fit. */
+   toggles can stack. The feed keeps Plans / Ideas as compact pills. */
 .segmented.segmented-feed-view button {
   border-radius: var(--r-control);
-  padding: 7px 10px;
+  padding: 7px 14px;
   background: var(--tan-mid);
   border: none;
   color: var(--muted);
   font-weight: 400;
   font-size: var(--text-body-small);
-  flex: 1 1 0;
+  flex: 0 0 auto;
   min-width: 0;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4831,8 +4826,34 @@ a.action-btn--stack {
   color: var(--red);
   font-weight: 600;
 }
-.segmented.segmented-feed-view .page-filter-count {
-  margin-left: 4px;
+.feed-filter-btn {
+  flex: 0 0 auto;
+  margin-left: auto;
+  align-self: stretch;
+  min-width: 36px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: var(--tan-mid);
+  border: 1.5px solid transparent;
+  border-radius: var(--r-control);
+  color: var(--muted);
+  cursor: pointer;
+}
+.feed-filter-btn:hover {
+  color: var(--ink);
+}
+.feed-filter-btn.is-active {
+  background: transparent;
+  border-color: var(--red);
+  color: var(--red);
+}
+.feed-filter-btn .page-filter-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
 }
 .page-filter-btn {
   margin-left: auto;
@@ -8577,14 +8598,14 @@ a.action-btn--stack {
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   padding: 4px 0 2px;
-  gap: 10px;
+  gap: 0;
 }
 .week-strip--scroll::-webkit-scrollbar {
   display: none;
 }
 .week-strip--scroll .week-strip-day {
   flex: 0 0 auto;
-  width: 52px;
+  width: 44px;
   padding-top: 18px;
   scroll-snap-align: start;
 }
@@ -11456,12 +11477,6 @@ a.action-btn--stack {
 }
 .interest-glyph svg {
   display: block;
-}
-.plan-card-interest-pill {
-  position: absolute;
-  left: 10px;
-  bottom: 10px;
-  z-index: 1;
 }
 .cover-thumb-wrap {
   position: relative;

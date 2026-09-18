@@ -5,7 +5,6 @@ import { api } from "../api/http";
 import { Avatar } from "./Avatar";
 import { JoinConfirmPopup, joinConfirmKind, type JoinConfirmKind } from "./JoinConfirmPopup";
 import { IdeaCoverFallback, planPhotoUrl } from "./CoverThumb";
-import { InterestGlyph } from "./InterestGlyph";
 import { BottomSheet } from "./ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
 import type { PlanDTO } from "../types/shared";
@@ -47,8 +46,6 @@ export function PlanCard({
 
   const goingCount = plan.participants.going.length;
   const interestedCount = plan.participants.interested.length;
-  const totalRsvps = goingCount + interestedCount;
-  const almostPlan = isLooking && !hasEnded && totalRsvps >= 2;
   const spotsRemaining =
     plan.capacity !== null && !hasEnded && !isCancelled
       ? Math.max(0, plan.capacity - goingCount)
@@ -60,9 +57,8 @@ export function PlanCard({
   // Going first, then Interested — up to 3 faces so the footer stays compact.
   const facepile = [...plan.participants.going, ...plan.participants.interested].slice(0, 3);
 
-  const footerSuffix = almostPlan
-    ? "almost a plan"
-    : hasEnded && goingCount >= 1
+  const footerSuffix =
+    hasEnded && goingCount >= 1
       ? null
       : isFull && !hasEnded && !isCancelled
         ? "full"
@@ -72,10 +68,8 @@ export function PlanCard({
 
   const showWentLabel = hasEnded && goingCount >= 1;
   const showGoingLabel =
-    !almostPlan && !hasEnded && (goingCount >= 1 || interestedCount >= 1 || Boolean(footerSuffix));
-  const showInterestedLabel = almostPlan
-    ? totalRsvps >= 1
-    : !hasEnded && interestedCount > 0;
+    !hasEnded && (goingCount >= 1 || interestedCount >= 1 || Boolean(footerSuffix));
+  const showInterestedLabel = !hasEnded && interestedCount > 0;
   const showCountLabels = showWentLabel || showGoingLabel || showInterestedLabel;
 
   const openPlan = (hash?: string) => {
@@ -106,16 +100,10 @@ export function PlanCard({
         {coverImage ? (
           <div className="plan-card-flyer">
             <img src={coverImage} alt="" loading="lazy" />
-            {plan.tags[0] ? (
-              <InterestGlyph tag={plan.tags[0]} size={32} className="plan-card-interest-pill" />
-            ) : null}
           </div>
         ) : isLooking ? (
           <div className="plan-card-flyer">
             <IdeaCoverFallback iconSize={42} />
-            {plan.tags[0] ? (
-              <InterestGlyph tag={plan.tags[0]} size={32} className="plan-card-interest-pill" />
-            ) : null}
           </div>
         ) : null}
         <div className="plan-card-body">
@@ -264,7 +252,7 @@ export function PlanCard({
                         openPlan("#guests");
                       }}
                     >
-                      {almostPlan ? totalRsvps : interestedCount} Interested
+                      {interestedCount} Interested
                     </button>
                   )}
                   {footerSuffix && (showGoingLabel || showInterestedLabel) && (
@@ -433,9 +421,9 @@ function QuickJoin({
   }
 
   const label = goingActive
-    ? "I'm in."
+    ? "I'm In"
     : interestedActive
-      ? "Interested ✓"
+      ? "Interested"
       : isLooking
         ? "Interested"
         : "I'm In";

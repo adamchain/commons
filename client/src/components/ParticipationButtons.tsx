@@ -185,7 +185,7 @@ export function ParticipationButtons({
           disabled={pending || isFull || isApproveOnly}
         >
           {goingActive
-            ? "I'm in."
+            ? "I'm In"
             : isFull
               ? "Full"
               : isApproveOnly
@@ -202,7 +202,7 @@ export function ParticipationButtons({
         {interestedActive
           ? isApproveOnly
             ? "Withdraw application"
-            : "Interested ✓"
+            : "Interested"
           : loose
             ? "Interested"
             : isApproveOnly
