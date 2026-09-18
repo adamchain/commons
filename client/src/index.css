@@ -3842,6 +3842,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
 .plan-card-attendees .plan-card-going-sep {
   color: var(--text-muted);
   font-weight: 400;
+  padding: 0 8px;
 }
 .host-row:hover {
   background: #F8F8F8;
@@ -6574,6 +6575,7 @@ a.action-btn--stack {
 .plan-card-going-sep {
   color: var(--text-muted);
   font-weight: 400;
+  padding: 0 8px;
 }
 
 .plan-card-state-pill {

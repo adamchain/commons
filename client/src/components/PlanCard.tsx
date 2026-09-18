@@ -238,9 +238,7 @@ export function PlanCard({
                     </button>
                   )}
                   {showGoingLabel && showInterestedLabel && (
-                    <span className="plan-card-going-sep" aria-hidden="true">
-                      {" · "}
-                    </span>
+                    <span className="plan-card-going-sep" aria-hidden="true">|</span>
                   )}
                   {showInterestedLabel && (
                     <button
