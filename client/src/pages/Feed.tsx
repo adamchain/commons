@@ -451,7 +451,7 @@ export function FeedPage() {
             aria-label={activeFilterCount > 0 ? `Filters, ${activeFilterCount} active` : "Filters"}
             aria-pressed={activeFilterCount > 0}
           >
-            <SlidersHorizontal size={16} strokeWidth={2} />
+            <SlidersHorizontal size={18} strokeWidth={2} />
             {activeFilterCount > 0 && <span className="page-filter-count">{activeFilterCount}</span>}
           </button>
         </div>

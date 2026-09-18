@@ -4781,7 +4781,7 @@ a.action-btn--stack {
 .feed-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin: 0;
   padding: 0 20px 14px;
   flex-wrap: nowrap;
@@ -4790,10 +4790,10 @@ a.action-btn--stack {
 }
 .feed-toolbar .segmented-feed-view {
   margin: 0;
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: row;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
   flex-wrap: nowrap;
 }
@@ -4803,16 +4803,16 @@ a.action-btn--stack {
   margin: 0 20px 14px;
 }
 /* Form `.segmented button` uses min-width: 120px + wrap so Create/Edit plan
-   toggles can stack. The feed keeps Plans / Ideas as compact pills. */
+   toggles can stack. Home Plans / Ideas share the row as two wide pills. */
 .segmented.segmented-feed-view button {
   border-radius: var(--r-control);
-  padding: 7px 14px;
+  padding: 7px 10px;
   background: var(--tan-mid);
   border: none;
   color: var(--muted);
   font-weight: 400;
   font-size: var(--text-body-small);
-  flex: 0 0 auto;
+  flex: 1 1 0;
   min-width: 0;
   white-space: nowrap;
   display: inline-flex;
@@ -4828,17 +4828,15 @@ a.action-btn--stack {
 }
 .feed-filter-btn {
   flex: 0 0 auto;
-  margin-left: auto;
-  align-self: stretch;
-  min-width: 36px;
-  padding: 0 10px;
+  margin: 0;
+  padding: 4px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  background: var(--tan-mid);
-  border: 1.5px solid transparent;
-  border-radius: var(--r-control);
+  background: transparent;
+  border: none;
+  border-radius: 0;
   color: var(--muted);
   cursor: pointer;
 }
@@ -4847,7 +4845,7 @@ a.action-btn--stack {
 }
 .feed-filter-btn.is-active {
   background: transparent;
-  border-color: var(--red);
+  border: none;
   color: var(--red);
 }
 .feed-filter-btn .page-filter-count {
