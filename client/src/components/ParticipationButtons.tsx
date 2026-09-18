@@ -177,20 +177,18 @@ export function ParticipationButtons({
               : `${goingCount}/${capacity} spots taken.`}
         </p>
       )}
-      {!loose && (
+      {!loose && (!isFull || goingActive) && (
         <button
           type="button"
           className={`btn-going ${goingActive ? "is-active" : ""}`}
           onClick={() => void tapGoing()}
-          disabled={pending || isFull || isApproveOnly}
+          disabled={pending || isApproveOnly}
         >
           {goingActive
             ? "I'm In"
-            : isFull
-              ? "Full"
-              : isApproveOnly
-                ? "Application-only"
-                : "I'm In"}
+            : isApproveOnly
+              ? "Application-only"
+              : "I'm In"}
         </button>
       )}
       <button

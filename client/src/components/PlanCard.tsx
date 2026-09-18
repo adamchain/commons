@@ -46,29 +46,18 @@ export function PlanCard({
 
   const goingCount = plan.participants.going.length;
   const interestedCount = plan.participants.interested.length;
-  const spotsRemaining =
-    plan.capacity !== null && !hasEnded && !isCancelled
-      ? Math.max(0, plan.capacity - goingCount)
-      : null;
-  const showSpotsRemaining =
-    spotsRemaining !== null && plan.capacity !== null && spotsRemaining > 0 && spotsRemaining <= 3;
   const isFull = plan.capacity !== null && goingCount >= plan.capacity;
+  const capacityFill =
+    plan.capacity !== null && !hasEnded && !isCancelled
+      ? `${Math.min(goingCount, plan.capacity)}/${plan.capacity}`
+      : null;
 
   // Going first, then Interested — up to 3 faces so the footer stays compact.
   const facepile = [...plan.participants.going, ...plan.participants.interested].slice(0, 3);
 
-  const footerSuffix =
-    hasEnded && goingCount >= 1
-      ? null
-      : isFull && !hasEnded && !isCancelled
-        ? "full"
-        : showSpotsRemaining
-          ? `${spotsRemaining} spot${spotsRemaining === 1 ? "" : "s"} left`
-          : null;
-
   const showWentLabel = hasEnded && goingCount >= 1;
   const showGoingLabel =
-    !hasEnded && (goingCount >= 1 || interestedCount >= 1 || Boolean(footerSuffix));
+    !hasEnded && (goingCount >= 1 || interestedCount >= 1 || Boolean(capacityFill));
   const showInterestedLabel = !hasEnded && interestedCount > 0;
   const showCountLabels = showWentLabel || showGoingLabel || showInterestedLabel;
 
@@ -237,6 +226,22 @@ export function PlanCard({
                       {goingCount} <span className="plan-card-going-label">Going</span>
                     </button>
                   )}
+                  {showGoingLabel && capacityFill && (
+                    <>
+                      <span className="plan-card-going-sep" aria-hidden="true">|</span>
+                      <button
+                        type="button"
+                        className="plan-card-going-count--link"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          openPlan("#guests");
+                        }}
+                      >
+                        {capacityFill}
+                      </button>
+                    </>
+                  )}
                   {showGoingLabel && showInterestedLabel && (
                     <span className="plan-card-going-sep" aria-hidden="true">|</span>
                   )}
@@ -252,12 +257,6 @@ export function PlanCard({
                     >
                       {interestedCount} <span className="plan-card-interested-label">Interested</span>
                     </button>
-                  )}
-                  {footerSuffix && (showGoingLabel || showInterestedLabel) && (
-                    <span className="plan-card-going-sep">
-                      {" · "}
-                      {footerSuffix}
-                    </span>
                   )}
                 </div>
               )}
@@ -397,7 +396,7 @@ function QuickJoin({
   async function onTap(e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (busy || (isFull && !goingActive && !interestedActive && !isLooking)) return;
+    if (busy) return;
     if (goingActive) {
       setShowSheet(true);
       return;
@@ -407,24 +406,14 @@ function QuickJoin({
       setShowSheet(true);
       return;
     }
-    await setState(isLooking ? "interested" : "going");
-  }
-
-  if (isFull && !goingActive && !interestedActive && !isLooking) {
-    return (
-      <span className="plan-card-quick-join is-full" aria-disabled="true">
-        Full
-      </span>
-    );
+    await setState(isLooking || isFull ? "interested" : "going");
   }
 
   const label = goingActive
     ? "I'm In"
-    : interestedActive
+    : interestedActive || isLooking || isFull
       ? "Interested"
-      : isLooking
-        ? "Interested"
-        : "I'm In";
+      : "I'm In";
 
   return (
     <>
