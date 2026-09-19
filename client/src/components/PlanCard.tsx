@@ -132,6 +132,17 @@ export function PlanCard({
                 {plan.communityName}
               </span>
             ) : null}
+            {showCountLabels && (
+              <GoingCount
+                goingCount={goingCount}
+                interestedCount={interestedCount}
+                capacityFill={capacityFill}
+                showWentLabel={showWentLabel}
+                showGoingLabel={showGoingLabel}
+                showInterestedLabel={showInterestedLabel}
+                onOpenGuests={() => openPlan("#guests")}
+              />
+            )}
           </header>
           <h3 className="plan-card-title">{title}</h3>
           <div className="plan-card-meta-row">
@@ -172,106 +183,46 @@ export function PlanCard({
             </a>
           )}
 
-          <footer className="plan-card-footer-row">
-            <div className="plan-card-attendees">
-              {facepile.length > 0 && (
-                <div className="avatar-stack">
-                  {facepile.map((person) => (
-                    <button
-                      key={person.id}
-                      type="button"
-                      className="avatar-stack-link plan-card-avatar-link"
-                      aria-label={`${person.firstName}'s profile`}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        openProfile(person.id);
-                      }}
-                    >
-                      <Avatar
-                        seed={person.avatarSeed}
-                        style={person.avatarStyle}
-                        photoDataUrl={person.avatarPhotoDataUrl}
-                        params={person.avatarParams}
-                        size="xs"
-                      />
-                    </button>
-                  ))}
-                </div>
-              )}
-              {showCountLabels && (
-                <div className="plan-card-going-count">
-                  {showWentLabel && (
-                    <button
-                      type="button"
-                      className="plan-card-going-count--link"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        openPlan("#guests");
-                      }}
-                    >
-                      {goingCount} went
-                    </button>
-                  )}
-                  {showGoingLabel && (
-                    <button
-                      type="button"
-                      className="plan-card-going-count--link"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        openPlan("#guests");
-                      }}
-                    >
-                      {goingCount} <span className="plan-card-going-label">Going</span>
-                    </button>
-                  )}
-                  {showGoingLabel && capacityFill && (
-                    <>
-                      <span className="plan-card-going-sep" aria-hidden="true">|</span>
+          {(facepile.length > 0 || (!isHosting && !hasEnded && !isCancelled)) && (
+            <footer className="plan-card-footer-row">
+              <div className="plan-card-attendees">
+                {facepile.length > 0 && (
+                  <div className="avatar-stack">
+                    {facepile.map((person) => (
                       <button
+                        key={person.id}
                         type="button"
-                        className="plan-card-going-count--link"
+                        className="avatar-stack-link plan-card-avatar-link"
+                        aria-label={`${person.firstName}'s profile`}
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          openPlan("#guests");
+                          openProfile(person.id);
                         }}
                       >
-                        {capacityFill}
+                        <Avatar
+                          seed={person.avatarSeed}
+                          style={person.avatarStyle}
+                          photoDataUrl={person.avatarPhotoDataUrl}
+                          params={person.avatarParams}
+                          size="xs"
+                        />
                       </button>
-                    </>
-                  )}
-                  {showGoingLabel && showInterestedLabel && (
-                    <span className="plan-card-going-sep" aria-hidden="true">|</span>
-                  )}
-                  {showInterestedLabel && (
-                    <button
-                      type="button"
-                      className="plan-card-going-count--link plan-card-going-count--link-interested"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        openPlan("#guests");
-                      }}
-                    >
-                      {interestedCount} <span className="plan-card-interested-label">Interested</span>
-                    </button>
-                  )}
-                </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {!isHosting && !hasEnded && !isCancelled && (
+                <QuickJoin
+                  planId={plan.id}
+                  isLooking={isLooking}
+                  state={plan.myState ?? null}
+                  isFull={isFull}
+                  onPlanRefresh={onPlanRefresh}
+                />
               )}
-            </div>
-            {!isHosting && !hasEnded && !isCancelled && (
-              <QuickJoin
-                planId={plan.id}
-                isLooking={isLooking}
-                state={plan.myState ?? null}
-                isFull={isFull}
-                onPlanRefresh={onPlanRefresh}
-              />
-            )}
-          </footer>
+            </footer>
+          )}
         </div>
       </Link>
 
@@ -322,6 +273,64 @@ export function PlanCard({
             </button>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function GoingCount({
+  goingCount,
+  interestedCount,
+  capacityFill,
+  showWentLabel,
+  showGoingLabel,
+  showInterestedLabel,
+  onOpenGuests,
+}: {
+  goingCount: number;
+  interestedCount: number;
+  capacityFill: string | null;
+  showWentLabel: boolean;
+  showGoingLabel: boolean;
+  showInterestedLabel: boolean;
+  onOpenGuests: () => void;
+}) {
+  const openGuests = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onOpenGuests();
+  };
+  return (
+    <div className="plan-card-going-count">
+      {showWentLabel && (
+        <button type="button" className="plan-card-going-count--link" onClick={openGuests}>
+          {goingCount} went
+        </button>
+      )}
+      {showGoingLabel && (
+        <button type="button" className="plan-card-going-count--link" onClick={openGuests}>
+          {goingCount} <span className="plan-card-going-label">Going</span>
+        </button>
+      )}
+      {showGoingLabel && capacityFill && (
+        <>
+          <span className="plan-card-going-sep" aria-hidden="true">|</span>
+          <button type="button" className="plan-card-going-count--link" onClick={openGuests}>
+            {capacityFill}
+          </button>
+        </>
+      )}
+      {showGoingLabel && showInterestedLabel && (
+        <span className="plan-card-going-sep" aria-hidden="true">|</span>
+      )}
+      {showInterestedLabel && (
+        <button
+          type="button"
+          className="plan-card-going-count--link plan-card-going-count--link-interested"
+          onClick={openGuests}
+        >
+          {interestedCount} <span className="plan-card-interested-label">Interested</span>
+        </button>
       )}
     </div>
   );

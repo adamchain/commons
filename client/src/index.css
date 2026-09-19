@@ -6460,14 +6460,25 @@ a.action-btn--stack {
   margin-bottom: 4px;
   padding-right: 0;
 }
-/* Past + cancelled cards also carry a "Hide" button top-right, which pushes
-   the star further left — give the pill even more clearance there. */
-.plan-card--happened .plan-card-poster-row,
-.plan-card--cancelled .plan-card-poster-row {
-  padding-right: 126px;
-}
 .plan-card-poster-row .plan-card-kind-pill {
   margin-left: auto;
+}
+.plan-card-poster-row .plan-card-going-count {
+  margin-left: auto;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  font-size: var(--text-body-small);
+}
+.plan-card-poster-row .plan-card-going-sep {
+  padding: 0 6px;
+}
+.plan-card-poster-row:has(.plan-card-going-count) .plan-card-kind-pill,
+.plan-card-poster-row:has(.plan-card-going-count) .plan-card-community-pill {
+  margin-left: 0;
+}
+.plan-card-poster-row:has(.plan-card-going-count) .plan-card-community-pill {
+  max-width: 30%;
 }
 .plan-card-poster-row > .avatar,
 .plan-card-poster-row > .avatar-initials {
