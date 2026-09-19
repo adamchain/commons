@@ -174,10 +174,10 @@ export function ParticipationButtons({
     <div className={`participation ${loose ? "participation--loose" : ""}`}>
       {!loose && (isApproveOnly || isFull || capacity !== null) && (
         <p className="participation-hint">
-          {isApproveOnly
-            ? "Application-only."
-            : isFull
-              ? "This one's full — tap Interested in case a spot opens."
+          {isFull
+            ? "This one's full — tap Interested in case a spot opens."
+            : isApproveOnly
+              ? "Application-only."
               : `${goingCount}/${capacity} spots taken.`}
         </p>
       )}
@@ -202,14 +202,12 @@ export function ParticipationButtons({
         disabled={pending}
       >
         {interestedActive
-          ? isApproveOnly
+          ? isApproveOnly && !isFull
             ? "Withdraw application"
             : "Interested"
-          : loose
-            ? "Interested"
-            : isApproveOnly
-              ? "Apply"
-              : "Interested"}
+          : isApproveOnly && !isFull
+            ? "Apply"
+            : "Interested"}
       </button>
       {error && <p className="onboarding-error" style={{ marginTop: 8 }}>{error}</p>}
       {confirm && <JoinConfirmPopup kind={confirm} onClose={() => setConfirm(null)} />}
