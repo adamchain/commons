@@ -17,7 +17,6 @@ import { FLEXIBLE_DATE_PLACEHOLDER } from "../lib/planTime";
 import { formatPlaceAddress, formatPlanDate, formatPlanTime } from "../lib/format";
 import { Avatar } from "../components/Avatar";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
-import { IdeaCoverFallback } from "../components/CoverThumb";
 import { LocationAutocomplete } from "../components/LocationAutocomplete";
 import { useAuth } from "../context/AuthContext";
 import type { NavFromState } from "../lib/navState";
@@ -27,7 +26,6 @@ import { isNative } from "../lib/platform";
 import { NumberPicker } from "../components/NumberPicker";
 import { interestVisual } from "../lib/interestIcons";
 import {
-  ALL_INTERESTS,
   INTEREST_LABELS,
   VIBE_OPTIONS,
   type InterestTag,
@@ -917,12 +915,9 @@ export function CreatePlanPage() {
             onClick={() => setPendingPath("idea")}
             aria-pressed={pendingPath === "idea"}
           >
-            <span className="path-picker-mark" aria-hidden="true">
-              <IdeaCoverFallback iconSize={22} />
-            </span>
             <span className="path-picker-title">Just an idea</span>
             <span className="path-picker-sub">
-              A thought. That&apos;s enough.
+              A casual thought — see who&apos;s down before committing to anything.
             </span>
           </button>
           <button
@@ -933,7 +928,7 @@ export function CreatePlanPage() {
           >
             <span className="path-picker-title">Make a plan</span>
             <span className="path-picker-sub">
-              Time, place, who&apos;s in.
+              Know what you want to do. Set the details, post it, and see who&apos;s in.
             </span>
           </button>
         </div>
@@ -1858,6 +1853,21 @@ function IdeaForm({
     };
   }, []);
 
+  const openIdeaCalendar = () => {
+    const input = ideaDateRef.current;
+    if (!input) return;
+    try {
+      if (typeof input.showPicker === "function") {
+        input.showPicker();
+        return;
+      }
+    } catch {
+      /* showPicker can throw if the input isn't ready */
+    }
+    input.focus();
+    input.click();
+  };
+
   const selectDateMode = (mode: IdeaDateMode) => {
     setDateMode(mode);
     if (mode === "specific") {
@@ -1866,6 +1876,7 @@ function IdeaForm({
         isFlexibleDate: false,
         date: f.date && f.date >= today() ? f.date : today(),
       }));
+      openIdeaCalendar();
     } else if (mode === "week") {
       setForm((f) => ({ ...f, isFlexibleDate: false, date: endOfThisWeek() }));
     } else {
@@ -1889,7 +1900,7 @@ function IdeaForm({
           <div className="idea-form-title-block">
             <h1 className="idea-form-title">Just an Idea</h1>
             <p className="idea-form-sub">
-              Toss it out. See who bites.
+              Have an idea? See who&apos;s down
             </p>
           </div>
 
@@ -2055,27 +2066,30 @@ function IdeaForm({
                     <div className="idea-when-value">
                       <span className="plan-meta-label">When</span>
                       {dateMode === "specific" ? (
-                        <>
-                          <span className={`plan-meta-value ${!form.date ? "is-placeholder" : ""}`}>
-                            {form.date ? formatPlanDate(form.date) : "Pick a day"}
-                          </span>
-                          <input
-                            ref={ideaDateRef}
-                            id="idea-date"
-                            className="plan-meta-native-input"
-                            type="date"
-                            min={today()}
-                            value={form.date}
-                            aria-invalid={Boolean(dateError)}
-                            onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-                            onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
-                          />
-                        </>
+                        <span className={`plan-meta-value ${!form.date ? "is-placeholder" : ""}`}>
+                          {form.date ? formatPlanDate(form.date) : "Pick a day"}
+                        </span>
                       ) : (
                         <span className={`plan-meta-value ${dateMode === "anytime" ? "is-placeholder" : ""}`}>
                           {dateMode === "week" ? "This week" : "Anytime"}
                         </span>
                       )}
+                      <input
+                        ref={ideaDateRef}
+                        id="idea-date"
+                        className={
+                          dateMode === "specific"
+                            ? "plan-meta-native-input"
+                            : "plan-meta-native-input is-dormant"
+                        }
+                        type="date"
+                        min={today()}
+                        value={form.date && form.date >= today() ? form.date : today()}
+                        aria-invalid={Boolean(dateError)}
+                        tabIndex={dateMode === "specific" ? 0 : -1}
+                        onChange={(e) => setForm((f) => ({ ...f, date: e.target.value, isFlexibleDate: false }))}
+                        onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
+                      />
                     </div>
                     <div className="seg-toggle idea-date-toggle" role="group" aria-label="When">
                       <button
@@ -2171,18 +2185,27 @@ function IdeaForm({
               </div>
 
               <p className="form-eyebrow">Category <span className="form-eyebrow-optional">— optional</span></p>
-              <div className="idea-interest-grid" role="group" aria-label="Interest tags">
-                {ALL_INTERESTS.map((tag) => {
-                  const selected = form.vibes.includes(tag);
+              <div className="vibe-grid" role="group" aria-label="Interest tags">
+                {VIBE_OPTIONS.map((opt) => {
+                  const selected = form.vibes.includes(opt.id);
+                  const { Icon, iconColor, tint } = interestVisual(opt.tag);
                   return (
                     <button
-                      key={tag}
+                      key={opt.id}
                       type="button"
-                      className={`idea-interest-pill ${selected ? "is-selected" : ""}`}
-                      onClick={() => toggleVibe(tag)}
+                      className={`vibe-tile ${selected ? "is-selected" : ""}`}
+                      onClick={() => toggleVibe(opt.id)}
                       aria-pressed={selected}
                     >
-                      {INTEREST_LABELS[tag]}
+                      {selected && <span className="vibe-tile-dot" aria-hidden="true" />}
+                      <span
+                        className="vibe-tile-icon"
+                        style={{ background: tint, color: iconColor }}
+                        aria-hidden="true"
+                      >
+                        <Icon size={18} strokeWidth={1.8} />
+                      </span>
+                      <span className="vibe-tile-label">{opt.label}</span>
                     </button>
                   );
                 })}
