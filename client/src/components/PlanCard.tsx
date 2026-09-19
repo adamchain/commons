@@ -50,7 +50,7 @@ export function PlanCard({
   const isFull = isPlanAtCapacity(capacity, goingCount);
   const capacityFill =
     capacity !== null && !hasEnded && !isCancelled
-      ? `${Math.min(goingCount, capacity)}/${capacity}`
+      ? `${Math.min(goingCount, capacity)}/${capacity} spots`
       : null;
 
   // Going first, then Interested — up to 3 faces so the footer stays compact.
