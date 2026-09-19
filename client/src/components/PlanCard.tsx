@@ -10,7 +10,7 @@ import { useAuth } from "../context/AuthContext";
 import type { PlanDTO } from "../types/shared";
 import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
 import { saveFeedScroll, type NavFromState } from "../lib/navState";
-import { isIdeaPlan, planHasEnded } from "../lib/planTime";
+import { isIdeaPlan, isPlanAtCapacity, planCapacityValue, planHasEnded } from "../lib/planTime";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
 
 /**
@@ -46,10 +46,11 @@ export function PlanCard({
 
   const goingCount = plan.participants.going.length;
   const interestedCount = plan.participants.interested.length;
-  const isFull = plan.capacity !== null && goingCount >= plan.capacity;
+  const capacity = planCapacityValue(plan.capacity);
+  const isFull = isPlanAtCapacity(capacity, goingCount);
   const capacityFill =
-    plan.capacity !== null && !hasEnded && !isCancelled
-      ? `${Math.min(goingCount, plan.capacity)}/${plan.capacity}`
+    capacity !== null && !hasEnded && !isCancelled
+      ? `${Math.min(goingCount, capacity)}/${capacity}`
       : null;
 
   // Going first, then Interested — up to 3 faces so the footer stays compact.
@@ -361,7 +362,7 @@ function QuickJoin({
   planId: string;
   isLooking: boolean;
   state: "going" | "interested" | null;
-  isFull?: boolean;
+  isFull: boolean;
   onPlanRefresh?: () => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -370,6 +371,10 @@ function QuickJoin({
 
   const goingActive = state === "going";
   const interestedActive = state === "interested";
+  // Full capacity: this CTA is Interested (waitlist), not I'm In — unless
+  // this person already has a Going seat.
+  const waitlist = isFull && !goingActive;
+  const interestedCta = interestedActive || isLooking || waitlist;
 
   async function setState(next: "going" | "interested" | null) {
     if (busy) return;
@@ -393,8 +398,6 @@ function QuickJoin({
     }
   }
 
-  const joinAsWaitlist = Boolean(isFull) && !goingActive;
-
   async function onTap(e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -408,21 +411,17 @@ function QuickJoin({
       setShowSheet(true);
       return;
     }
-    await setState(isLooking || joinAsWaitlist ? "interested" : "going");
+    await setState(interestedCta ? "interested" : "going");
   }
 
-  const label = goingActive
-    ? "I'm In"
-    : interestedActive || isLooking || joinAsWaitlist
-      ? "Interested"
-      : "I'm In";
+  const label = goingActive ? "I'm In" : interestedCta ? "Interested" : "I'm In";
 
   return (
     <>
       <button
         type="button"
         className={`plan-card-quick-join ${goingActive ? "is-active" : ""} ${
-          interestedActive || isLooking || joinAsWaitlist ? "is-interested" : ""
+          interestedCta ? "is-interested" : ""
         }`}
         onClick={(e) => void onTap(e)}
         disabled={busy}

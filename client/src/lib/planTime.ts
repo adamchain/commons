@@ -39,3 +39,16 @@ export function planHasEnded(plan: PlanDTO, now: Date = new Date()): boolean {
 export function isIdeaPlan(plan: Pick<PlanDTO, "planKind" | "lockedAt">): boolean {
   return plan.planKind === "looking_for" && !plan.lockedAt;
 }
+
+/** Positive spot cap, or null when the plan is uncapped. */
+export function planCapacityValue(capacity: unknown): number | null {
+  const n = typeof capacity === "number" ? capacity : Number(capacity);
+  if (!Number.isFinite(n) || n < 1) return null;
+  return Math.floor(n);
+}
+
+/** True when Going has filled every reserved spot. */
+export function isPlanAtCapacity(capacity: unknown, goingCount: number): boolean {
+  const cap = planCapacityValue(capacity);
+  return cap !== null && goingCount >= cap;
+}

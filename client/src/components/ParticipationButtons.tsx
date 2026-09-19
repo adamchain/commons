@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
 import type { JoinType, ParticipationState, PlanKind } from "../types/shared";
+import { isPlanAtCapacity } from "../lib/planTime";
 import { JoinConfirmPopup, joinConfirmKind, type JoinConfirmKind } from "./JoinConfirmPopup";
 import { BottomSheet } from "./ui/BottomSheet";
 
@@ -163,11 +164,11 @@ export function ParticipationButtons({
   const goingActive = state === "going";
   const interestedActive = state === "interested";
   const loose = planKind === "looking_for";
-  const isFull = !isHosting && capacity !== null && goingCount >= capacity && !goingActive;
+  const isFull = !isHosting && isPlanAtCapacity(capacity, goingCount) && !goingActive;
   const isApproveOnly = !isHosting && joinType === "approve" && !goingActive;
   // Full plans can't take another Going RSVP, but anyone can waitlist as
   // Interested and tap I'm In later if a spot opens.
-  const waitlistOnly = isFull && !goingActive;
+  const waitlistOnly = isFull;
 
   return (
     <div className={`participation ${loose ? "participation--loose" : ""}`}>
