@@ -57,10 +57,8 @@ export function PlanCard({
   const facepile = [...plan.participants.going, ...plan.participants.interested].slice(0, 3);
 
   const showWentLabel = hasEnded && goingCount >= 1;
-  const showGoingLabel =
-    !hasEnded && (goingCount >= 1 || interestedCount >= 1 || Boolean(capacityFill));
+  const showGoingLabel = !hasEnded && goingCount >= 1;
   const showInterestedLabel = !hasEnded && interestedCount > 0;
-  const showCountLabels = showWentLabel || showGoingLabel || showInterestedLabel;
 
   const openPlan = (hash?: string) => {
     if (navFrom.from === "feed") saveFeedScroll();
@@ -132,16 +130,18 @@ export function PlanCard({
                 {plan.communityName}
               </span>
             ) : null}
-            {showCountLabels && (
-              <GoingCount
-                goingCount={goingCount}
-                interestedCount={interestedCount}
-                capacityFill={capacityFill}
-                showWentLabel={showWentLabel}
-                showGoingLabel={showGoingLabel}
-                showInterestedLabel={showInterestedLabel}
-                onOpenGuests={() => openPlan("#guests")}
-              />
+            {capacityFill && (
+              <button
+                type="button"
+                className="plan-card-capacity"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  openPlan("#guests");
+                }}
+              >
+                {capacityFill}
+              </button>
             )}
           </header>
           <h3 className="plan-card-title">{title}</h3>
@@ -183,7 +183,11 @@ export function PlanCard({
             </a>
           )}
 
-          {(facepile.length > 0 || (!isHosting && !hasEnded && !isCancelled)) && (
+          {(facepile.length > 0 ||
+            showWentLabel ||
+            showGoingLabel ||
+            showInterestedLabel ||
+            (!isHosting && !hasEnded && !isCancelled)) && (
             <footer className="plan-card-footer-row">
               <div className="plan-card-attendees">
                 {facepile.length > 0 && (
@@ -210,6 +214,16 @@ export function PlanCard({
                       </button>
                     ))}
                   </div>
+                )}
+                {(showWentLabel || showGoingLabel || showInterestedLabel) && (
+                  <GoingCount
+                    goingCount={goingCount}
+                    interestedCount={interestedCount}
+                    showWentLabel={showWentLabel}
+                    showGoingLabel={showGoingLabel}
+                    showInterestedLabel={showInterestedLabel}
+                    onOpenGuests={() => openPlan("#guests")}
+                  />
                 )}
               </div>
               {!isHosting && !hasEnded && !isCancelled && (
@@ -281,7 +295,6 @@ export function PlanCard({
 function GoingCount({
   goingCount,
   interestedCount,
-  capacityFill,
   showWentLabel,
   showGoingLabel,
   showInterestedLabel,
@@ -289,7 +302,6 @@ function GoingCount({
 }: {
   goingCount: number;
   interestedCount: number;
-  capacityFill: string | null;
   showWentLabel: boolean;
   showGoingLabel: boolean;
   showInterestedLabel: boolean;
@@ -311,14 +323,6 @@ function GoingCount({
         <button type="button" className="plan-card-going-count--link" onClick={openGuests}>
           {goingCount} <span className="plan-card-going-label">Going</span>
         </button>
-      )}
-      {showGoingLabel && capacityFill && (
-        <>
-          <span className="plan-card-going-sep" aria-hidden="true">|</span>
-          <button type="button" className="plan-card-going-count--link" onClick={openGuests}>
-            {capacityFill}
-          </button>
-        </>
       )}
       {showGoingLabel && showInterestedLabel && (
         <span className="plan-card-going-sep" aria-hidden="true">|</span>
