@@ -45,6 +45,10 @@ function formatInboxTime(iso: string | null | undefined): string {
 }
 
 const SWIPE_ACTION_W = 88;
+const SWIPE_LOCK_PX = 6;
+const SWIPE_OPEN_PX = 28;
+const SWIPE_FLICK_PX_MS = 0.4;
+const SWIPE_CLOSE_EVENT = "commons:messages-swipe-close";
 
 function SwipeRemoveRow({
   enabled,
@@ -57,38 +61,103 @@ function SwipeRemoveRow({
 }) {
   const [x, setX] = useState(0);
   const [dragging, setDragging] = useState(false);
-  const start = useRef({ x: 0, y: 0, ox: 0 });
+  const xRef = useRef(0);
+  const draggingRef = useRef(false);
+  const start = useRef({ x: 0, y: 0, ox: 0, t: 0 });
+  const last = useRef({ x: 0, t: 0 });
   const axis = useRef<"h" | "v" | null>(null);
+  const idRef = useRef(`swipe-${Math.random().toString(36).slice(2)}`);
   const frontRef = useRef<HTMLDivElement>(null);
+
+  const applyX = (next: number) => {
+    const clamped = Math.min(0, Math.max(-SWIPE_ACTION_W, next));
+    xRef.current = clamped;
+    setX(clamped);
+  };
+
+  useEffect(() => {
+    const el = frontRef.current;
+    if (!el) return;
+    const onTouchMove = (e: TouchEvent) => {
+      if (axis.current === "h") e.preventDefault();
+    };
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onTouchMove);
+  }, []);
+
+  useEffect(() => {
+    const onClose = (e: Event) => {
+      const other = (e as CustomEvent<string>).detail;
+      if (other === idRef.current) return;
+      xRef.current = 0;
+      setX(0);
+      setDragging(false);
+      draggingRef.current = false;
+      axis.current = null;
+    };
+    window.addEventListener(SWIPE_CLOSE_EVENT, onClose);
+    return () => window.removeEventListener(SWIPE_CLOSE_EVENT, onClose);
+  }, []);
 
   const onDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!enabled || (e.pointerType === "mouse" && e.button !== 0)) return;
     axis.current = null;
-    start.current = { x: e.clientX, y: e.clientY, ox: x };
-    setDragging(true);
+    draggingRef.current = true;
+    const t = performance.now();
+    start.current = { x: e.clientX, y: e.clientY, ox: xRef.current, t };
+    last.current = { x: e.clientX, t };
   };
 
   const onMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!enabled || !dragging) return;
+    if (!enabled || !draggingRef.current) return;
     const dx = e.clientX - start.current.x;
     const dy = e.clientY - start.current.y;
     if (!axis.current) {
-      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
-      axis.current = Math.abs(dx) > Math.abs(dy) * 1.15 ? "h" : "v";
+      if (Math.abs(dx) < SWIPE_LOCK_PX && Math.abs(dy) < SWIPE_LOCK_PX) return;
+      axis.current = Math.abs(dx) >= Math.abs(dy) ? "h" : "v";
       if (axis.current === "h") {
-        frontRef.current?.setPointerCapture(e.pointerId);
+        window.dispatchEvent(new CustomEvent(SWIPE_CLOSE_EVENT, { detail: idRef.current }));
+        setDragging(true);
+        try {
+          frontRef.current?.setPointerCapture(e.pointerId);
+        } catch {
+          /* capture isn't required if the pointer stays on the row */
+        }
+      } else {
+        draggingRef.current = false;
+        return;
       }
     }
     if (axis.current !== "h") return;
-    e.preventDefault();
-    setX(Math.min(0, Math.max(-SWIPE_ACTION_W, start.current.ox + dx)));
+    last.current = { x: e.clientX, t: performance.now() };
+    applyX(start.current.ox + dx);
   };
 
-  const onUp = () => {
-    if (!enabled || !dragging) return;
+  const settle = () => {
+    const wasH = axis.current === "h";
+    const cur = xRef.current;
+    const elapsed = Math.max(16, performance.now() - start.current.t);
+    const vx = (last.current.x - start.current.x) / elapsed;
+    draggingRef.current = false;
     setDragging(false);
-    setX((cur) => (axis.current === "h" && cur < -SWIPE_ACTION_W / 2 ? -SWIPE_ACTION_W : 0));
     axis.current = null;
+    if (!wasH) return;
+    const flickedOpen = vx < -SWIPE_FLICK_PX_MS;
+    const flickedClosed = vx > SWIPE_FLICK_PX_MS;
+    const next = flickedClosed ? 0 : flickedOpen || cur < -SWIPE_OPEN_PX ? -SWIPE_ACTION_W : 0;
+    applyX(next);
+  };
+
+  const onUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!enabled) return;
+    try {
+      if (frontRef.current?.hasPointerCapture(e.pointerId)) {
+        frontRef.current.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      /* already released */
+    }
+    settle();
   };
 
   if (!enabled) return <>{children}</>;
@@ -100,17 +169,17 @@ function SwipeRemoveRow({
       </button>
       <div
         ref={frontRef}
-        className={`messages-swipe-front${dragging && axis.current === "h" ? " is-dragging" : ""}`}
+        className={`messages-swipe-front${dragging ? " is-dragging" : ""}`}
         style={{ transform: `translateX(${x}px)` }}
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerCancel={onUp}
         onClickCapture={(e) => {
-          if (x < -8) {
+          if (xRef.current < -8) {
             e.preventDefault();
             e.stopPropagation();
-            setX(0);
+            applyX(0);
           }
         }}
       >
