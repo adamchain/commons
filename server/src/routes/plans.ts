@@ -48,6 +48,21 @@ function normalizeFlyerDataUrl(raw: unknown): string | undefined {
   return undefined;
 }
 
+function parseHttpUrl(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  let s = raw.trim().replace(/^<|>$/g, "").replace(/[\u200B-\u200D\uFEFF]/g, "");
+  if (!s) return undefined;
+  if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
+  try {
+    const u = new URL(s);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return undefined;
+    if (!u.hostname.includes(".")) return undefined;
+    return u.toString().slice(0, 2048);
+  } catch {
+    return undefined;
+  }
+}
+
 export { planVisibleToViewer, userHoods } from "../lib/feedScope.js";
 
 export function userToPublic(user: UserRecord): PublicUser {
@@ -409,17 +424,7 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   // sanitized the URL; refetching here would just double the latency.
   let flyerLinkUrl: string | undefined;
   let flyerLinkPreview: PlanRecord["flyerLinkPreview"];
-  const rawLink = typeof req.body?.flyerLinkUrl === "string" ? req.body.flyerLinkUrl.trim() : "";
-  if (rawLink) {
-    try {
-      const u = new URL(rawLink);
-      if (u.protocol === "http:" || u.protocol === "https:") {
-        flyerLinkUrl = u.toString().slice(0, 2048);
-      }
-    } catch {
-      /* invalid URL — silently drop */
-    }
-  }
+  flyerLinkUrl = parseHttpUrl(req.body?.flyerLinkUrl);
   if (flyerLinkUrl && req.body?.flyerLinkPreview && typeof req.body.flyerLinkPreview === "object") {
     const p = req.body.flyerLinkPreview as Record<string, unknown>;
     const trim = (v: unknown, max: number): string | undefined =>
@@ -668,15 +673,9 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
     if (raw === null || raw === "") {
       patch.flyerLinkUrl = undefined;
       patch.flyerLinkPreview = undefined;
-    } else if (typeof raw === "string") {
-      try {
-        const u = new URL(raw.trim());
-        if (u.protocol === "http:" || u.protocol === "https:") {
-          patch.flyerLinkUrl = u.toString().slice(0, 2048);
-        }
-      } catch {
-        /* invalid — drop */
-      }
+    } else {
+      const parsed = parseHttpUrl(raw);
+      if (parsed) patch.flyerLinkUrl = parsed;
     }
   }
   if (req.body?.flyerLinkPreview !== undefined) {
@@ -1050,6 +1049,14 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
     isFlexibleLocation: false,
     ...flyerPatch,
   };
+  if (req.body?.flyerLinkUrl !== undefined) {
+    const parsed = parseHttpUrl(req.body.flyerLinkUrl);
+    if (parsed) patch.flyerLinkUrl = parsed;
+    else if (req.body.flyerLinkUrl === null || req.body.flyerLinkUrl === "") {
+      patch.flyerLinkUrl = undefined;
+      patch.flyerLinkPreview = undefined;
+    }
+  }
   if (title) patch.title = title;
   if (description !== undefined) patch.description = description;
   if (tags) patch.tags = tags;

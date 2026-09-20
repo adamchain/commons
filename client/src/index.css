@@ -1587,6 +1587,47 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   padding: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
+.plan-detail-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+.plan-detail-link-image {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 10px;
+  flex-shrink: 0;
+  background: var(--tan);
+}
+.plan-detail-link-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.plan-detail-link-title {
+  font-weight: 600;
+  font-size: var(--text-body);
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plan-detail-link-host {
+  font-size: var(--text-body-small);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plan-detail-link svg {
+  flex-shrink: 0;
+  color: var(--muted);
+}
 
 /* Plan detail: Display title, Label eyebrows, Body copy. */
 .plan-detail-page {
@@ -3867,6 +3908,19 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   color: var(--accent);
   font-weight: 600;
   word-break: break-word;
+}
+.idea-link-input {
+  display: block;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: var(--text-body);
+  color: var(--ink);
+  outline: none;
+}
+.idea-link-input::placeholder {
+  color: var(--faint);
 }
 .plan-actions-row {
   display: flex;

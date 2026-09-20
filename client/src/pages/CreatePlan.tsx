@@ -9,12 +9,13 @@ import {
   Clock,
   Globe,
   ImagePlus,
+  Link2,
   MapPin,
   Users,
 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { FLEXIBLE_DATE_PLACEHOLDER, thisWeekAnchorDate } from "../lib/planTime";
-import { formatPlaceAddress, formatPlanDate, formatPlanTime } from "../lib/format";
+import { formatPlaceAddress, formatPlanDate, formatPlanTime, normalizeHttpUrl } from "../lib/format";
 import { Avatar } from "../components/Avatar";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
 import { LocationAutocomplete } from "../components/LocationAutocomplete";
@@ -642,7 +643,7 @@ export function CreatePlanPage() {
               ? form.repeatDays
               : undefined,
           flyerDataUrl: form.flyerDataUrl ?? undefined,
-          flyerLinkUrl: form.flyerLinkUrl.trim() || undefined,
+          flyerLinkUrl: normalizeHttpUrl(form.flyerLinkUrl),
           flyerLinkPreview: form.flyerLinkPreview ?? undefined,
           // Only when this screen was opened as "Do it again" / host-again.
           fromPlanId: replanFromId || undefined,
@@ -698,7 +699,7 @@ export function CreatePlanPage() {
           capacity: capacityNum,
           joinType: form.joinType,
           flyerDataUrl: form.flyerDataUrl ?? null,
-          flyerLinkUrl: form.flyerLinkUrl.trim() || null,
+          flyerLinkUrl: normalizeHttpUrl(form.flyerLinkUrl) ?? null,
           flyerLinkPreview: form.flyerLinkPreview ?? null,
           hostEmoji: VIBE_OPTIONS.find((o) => o.id === form.vibes[0])?.emoji ?? "✨",
         }),
@@ -770,6 +771,7 @@ export function CreatePlanPage() {
           capacity: capacityNum,
           joinType: form.joinType,
           flyerDataUrl: form.flyerDataUrl ?? null,
+          flyerLinkUrl: normalizeHttpUrl(form.flyerLinkUrl) ?? null,
           hostEmoji: VIBE_OPTIONS.find((o) => o.id === form.vibes[0])?.emoji ?? "✨",
           inviteUserIds: [...invitedIds],
         }),
@@ -1004,6 +1006,9 @@ export function CreatePlanPage() {
           communityName={communityName}
           communityVisibility={communityVisibility}
           onCommunityVisibilityChange={setCommunityVisibility}
+          onFetchLink={fetchLinkPreview}
+          linkBusy={linkBusy}
+          linkError={linkError}
         />
         <input
           ref={flyerRef}
@@ -1778,6 +1783,9 @@ function IdeaForm({
   communityName,
   communityVisibility,
   onCommunityVisibilityChange,
+  onFetchLink,
+  linkBusy,
+  linkError,
 }: {
   form: FormShape;
   setForm: (updater: (f: FormShape) => FormShape) => void;
@@ -1802,6 +1810,9 @@ function IdeaForm({
   communityName: string | null;
   communityVisibility: "public" | "community_only";
   onCommunityVisibilityChange: (v: "public" | "community_only") => void;
+  onFetchLink: (rawUrl: string) => Promise<void>;
+  linkBusy: boolean;
+  linkError: string | null;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [coverPickerOpen, setCoverPickerOpen] = useState(false);
@@ -2181,6 +2192,29 @@ function IdeaForm({
                     }
                     label="Flexible"
                   />
+                </div>
+                <div className="plan-meta-row plan-meta-row--edit">
+                  <span className="plan-meta-icon" aria-hidden="true"><Link2 size={18} strokeWidth={1.8} /></span>
+                  <label className="plan-meta-text" htmlFor="idea-link">
+                    <span className="plan-meta-label">Link</span>
+                    <input
+                      id="idea-link"
+                      className="idea-link-input"
+                      type="url"
+                      inputMode="url"
+                      placeholder="https://…"
+                      value={form.flyerLinkUrl}
+                      onChange={(e) => setForm((f) => ({ ...f, flyerLinkUrl: e.target.value }))}
+                      onBlur={(e) => void onFetchLink(e.target.value)}
+                      onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
+                      disabled={linkBusy}
+                    />
+                    {linkBusy && <span className="plan-meta-sub">Loading preview…</span>}
+                    {linkError && <span className="plan-meta-sub">{linkError}</span>}
+                    {form.flyerLinkPreview?.title && (
+                      <span className="plan-meta-sub">{form.flyerLinkPreview.title}</span>
+                    )}
+                  </label>
                 </div>
               </div>
 

@@ -8,6 +8,31 @@ export function sentenceCaseTitle(raw: string): string {
     .join(" ");
 }
 
+/** Accept pasted links with or without a scheme. */
+export function normalizeHttpUrl(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  let s = raw.trim().replace(/^<|>$/g, "").replace(/[\u200B-\u200D\uFEFF]/g, "");
+  if (!s) return undefined;
+  if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
+  try {
+    const u = new URL(s);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return undefined;
+    if (!u.hostname.includes(".")) return undefined;
+    return u.toString().slice(0, 2048);
+  } catch {
+    return undefined;
+  }
+}
+
+export function firstHttpUrlInText(text: string | null | undefined): string | undefined {
+  if (!text) return undefined;
+  const tagged = text.match(/https?:\/\/[^\s<>"']+/i);
+  if (tagged) return normalizeHttpUrl(tagged[0].replace(/[),.;!?]+$/, ""));
+  const www = text.match(/\bwww\.[^\s<>"']+/i);
+  if (www) return normalizeHttpUrl(www[0].replace(/[),.;!?]+$/, ""));
+  return undefined;
+}
+
 export function formatPlanDate(
   iso: string,
   opts?: { isFlexibleDate?: boolean; isThisWeek?: boolean },

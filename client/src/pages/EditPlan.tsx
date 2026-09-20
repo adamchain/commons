@@ -10,7 +10,7 @@ import { fileToResizedDataUrl } from "../lib/imageResize";
 import { interestVisual } from "../lib/interestIcons";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
-import { formatPlanDate, formatPlanTime } from "../lib/format";
+import { formatPlanDate, formatPlanTime, normalizeHttpUrl } from "../lib/format";
 import {
   INTEREST_LABELS,
   VIBE_OPTIONS,
@@ -274,7 +274,7 @@ function EditForm({
         method: "PATCH",
         body: JSON.stringify({
           flyerDataUrl: form.flyerDataUrl ?? null,
-          flyerLinkUrl: form.flyerLinkUrl.trim() || null,
+          flyerLinkUrl: normalizeHttpUrl(form.flyerLinkUrl) ?? null,
           flyerLinkPreview: form.flyerLinkPreview ?? null,
         }),
       });

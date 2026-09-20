@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ChevronRight, Hand, Pencil, Send, UserPlus, X } from "lucide-react";
+import { ArrowLeft, ChevronRight, ExternalLink, Hand, Pencil, Send, UserPlus, X } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { IdeaCoverFallback, planPhotoUrl } from "../components/CoverThumb";
@@ -16,7 +16,7 @@ import { Button } from "../components/ui/Button";
 import { useAuth } from "../context/AuthContext";
 import { isIdeaPlan, planHasEnded } from "../lib/planTime";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
-import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
+import { formatPlanDate, formatPlanTime, sentenceCaseTitle, firstHttpUrlInText, normalizeHttpUrl } from "../lib/format";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import { INTEREST_LABELS, type ConversationDTO, type MessageDTO, type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
 
@@ -42,15 +42,23 @@ function flyerLinkHost(url: string): string {
   }
 }
 
+function planAttachedUrl(plan: PlanDTO): string | undefined {
+  return (
+    normalizeHttpUrl(plan.flyerLinkUrl) ??
+    firstHttpUrlInText(plan.description) ??
+    firstHttpUrlInText(plan.title)
+  );
+}
+
 function linkifyText(text: string): ReactNode[] {
-  return text.split(/(https?:\/\/[^\s]+)/gi).map((part, i) => {
-    if (!/^https?:\/\//i.test(part)) return part;
-    const href = part.replace(/[),.;!?]+$/, "");
-    const trail = part.slice(href.length);
+  return text.split(/(https?:\/\/[^\s]+|\bwww\.[^\s]+)/gi).map((part, i) => {
+    const href = normalizeHttpUrl(part.replace(/[),.;!?]+$/, ""));
+    if (!href || (!/^https?:\/\//i.test(part) && !/^www\./i.test(part))) return part;
+    const trail = part.match(/[),.;!?]+$/)?.[0] ?? "";
     return (
       <span key={i}>
         <a href={href} target="_blank" rel="noopener noreferrer" className="plan-description-link">
-          {href}
+          {part.slice(0, part.length - trail.length)}
         </a>
         {trail}
       </span>
@@ -244,6 +252,7 @@ export function PlanDetailPage() {
   ];
   const peoplePreviewMax = 4;
   const planPeoplePreview = planPeople.slice(0, peoplePreviewMax);
+  const attachedUrl = planAttachedUrl(plan);
 
   function closeGuestsModal() {
     setShowGuestsModal(false);
@@ -393,6 +402,36 @@ export function PlanDetailPage() {
           </div>
         </header>
 
+        {attachedUrl && (
+          <a
+            href={attachedUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="plan-detail-card plan-detail-link"
+          >
+            {plan.flyerLinkPreview?.image && (
+              <img
+                src={plan.flyerLinkPreview.image}
+                alt=""
+                className="plan-detail-link-image"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            )}
+            <div className="plan-detail-link-body">
+              <span className="plan-meta-label">Link</span>
+              <span className="plan-detail-link-title">
+                {plan.flyerLinkPreview?.title || flyerLinkHost(attachedUrl)}
+              </span>
+              <span className="plan-detail-link-host">
+                {plan.flyerLinkPreview?.siteName || flyerLinkHost(attachedUrl)}
+              </span>
+            </div>
+            <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />
+          </a>
+        )}
+
         <button
           type="button"
           className="host-row plan-detail-card"
@@ -444,37 +483,6 @@ export function PlanDetailPage() {
               </p>
             )}
           </div>
-        )}
-
-        {plan.flyerLinkUrl && (
-          <a
-            href={plan.flyerLinkUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="link-preview link-preview--detail"
-          >
-            {plan.flyerLinkPreview?.image && (
-              <img
-                src={plan.flyerLinkPreview.image}
-                alt=""
-                className="link-preview-image"
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                }}
-              />
-            )}
-            <div className="link-preview-body">
-              <div className="link-preview-site">
-                {plan.flyerLinkPreview?.siteName || flyerLinkHost(plan.flyerLinkUrl)}
-              </div>
-              <div className="link-preview-title">
-                {plan.flyerLinkPreview?.title || plan.flyerLinkUrl}
-              </div>
-              {plan.flyerLinkPreview?.description && (
-                <div className="link-preview-desc">{plan.flyerLinkPreview.description}</div>
-              )}
-            </div>
-          </a>
         )}
 
         {!isPast && canChat && (
