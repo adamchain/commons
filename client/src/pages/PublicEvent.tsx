@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, parseApiError } from "../api/http";
-import { formatPhoneInput, formatPlanDate, formatPlanTime } from "../lib/format";
+import { formatPhoneInput, formatPlanWhenLine } from "../lib/format";
 import { INTEREST_EMOJI, INTEREST_LABELS, type PublicPlanDTO } from "../types/shared";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { IdeaCoverFallback } from "../components/CoverThumb";
@@ -79,9 +79,11 @@ export function PublicEventPage() {
   }
   if (!plan) return <LoadingScreen simple tagline="Loading the plan…" />;
 
-  const dateLine = [formatPlanDate(plan.date, { isFlexibleDate: plan.isFlexibleDate, isThisWeek: plan.isThisWeek }), formatPlanTime(plan.time, plan.isFlexibleTime)]
-    .filter(Boolean)
-    .join(" · ");
+  const dateLine = formatPlanWhenLine(plan.date, plan.time, plan.isFlexibleTime, {
+    isFlexibleDate: plan.isFlexibleDate,
+    isThisWeek: plan.isThisWeek,
+    isFlexibleLocation: plan.isFlexibleLocation,
+  });
   const attendance =
     plan.goingCount > 0 || plan.interestedCount > 0
       ? `${plan.goingCount} going · ${plan.interestedCount} interested`
@@ -116,7 +118,11 @@ export function PublicEventPage() {
 
           <h1 className="public-event-title">{plan.title}</h1>
           <div className="public-event-meta">{dateLine}</div>
-          {plan.locationName && <div className="public-event-meta">📍 {plan.locationName}</div>}
+          {!plan.isFlexibleLocation && plan.locationName ? (
+            <div className="public-event-meta">📍 {plan.locationName}</div>
+          ) : plan.isFlexibleLocation ? (
+            <div className="public-event-meta">📍 Flexible</div>
+          ) : null}
           <div className="public-event-host">Hosted by {plan.hostFirstName}</div>
 
           <div className="public-event-attendance">{attendance}</div>

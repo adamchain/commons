@@ -7,7 +7,7 @@ import { InterestGlyph } from "../components/InterestGlyph";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { EmptyCard, Label, ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
-import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
+import { formatPlanWhenWhereLine, sentenceCaseTitle } from "../lib/format";
 import { isIdeaPlan, planHasEnded } from "../lib/planTime";
 import type { PlanDTO } from "../types/shared";
 
@@ -129,16 +129,7 @@ function PlanSection({ label, plans }: { label: ReactNode; plans: PlanDTO[] }) {
 }
 
 function PlanRow({ plan }: { plan: PlanDTO }) {
-  const locationPart = plan.isFlexibleLocation
-    ? "Flexible location"
-    : plan.location.name || null;
-  const meta = [
-    formatPlanDate(plan.date, { isFlexibleDate: plan.isFlexibleDate, isThisWeek: plan.isThisWeek }),
-    formatPlanTime(plan.time, plan.isFlexibleTime),
-    locationPart,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const meta = formatPlanWhenWhereLine(plan);
 
   return (
     <Link to={`/plans/${plan.id}`} state={{ from: "my-plans" }} className="my-plans-row">

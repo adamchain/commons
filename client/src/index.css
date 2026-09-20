@@ -1122,7 +1122,7 @@ a.btn-primary[aria-disabled="true"] {
 }
 
 .plan-detail-hero-bar {
-  position: fixed;
+  position: absolute;
   top: calc(14px + env(safe-area-inset-top, 0px));
   left: 16px;
   right: 16px;
@@ -3982,23 +3982,18 @@ a.action-btn--stack {
   box-sizing: border-box;
 }
 
-/* Chat preview card on plan detail — same card + icon-circle as Date/Location */
+/* Chat preview card on plan detail */
 .chat-preview-card {
   display: block;
   color: inherit;
 }
 .chat-preview-messages-link {
-  display: flex;
+  display: block;
   text-decoration: none;
   color: inherit;
 }
 .chat-preview-messages-link:hover {
   opacity: 0.85;
-}
-.chat-preview-messages-wrap {
-  display: block;
-  padding: 0 16px 12px;
-  border-top: 1px solid var(--border);
 }
 .chat-preview-header {
   display: flex;
@@ -4017,7 +4012,6 @@ a.action-btn--stack {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding-top: 12px;
 }
 .chat-preview-message {
   display: flex;
@@ -4050,12 +4044,11 @@ a.action-btn--stack {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 0;
-  padding: 4px 16px 14px;
+  margin-top: 10px;
 }
 .chat-preview-compose--below-msgs {
   border-top: 1px solid var(--border);
-  padding-top: 12px;
+  padding-top: 10px;
 }
 .chat-preview-input {
   flex: 1;
@@ -7421,8 +7414,8 @@ a.action-btn--stack {
   display: inline-block;
   margin-top: 10px;
   font-size: var(--text-body);
-  font-weight: 600;
-  color: var(--accent);
+  font-weight: 700;
+  color: var(--red);
   text-decoration: none;
 }
 
@@ -7935,11 +7928,6 @@ a.action-btn--stack {
 }
 
 /* ---- Lock in a Just an Idea (same details screen) ---- */
-/* Two classes so this beats .app-shell--with-nav and the last cards can
-   scroll above the fixed Lock it in bar + bottom nav. */
-.app-shell--with-nav.plan-detail-page--lock-in {
-  padding-bottom: calc(var(--nav-height, 58px) + 80px + env(safe-area-inset-bottom, 0px));
-}
 .plan-meta-card--edit {
   overflow: visible;
 }

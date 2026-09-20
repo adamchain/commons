@@ -62,13 +62,57 @@ export function formatPlanDate(
 }
 
 export function formatPlanTime(time: string, isFlexible: boolean): string {
-  if (isFlexible || time === "Flexible" || !time) return "Flexible time";
+  if (isFlexible || time === "Flexible" || !time) return "Flexible";
   const [hStr, mStr = "00"] = time.split(":");
   const h = Number(hStr);
   if (Number.isNaN(h)) return time;
   const ampm = h >= 12 ? "PM" : "AM";
   const hour12 = h % 12 === 0 ? 12 : h % 12;
   return `${hour12}:${mStr.padStart(2, "0")} ${ampm}`;
+}
+
+function timeIsOpen(time?: string | null, isFlexibleTime?: boolean): boolean {
+  return Boolean(isFlexibleTime || time === "Flexible" || !time?.trim());
+}
+
+/** Date · set time · set place, with a single trailing Flexible if time
+ *  and/or location are still open. Never stacks Flexible twice. */
+export function formatPlanWhenWhereLine(plan: {
+  date: string;
+  time?: string | null;
+  isFlexibleDate?: boolean;
+  isThisWeek?: boolean;
+  isFlexibleTime?: boolean;
+  isFlexibleLocation?: boolean;
+  location?: { name?: string } | null;
+}): string {
+  const parts: string[] = [
+    formatPlanDate(plan.date, {
+      isFlexibleDate: plan.isFlexibleDate,
+      isThisWeek: plan.isThisWeek,
+    }),
+  ];
+  const timeOpen = timeIsOpen(plan.time, plan.isFlexibleTime);
+  const locName = plan.location?.name?.trim() ?? "";
+  const locOpen = Boolean(plan.isFlexibleLocation || !locName);
+  if (!timeOpen && plan.time) parts.push(formatPlanTime(plan.time, false));
+  else if (timeOpen && !locOpen) parts.push("Flexible");
+  if (!locOpen) parts.push(locName);
+  else parts.push("Flexible");
+  return parts.join(" · ");
+}
+
+/** Date & time row: keep Flexible off this line when Location will say it. */
+export function formatPlanWhenLine(
+  date: string,
+  time: string,
+  isFlexibleTime: boolean,
+  opts?: { isFlexibleDate?: boolean; isThisWeek?: boolean; isFlexibleLocation?: boolean },
+): string {
+  const day = formatPlanDate(date, opts);
+  if (!timeIsOpen(time, isFlexibleTime)) return `${day} · ${formatPlanTime(time, false)}`;
+  if (!opts?.isFlexibleLocation) return `${day} · Flexible`;
+  return day;
 }
 
 /**

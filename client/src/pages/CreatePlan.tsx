@@ -1217,7 +1217,7 @@ export function CreatePlanPage() {
               <div className="plan-meta-text">
                 <span className="plan-meta-label">Venue</span>
                 {form.isFlexibleLocation ? (
-                  <span className="plan-meta-value is-placeholder">Flexible location</span>
+                  <span className="plan-meta-value is-placeholder">Anywhere</span>
                 ) : (
                   <>
                     <LocationAutocomplete
@@ -1317,7 +1317,7 @@ export function CreatePlanPage() {
               <label className="plan-meta-text" htmlFor="time">
                 <span className="plan-meta-label">Time</span>
                 {form.isFlexibleTime ? (
-                  <span className="plan-meta-value is-placeholder">Flexible time</span>
+                  <span className="plan-meta-value is-placeholder">Open</span>
                 ) : (
                   <span className="plan-meta-value-hit">
                     <span className={`plan-meta-value ${!form.time ? "is-placeholder" : ""}`}>
@@ -2147,7 +2147,7 @@ function IdeaForm({
                   <div className="plan-meta-text">
                     <span className="plan-meta-label">Venue</span>
                     {form.isFlexibleLocation ? (
-                      <span className="plan-meta-value is-placeholder">Flexible location</span>
+                      <span className="plan-meta-value is-placeholder">Anywhere</span>
                     ) : (
                       <>
                         <LocationAutocomplete

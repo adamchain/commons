@@ -8,7 +8,7 @@ import { IdeaCoverFallback, planPhotoUrl } from "./CoverThumb";
 import { BottomSheet } from "./ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
 import type { PlanDTO } from "../types/shared";
-import { formatPlanDate, formatPlanTime, sentenceCaseTitle } from "../lib/format";
+import { formatPlanDate, formatPlanTime, formatPlanWhenWhereLine, sentenceCaseTitle } from "../lib/format";
 import { saveFeedScroll, type NavFromState } from "../lib/navState";
 import { isIdeaPlan, isPlanAtCapacity, planCapacityValue, planHasEnded } from "../lib/planTime";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
@@ -291,20 +291,7 @@ function ideaMetaLine(plan: PlanDTO): string {
 }
 
 function confirmedMetaLine(plan: PlanDTO): string {
-  const whenParts: string[] = [];
-  const dateLabel = formatPlanDate(plan.date, {
-    isFlexibleDate: plan.isFlexibleDate,
-    isThisWeek: plan.isThisWeek,
-  });
-  if (plan.isFlexibleTime) {
-    whenParts.push(dateLabel);
-    whenParts.push("flexible");
-  } else {
-    whenParts.push(dateLabel);
-    whenParts.push(formatPlanTime(plan.time, false));
-  }
-  const locationPart = plan.isFlexibleLocation ? "flexible" : plan.location.name;
-  return [...whenParts, locationPart].filter(Boolean).join(" · ");
+  return formatPlanWhenWhereLine(plan);
 }
 
 function QuickJoin({

@@ -16,23 +16,9 @@ import { Button } from "../components/ui/Button";
 import { useAuth } from "../context/AuthContext";
 import { isIdeaPlan, planHasEnded } from "../lib/planTime";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
-import { formatPlanDate, formatPlanTime, sentenceCaseTitle, firstHttpUrlInText, normalizeHttpUrl } from "../lib/format";
+import { formatPlanDate, formatPlanTime, formatPlanWhenLine, sentenceCaseTitle, firstHttpUrlInText, normalizeHttpUrl } from "../lib/format";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import { INTEREST_LABELS, type ConversationDTO, type MessageDTO, type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
-
-/** Same "set parts + · flexible" convention as the feed card — never show a
- *  specific time/date next to a field that's still open. */
-function formatWhen(
-  date: string,
-  time: string,
-  isFlexibleTime: boolean,
-  opts?: { isFlexibleDate?: boolean; isThisWeek?: boolean },
-): string {
-  const day = formatPlanDate(date, opts);
-  return isFlexibleTime
-    ? `${day} · flexible`
-    : `${day} · ${formatPlanTime(time, false)}`;
-}
 
 function flyerLinkHost(url: string): string {
   try {
@@ -271,7 +257,7 @@ export function PlanDetailPage() {
   }
 
   return (
-    <main className={`app-shell app-shell--wide app-shell--with-nav plan-detail-page${canLock ? " plan-detail-page--lock-in" : ""}`}>
+    <main className="app-shell app-shell--wide app-shell--with-nav plan-detail-page">
       <div className="plan-detail-safe-scrim" aria-hidden="true" />
       <div className={`plan-detail-hero${coverSrc || ideaCoverFallback ? "" : " plan-detail-hero--empty"}`}>
         {coverSrc && <img src={coverSrc} alt="" loading="lazy" />}
@@ -370,9 +356,10 @@ export function PlanDetailPage() {
               <div className="plan-meta-text">
                 <span className="plan-meta-label">Date &amp; time</span>
                 <span className="plan-meta-value">
-                  {formatWhen(plan.date, plan.time, plan.isFlexibleTime, {
+                  {formatPlanWhenLine(plan.date, plan.time, plan.isFlexibleTime, {
                     isFlexibleDate: plan.isFlexibleDate,
                     isThisWeek: plan.isThisWeek,
+                    isFlexibleLocation: plan.isFlexibleLocation,
                   })}
                 </span>
               </div>
@@ -459,16 +446,19 @@ export function PlanDetailPage() {
           <span className="host-row-chevron" aria-hidden="true">›</span>
         </button>
 
-        {canLock && (
-          <div className="plan-detail-card idea-lock-card">
-            <p className="idea-lock-card-title">Ready to make this real?</p>
-            <p className="idea-lock-card-copy">
-              Pick a place and a time. Anyone interested comes along.
-            </p>
-            <Link to={`/plans/new?lockFromId=${plan.id}`} className="idea-lock-card-link">
-              Take this to Make a Plan
-            </Link>
-          </div>
+        {!isPast && canChat && (
+          <ChatPreviewCard
+            planId={plan.id}
+            messages={chatPreview}
+            convId={chatConvId}
+            navState={{ from: "plan", planId: plan.id }}
+            onSent={(msg) => {
+              setChatPreview((prev) => {
+                const list = prev ?? [];
+                return [...list, msg].filter((m) => !m.kind || m.kind === "user").slice(-2);
+              });
+            }}
+          />
         )}
 
         {plan.description && (
@@ -485,19 +475,16 @@ export function PlanDetailPage() {
           </div>
         )}
 
-        {!isPast && canChat && (
-          <ChatPreviewCard
-            planId={plan.id}
-            messages={chatPreview}
-            convId={chatConvId}
-            navState={{ from: "plan", planId: plan.id }}
-            onSent={(msg) => {
-              setChatPreview((prev) => {
-                const list = prev ?? [];
-                return [...list, msg].filter((m) => !m.kind || m.kind === "user").slice(-2);
-              });
-            }}
-          />
+        {canLock && (
+          <div className="plan-detail-card idea-lock-card">
+            <p className="idea-lock-card-title">Ready to make this real?</p>
+            <p className="idea-lock-card-copy">
+              Pick a place and a time. Anyone interested comes along.
+            </p>
+            <Link to={`/plans/new?lockFromId=${plan.id}`} className="idea-lock-card-link">
+              Make a Plan
+            </Link>
+          </div>
         )}
 
         {isPast && (
@@ -605,7 +592,7 @@ export function PlanDetailPage() {
           </div>
         )}
 
-        {isHosting && !isPast && !canLock && !plan.cancelledAt && (
+        {isHosting && !isPast && !plan.cancelledAt && (
           <button
             type="button"
             className="plan-edit-row plan-detail-card"
@@ -654,14 +641,6 @@ export function PlanDetailPage() {
           </BottomSheet>
         )}
       </div>
-
-      {canLock && (
-        <div className="lock-in-cta-bar">
-          <Link to={`/plans/new?lockFromId=${plan.id}`} className="btn-primary btn-block">
-            Lock it in
-          </Link>
-        </div>
-      )}
 
       {showShare && <ShareSheet plan={plan} isOwn={isHosting} onClose={() => setShowShare(false)} />}
       {showGetThere && <GetThereSheet plan={plan} onClose={() => setShowGetThere(false)} />}
@@ -1044,27 +1023,19 @@ function ChatPreviewCard({
   }
 
   return (
-    <div className="plan-meta-card chat-preview-card">
+    <div className="plan-detail-card chat-preview-card">
       <Link
         to={`/plans/${planId}/chat`}
         state={navState}
-        className="plan-meta-row chat-preview-messages-link"
+        className="chat-preview-messages-link"
       >
-        <span className="plan-meta-icon" aria-hidden="true"><ChatBubbleIcon /></span>
-        <div className="plan-meta-text">
-          <span className="plan-meta-label">Chat</span>
-          {messages === null ? (
-            <span className="plan-meta-sub">Loading…</span>
-          ) : null}
+        <div className="chat-preview-header">
+          <span className="chat-preview-title">Chat</span>
+          <ChevronRight size={16} strokeWidth={2} color="var(--text-muted)" aria-hidden="true" />
         </div>
-        <ChevronRight size={16} strokeWidth={2} color="var(--text-muted)" aria-hidden="true" />
-      </Link>
-      {hasMessages ? (
-        <Link
-          to={`/plans/${planId}/chat`}
-          state={navState}
-          className="chat-preview-messages-link chat-preview-messages-wrap"
-        >
+        {messages === null ? (
+          <span className="chat-preview-empty">Loading…</span>
+        ) : hasMessages ? (
           <div className="chat-preview-messages">
             {messages.map((msg) => (
               <div key={msg.id} className="chat-preview-message">
@@ -1089,8 +1060,8 @@ function ChatPreviewCard({
               </div>
             ))}
           </div>
-        </Link>
-      ) : null}
+        ) : null}
+      </Link>
       <div className={`chat-preview-compose${hasMessages ? " chat-preview-compose--below-msgs" : ""}`}>
         <input
           className="chat-preview-input"

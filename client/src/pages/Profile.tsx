@@ -24,7 +24,7 @@ import { CommunityCoverThumb, PlanCoverThumb, planPhotoUrl } from "../components
 import { ReportModal } from "../components/PlanSafetyMenu";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
-import { formatPlanDate, formatPlanTime } from "../lib/format";
+import { formatPlanDate, formatPlanWhenLine } from "../lib/format";
 import { isIdeaPlan } from "../lib/planTime";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import {
@@ -369,8 +369,10 @@ export function ProfilePage() {
                       <span className="profile-other-plan-text">
                         <span className="profile-other-plan-title">{p.title}</span>
                         <span className="profile-other-plan-meta">
-                          {formatPlanDate(p.date, { isFlexibleDate: p.isFlexibleDate, isThisWeek: p.isThisWeek })}
-                          {p.time ? ` · ${formatPlanTime(p.time, p.isFlexibleTime)}` : ""}
+                          {formatPlanWhenLine(p.date, p.time, p.isFlexibleTime, {
+                            isFlexibleDate: p.isFlexibleDate,
+                            isThisWeek: p.isThisWeek,
+                          })}
                           {going > 0 ? ` · ${going} going` : ""}
                         </span>
                       </span>
@@ -407,8 +409,10 @@ export function ProfilePage() {
                     <span className="profile-other-plan-body">
                       <span className="profile-other-plan-title">{p.title}</span>
                       <span className="profile-other-plan-date">
-                        {formatPlanDate(p.date, { isFlexibleDate: p.isFlexibleDate, isThisWeek: p.isThisWeek })}
-                        {p.time ? ` · ${formatPlanTime(p.time, p.isFlexibleTime)}` : ""}
+                        {formatPlanWhenLine(p.date, p.time, p.isFlexibleTime, {
+                          isFlexibleDate: p.isFlexibleDate,
+                          isThisWeek: p.isThisWeek,
+                        })}
                       </span>
                     </span>
                     <span className="profile-other-plan-going">
