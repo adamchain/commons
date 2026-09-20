@@ -10,7 +10,6 @@ import {
   Globe,
   ImagePlus,
   MapPin,
-  UserPlus,
   Users,
 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
@@ -1040,13 +1039,6 @@ export function CreatePlanPage() {
         <button type="button" className="detail-back" onClick={leaveCreatePlan}>
           <ArrowLeft size={13} strokeWidth={2} aria-hidden="true" /> Back
         </button>
-        <button
-          type="button"
-          className="detail-back create-plan-topbar-invite"
-          onClick={() => setShowInvitePicker(true)}
-        >
-          <UserPlus size={13} strokeWidth={2} aria-hidden="true" /> Invite
-        </button>
       </header>
       <form id="create-plan-form" onSubmit={submit}>
       <div className={`plan-detail-hero${form.flyerDataUrl ? "" : " plan-detail-hero--empty"}`}>
@@ -1274,20 +1266,20 @@ export function CreatePlanPage() {
                 {form.isFlexibleDate ? (
                   <span className="plan-meta-value is-placeholder">Anytime</span>
                 ) : (
-                  <span className={`plan-meta-value ${!form.date ? "is-placeholder" : ""}`}>
-                    {form.date ? formatPlanDate(form.date) : "Pick a day"}
+                  <span className="plan-meta-value-hit">
+                    <span className={`plan-meta-value ${!form.date ? "is-placeholder" : ""}`}>
+                      {form.date ? formatPlanDate(form.date) : "Pick a day"}
+                    </span>
+                    <input
+                      id="date"
+                      className="plan-meta-native-input"
+                      type="date"
+                      min={today()}
+                      value={form.date}
+                      aria-invalid={Boolean(dateError)}
+                      onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                    />
                   </span>
-                )}
-                {!form.isFlexibleDate && (
-                  <input
-                    id="date"
-                    className="plan-meta-native-input"
-                    type="date"
-                    min={today()}
-                    value={form.date}
-                    aria-invalid={Boolean(dateError)}
-                    onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-                  />
                 )}
               </label>
               {!lockFromId && (
@@ -1317,23 +1309,23 @@ export function CreatePlanPage() {
               <span className="plan-meta-icon" aria-hidden="true"><Clock size={18} strokeWidth={1.8} /></span>
               <label className="plan-meta-text" htmlFor="time">
                 <span className="plan-meta-label">Time</span>
-                <span className={`plan-meta-value ${form.isFlexibleTime || !form.time ? "is-placeholder" : ""}`}>
-                  {form.isFlexibleTime
-                    ? "Flexible time"
-                    : form.time
-                      ? formatPlanTime(form.time, false)
-                      : "Pick a time"}
-                </span>
-                {!form.isFlexibleTime && (
-                  <input
-                    id="time"
-                    className="plan-meta-native-input"
-                    type="time"
-                    min={!form.isFlexibleDate && form.date === today() ? nowTime() : undefined}
-                    value={form.time}
-                    aria-invalid={Boolean(timeError)}
-                    onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
-                  />
+                {form.isFlexibleTime ? (
+                  <span className="plan-meta-value is-placeholder">Flexible time</span>
+                ) : (
+                  <span className="plan-meta-value-hit">
+                    <span className={`plan-meta-value ${!form.time ? "is-placeholder" : ""}`}>
+                      {form.time ? formatPlanTime(form.time, false) : "Pick a time"}
+                    </span>
+                    <input
+                      id="time"
+                      className="plan-meta-native-input"
+                      type="time"
+                      min={!form.isFlexibleDate && form.date === today() ? nowTime() : undefined}
+                      value={form.time}
+                      aria-invalid={Boolean(timeError)}
+                      onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
+                    />
+                  </span>
                 )}
               </label>
               {!lockFromId && (
@@ -2072,7 +2064,7 @@ function IdeaForm({
                     <div className="idea-when-value">
                       <span className="plan-meta-label">When</span>
                       {dateMode === "specific" ? (
-                        <>
+                        <span className="plan-meta-value-hit">
                           <span className={`plan-meta-value ${!form.date ? "is-placeholder" : ""}`}>
                             {form.date ? formatPlanDate(form.date) : "Pick a day"}
                           </span>
@@ -2087,7 +2079,7 @@ function IdeaForm({
                             onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
                             onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
                           />
-                        </>
+                        </span>
                       ) : (
                         <span className={`plan-meta-value ${dateMode === "anytime" ? "is-placeholder" : ""}`}>
                           {dateMode === "week" ? "This week" : "Anytime"}
