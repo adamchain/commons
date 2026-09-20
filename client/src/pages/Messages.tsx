@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { BarChart2, MessageCircle } from "lucide-react";
 import { api, parseApiError } from "../api/http";
@@ -25,6 +26,98 @@ function previewLooksLikePoll(text: string | null | undefined): boolean {
 function cleanPreview(text: string | null | undefined): string {
   if (!text) return "No messages yet — say hi";
   return text.replace(/📊\s*/g, "").trim() || "No messages yet — say hi";
+}
+
+function formatInboxTime(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) {
+    return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+  const days = Math.round((now.getTime() - d.getTime()) / 86_400_000);
+  if (days > 0 && days < 7) return d.toLocaleDateString(undefined, { weekday: "short" });
+  return d.toLocaleDateString(undefined, { month: "numeric", day: "numeric" });
+}
+
+const SWIPE_ACTION_W = 88;
+
+function SwipeRemoveRow({
+  enabled,
+  onRemove,
+  children,
+}: {
+  enabled: boolean;
+  onRemove: () => void;
+  children: ReactNode;
+}) {
+  const [x, setX] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const start = useRef({ x: 0, y: 0, ox: 0 });
+  const axis = useRef<"h" | "v" | null>(null);
+  const frontRef = useRef<HTMLDivElement>(null);
+
+  const onDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!enabled || (e.pointerType === "mouse" && e.button !== 0)) return;
+    axis.current = null;
+    start.current = { x: e.clientX, y: e.clientY, ox: x };
+    setDragging(true);
+  };
+
+  const onMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!enabled || !dragging) return;
+    const dx = e.clientX - start.current.x;
+    const dy = e.clientY - start.current.y;
+    if (!axis.current) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      axis.current = Math.abs(dx) > Math.abs(dy) * 1.15 ? "h" : "v";
+      if (axis.current === "h") {
+        frontRef.current?.setPointerCapture(e.pointerId);
+      }
+    }
+    if (axis.current !== "h") return;
+    e.preventDefault();
+    setX(Math.min(0, Math.max(-SWIPE_ACTION_W, start.current.ox + dx)));
+  };
+
+  const onUp = () => {
+    if (!enabled || !dragging) return;
+    setDragging(false);
+    setX((cur) => (axis.current === "h" && cur < -SWIPE_ACTION_W / 2 ? -SWIPE_ACTION_W : 0));
+    axis.current = null;
+  };
+
+  if (!enabled) return <>{children}</>;
+
+  return (
+    <div className="messages-swipe">
+      <button type="button" className="messages-swipe-action" onClick={onRemove}>
+        Remove
+      </button>
+      <div
+        ref={frontRef}
+        className={`messages-swipe-front${dragging && axis.current === "h" ? " is-dragging" : ""}`}
+        style={{ transform: `translateX(${x}px)` }}
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
+        onClickCapture={(e) => {
+          if (x < -8) {
+            e.preventDefault();
+            e.stopPropagation();
+            setX(0);
+          }
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
 }
 
 export function MessagesPage() {
@@ -150,19 +243,28 @@ export function MessagesPage() {
                           <div className="messages-row-body">
                             <div className="messages-row-top">
                               <span className="messages-row-title">{f.label}</span>
-                              {f.hasUnread && (
-                                <span className="messages-row-unread-dot" aria-label="Unread" />
-                              )}
-                            </div>
-                            <div className="messages-row-preview">
-                              {f.latestPost ? (
-                                <span>
-                                  <span className="messages-row-author">{f.latestPost.authorName}</span>
-                                  {`: ${f.latestPost.preview}`}
+                              {f.latestPost?.createdAt ? (
+                                <span className={`messages-row-time${f.hasUnread ? " is-unread" : ""}`}>
+                                  {formatInboxTime(f.latestPost.createdAt)}
                                 </span>
-                              ) : (
-                                <span className="messages-row-preview--empty">
-                                  It's quiet in here
+                              ) : null}
+                            </div>
+                            <div className="messages-row-bottom">
+                              <div className="messages-row-preview">
+                                {f.latestPost ? (
+                                  <span>
+                                    <span className="messages-row-author">{f.latestPost.authorName}</span>
+                                    {`: ${f.latestPost.preview}`}
+                                  </span>
+                                ) : (
+                                  <span className="messages-row-preview--empty">
+                                    It's quiet in here
+                                  </span>
+                                )}
+                              </div>
+                              {f.hasUnread && (
+                                <span className="messages-row-unread" aria-label="Unread">
+                                  1
                                 </span>
                               )}
                             </div>
@@ -225,6 +327,11 @@ export function MessagesPage() {
                 const isPoll = previewLooksLikePoll(c.lastMessagePreview);
                 const canDismiss = Boolean(c.conversationId);
                 const title = c.communityName ?? sentenceCaseTitle(c.planTitle);
+                const time = formatInboxTime(c.lastMessageAt ?? c.planDate);
+                const unread = c.unreadCount > 0;
+                const previewLine = c.lastMessageSender && c.lastMessagePreview
+                  ? `${c.lastMessageSender}: ${preview}`
+                  : preview;
                 const rowInner = (
                   <>
                     <PlanCoverThumb
@@ -235,35 +342,32 @@ export function MessagesPage() {
                     <div className="messages-row-body">
                       <div className="messages-row-top">
                         <span className="messages-row-title">{title}</span>
+                        {time ? (
+                          <span className={`messages-row-time${unread ? " is-unread" : ""}`}>{time}</span>
+                        ) : null}
                       </div>
-                      <div className="messages-row-preview">
-                        {isPoll && <BarChart2 size={14} strokeWidth={1.8} />}
-                        <span>{preview}</span>
-                      </div>
-                      <div className="messages-row-meta">
-                        {c.communityId
-                          ? "Joined"
-                          : c.myRole === "hosting"
-                            ? "Started"
-                            : c.myRole === "going"
-                              ? "Going"
-                              : "Interested"}
-                        {" · "}
-                        {c.participantCount}{" "}
-                        {c.participantCount === 1 ? "person" : "people"}
+                      <div className="messages-row-bottom">
+                        <div className="messages-row-preview">
+                          {isPoll && <BarChart2 size={14} strokeWidth={1.8} />}
+                          <span>{previewLine}</span>
+                        </div>
+                        {unread && (
+                          <span className="messages-row-unread" aria-label={`${c.unreadCount} unread`}>
+                            {c.unreadCount > 9 ? "9+" : c.unreadCount}
+                          </span>
+                        )}
                       </div>
                     </div>
-                    {c.unreadCount > 0 && (
-                      <span className="messages-row-unread" aria-label={`${c.unreadCount} unread`}>
-                        {c.unreadCount > 9 ? "9+" : c.unreadCount}
-                      </span>
-                    )}
                   </>
                 );
                 return (
-                  <div
+                  <SwipeRemoveRow
                     key={c.communityId ? `comm-${c.communityId}` : c.planId}
-                    className="messages-row-wrap"
+                    enabled={canDismiss}
+                    onRemove={() => {
+                      setDismissErr(null);
+                      setDismissTarget(c.conversationId!);
+                    }}
                   >
                     <Link
                       to={
@@ -276,20 +380,7 @@ export function MessagesPage() {
                     >
                       {rowInner}
                     </Link>
-                    {canDismiss && (
-                      <button
-                        type="button"
-                        className="messages-row-dismiss"
-                        aria-label="Remove from inbox"
-                        onClick={() => {
-                          setDismissErr(null);
-                          setDismissTarget(c.conversationId!);
-                        }}
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
+                  </SwipeRemoveRow>
                 );
               })}
             </div>

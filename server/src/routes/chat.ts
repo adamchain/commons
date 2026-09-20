@@ -25,6 +25,12 @@ function messagePreview(msg: { kind?: string; body: string; imageUrl?: string | 
   return truncate(msg.body, 80);
 }
 
+function lastSenderName(msg: { senderId: string; kind?: string } | null): string | null {
+  if (!msg || msg.kind === "system") return null;
+  const name = store.findUserById(msg.senderId)?.firstName?.trim();
+  return name || null;
+}
+
 async function resolveChatImageUrl(raw: string): Promise<string | null> {
   if (raw.startsWith("http://") || raw.startsWith("https://")) {
     return raw.slice(0, 2048);
@@ -111,6 +117,7 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
       conversationId: conv?.id ?? null,
       lastMessageAt: conv && msgs.length ? conv.lastMessageAt : null,
       lastMessagePreview: lastMsg ? messagePreview(lastMsg) : null,
+      lastMessageSender: lastSenderName(lastMsg),
       unreadCount: conv ? msgs.filter((m) => !m.readBy.includes(userId)).length : 0,
       participantCount,
       myRole,
@@ -139,6 +146,7 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
       conversationId: conv?.id ?? null,
       lastMessageAt: conv && msgs.length ? conv.lastMessageAt : null,
       lastMessagePreview: lastMsg ? messagePreview(lastMsg) : null,
+      lastMessageSender: lastSenderName(lastMsg),
       unreadCount: conv ? msgs.filter((m) => !m.readBy.includes(userId)).length : 0,
       participantCount: community.memberCount,
       myRole: community.organizerId === userId ? "hosting" : "going",

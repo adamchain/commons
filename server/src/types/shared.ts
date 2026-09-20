@@ -257,6 +257,7 @@ export interface ConversationSummaryDTO {
   conversationId: string | null;
   lastMessageAt: string | null;
   lastMessagePreview: string | null;
+  lastMessageSender?: string | null;
   unreadCount: number;
   /** Host + everyone going/interested who could be in the thread. */
   participantCount: number;

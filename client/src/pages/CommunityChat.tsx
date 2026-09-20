@@ -570,6 +570,7 @@ export function CommunityChatPage() {
                       ) : null}
                     </span>
                   )}
+                  <div className="chat-bubble-stack">
                   <div className={`chat-bubble${entry.imageUrl ? " has-image" : ""}`}>
                     {!mine && entry.showAvatar && (
                       <div className="chat-bubble-author">{entry.sender.firstName}</div>
@@ -588,6 +589,7 @@ export function CommunityChatPage() {
                       <div className="chat-bubble-body">{entry.body}</div>
                     )}
                     <div className="chat-bubble-time">{formatTimeOnly(entry.createdAt)}</div>
+                  </div>
                     {(() => {
                       const hearts = entry.reactions["❤️"] ?? [];
                       const iReacted = hearts.includes(user.id);
