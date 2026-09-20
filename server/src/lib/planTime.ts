@@ -3,6 +3,16 @@ import type { PlanRecord } from "../store.js";
 /** Stored on "Anytime" idea posts — far enough out that feed/end logic never treats them as past. */
 export const FLEXIBLE_DATE_PLACEHOLDER = "2099-12-31";
 
+/** Upcoming Saturday (today if Saturday) — sort anchor for "This week" ideas. */
+export function thisWeekAnchorDate(now: Date = new Date()): string {
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  d.setDate(d.getDate() + (6 - d.getDay()));
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 /** Parse `HH:mm` (24h) for ISO datetime construction. */
 function timeToHms(t: string): string {
   const s = t.trim();
@@ -31,6 +41,11 @@ export function planEndTimestamp(plan: PlanRecord): number {
 
 export function planHasEnded(plan: PlanRecord, now = new Date()): boolean {
   if (plan.isFlexibleDate && !plan.lockedAt) return false;
+  if (plan.isThisWeek && !plan.lockedAt) {
+    const [y, m, day] = plan.date.slice(0, 10).split("-").map(Number);
+    const weekEnd = new Date(y, m - 1, day, 23, 59, 59);
+    return weekEnd.getTime() < now.getTime();
+  }
   return planEndTimestamp(plan) < now.getTime();
 }
 

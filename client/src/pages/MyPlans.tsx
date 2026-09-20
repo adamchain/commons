@@ -133,7 +133,7 @@ function PlanRow({ plan }: { plan: PlanDTO }) {
     ? "Flexible location"
     : plan.location.name || null;
   const meta = [
-    formatPlanDate(plan.date),
+    formatPlanDate(plan.date, { isFlexibleDate: plan.isFlexibleDate, isThisWeek: plan.isThisWeek }),
     formatPlanTime(plan.time, plan.isFlexibleTime),
     locationPart,
   ]

@@ -3861,6 +3861,12 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   margin: 12px 0 16px;
   font-size: var(--text-body);
   line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.plan-description-link {
+  color: var(--accent);
+  font-weight: 600;
+  word-break: break-word;
 }
 .plan-actions-row {
   display: flex;
@@ -10435,6 +10441,15 @@ a.action-btn--stack {
 
 .link-preview--card {
   margin-top: 10px;
+}
+.link-preview--detail {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: none;
+  background: #FFFFFF;
+}
+.link-preview--detail .link-preview-title {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .link-preview:hover {

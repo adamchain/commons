@@ -13,7 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
-import { FLEXIBLE_DATE_PLACEHOLDER } from "../lib/planTime";
+import { FLEXIBLE_DATE_PLACEHOLDER, thisWeekAnchorDate } from "../lib/planTime";
 import { formatPlaceAddress, formatPlanDate, formatPlanTime } from "../lib/format";
 import { Avatar } from "../components/Avatar";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
@@ -67,15 +67,6 @@ const DAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 const weekdayOf = (iso: string) => {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, m - 1, d).getDay();
-};
-
-// The upcoming Saturday (or today, if today already is one) — used as the
-// anchor date for "That week" ideas so the plan still sorts/shows sensibly
-// on the feed without needing a dedicated "loose week" concept server-side.
-const endOfThisWeek = (): string => {
-  const d = new Date();
-  d.setDate(d.getDate() + (6 - d.getDay()));
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
 // F.11 — loose date buckets for "Just an idea" (specific day, sometime this
@@ -169,6 +160,7 @@ export function CreatePlanPage() {
     isFlexibleTime: false,
     isFlexibleLocation: false,
     isFlexibleDate: false,
+    isThisWeek: false,
     vibes: defaultVibes,
     description: "",
     visibility: (inviteUserId || inviteUserIds.length > 0 ? "network" : "everyone") as PlanVisibility,
@@ -197,6 +189,7 @@ export function CreatePlanPage() {
     time: string;
     isFlexibleTime: boolean;
     isFlexibleDate: boolean;
+    isThisWeek?: boolean;
   } | null>(null);
   // Step 1 — user picks Make a plan (full form) vs Just an idea (loose, looking_for).
   // Skipped automatically when arriving with an invite seed or community tag.
@@ -423,6 +416,7 @@ export function CreatePlanPage() {
           time: prev.time || "",
           isFlexibleTime: Boolean(prev.isFlexibleTime),
           isFlexibleDate: flexDate,
+          isThisWeek: Boolean(prev.isThisWeek) && !flexDate,
         };
         setForm((f) => ({
           ...f,
@@ -437,6 +431,7 @@ export function CreatePlanPage() {
           time: formFlexTime ? defaultPlanTime() : (proposal?.time || prev.time || defaultPlanTime()),
           isFlexibleTime: formFlexTime,
           isFlexibleDate: formFlexDate,
+          isThisWeek: Boolean(prev.isThisWeek) && !formFlexDate,
           isFlexibleLocation: Boolean(prev.isFlexibleLocation),
           vibes: vibeIds.length ? vibeIds : f.vibes,
           description: prev.description ?? "",
@@ -491,6 +486,7 @@ export function CreatePlanPage() {
           time: prev.isFlexibleTime ? defaultPlanTime() : (prev.time || defaultPlanTime()),
           isFlexibleTime: false,
           isFlexibleDate: false,
+          isThisWeek: false,
           isFlexibleLocation: false,
           vibes: vibeIds.length ? vibeIds : f.vibes,
           description: prev.description ?? "",
@@ -536,7 +532,7 @@ export function CreatePlanPage() {
 
   // A "looking for" plan = at least one of date/time/location is flexible.
   // We derive planKind from the flex toggles rather than asking up-front.
-  const planKind = form.isFlexibleDate || form.isFlexibleTime || form.isFlexibleLocation
+  const planKind = form.isFlexibleDate || form.isThisWeek || form.isFlexibleTime || form.isFlexibleLocation
     ? "looking_for"
     : "standard";
 
@@ -623,10 +619,11 @@ export function CreatePlanPage() {
             lng: form.locationLng,
             placeId: form.locationPlaceId,
           },
-          date: form.isFlexibleDate ? FLEXIBLE_DATE_PLACEHOLDER : form.date,
+          date: form.isFlexibleDate ? FLEXIBLE_DATE_PLACEHOLDER : form.isThisWeek ? thisWeekAnchorDate() : form.date,
           time: form.isFlexibleTime ? "" : form.time,
           isFlexibleTime: form.isFlexibleTime || form.isFlexibleDate,
           isFlexibleDate: form.isFlexibleDate,
+          isThisWeek: Boolean(form.isThisWeek) && !form.isFlexibleDate,
           isFlexibleLocation: form.isFlexibleLocation,
           tags: resolvedTags,
           description: form.description.trim() || undefined,
@@ -696,6 +693,7 @@ export function CreatePlanPage() {
           },
           isFlexibleLocation: form.isFlexibleLocation,
           isFlexibleDate: form.isFlexibleDate,
+          isThisWeek: Boolean(form.isThisWeek) && !form.isFlexibleDate,
           visibility: form.visibility,
           capacity: capacityNum,
           joinType: form.joinType,
@@ -714,7 +712,8 @@ export function CreatePlanPage() {
         prev.date !== nextDate ||
         prev.time !== nextTime ||
         prev.isFlexibleTime !== nextFlexTime ||
-        prev.isFlexibleDate !== form.isFlexibleDate;
+        prev.isFlexibleDate !== form.isFlexibleDate ||
+        Boolean(prev.isThisWeek) !== Boolean(form.isThisWeek);
       if (whenChanged) {
         await api(`/api/plans/${editingPlanId}/propose-time`, {
           method: "POST",
@@ -944,6 +943,7 @@ export function CreatePlanPage() {
                 isFlexibleLocation: true,
                 isFlexibleTime: true,
                 isFlexibleDate: true,
+                isThisWeek: false,
               }));
               setPath("idea");
             } else if (pendingPath === "plan") {
@@ -955,6 +955,7 @@ export function CreatePlanPage() {
                 isFlexibleLocation: false,
                 isFlexibleTime: false,
                 isFlexibleDate: false,
+                isThisWeek: false,
                 date:
                   f.date && f.date >= today() && f.date !== FLEXIBLE_DATE_PLACEHOLDER
                     ? f.date
@@ -1290,10 +1291,11 @@ export function CreatePlanPage() {
                   setForm((f) => {
                     const next = !f.isFlexibleDate;
                     return next
-                      ? { ...f, isFlexibleDate: true }
+                      ? { ...f, isFlexibleDate: true, isThisWeek: false }
                       : {
                           ...f,
                           isFlexibleDate: false,
+                          isThisWeek: false,
                           date:
                             f.date && f.date >= today() && f.date !== FLEXIBLE_DATE_PLACEHOLDER
                               ? f.date
@@ -1566,7 +1568,7 @@ export function CreatePlanPage() {
               )}
             </section>
 
-            {/* Link — paste a URL to show a preview on the card. The cover
+            {/* Link — paste a URL to show a preview on the plan. The cover
                 image at the top of the form handles uploads. */}
             <section className="form-section">
               <label className="form-question" htmlFor="flyer-link">
@@ -1729,6 +1731,7 @@ type FormShape = {
   isFlexibleTime: boolean;
   isFlexibleLocation: boolean;
   isFlexibleDate: boolean;
+  isThisWeek: boolean;
   vibes: VibeIcon[];
   description: string;
   visibility: PlanVisibility;
@@ -1802,7 +1805,9 @@ function IdeaForm({
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [coverPickerOpen, setCoverPickerOpen] = useState(false);
-  const [dateMode, setDateMode] = useState<IdeaDateMode>(form.isFlexibleDate ? "anytime" : "specific");
+  const [dateMode, setDateMode] = useState<IdeaDateMode>(
+    form.isThisWeek ? "week" : form.isFlexibleDate ? "anytime" : "specific",
+  );
   const [placeholderIdx] = useState(() => Math.floor(Math.random() * IDEA_PLACEHOLDERS.length));
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const detailsRef = useRef<HTMLDivElement>(null);
@@ -1868,7 +1873,8 @@ function IdeaForm({
         setForm((f) => ({
           ...f,
           isFlexibleDate: false,
-          date: f.date && f.date >= today() ? f.date : today(),
+          isThisWeek: false,
+          date: f.date && f.date >= today() && f.date !== FLEXIBLE_DATE_PLACEHOLDER ? f.date : today(),
         }));
       });
       openIdeaCalendar();
@@ -1876,9 +1882,19 @@ function IdeaForm({
     }
     setDateMode(mode);
     if (mode === "week") {
-      setForm((f) => ({ ...f, isFlexibleDate: false, date: endOfThisWeek() }));
+      setForm((f) => ({
+        ...f,
+        isFlexibleDate: false,
+        isThisWeek: true,
+        date: thisWeekAnchorDate(),
+      }));
     } else {
-      setForm((f) => ({ ...f, isFlexibleDate: true, date: today() }));
+      setForm((f) => ({
+        ...f,
+        isFlexibleDate: true,
+        isThisWeek: false,
+        date: today(),
+      }));
     }
   };
 

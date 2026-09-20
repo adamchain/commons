@@ -22,7 +22,7 @@ import {
 } from "../types/shared.js";
 import { onPlanCreatedVenueNudge, notifyInterestedPlanLocked } from "../lib/nudges.js";
 import { emit } from "../lib/notify.js";
-import { planHasEnded, plansOverlap, FLEXIBLE_DATE_PLACEHOLDER } from "../lib/planTime.js";
+import { planHasEnded, plansOverlap, FLEXIBLE_DATE_PLACEHOLDER, thisWeekAnchorDate } from "../lib/planTime.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
 import { communityCreationBlockReason } from "../lib/communityAccess.js";
 import { coverUrlFor } from "./share.js";
@@ -123,6 +123,7 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     time: plan.time,
     isFlexibleTime: plan.isFlexibleTime,
     isFlexibleDate: plan.isFlexibleDate ?? false,
+    isThisWeek: plan.isThisWeek ?? false,
     isFlexibleLocation: plan.isFlexibleLocation ?? false,
     endTime: plan.endTime,
     tags: plan.tags,
@@ -187,6 +188,8 @@ plansRouter.get("/:id/public", (req, res) => {
     date: plan.date,
     time: plan.time,
     isFlexibleTime: plan.isFlexibleTime,
+    isFlexibleDate: plan.isFlexibleDate ?? false,
+    isThisWeek: plan.isThisWeek ?? false,
     isFlexibleLocation: plan.isFlexibleLocation ?? false,
     locationName: plan.isFlexibleLocation ? "Flexible location" : plan.location?.name ?? "",
     hostFirstName: host?.firstName ?? "A host",
@@ -262,6 +265,7 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   const time = String(req.body?.time ?? "").trim();
   const isFlexibleTime = Boolean(req.body?.isFlexibleTime);
   const isFlexibleDate = Boolean(req.body?.isFlexibleDate);
+  const isThisWeek = Boolean(req.body?.isThisWeek) && !isFlexibleDate;
   const isFlexibleLocation = Boolean(req.body?.isFlexibleLocation);
   const description = req.body?.description ? String(req.body.description).trim() : undefined;
   const hostEmoji = String(req.body?.hostEmoji ?? "").trim() || "✨";
@@ -308,7 +312,7 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     visibilityCommunityTag = tagPick as InterestTag;
   }
 
-  if (!title || (!dateInput && !isFlexibleDate)) {
+  if (!title || (!dateInput && !isFlexibleDate && !isThisWeek)) {
     res.status(400).json({ error: "Title and date are required" });
     return;
   }
@@ -317,7 +321,11 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     res.status(400).json({ error: filtered });
     return;
   }
-  const resolvedDate = isFlexibleDate ? FLEXIBLE_DATE_PLACEHOLDER : dateInput;
+  const resolvedDate = isFlexibleDate
+    ? FLEXIBLE_DATE_PLACEHOLDER
+    : isThisWeek
+      ? (dateInput || thisWeekAnchorDate())
+      : dateInput;
   // Exact location is the default; Flexible is opt-in. Require a venue/place
   // name unless the host explicitly toggled flexible. Neighborhood is not
   // required — hosts may have skipped it at signup.
@@ -325,7 +333,7 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     res.status(400).json({ error: "Pick a location or turn on flexible." });
     return;
   }
-  if (!isFlexibleTime && !isFlexibleDate && !time) {
+  if (!isFlexibleTime && !isFlexibleDate && !isThisWeek && !time) {
     res.status(400).json({ error: "Pick a time or turn on flexible." });
     return;
   }
@@ -431,9 +439,10 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     neighborhoodId,
     location: { name: resolvedLocationName, address: resolvedAddress, lat, lng, placeId },
     date: resolvedDate,
-    time: isFlexibleTime || isFlexibleDate ? "" : time,
-    isFlexibleTime: isFlexibleTime || isFlexibleDate,
+    time: isFlexibleTime || isFlexibleDate || isThisWeek ? "" : time,
+    isFlexibleTime: isFlexibleTime || isFlexibleDate || isThisWeek,
     isFlexibleDate,
+    isThisWeek,
     isFlexibleLocation,
     tags,
     description,
@@ -618,6 +627,9 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
   }
   if (req.body?.isFlexibleDate !== undefined) {
     patch.isFlexibleDate = Boolean(req.body.isFlexibleDate);
+  }
+  if (req.body?.isThisWeek !== undefined) {
+    patch.isThisWeek = Boolean(req.body.isThisWeek);
   }
   if (req.body?.visibility !== undefined) {
     const raw = String(req.body.visibility);
@@ -1034,6 +1046,7 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
     time: isFlexibleTime ? "" : time,
     isFlexibleTime,
     isFlexibleDate: false,
+    isThisWeek: false,
     isFlexibleLocation: false,
     ...flyerPatch,
   };

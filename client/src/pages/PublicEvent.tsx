@@ -79,7 +79,7 @@ export function PublicEventPage() {
   }
   if (!plan) return <LoadingScreen simple tagline="Loading the plan…" />;
 
-  const dateLine = [formatPlanDate(plan.date), formatPlanTime(plan.time, plan.isFlexibleTime)]
+  const dateLine = [formatPlanDate(plan.date, { isFlexibleDate: plan.isFlexibleDate, isThisWeek: plan.isThisWeek }), formatPlanTime(plan.time, plan.isFlexibleTime)]
     .filter(Boolean)
     .join(" · ");
   const attendance =

@@ -119,6 +119,8 @@ export interface PlanRecord {
   isFlexibleTime: boolean;
   /** True when the host picked "Anytime" — date is a far-future placeholder until lock-in. */
   isFlexibleDate?: boolean;
+  /** True when the host picked "This week" — `date` is the week's Saturday for sorting only. */
+  isThisWeek?: boolean;
   /** Optional on legacy rows — normalized when serving. */
   isFlexibleLocation?: boolean;
   endTime?: string;

@@ -369,7 +369,7 @@ export function ProfilePage() {
                       <span className="profile-other-plan-text">
                         <span className="profile-other-plan-title">{p.title}</span>
                         <span className="profile-other-plan-meta">
-                          {formatPlanDate(p.date)}
+                          {formatPlanDate(p.date, { isFlexibleDate: p.isFlexibleDate, isThisWeek: p.isThisWeek })}
                           {p.time ? ` · ${formatPlanTime(p.time, p.isFlexibleTime)}` : ""}
                           {going > 0 ? ` · ${going} going` : ""}
                         </span>
@@ -407,7 +407,7 @@ export function ProfilePage() {
                     <span className="profile-other-plan-body">
                       <span className="profile-other-plan-title">{p.title}</span>
                       <span className="profile-other-plan-date">
-                        {formatPlanDate(p.date)}
+                        {formatPlanDate(p.date, { isFlexibleDate: p.isFlexibleDate, isThisWeek: p.isThisWeek })}
                         {p.time ? ` · ${formatPlanTime(p.time, p.isFlexibleTime)}` : ""}
                       </span>
                     </span>
@@ -1167,7 +1167,7 @@ function YourPlansBlock({
                     <span className="profile-plan-text">
                       <span className="profile-list-title">{p.title}</span>
                       <span className="profile-list-when">
-                        {formatPlanDate(p.date, { isFlexibleDate: p.isFlexibleDate })}
+                        {formatPlanDate(p.date, { isFlexibleDate: p.isFlexibleDate, isThisWeek: p.isThisWeek })}
                       </span>
                     </span>
                     <span className={`profile-plan-chip ${badge.className}`}>

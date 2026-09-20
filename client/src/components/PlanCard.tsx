@@ -37,7 +37,6 @@ export function PlanCard({
   const hasEnded = !isCancelled && planHasEnded(plan);
   const { user } = useAuth();
   const isHosting = !!user && plan.creator.id === user.id;
-  const [linkOpen, setLinkOpen] = useState(false);
   const cardNavigate = useNavigate();
 
   // Ideas: one "Flexible" when nothing concrete is set. Confirmed plans keep
@@ -154,35 +153,6 @@ export function PlanCard({
             <p className="plan-card-description">{plan.description}</p>
           )}
 
-          {plan.flyerLinkUrl && (
-            <a
-              href={plan.flyerLinkUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="link-preview link-preview--card"
-              onClick={(e) => {
-                e.stopPropagation();
-              }}
-            >
-              {plan.flyerLinkPreview?.image && (
-                <img src={plan.flyerLinkPreview.image} alt="" className="link-preview-image" />
-              )}
-              <div className="link-preview-body">
-                {plan.flyerLinkPreview?.siteName && (
-                  <div className="link-preview-site">{plan.flyerLinkPreview.siteName}</div>
-                )}
-                {plan.flyerLinkPreview?.title ? (
-                  <div className="link-preview-title">{plan.flyerLinkPreview.title}</div>
-                ) : (
-                  <div className="link-preview-title">View link</div>
-                )}
-                {plan.flyerLinkPreview?.description && (
-                  <div className="link-preview-desc">{plan.flyerLinkPreview.description}</div>
-                )}
-              </div>
-            </a>
-          )}
-
           {(facepile.length > 0 ||
             showWentLabel ||
             showGoingLabel ||
@@ -250,44 +220,6 @@ export function PlanCard({
           Host another like this →
         </Link>
       )}
-
-      {linkOpen && plan.flyerLinkUrl && (
-        <div
-          className="modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setLinkOpen(false)}
-        >
-          <div className="modal-card link-preview-modal" onClick={(e) => e.stopPropagation()}>
-            {plan.flyerLinkPreview?.image && (
-              <img src={plan.flyerLinkPreview.image} alt="" className="link-preview-image" />
-            )}
-            <div className="link-preview-body">
-              {plan.flyerLinkPreview?.siteName && (
-                <div className="link-preview-site">{plan.flyerLinkPreview.siteName}</div>
-              )}
-              <div className="link-preview-title">
-                {plan.flyerLinkPreview?.title ?? "Shared link"}
-              </div>
-              {plan.flyerLinkPreview?.description && (
-                <div className="link-preview-desc">{plan.flyerLinkPreview.description}</div>
-              )}
-            </div>
-            <a
-              href={plan.flyerLinkUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-primary btn-block"
-              style={{ marginTop: 12 }}
-            >
-              Open link
-            </a>
-            <button type="button" className="btn-link" style={{ marginTop: 8 }} onClick={() => setLinkOpen(false)}>
-              Close
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -342,23 +274,33 @@ function GoingCount({
 
 function ideaMetaLine(plan: PlanDTO): string {
   const parts: string[] = [];
-  const dateUnset = plan.isFlexibleDate || plan.date.startsWith("2099-12-31");
+  const dateUnset =
+    !plan.isThisWeek && (plan.isFlexibleDate || plan.date.startsWith("2099-12-31"));
   const timeUnset = plan.isFlexibleTime || !plan.time?.trim() || plan.time === "Flexible";
   const locationName = plan.location?.name?.trim() ?? "";
   const locUnset = plan.isFlexibleLocation || !locationName;
-  if (!dateUnset) parts.push(formatPlanDate(plan.date));
+  if (plan.isThisWeek) {
+    parts.push("This week");
+  } else if (!dateUnset) {
+    parts.push(formatPlanDate(plan.date, { isFlexibleDate: plan.isFlexibleDate, isThisWeek: plan.isThisWeek }));
+  }
   if (!timeUnset) parts.push(formatPlanTime(plan.time, false));
   if (!locUnset) parts.push(locationName);
-  return parts.length > 0 ? parts.join(" · ") : "Flexible";
+  if (parts.length > 0) return parts.join(" · ");
+  return plan.isFlexibleDate || plan.date.startsWith("2099-12-31") ? "Anytime" : "Flexible";
 }
 
 function confirmedMetaLine(plan: PlanDTO): string {
   const whenParts: string[] = [];
+  const dateLabel = formatPlanDate(plan.date, {
+    isFlexibleDate: plan.isFlexibleDate,
+    isThisWeek: plan.isThisWeek,
+  });
   if (plan.isFlexibleTime) {
-    whenParts.push(formatPlanDate(plan.date));
+    whenParts.push(dateLabel);
     whenParts.push("flexible");
   } else {
-    whenParts.push(formatPlanDate(plan.date));
+    whenParts.push(dateLabel);
     whenParts.push(formatPlanTime(plan.time, false));
   }
   const locationPart = plan.isFlexibleLocation ? "flexible" : plan.location.name;

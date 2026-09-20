@@ -144,6 +144,8 @@ export interface PublicPlanDTO {
   date: string;
   time: string;
   isFlexibleTime: boolean;
+  isFlexibleDate?: boolean;
+  isThisWeek?: boolean;
   isFlexibleLocation: boolean;
   locationName: string;
   hostFirstName: string;
@@ -170,6 +172,8 @@ export interface PlanDTO {
   time: string;
   isFlexibleTime: boolean;
   isFlexibleDate: boolean;
+  /** True when the host picked "This week" — `date` is the week's Saturday for sorting only. */
+  isThisWeek: boolean;
   isFlexibleLocation: boolean;
   endTime?: string;
   tags: InterestTag[];

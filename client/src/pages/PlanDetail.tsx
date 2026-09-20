@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronRight, Hand, Pencil, Send, UserPlus, X } from "lucide-react";
 import { api, parseApiError } from "../api/http";
@@ -21,10 +22,40 @@ import { INTEREST_LABELS, type ConversationDTO, type MessageDTO, type Participat
 
 /** Same "set parts + · flexible" convention as the feed card — never show a
  *  specific time/date next to a field that's still open. */
-function formatWhen(date: string, time: string, isFlexibleTime: boolean): string {
+function formatWhen(
+  date: string,
+  time: string,
+  isFlexibleTime: boolean,
+  opts?: { isFlexibleDate?: boolean; isThisWeek?: boolean },
+): string {
+  const day = formatPlanDate(date, opts);
   return isFlexibleTime
-    ? `${formatPlanDate(date)} · flexible`
-    : `${formatPlanDate(date)} · ${formatPlanTime(time, false)}`;
+    ? `${day} · flexible`
+    : `${day} · ${formatPlanTime(time, false)}`;
+}
+
+function flyerLinkHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+function linkifyText(text: string): ReactNode[] {
+  return text.split(/(https?:\/\/[^\s]+)/gi).map((part, i) => {
+    if (!/^https?:\/\//i.test(part)) return part;
+    const href = part.replace(/[),.;!?]+$/, "");
+    const trail = part.slice(href.length);
+    return (
+      <span key={i}>
+        <a href={href} target="_blank" rel="noopener noreferrer" className="plan-description-link">
+          {href}
+        </a>
+        {trail}
+      </span>
+    );
+  });
 }
 
 export function PlanDetailPage() {
@@ -330,7 +361,10 @@ export function PlanDetailPage() {
               <div className="plan-meta-text">
                 <span className="plan-meta-label">Date &amp; time</span>
                 <span className="plan-meta-value">
-                  {formatWhen(plan.date, plan.time, plan.isFlexibleTime)}
+                  {formatWhen(plan.date, plan.time, plan.isFlexibleTime, {
+                    isFlexibleDate: plan.isFlexibleDate,
+                    isThisWeek: plan.isThisWeek,
+                  })}
                 </span>
               </div>
             </div>
@@ -401,11 +435,46 @@ export function PlanDetailPage() {
         {plan.description && (
           <div className="plan-detail-card">
             {plan.planKind === "looking_for" ? (
-              <p className="plan-description plan-description-quote" style={{ margin: 0 }}>&ldquo;{plan.description}&rdquo;</p>
+              <p className="plan-description plan-description-quote" style={{ margin: 0 }}>
+                &ldquo;{linkifyText(plan.description)}&rdquo;
+              </p>
             ) : (
-              <p className="plan-description" style={{ margin: 0 }}>{plan.description}</p>
+              <p className="plan-description" style={{ margin: 0 }}>
+                {linkifyText(plan.description)}
+              </p>
             )}
           </div>
+        )}
+
+        {plan.flyerLinkUrl && (
+          <a
+            href={plan.flyerLinkUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="link-preview link-preview--detail"
+          >
+            {plan.flyerLinkPreview?.image && (
+              <img
+                src={plan.flyerLinkPreview.image}
+                alt=""
+                className="link-preview-image"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            )}
+            <div className="link-preview-body">
+              <div className="link-preview-site">
+                {plan.flyerLinkPreview?.siteName || flyerLinkHost(plan.flyerLinkUrl)}
+              </div>
+              <div className="link-preview-title">
+                {plan.flyerLinkPreview?.title || plan.flyerLinkUrl}
+              </div>
+              {plan.flyerLinkPreview?.description && (
+                <div className="link-preview-desc">{plan.flyerLinkPreview.description}</div>
+              )}
+            </div>
+          </a>
         )}
 
         {!isPast && canChat && (

@@ -469,7 +469,7 @@ function EditForm({
               Changes here go through a proposal, not an instant save.
             </p>
             <p className="edit-proposal-current">
-              Current: {formatPlanDate(plan.date)} · {formatPlanTime(plan.time, plan.isFlexibleTime)}
+              Current: {formatPlanDate(plan.date, { isFlexibleDate: plan.isFlexibleDate, isThisWeek: plan.isThisWeek })} · {formatPlanTime(plan.time, plan.isFlexibleTime)}
             </p>
             {plan.pendingTimeProposal ? (
               <div className="coordination-banner coordination-banner--expanded" role="note">

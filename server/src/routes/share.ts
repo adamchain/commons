@@ -111,7 +111,9 @@ function titleCase(raw: string): string {
   return raw.trim().replace(/\s+/g, " ");
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, plan?: { isFlexibleDate?: boolean; isThisWeek?: boolean }): string {
+  if (plan?.isThisWeek) return "This week";
+  if (plan?.isFlexibleDate || iso.startsWith("2099-12-31")) return "Anytime";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -265,7 +267,7 @@ function buildTree(
 ): El {
   const host = store.findUserById(plan.creatorId);
   const hostName = host?.firstName ?? "A host";
-  const dateLine = [formatDate(plan.date), formatTime(plan.time, plan.isFlexibleTime)].filter(Boolean).join("  ·  ");
+  const dateLine = [formatDate(plan.date, plan), formatTime(plan.time, plan.isFlexibleTime)].filter(Boolean).join("  ·  ");
   const place = plan.isFlexibleLocation ? "Flexible location" : plan.location?.name || "";
 
   const layers: unknown[] = [];
@@ -429,7 +431,7 @@ function esc(s: string): string {
 export function injectPlanMeta(html: string, plan: PlanRecord, origin: string): string {
   const counts = countsFor(plan.id);
   const title = titleCase(plan.title);
-  const dateLine = [formatDate(plan.date), formatTime(plan.time, plan.isFlexibleTime)].filter(Boolean).join(" · ");
+  const dateLine = [formatDate(plan.date, plan), formatTime(plan.time, plan.isFlexibleTime)].filter(Boolean).join(" · ");
   const place = plan.isFlexibleLocation ? "Flexible location" : plan.location?.name || "";
   const badge = countBadge(counts.going, counts.interested);
   const descParts = [dateLine, place, badge].filter(Boolean);
