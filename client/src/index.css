@@ -13307,6 +13307,11 @@ button.xpl-photo-tile {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  overscroll-behavior: none;
+}
+.app-shell--messages-lock .screen-title,
+.app-shell--messages-lock .messages-tabs {
+  flex-shrink: 0;
 }
 .app-shell--messages-lock .messages-scroll {
   flex: 1 1 auto;
@@ -14111,6 +14116,11 @@ button.xpl-photo-tile {
   gap: 8px;
   margin: 0 0 12px;
   width: 100%;
+  position: sticky;
+  top: calc(var(--topbar-height, 56px) + env(safe-area-inset-top, 0px));
+  z-index: 4;
+  background: var(--bg);
+  padding-bottom: 2px;
 }
 .messages-tab {
   appearance: none;
