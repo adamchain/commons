@@ -103,16 +103,15 @@ export function PlanDetailPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [showGuestsModal, location.hash, location.pathname, navigate, navFrom]);
 
-  // Fetch the last 2 user messages for the inline chat preview.
+  // Fetch the last 2 user messages for the inline chat preview. Every plan
+  // page shows chat — join=0 so merely opening the page doesn't add the
+  // viewer to the inbox thread.
   useEffect(() => {
     if (!plan || !user) return;
-    const hosting = plan.creator.id === user.id;
-    const eligible = hosting || plan.myState === "going" || plan.myState === "interested";
-    if (!eligible) { setChatPreview([]); return; }
     setChatPreview(null);
     void (async () => {
       try {
-        const conv = await api<ConversationDTO>(`/api/plans/${plan.id}/conversation`);
+        const conv = await api<ConversationDTO>(`/api/plans/${plan.id}/conversation?join=0`);
         setChatConvId(conv.id);
         const msgs = await api<MessageDTO[]>(`/api/conversations/${conv.id}/messages`);
         setChatPreview(msgs.filter((m) => !m.kind || m.kind === "user").slice(-2));
@@ -120,7 +119,7 @@ export function PlanDetailPage() {
         setChatPreview([]);
       }
     })();
-  }, [plan?.id, plan?.myState, user?.id]);
+  }, [plan?.id, user?.id]);
 
   if (!plan || !user) {
     return <LoadingScreen tagline="Loading plan" />;
@@ -154,8 +153,6 @@ export function PlanDetailPage() {
   // Other interested folks coordinate via the group chat until the host
   // commits to a venue + day.
   const canLock = !plan.lockedAt && isHosting && isLookingFor && !isPast && !plan.cancelledAt;
-  const canChat =
-    isHosting || plan.myState === "going" || plan.myState === "interested";
 
   async function cancelPlan() {
     if (!plan) return;
@@ -442,7 +439,7 @@ export function PlanDetailPage() {
           <span className="host-row-chevron" aria-hidden="true">›</span>
         </button>
 
-        {!isPast && canChat && (
+        {!plan.cancelledAt && (
           <ChatPreviewCard
             planId={plan.id}
             messages={chatPreview}
@@ -1084,12 +1081,12 @@ function ChatPreviewCard({
         />
         <button
           type="button"
-          className={`chat-composer-send${body.trim() ? " is-ready" : ""}`}
+          className="chat-preview-send"
           disabled={!body.trim() || sending || !convId}
           onClick={() => void send()}
           aria-label="Send"
         >
-          <Send size={14} strokeWidth={2} aria-hidden="true" />
+          <ChevronRight size={18} strokeWidth={2.4} aria-hidden="true" />
         </button>
       </div>
     </div>

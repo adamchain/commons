@@ -11,6 +11,7 @@ import {
 } from "../lib/communityAccess.js";
 import { isGcsConfigured, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
+import { planVisibleToViewer } from "../lib/feedScope.js";
 import type { ConversationDTO, ConversationSummaryDTO, MessageDTO, PollDTO } from "../types/shared.js";
 
 const MAX_CHAT_IMAGE_CHARS = 1_600_000;
@@ -170,16 +171,14 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
 function canAccessPlanGroupChat(planId: string, userId: string): boolean {
   const plan = store.findPlanById(planId);
   if (!plan) return false;
-  if (plan.creatorId !== userId && store.isBlockedEitherWay(userId, plan.creatorId)) return false;
-  if (plan.creatorId === userId) return true;
-  const part = store.findParticipation(planId, userId);
-  if (part?.state === "going") return true;
-  if (part?.state === "interested") return true;
-  // Carried-over group members (e.g. a "Do it again" re-plan that brought the
-  // previous crew along) already belong to the conversation before they RSVP —
-  // let them read the persisted thread.
-  const conv = store.findGroupConversationByPlan(planId);
-  if (conv?.participantIds.includes(userId)) return true;
+  const me = store.findUserById(userId);
+  if (!me) return false;
+  return planVisibleToViewer(plan, me);
+}
+
+function canReadConversation(conv: ConversationRecord, userId: string): boolean {
+  if (conv.participantIds.includes(userId)) return true;
+  if (conv.planId) return canAccessPlanGroupChat(conv.planId, userId);
   return false;
 }
 
@@ -196,8 +195,16 @@ chatRouter.get("/plans/:planId/conversation", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Join the plan to access chat" });
     return;
   }
+  // Plan-detail preview uses ?join=0 so just looking at a plan doesn't dump
+  // the viewer into the inbox. Opening the full thread (default) still joins.
+  const join = String(req.query.join ?? "1") !== "0";
   const existed = store.findGroupConversationByPlan(planId);
   const alreadyHadUser = existed?.participantIds.includes(userId) ?? false;
+  if (!join) {
+    const conv = store.ensureGroupConversation(planId, [plan.creatorId]);
+    res.json(await toConversationDto(conv, userId));
+    return;
+  }
   // Opening chat intentionally rejoins after an inbox leave.
   if (existed) store.setConversationLeft(userId, existed.id, false);
   const conv = store.ensureGroupConversation(planId, [plan.creatorId, userId], {
@@ -231,7 +238,7 @@ chatRouter.get("/conversations/:id/messages", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Conversation not found" });
     return;
   }
-  if (!conv.participantIds.includes(userId)) {
+  if (!canReadConversation(conv, userId)) {
     res.status(403).json({ error: "Not a participant" });
     return;
   }
@@ -274,8 +281,12 @@ chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => 
     return;
   }
   if (!conv.participantIds.includes(userId)) {
-    res.status(403).json({ error: "Not a participant" });
-    return;
+    if (conv.planId && canAccessPlanGroupChat(conv.planId, userId)) {
+      store.ensureGroupConversation(conv.planId, [userId], { rejoinIds: [userId] });
+    } else {
+      res.status(403).json({ error: "Not a participant" });
+      return;
+    }
   }
   if (conv.type === "dm") {
     const otherId = conv.participantIds.find((id) => id !== userId);

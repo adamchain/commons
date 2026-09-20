@@ -4061,33 +4061,58 @@ a.action-btn--stack {
 .chat-preview-compose {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 0;
-  padding: 4px 16px 14px;
+  gap: 10px;
+  margin: 0 12px 12px;
+  padding: 8px;
+  background: var(--bg);
+  border-radius: 28px;
 }
 .chat-preview-compose--below-msgs {
-  border-top: 1px solid var(--border);
-  padding-top: 12px;
+  border-top: none;
+  padding-top: 8px;
+  margin-top: 4px;
 }
 .chat-preview-input {
   flex: 1;
   min-width: 0;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--r-control);
-  padding: 9px 14px;
+  height: 44px;
+  background: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 0 18px;
   color: var(--ink);
   font-size: var(--text-body);
   font-family: inherit;
   line-height: 1.35;
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 .chat-preview-input:focus {
   outline: none;
-  border-color: var(--border);
+  border: none;
 }
 .chat-preview-input::placeholder {
-  color: var(--faint);
+  color: var(--muted);
+}
+.chat-preview-send {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--red);
+  color: #fff;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+.chat-preview-send:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.chat-preview-send:not(:disabled):hover {
+  background: var(--accent-hover);
 }
 
 /* Edit plan row — host-only bottom row */
