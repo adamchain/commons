@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import { flushSync } from "react-dom";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -1869,15 +1870,20 @@ function IdeaForm({
   };
 
   const selectDateMode = (mode: IdeaDateMode) => {
-    setDateMode(mode);
     if (mode === "specific") {
-      setForm((f) => ({
-        ...f,
-        isFlexibleDate: false,
-        date: f.date && f.date >= today() ? f.date : today(),
-      }));
+      flushSync(() => {
+        setDateMode("specific");
+        setForm((f) => ({
+          ...f,
+          isFlexibleDate: false,
+          date: f.date && f.date >= today() ? f.date : today(),
+        }));
+      });
       openIdeaCalendar();
-    } else if (mode === "week") {
+      return;
+    }
+    setDateMode(mode);
+    if (mode === "week") {
       setForm((f) => ({ ...f, isFlexibleDate: false, date: endOfThisWeek() }));
     } else {
       setForm((f) => ({ ...f, isFlexibleDate: true, date: today() }));
@@ -2066,30 +2072,27 @@ function IdeaForm({
                     <div className="idea-when-value">
                       <span className="plan-meta-label">When</span>
                       {dateMode === "specific" ? (
-                        <span className={`plan-meta-value ${!form.date ? "is-placeholder" : ""}`}>
-                          {form.date ? formatPlanDate(form.date) : "Pick a day"}
-                        </span>
+                        <>
+                          <span className={`plan-meta-value ${!form.date ? "is-placeholder" : ""}`}>
+                            {form.date ? formatPlanDate(form.date) : "Pick a day"}
+                          </span>
+                          <input
+                            ref={ideaDateRef}
+                            id="idea-date"
+                            className="plan-meta-native-input"
+                            type="date"
+                            min={today()}
+                            value={form.date}
+                            aria-invalid={Boolean(dateError)}
+                            onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                            onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
+                          />
+                        </>
                       ) : (
                         <span className={`plan-meta-value ${dateMode === "anytime" ? "is-placeholder" : ""}`}>
                           {dateMode === "week" ? "This week" : "Anytime"}
                         </span>
                       )}
-                      <input
-                        ref={ideaDateRef}
-                        id="idea-date"
-                        className={
-                          dateMode === "specific"
-                            ? "plan-meta-native-input"
-                            : "plan-meta-native-input is-dormant"
-                        }
-                        type="date"
-                        min={today()}
-                        value={form.date && form.date >= today() ? form.date : today()}
-                        aria-invalid={Boolean(dateError)}
-                        tabIndex={dateMode === "specific" ? 0 : -1}
-                        onChange={(e) => setForm((f) => ({ ...f, date: e.target.value, isFlexibleDate: false }))}
-                        onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
-                      />
                     </div>
                     <div className="seg-toggle idea-date-toggle" role="group" aria-label="When">
                       <button

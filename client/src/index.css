@@ -7955,11 +7955,15 @@ a.action-btn--stack {
   color: var(--faint);
   font-weight: 500;
 }
-.plan-meta-native-input.is-dormant {
-  width: 1px;
-  height: 1px;
-  inset: auto;
-  pointer-events: none;
+.plan-meta-native-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: none;
+  background: transparent;
 }
 .plan-meta-text--time {
   flex: 1;
