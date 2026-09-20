@@ -141,12 +141,6 @@ export function PlanDetailPage() {
       const going = next === "going" ? [...goingFiltered, me] : goingFiltered;
       const interested = next === "interested" ? [...interestedFiltered, me] : interestedFiltered;
       const updated = { ...prev, myState: next, participants: { going, interested } };
-      // Looking-For lifecycle: tapping Interested drops you into the group
-      // chat — that's where coordination happens before anyone locks in.
-      if (next === "interested" && prev.planKind === "looking_for" && prev.creator.id !== user.id) {
-        // Defer navigation so the state update flushes first.
-        setTimeout(() => navigate(`/plans/${prev.id}/chat`), 200);
-      }
       return updated;
     });
   };
@@ -260,8 +254,10 @@ export function PlanDetailPage() {
     <main className="app-shell app-shell--wide app-shell--with-nav plan-detail-page">
       <div className="plan-detail-safe-scrim" aria-hidden="true" />
       <div className={`plan-detail-hero${coverSrc || ideaCoverFallback ? "" : " plan-detail-hero--empty"}`}>
-        {coverSrc && <img src={coverSrc} alt="" loading="lazy" />}
-        {ideaCoverFallback && <IdeaCoverFallback iconSize={56} />}
+        <div className="plan-detail-hero-media">
+          {coverSrc && <img src={coverSrc} alt="" loading="lazy" />}
+          {ideaCoverFallback && <IdeaCoverFallback iconSize={56} />}
+        </div>
         <div className="plan-detail-hero-bar">
           <button
             type="button"
@@ -550,6 +546,11 @@ export function PlanDetailPage() {
               joinType={plan.joinType}
               isHosting={isHosting}
               onJustMarkedGoing={() => setShowInvite(true)}
+              onConfirmClose={(kind) => {
+                if (kind === "idea_interested") {
+                  navigate(`/plans/${plan.id}/chat`, { state: { from: "plan", planId: plan.id } });
+                }
+              }}
             />
           </div>
         )}
@@ -1023,19 +1024,27 @@ function ChatPreviewCard({
   }
 
   return (
-    <div className="plan-detail-card chat-preview-card">
+    <div className="plan-meta-card chat-preview-card">
       <Link
         to={`/plans/${planId}/chat`}
         state={navState}
-        className="chat-preview-messages-link"
+        className="plan-meta-row chat-preview-messages-link"
       >
-        <div className="chat-preview-header">
-          <span className="chat-preview-title">Chat</span>
-          <ChevronRight size={16} strokeWidth={2} color="var(--text-muted)" aria-hidden="true" />
+        <span className="plan-meta-icon" aria-hidden="true"><ChatBubbleIcon /></span>
+        <div className="plan-meta-text">
+          <span className="plan-meta-label">Chat</span>
+          {messages === null ? (
+            <span className="plan-meta-sub">Loading…</span>
+          ) : null}
         </div>
-        {messages === null ? (
-          <span className="chat-preview-empty">Loading…</span>
-        ) : hasMessages ? (
+        <ChevronRight size={16} strokeWidth={2} color="var(--text-muted)" aria-hidden="true" />
+      </Link>
+      {hasMessages ? (
+        <Link
+          to={`/plans/${planId}/chat`}
+          state={navState}
+          className="chat-preview-messages-link chat-preview-messages-wrap"
+        >
           <div className="chat-preview-messages">
             {messages.map((msg) => (
               <div key={msg.id} className="chat-preview-message">
@@ -1060,8 +1069,8 @@ function ChatPreviewCard({
               </div>
             ))}
           </div>
-        ) : null}
-      </Link>
+        </Link>
+      ) : null}
       <div className={`chat-preview-compose${hasMessages ? " chat-preview-compose--below-msgs" : ""}`}>
         <input
           className="chat-preview-input"

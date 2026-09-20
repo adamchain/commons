@@ -331,7 +331,7 @@ function QuickJoin({
       } else {
         await api(`/api/plans/${planId}/participation`, { method: "DELETE" });
       }
-      setConfirm(joinConfirmKind(next));
+      setConfirm(joinConfirmKind(next, { isIdea: isLooking }));
       onPlanRefresh?.();
     } catch {
       /* surface nothing on the card */

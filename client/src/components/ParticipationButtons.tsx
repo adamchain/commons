@@ -51,6 +51,7 @@ export function ParticipationButtons({
   joinType = "open",
   isHosting = false,
   onJustMarkedGoing,
+  onConfirmClose,
 }: {
   planId: string;
   initialState: ParticipationState | null;
@@ -65,6 +66,7 @@ export function ParticipationButtons({
   isHosting?: boolean;
   /** Called the first time someone confirms I'm In — opens the invite sheet. */
   onJustMarkedGoing?: () => void;
+  onConfirmClose?: (kind: JoinConfirmKind) => void;
 }) {
   const { user } = useAuth();
   const [state, setState] = useState<ParticipationState | null>(initialState);
@@ -98,7 +100,7 @@ export function ParticipationButtons({
       } else {
         await api(`/api/plans/${planId}/participation`, { method: "DELETE" });
       }
-      if (opts?.celebrate !== false) setConfirm(joinConfirmKind(next));
+      if (opts?.celebrate !== false) setConfirm(joinConfirmKind(next, { isIdea: planKind === "looking_for" }));
       return true;
     } catch (err) {
       setState(prev);
@@ -181,36 +183,70 @@ export function ParticipationButtons({
               : `${goingCount}/${capacity} spots taken.`}
         </p>
       )}
-      {!loose && !waitlistOnly && (
-        <button
-          type="button"
-          className={`btn-going ${goingActive ? "is-active" : ""}`}
-          onClick={() => void tapGoing()}
-          disabled={pending || isApproveOnly}
-        >
-          {goingActive
-            ? "I'm In"
-            : isApproveOnly
-              ? "Application-only"
-              : "I'm In"}
-        </button>
+      {loose ? (
+        <>
+          <button
+            type="button"
+            className={`btn-interested ${interestedActive ? "is-active" : ""}`}
+            onClick={() => void tapInterested()}
+            disabled={pending}
+          >
+            Interested
+          </button>
+          {!waitlistOnly && (
+            <button
+              type="button"
+              className={`btn-going ${goingActive ? "is-active" : ""}`}
+              onClick={() => void tapGoing()}
+              disabled={pending || isApproveOnly}
+            >
+              I&apos;m In
+            </button>
+          )}
+        </>
+      ) : (
+        <>
+          {!waitlistOnly && (
+            <button
+              type="button"
+              className={`btn-going ${goingActive ? "is-active" : ""}`}
+              onClick={() => void tapGoing()}
+              disabled={pending || isApproveOnly}
+            >
+              {goingActive
+                ? "I'm In"
+                : isApproveOnly
+                  ? "Application-only"
+                  : "I'm In"}
+            </button>
+          )}
+          <button
+            type="button"
+            className={`btn-interested ${interestedActive ? "is-active" : ""}`}
+            onClick={() => void tapInterested()}
+            disabled={pending}
+          >
+            {interestedActive
+              ? isApproveOnly && !isFull
+                ? "Withdraw application"
+                : "Interested"
+              : isApproveOnly && !isFull
+                ? "Apply"
+                : "Interested"}
+          </button>
+        </>
       )}
-      <button
-        type="button"
-        className={`btn-interested ${interestedActive ? "is-active" : ""}`}
-        onClick={() => void tapInterested()}
-        disabled={pending}
-      >
-        {interestedActive
-          ? isApproveOnly && !isFull
-            ? "Withdraw application"
-            : "Interested"
-          : isApproveOnly && !isFull
-            ? "Apply"
-            : "Interested"}
-      </button>
       {error && <p className="onboarding-error" style={{ marginTop: 8 }}>{error}</p>}
-      {confirm && <JoinConfirmPopup kind={confirm} onClose={() => setConfirm(null)} />}
+      {confirm && (
+        <JoinConfirmPopup
+          kind={confirm}
+          onClose={() => {
+            const kind = confirm;
+            setConfirm(null);
+            onConfirmClose?.(kind);
+          }}
+        />
+      )}
 
       {showGoingSheet && (
         <BottomSheet onClose={() => setShowGoingSheet(false)} labelledBy="rsvp-going-title">

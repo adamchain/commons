@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { Check } from "lucide-react";
 import type { ParticipationState } from "../types/shared";
 
-export type JoinConfirmKind = ParticipationState | "dropped" | "community";
+export type JoinConfirmKind = ParticipationState | "dropped" | "community" | "idea_interested";
 
 const COPY: Record<JoinConfirmKind, { title: string; sub: string; celebrate: boolean }> = {
   going: {
@@ -14,6 +14,11 @@ const COPY: Record<JoinConfirmKind, { title: string; sub: string; celebrate: boo
   interested: {
     title: "You're Interested",
     sub: "We'll keep you posted.",
+    celebrate: true,
+  },
+  idea_interested: {
+    title: "You're Interested.",
+    sub: "Head to the chat to coordinate the details",
     celebrate: true,
   },
   dropped: {
@@ -40,11 +45,12 @@ export function JoinConfirmPopup({
 }) {
   const { title, sub, celebrate } = COPY[kind];
   const dismiss = useEffectEvent(onClose);
+  const dismissAfter = kind === "idea_interested" ? Math.max(autoDismissMs, 3200) : autoDismissMs;
 
   useEffect(() => {
-    const t = window.setTimeout(() => dismiss(), autoDismissMs);
+    const t = window.setTimeout(() => dismiss(), dismissAfter);
     return () => window.clearTimeout(t);
-  }, [kind, autoDismissMs]);
+  }, [kind, dismissAfter]);
 
   return createPortal(
     <div
@@ -74,8 +80,11 @@ export function JoinConfirmPopup({
   );
 }
 
-export function joinConfirmKind(next: ParticipationState | null): JoinConfirmKind {
+export function joinConfirmKind(
+  next: ParticipationState | null,
+  opts?: { isIdea?: boolean },
+): JoinConfirmKind {
   if (next === "going") return "going";
-  if (next === "interested") return "interested";
+  if (next === "interested") return opts?.isIdea ? "idea_interested" : "interested";
   return "dropped";
 }
