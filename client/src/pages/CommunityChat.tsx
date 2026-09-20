@@ -161,11 +161,12 @@ export function CommunityChatPage() {
     return (
       <main className="app-shell app-shell--chat">
         <header className={CHAT_HEADER_CLASS}>
-          <Link to={backTo} className="detail-back chat-back-link">
-            <ArrowLeft size={13} strokeWidth={2.2} aria-hidden="true" />
-            {backLabel.replace(/^←\s*/, "")}
+          <Link to={backTo} className="detail-back chat-back-link" aria-label={backLabel}>
+            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
           </Link>
-          <div className="chat-thread-title">Chat</div>
+          <div className="chat-thread-heading">
+            <div className="chat-thread-title">Chat</div>
+          </div>
           <span aria-hidden="true" />
         </header>
         <div className="empty-state">
@@ -182,11 +183,12 @@ export function CommunityChatPage() {
     return (
       <main className="app-shell app-shell--chat">
         <header className={CHAT_HEADER_CLASS}>
-          <Link to={backTo} className="detail-back chat-back-link">
-            <ArrowLeft size={13} strokeWidth={2.2} aria-hidden="true" />
-            {backLabel.replace(/^←\s*/, "")}
+          <Link to={backTo} className="detail-back chat-back-link" aria-label={backLabel}>
+            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
           </Link>
-          <div className="chat-thread-title">Chat</div>
+          <div className="chat-thread-heading">
+            <div className="chat-thread-title">Chat</div>
+          </div>
           <span aria-hidden="true" />
         </header>
         <div className="empty-state">
@@ -375,11 +377,12 @@ export function CommunityChatPage() {
   return (
     <main ref={shellRef} className="app-shell app-shell--chat">
       <header className={CHAT_HEADER_CLASS}>
-        <Link to={backTo} className="detail-back chat-back-link">
-          <ArrowLeft size={13} strokeWidth={2.2} aria-hidden="true" />
-          {backLabel.replace(/^←\s*/, "")}
+        <Link to={backTo} className="detail-back chat-back-link" aria-label={backLabel}>
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </Link>
-        <div className="chat-thread-title">{sentenceCaseTitle(conv.communityName)}</div>
+        <div className="chat-thread-heading">
+          <div className="chat-thread-title">{sentenceCaseTitle(conv.communityName)}</div>
+        </div>
         <div className="chat-header-menu-wrap" ref={headerMenuRef}>
           <button
             type="button"

@@ -153,7 +153,9 @@ export function ChatPage() {
           <Link to={backHref} className="detail-back chat-back-link" aria-label={backLabel}>
             <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
           </Link>
-          <div className="chat-thread-title">Chat</div>
+          <div className="chat-thread-heading">
+            <div className="chat-thread-title">Chat</div>
+          </div>
           <span aria-hidden="true" />
         </header>
         <div className="empty-state">
