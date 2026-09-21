@@ -439,21 +439,6 @@ export function PlanDetailPage() {
           <span className="host-row-chevron" aria-hidden="true">›</span>
         </button>
 
-        {!plan.cancelledAt && (
-          <ChatPreviewCard
-            planId={plan.id}
-            messages={chatPreview}
-            convId={chatConvId}
-            navState={{ from: "plan", planId: plan.id }}
-            onSent={(msg) => {
-              setChatPreview((prev) => {
-                const list = prev ?? [];
-                return [...list, msg].filter((m) => !m.kind || m.kind === "user").slice(-2);
-              });
-            }}
-          />
-        )}
-
         {plan.description && (
           <div className="plan-detail-card">
             {plan.planKind === "looking_for" ? (
@@ -478,6 +463,21 @@ export function PlanDetailPage() {
               Make a Plan
             </Link>
           </div>
+        )}
+
+        {!plan.cancelledAt && (
+          <ChatPreviewCard
+            planId={plan.id}
+            messages={chatPreview}
+            convId={chatConvId}
+            navState={{ from: "plan", planId: plan.id }}
+            onSent={(msg) => {
+              setChatPreview((prev) => {
+                const list = prev ?? [];
+                return [...list, msg].filter((m) => !m.kind || m.kind === "user").slice(-2);
+              });
+            }}
+          />
         )}
 
         {isPast && (
@@ -1022,20 +1022,6 @@ function ChatPreviewCard({
 
   return (
     <div className="plan-meta-card chat-preview-card">
-      <Link
-        to={`/plans/${planId}/chat`}
-        state={navState}
-        className="plan-meta-row chat-preview-messages-link"
-      >
-        <span className="plan-meta-icon" aria-hidden="true"><ChatBubbleIcon /></span>
-        <div className="plan-meta-text">
-          <span className="plan-meta-label">Chat</span>
-          {messages === null ? (
-            <span className="plan-meta-sub">Loading…</span>
-          ) : null}
-        </div>
-        <ChevronRight size={16} strokeWidth={2} color="var(--text-muted)" aria-hidden="true" />
-      </Link>
       {hasMessages ? (
         <Link
           to={`/plans/${planId}/chat`}
@@ -1068,7 +1054,7 @@ function ChatPreviewCard({
           </div>
         </Link>
       ) : null}
-      <div className={`chat-preview-compose${hasMessages ? " chat-preview-compose--below-msgs" : ""}`}>
+      <div className="chat-preview-compose">
         <input
           className="chat-preview-input"
           type="text"
@@ -1081,12 +1067,12 @@ function ChatPreviewCard({
         />
         <button
           type="button"
-          className="chat-preview-send"
+          className="chat-composer-send is-ready"
           disabled={!body.trim() || sending || !convId}
           onClick={() => void send()}
           aria-label="Send"
         >
-          <ChevronRight size={18} strokeWidth={2.4} aria-hidden="true" />
+          <ChevronRight size={20} strokeWidth={2.5} aria-hidden="true" />
         </button>
       </div>
     </div>
