@@ -470,6 +470,14 @@ export function PlanDetailPage() {
             planId={plan.id}
             messages={chatPreview}
             convId={chatConvId}
+            peopleCount={
+              new Set([
+                plan.creator.id,
+                ...(plan.coHosts?.map((h) => h.id) ?? []),
+                ...plan.participants.going.map((u) => u.id),
+                ...plan.participants.interested.map((u) => u.id),
+              ]).size
+            }
             navState={{ from: "plan", planId: plan.id }}
             onSent={(msg) => {
               setChatPreview((prev) => {
@@ -989,12 +997,14 @@ function ChatPreviewCard({
   planId,
   messages,
   convId,
+  peopleCount,
   navState,
   onSent,
 }: {
   planId: string;
   messages: MessageDTO[] | null;
   convId: string | null;
+  peopleCount: number;
   navState: { from: string; planId: string };
   onSent: (msg: MessageDTO) => void;
 }) {
@@ -1020,14 +1030,46 @@ function ChatPreviewCard({
     }
   }
 
+  const compose = (
+    <div className="chat-preview-compose">
+      <input
+        className="chat-preview-input"
+        type="text"
+        placeholder={placeholder}
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); }
+        }}
+      />
+      <button
+        type="button"
+        className="chat-composer-send is-ready"
+        disabled={!body.trim() || sending || !convId}
+        onClick={() => void send()}
+        aria-label="Send"
+      >
+        <ChevronRight size={20} strokeWidth={2.5} aria-hidden="true" />
+      </button>
+    </div>
+  );
+
   return (
-    <div className="plan-meta-card chat-preview-card">
+    <div className={`plan-meta-card chat-preview-card${hasMessages ? " chat-preview-card--thread" : ""}`}>
       {hasMessages ? (
         <Link
           to={`/plans/${planId}/chat`}
           state={navState}
           className="chat-preview-messages-link chat-preview-messages-wrap"
         >
+          <div className="chat-preview-header">
+            <span className="chat-preview-title">Chat</span>
+            {peopleCount > 0 && (
+              <span className="chat-preview-people">
+                {peopleCount} {peopleCount === 1 ? "person" : "people"}
+              </span>
+            )}
+          </div>
           <div className="chat-preview-messages">
             {messages.map((msg) => (
               <div key={msg.id} className="chat-preview-message">
@@ -1054,27 +1096,7 @@ function ChatPreviewCard({
           </div>
         </Link>
       ) : null}
-      <div className="chat-preview-compose">
-        <input
-          className="chat-preview-input"
-          type="text"
-          placeholder={placeholder}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); }
-          }}
-        />
-        <button
-          type="button"
-          className="chat-composer-send is-ready"
-          disabled={!body.trim() || sending || !convId}
-          onClick={() => void send()}
-          aria-label="Send"
-        >
-          <ChevronRight size={20} strokeWidth={2.5} aria-hidden="true" />
-        </button>
-      </div>
+      {compose}
     </div>
   );
 }
