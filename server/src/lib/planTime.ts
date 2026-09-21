@@ -69,3 +69,12 @@ export function plansOverlap(a: PlanRecord, b: PlanRecord): boolean {
   const bEnd = planEndTimestamp(b);
   return aStart < bEnd && bStart < aEnd;
 }
+
+/** Capped plans always go through Interested → host accept. */
+export function planRequiresHostApproval(plan: {
+  capacity?: number | null;
+  joinType?: string;
+}): boolean {
+  const n = typeof plan.capacity === "number" ? plan.capacity : Number(plan.capacity);
+  return (Number.isFinite(n) && n >= 1) || plan.joinType === "approve";
+}

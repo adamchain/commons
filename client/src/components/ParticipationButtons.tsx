@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
 import type { JoinType, ParticipationState, PlanKind } from "../types/shared";
-import { isPlanAtCapacity } from "../lib/planTime";
+import { isPlanAtCapacity, planCapacityValue } from "../lib/planTime";
 import { JoinConfirmPopup, joinConfirmKind, type JoinConfirmKind } from "./JoinConfirmPopup";
 import { BottomSheet } from "./ui/BottomSheet";
 
@@ -167,10 +167,13 @@ export function ParticipationButtons({
   const interestedActive = state === "interested";
   const loose = planKind === "looking_for";
   const isFull = !isHosting && isPlanAtCapacity(capacity, goingCount) && !goingActive;
-  const isApproveOnly = !isHosting && joinType === "approve" && !goingActive;
-  // Full plans can't take another Going RSVP, but anyone can waitlist as
-  // Interested and tap I'm In later if a spot opens.
-  const waitlistOnly = isFull;
+  const isApproveOnly =
+    !isHosting &&
+    (joinType === "approve" || planCapacityValue(capacity) !== null) &&
+    !goingActive;
+  // Full / host-review plans can't take another Going RSVP, but anyone can
+  // waitlist as Interested until the host lets them in.
+  const waitlistOnly = isFull || isApproveOnly;
 
   return (
     <div className={`participation ${loose ? "participation--loose" : ""}`}>
@@ -179,20 +182,24 @@ export function ParticipationButtons({
           {isFull
             ? "This one's full — tap Interested in case a spot opens."
             : isApproveOnly
-              ? "Application-only."
+              ? capacity !== null
+                ? `${goingCount}/${capacity} spots — apply and the host lets you in.`
+                : "Application-only."
               : `${goingCount}/${capacity} spots taken.`}
         </p>
       )}
       {loose ? (
         <>
-          <button
-            type="button"
-            className={`btn-interested ${interestedActive ? "is-active" : ""}`}
-            onClick={() => void tapInterested()}
-            disabled={pending}
-          >
-            Interested
-          </button>
+          {!goingActive && (
+            <button
+              type="button"
+              className={`btn-interested ${interestedActive ? "is-active" : ""}`}
+              onClick={() => void tapInterested()}
+              disabled={pending}
+            >
+              Interested
+            </button>
+          )}
           {!waitlistOnly && (
             <button
               type="button"
@@ -200,7 +207,7 @@ export function ParticipationButtons({
               onClick={() => void tapGoing()}
               disabled={pending || isApproveOnly}
             >
-              I&apos;m In
+              {goingActive ? "Drop Out" : "I'm In"}
             </button>
           )}
         </>
@@ -250,9 +257,9 @@ export function ParticipationButtons({
 
       {showGoingSheet && (
         <BottomSheet onClose={() => setShowGoingSheet(false)} labelledBy="rsvp-going-title">
-            <div id="rsvp-going-title" className="sheet-title">I'm in.</div>
+            <div id="rsvp-going-title" className="sheet-title">{loose ? "Drop Out" : "I'm in."}</div>
             <button type="button" className="sheet-link" onClick={() => void switchToInterested()}>
-              Switch to Interested
+              {loose ? "Switch to I'm Interested" : "Switch to Interested"}
             </button>
             <button type="button" className="sheet-link sheet-link--danger" disabled={pending} onClick={() => void dropOutFromGoing()}>
               Drop out

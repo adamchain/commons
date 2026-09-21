@@ -67,3 +67,11 @@ export function isPlanAtCapacity(capacity: unknown, goingCount: number): boolean
   const cap = planCapacityValue(capacity);
   return cap !== null && goingCount >= cap;
 }
+
+/** Capped plans always go through Interested → host accept. */
+export function planRequiresHostApproval(plan: {
+  capacity?: number | null;
+  joinType?: string;
+}): boolean {
+  return planCapacityValue(plan.capacity) !== null || plan.joinType === "approve";
+}

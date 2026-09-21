@@ -635,7 +635,7 @@ export function CreatePlanPage() {
           coHostIds: inviteUserId ? [inviteUserId] : undefined,
           visibility: form.visibility,
           capacity: capacityNum,
-          joinType: form.joinType,
+          joinType: capacityNum !== null ? "approve" : "open",
           isRecurring: form.recurrence !== "none",
           recurrence: form.recurrence,
           repeatDays:
@@ -697,7 +697,7 @@ export function CreatePlanPage() {
           isThisWeek: Boolean(form.isThisWeek) && !form.isFlexibleDate,
           visibility: form.visibility,
           capacity: capacityNum,
-          joinType: form.joinType,
+          joinType: capacityNum !== null ? "approve" : "open",
           flyerDataUrl: form.flyerDataUrl ?? null,
           flyerLinkUrl: normalizeHttpUrl(form.flyerLinkUrl) ?? null,
           flyerLinkPreview: form.flyerLinkPreview ?? null,
@@ -769,7 +769,7 @@ export function CreatePlanPage() {
           isFlexibleTime: form.isFlexibleTime,
           visibility: form.visibility,
           capacity: capacityNum,
-          joinType: form.joinType,
+          joinType: capacityNum !== null ? "approve" : "open",
           flyerDataUrl: form.flyerDataUrl ?? null,
           flyerLinkUrl: normalizeHttpUrl(form.flyerLinkUrl) ?? null,
           hostEmoji: VIBE_OPTIONS.find((o) => o.id === form.vibes[0])?.emoji ?? "✨",
@@ -1507,27 +1507,9 @@ export function CreatePlanPage() {
               )}
 
               {form.capacityOn && (
-                <>
-                  <label className="form-question" style={{ marginTop: 12 }}>
-                    How do people get in?
-                  </label>
-                  <div className="segmented">
-                    <button
-                      type="button"
-                      className={form.joinType === "open" ? "is-active" : ""}
-                      onClick={() => setForm((f) => ({ ...f, joinType: "open" }))}
-                    >
-                      First come
-                    </button>
-                    <button
-                      type="button"
-                      className={form.joinType === "approve" ? "is-active" : ""}
-                      onClick={() => setForm((f) => ({ ...f, joinType: "approve" }))}
-                    >
-                      Approve
-                    </button>
-                  </div>
-                </>
+                <p className="form-help" style={{ marginTop: 8 }}>
+                  People apply as Interested. You review and let them in.
+                </p>
               )}
             </section>
 

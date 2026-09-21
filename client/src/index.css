@@ -4117,6 +4117,9 @@ a.action-btn--stack {
   display: flex;
   align-items: flex-start;
   gap: 10px;
+  background: #f0e9df;
+  border-radius: var(--r-control);
+  padding: 10px 12px;
 }
 .chat-preview-message-body {
   display: flex;

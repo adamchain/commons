@@ -136,7 +136,7 @@ export const ALL_AGE_RANGES: AgeRange[] = ["18_24", "25_35", "35_50", "50_plus"]
 
 export type PlanVisibility = "everyone" | "community" | "network";
 
-/** How RSVPs work when capacity is set. `open` is first-come; `approve` is one-tap host confirmation. */
+/** How RSVPs work when capacity is set. Capacity plans always use `approve`. */
 export type JoinType = "open" | "approve";
 
 export type ParticipationState = "interested" | "going";

@@ -22,7 +22,7 @@ import {
 } from "../types/shared.js";
 import { onPlanCreatedVenueNudge, notifyInterestedPlanLocked } from "../lib/nudges.js";
 import { emit } from "../lib/notify.js";
-import { planHasEnded, plansOverlap, FLEXIBLE_DATE_PLACEHOLDER, thisWeekAnchorDate } from "../lib/planTime.js";
+import { planHasEnded, planRequiresHostApproval, plansOverlap, FLEXIBLE_DATE_PLACEHOLDER, thisWeekAnchorDate } from "../lib/planTime.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
 import { communityCreationBlockReason } from "../lib/communityAccess.js";
 import { coverUrlFor } from "./share.js";
@@ -403,8 +403,8 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   if (typeof rawCapacity === "number" && Number.isFinite(rawCapacity) && rawCapacity > 0) {
     capacity = Math.floor(rawCapacity);
   }
-  const rawJoinType = String(req.body?.joinType ?? "open");
-  const joinType: JoinType = rawJoinType === "approve" ? "approve" : "open";
+  // Capacity always means host-review: joiners apply as Interested.
+  const joinType: JoinType = capacity !== null ? "approve" : "open";
 
   // Co-hosts — "make a plan with X" co-creates with the picked person. Validate
   // they're real users, never include the creator, cap at a sane number.
@@ -655,10 +655,7 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
     else if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {
       patch.capacity = Math.floor(raw);
     }
-  }
-  if (req.body?.joinType !== undefined) {
-    const raw = String(req.body.joinType);
-    patch.joinType = raw === "approve" ? "approve" : "open";
+    patch.joinType = patch.capacity ? "approve" : "open";
   }
   if (req.body?.flyerDataUrl !== undefined) {
     const raw = req.body.flyerDataUrl;
@@ -996,9 +993,6 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
       : typeof req.body?.capacity === "number"
         ? req.body.capacity
         : undefined;
-  const joinType = req.body?.joinType === "approve" || req.body?.joinType === "open"
-    ? (req.body.joinType as JoinType)
-    : undefined;
   const inviteUserIds: string[] = Array.isArray(req.body?.inviteUserIds)
     ? (req.body.inviteUserIds as unknown[]).map(String).filter(Boolean)
     : [];
@@ -1062,7 +1056,8 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
   if (tags) patch.tags = tags;
   if (visibility) patch.visibility = visibility;
   if (capacity !== undefined) patch.capacity = capacity;
-  if (joinType) patch.joinType = joinType;
+  const lockedCapacity = capacity !== undefined ? capacity : plan.capacity;
+  patch.joinType = lockedCapacity ? "approve" : "open";
   if (req.body?.neighborhoodId !== undefined) {
     const hood = store.resolveNeighborhoodId(String(req.body.neighborhoodId ?? "").trim());
     if (hood) patch.neighborhoodId = hood;
@@ -1157,18 +1152,17 @@ plansRouter.put("/:id/participation", requireAuth, async (req, res) => {
     return;
   }
   const existing = store.findParticipation(planId, userId);
-  // Enforce capacity for "going" RSVPs. Approve-mode plans never let a
+  // Enforce capacity for "going" RSVPs. Capped / approve-mode plans never let a
   // non-host go directly — they must apply (be interested) until the host
-  // promotes them. FCFS plans cap at `capacity` slots.
+  // promotes them.
   if (state === "going" && plan.creatorId !== userId && existing?.state !== "going") {
-    const goingCount = store
-      .listParticipationsForPlan(planId)
-      .filter((p) => p.state === "going").length;
-    const joinType = plan.joinType ?? "open";
-    if (joinType === "approve") {
+    if (planRequiresHostApproval(plan)) {
       res.status(403).json({ error: "This plan is invite-only — request to join instead." });
       return;
     }
+    const goingCount = store
+      .listParticipationsForPlan(planId)
+      .filter((p) => p.state === "going").length;
     if (plan.capacity && goingCount >= plan.capacity) {
       res.status(409).json({ error: "This plan is full." });
       return;
@@ -1205,6 +1199,23 @@ plansRouter.put("/:id/participation", requireAuth, async (req, res) => {
     from: existing?.state ?? null,
     to: state,
   });
+  // Notify host on first Interested apply when they need to review the request.
+  if (
+    state === "interested" &&
+    existing?.state !== "interested" &&
+    plan.creatorId !== userId &&
+    planRequiresHostApproval(plan)
+  ) {
+    const joiner = await findUserById(userId);
+    const joinerName = joiner?.firstName || "Someone";
+    await emit({
+      userId: plan.creatorId,
+      kind: "someoneJoinedYourPlan",
+      body: `${joinerName} wants a spot on "${plan.title}"`,
+      planId: plan.id,
+      dedupKey: `planApplication:${plan.id}:${userId}`,
+    });
+  }
   // Notify host on first promotion to "going" — fires once per (plan, joiner)
   // via dedupKey. The very first joiner on a plan gets warmer, specific copy
   // ("you're going together") since it's the moment the plan stops being

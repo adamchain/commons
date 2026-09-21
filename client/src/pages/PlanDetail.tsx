@@ -14,7 +14,7 @@ import { ShareSheet } from "../components/ShareSheet";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { Button } from "../components/ui/Button";
 import { useAuth } from "../context/AuthContext";
-import { isIdeaPlan, planHasEnded } from "../lib/planTime";
+import { isIdeaPlan, planHasEnded, planRequiresHostApproval } from "../lib/planTime";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
 import { formatPlanDate, formatPlanTime, formatPlanWhenLine, sentenceCaseTitle, firstHttpUrlInText, normalizeHttpUrl } from "../lib/format";
 import { hrefForBack, type NavFromState } from "../lib/navState";
@@ -905,9 +905,9 @@ function PlanGuests({
       {plan.participants.interested.length > 0 && (
         <div className="who-row" style={{ marginTop: 14 }}>
           <h3 className="who-block-heading">
-            {plan.joinType === "approve" && isHosting ? "Applications" : "Interested"} · {plan.participants.interested.length}
+            {planRequiresHostApproval(plan) && isHosting ? "Applications" : "Interested"} · {plan.participants.interested.length}
           </h3>
-          {plan.joinType === "approve" && isHosting ? (
+          {planRequiresHostApproval(plan) && isHosting ? (
             <div className="participant-list-interested">
               {plan.participants.interested.map((person) => (
                 <div key={person.id} className="participant-row participant-row--with-action">

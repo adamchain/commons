@@ -228,7 +228,7 @@ function EditForm({
           neighborhoodId: form.neighborhoodId || undefined,
           isFlexibleLocation: form.isFlexibleLocation,
           capacity: capacityNum,
-          joinType: form.joinType,
+          joinType: capacityNum !== null ? "approve" : "open",
           visibility: form.visibility,
         }),
       });
@@ -608,33 +608,9 @@ function EditForm({
             </button>
           </div>
           {form.capacityOn && (
-            <>
-              <label className="form-question" style={{ marginTop: 12 }}>
-                How do people get in?
-              </label>
-              <div className="segmented">
-                <button
-                  type="button"
-                  className={form.joinType === "open" ? "is-active" : ""}
-                  onClick={() => {
-                    lastInstantGroup.current = "who";
-                    setForm((f) => ({ ...f, joinType: "open" as JoinType }));
-                  }}
-                >
-                  First come
-                </button>
-                <button
-                  type="button"
-                  className={form.joinType === "approve" ? "is-active" : ""}
-                  onClick={() => {
-                    lastInstantGroup.current = "who";
-                    setForm((f) => ({ ...f, joinType: "approve" as JoinType }));
-                  }}
-                >
-                  Approve
-                </button>
-              </div>
-            </>
+            <p className="form-help" style={{ marginTop: 8 }}>
+              People apply as Interested. You review and let them in.
+            </p>
           )}
         </section>
 

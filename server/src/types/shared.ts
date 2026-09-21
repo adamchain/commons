@@ -97,7 +97,7 @@ export const ALL_AGE_RANGES: AgeRange[] = ["18_24", "25_35", "35_50", "50_plus"]
 
 export type PlanVisibility = "everyone" | "community" | "network";
 
-export type JoinType = "open" | "approve";
+export type JoinType = "open" | "approve"; // Capacity plans are always `approve`.
 
 export type ParticipationState = "interested" | "going";
 

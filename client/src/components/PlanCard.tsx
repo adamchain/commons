@@ -10,7 +10,7 @@ import { useAuth } from "../context/AuthContext";
 import type { PlanDTO } from "../types/shared";
 import { formatPlanDate, formatPlanTime, formatPlanWhenWhereLine, sentenceCaseTitle } from "../lib/format";
 import { saveFeedScroll, type NavFromState } from "../lib/navState";
-import { isIdeaPlan, isPlanAtCapacity, planCapacityValue, planHasEnded } from "../lib/planTime";
+import { isIdeaPlan, isPlanAtCapacity, planCapacityValue, planHasEnded, planRequiresHostApproval } from "../lib/planTime";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
 
 /**
@@ -202,6 +202,7 @@ export function PlanCard({
                   isLooking={isLooking}
                   state={plan.myState ?? null}
                   isFull={isFull}
+                  requiresApproval={planRequiresHostApproval(plan)}
                   onPlanRefresh={onPlanRefresh}
                 />
               )}
@@ -299,12 +300,14 @@ function QuickJoin({
   isLooking,
   state,
   isFull,
+  requiresApproval,
   onPlanRefresh,
 }: {
   planId: string;
   isLooking: boolean;
   state: "going" | "interested" | null;
   isFull: boolean;
+  requiresApproval: boolean;
   onPlanRefresh?: () => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -313,9 +316,9 @@ function QuickJoin({
 
   const goingActive = state === "going";
   const interestedActive = state === "interested";
-  // Full capacity: this CTA is Interested (waitlist), not I'm In — unless
+  // Full or host-review capacity: this CTA is Interested, not I'm In — unless
   // this person already has a Going seat.
-  const waitlist = isFull && !goingActive;
+  const waitlist = (isFull || requiresApproval) && !goingActive;
   const interestedCta = interestedActive || isLooking || waitlist;
 
   async function setState(next: "going" | "interested" | null) {
@@ -382,7 +385,7 @@ function QuickJoin({
                   Switch to Interested
                 </button>
               )}
-              {interestedActive && !isLooking && !isFull && (
+              {interestedActive && !isLooking && !isFull && !requiresApproval && (
                 <button type="button" className="sheet-link" onClick={() => void setState("going")}>
                   Switch to I&apos;m In
                 </button>
