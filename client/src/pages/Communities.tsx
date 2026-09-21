@@ -22,6 +22,7 @@ import "./Communities.css";
 
 export function CommunitiesPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [all, setAll] = useState<CommunityCardDTO[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [category, setCategory] = useState<CommunityCategory | "all">("all");
@@ -58,6 +59,18 @@ export function CommunitiesPage() {
 
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy-list">
+      <header className="cmy-list-masthead">
+        <div className="cmy-list-masthead-copy">
+          <h1 className="cmy-list-title">Communities</h1>
+        </div>
+        <button
+          type="button"
+          className="cmy-btn cmy-btn--primary cmy-list-create"
+          onClick={() => navigate("/communities/new")}
+        >
+          Create a Community
+        </button>
+      </header>
       <div className="cmy-cat-pills">
         {user && (
           <Link
