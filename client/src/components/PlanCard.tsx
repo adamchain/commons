@@ -359,7 +359,7 @@ function QuickJoin({
     await setState(interestedCta ? "interested" : "going");
   }
 
-  const label = goingActive ? "I'm In" : interestedCta ? "Interested" : "I'm In";
+  const label = goingActive ? "I'm In" : interestedActive ? "You're Interested" : interestedCta ? "Interested" : "I'm In";
 
   return (
     <>
@@ -379,7 +379,7 @@ function QuickJoin({
             onClose={() => setShowSheet(false)}
             labelledBy="plan-card-rsvp-title"
           >
-              <div id="plan-card-rsvp-title" className="sheet-title">{goingActive ? "I'm in." : "Interested"}</div>
+              <div id="plan-card-rsvp-title" className="sheet-title">{goingActive ? "I'm in." : "You're Interested"}</div>
               {goingActive && (
                 <button type="button" className="sheet-link" onClick={() => void setState("interested")}>
                   Switch to Interested

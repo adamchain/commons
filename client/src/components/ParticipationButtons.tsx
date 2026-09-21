@@ -197,7 +197,7 @@ export function ParticipationButtons({
               onClick={() => void tapInterested()}
               disabled={pending}
             >
-              Interested
+              {interestedActive ? "You're Interested" : "Interested"}
             </button>
           )}
           {!waitlistOnly && (
@@ -233,7 +233,7 @@ export function ParticipationButtons({
               {interestedActive
                 ? isApproveOnly && !isFull
                   ? "Withdraw application"
-                  : "Interested"
+                  : "You're Interested"
                 : isApproveOnly && !isFull
                   ? "Apply"
                   : "Interested"}
@@ -270,7 +270,7 @@ export function ParticipationButtons({
 
       {showInterestedSheet && (
         <BottomSheet onClose={() => setShowInterestedSheet(false)} labelledBy="rsvp-interested-title">
-            <div id="rsvp-interested-title" className="sheet-title">Interested</div>
+            <div id="rsvp-interested-title" className="sheet-title">You're Interested</div>
             {!loose && !isApproveOnly && !isFull && (
               <button type="button" className="sheet-link" onClick={() => void switchToGoing()}>
                 Switch to I&apos;m In
