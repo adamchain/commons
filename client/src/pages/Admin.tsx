@@ -1390,6 +1390,7 @@ export function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [userQuery, setUserQuery] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [tab, setTab] = useState<"overview" | "images">("overview");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1485,6 +1486,31 @@ export function AdminPage() {
           </div>
         </header>
 
+        <nav className="admin-tabs" role="tablist" aria-label="Admin">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "overview"}
+            className={`admin-tab${tab === "overview" ? " is-active" : ""}`}
+            onClick={() => setTab("overview")}
+          >
+            Overview
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "images"}
+            className={`admin-tab${tab === "images" ? " is-active" : ""}`}
+            onClick={() => setTab("images")}
+          >
+            Images
+          </button>
+        </nav>
+
+        {tab === "images" ? (
+          <CardImagesManager />
+        ) : (
+          <>
         {error ? (
           <div className="admin-card" style={{ marginBottom: "1rem" }}>
             <p className="admin-err" style={{ margin: 0 }}>
@@ -1653,8 +1679,6 @@ export function AdminPage() {
               </div>
             </section>
 
-            <CardImagesManager />
-
             <ReportsReview />
 
             <CommunitiesReview />
@@ -1760,6 +1784,8 @@ export function AdminPage() {
             </section>
           </>
         ) : null}
+          </>
+        )}
       </div>
       {selectedUserId && (
         <AdminUserDetailModal userId={selectedUserId} onClose={() => setSelectedUserId(null)} />
