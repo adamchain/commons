@@ -28,7 +28,6 @@ import { formatPlanDate, formatPlanWhenLine } from "../lib/format";
 import { isIdeaPlan } from "../lib/planTime";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import {
-  communityCategoryLine,
   INTEREST_LABELS,
   type CommunityCardDTO,
   type InterestTag,
@@ -107,6 +106,7 @@ export function ProfilePage() {
   const [profile, setProfile] = useState<ProfilePayload | null>(null);
   const [network, setNetwork] = useState<PublicUser[] | null>(null);
   const [communities, setCommunities] = useState<CommunityCardDTO[]>([]);
+  const [communitiesExpanded, setCommunitiesExpanded] = useState(false);
   const [plansView, setPlansView] = useState<"list" | "calendar">("list");
   const [actionSheetOpen, setActionSheetOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -118,6 +118,7 @@ export function ProfilePage() {
   useEffect(() => {
     reloadProfile();
     setPlansView("list");
+    setCommunitiesExpanded(false);
   }, [userId, location.pathname, location.key]);
 
   // Refetch when returning to the tab so joins show up without a hard reload.
@@ -184,10 +185,10 @@ export function ProfilePage() {
   }
 
   const displayName = [profile.user.firstName, profile.user.lastName].filter(Boolean).join(" ") || "Unnamed";
+  const visibleCommunities = communitiesExpanded ? communities : communities.slice(0, 3);
+  const hiddenCommunityCount = Math.max(0, communities.length - visibleCommunities.length);
   const firstName = profile.user.firstName || "them";
-  const locationLabel = profile.neighborhood
-    ? [profile.neighborhood.name, profile.neighborhood.metro].filter(Boolean).join(" · ")
-    : null;
+  const locationLabel = profile.neighborhood?.name ?? null;
 
   async function shareProfile() {
     const url = `${window.location.origin}/profile/${userId}`;
@@ -259,7 +260,6 @@ export function ProfilePage() {
         <OtherProfileNav
           backLabel={backLabel}
           onBack={goBack}
-          title={profile.user.firstName || displayName}
           onMore={() => setActionSheetOpen(true)}
         />
 
@@ -279,16 +279,15 @@ export function ProfilePage() {
               <div className="profile-other-name">{displayName}</div>
               {locationLabel && (
                 <div className="profile-other-location">
-                  <MapPin size={11} strokeWidth={1.8} aria-hidden="true" />
+                  <MapPin size={12} strokeWidth={2.2} fill="currentColor" aria-hidden="true" />
                   {locationLabel}
                 </div>
               )}
               <div className="profile-other-stats" aria-label="Profile stats">
                 <div className="profile-other-stat">
                   <span className="profile-other-stat-num">{profile.stats.hosted}</span>
-                  <span className="profile-other-stat-label">Made</span>
+                  <span className="profile-other-stat-label">Started</span>
                 </div>
-                <span className="profile-other-stat-divider" aria-hidden="true" />
                 <div className="profile-other-stat">
                   <span className="profile-other-stat-num">{profile.stats.joined}</span>
                   <span className="profile-other-stat-label">Joined</span>
@@ -297,51 +296,35 @@ export function ProfilePage() {
             </div>
           </div>
 
+          {profile.user.bio && <p className="profile-other-bio">{profile.user.bio}</p>}
+
           <div className="profile-other-ctas">
             {!profile.network.inMyNetwork && (
               <FriendButton profile={profile} onUpdated={reloadProfile} variant="other" />
             )}
-            <Link
-              to={`/plans/new?inviteUser=${encodeURIComponent(profile.user.id)}&inviteName=${encodeURIComponent(profile.user.firstName)}`}
-              className="profile-other-cta profile-other-cta--primary"
-            >
-              <CalendarPlus size={13} strokeWidth={1.8} aria-hidden="true" />
-              Make a Plan
-            </Link>
-            {profile.sharedPlanId && (
-              <Link
-                to={`/plans/${profile.sharedPlanId}/chat`}
-                state={{ from: "profile", profileUserId: userId }}
-                className="profile-other-cta profile-other-cta--message"
-              >
-                <MessageCircle size={13} strokeWidth={1.8} aria-hidden="true" />
-                Message
-              </Link>
-            )}
+            <OtherMessageButton sharedPlanId={profile.sharedPlanId} profileUserId={userId} />
           </div>
-
-          {profile.network.mutualCount > 0 && mutualLabel && (
-            <div className="profile-other-mutuals">
-              <div className="profile-other-mutuals-avatars">
-                {mutuals.map((u) => (
-                  <span key={u.id} className="profile-other-mutuals-avatar">
-                    <Avatar
-                      seed={u.avatarSeed}
-                      style={u.avatarStyle}
-                      photoDataUrl={u.avatarPhotoDataUrl}
-                      params={u.avatarParams}
-                      name={u.firstName}
-                      size="sm"
-                    />
-                  </span>
-                ))}
-              </div>
-              <span className="profile-other-mutuals-text">{mutualLabel}</span>
-            </div>
-          )}
         </section>
 
-        <div className="profile-other-divider" />
+        {profile.network.mutualCount > 0 && mutualLabel && (
+          <div className="profile-other-mutuals">
+            <div className="profile-other-mutuals-avatars">
+              {mutuals.map((u) => (
+                <span key={u.id} className="profile-other-mutuals-avatar">
+                  <Avatar
+                    seed={u.avatarSeed}
+                    style={u.avatarStyle}
+                    photoDataUrl={u.avatarPhotoDataUrl}
+                    params={u.avatarParams}
+                    name={u.firstName}
+                    size="sm"
+                  />
+                </span>
+              ))}
+            </div>
+            <span className="profile-other-mutuals-text">{mutualLabel}</span>
+          </div>
+        )}
 
         {profile.plansGated ? (
           <section className="profile-other-section">
@@ -350,35 +333,10 @@ export function ProfilePage() {
               You&apos;re on this one together. The rest of their calendar takes a connection.
             </p>
             {profile.upcoming.length > 0 && (
-              <div className="profile-other-plans" style={{ marginTop: 12 }}>
-                {profile.upcoming.map((p) => {
-                  const going = p.participants.going.length;
-                  return (
-                    <Link
-                      key={p.id}
-                      to={`/plans/${p.id}`}
-                      state={{ from: "profile", profileUserId: userId }}
-                      className="profile-other-plan-card"
-                    >
-                      <PlanCoverThumb
-                        planId={p.id}
-                        flyerDataUrl={planPhotoUrl(p)}
-                        isIdea={isIdeaPlan(p)}
-                        className="cover-thumb--sm"
-                      />
-                      <span className="profile-other-plan-text">
-                        <span className="profile-other-plan-title">{p.title}</span>
-                        <span className="profile-other-plan-meta">
-                          {formatPlanWhenLine(p.date, p.time, p.isFlexibleTime, {
-                            isFlexibleDate: p.isFlexibleDate,
-                            isThisWeek: p.isThisWeek,
-                          })}
-                          {going > 0 ? ` · ${going} going` : ""}
-                        </span>
-                      </span>
-                    </Link>
-                  );
-                })}
+              <div className="profile-other-plans">
+                {profile.upcoming.map((p) => (
+                  <OtherPlanRow key={p.id} plan={p} profileUserId={userId} />
+                ))}
               </div>
             )}
           </section>
@@ -391,64 +349,31 @@ export function ProfilePage() {
               </span>
             </div>
             <div className="profile-other-plans">
-              {profile.upcoming.map((p) => {
-                const going = p.participants.going.length;
-                return (
-                  <Link
-                    key={p.id}
-                    to={`/plans/${p.id}`}
-                    state={{ from: "profile", profileUserId: userId }}
-                    className="profile-other-plan-card"
-                  >
-                    <PlanCoverThumb
-                      planId={p.id}
-                      flyerDataUrl={planPhotoUrl(p)}
-                      isIdea={isIdeaPlan(p)}
-                      className="cover-thumb--sm"
-                    />
-                    <span className="profile-other-plan-body">
-                      <span className="profile-other-plan-title">{p.title}</span>
-                      <span className="profile-other-plan-date">
-                        {formatPlanWhenLine(p.date, p.time, p.isFlexibleTime, {
-                          isFlexibleDate: p.isFlexibleDate,
-                          isThisWeek: p.isThisWeek,
-                        })}
-                      </span>
-                    </span>
-                    <span className="profile-other-plan-going">
-                      <Users size={11} strokeWidth={1.8} aria-hidden="true" />
-                      {going}
-                    </span>
-                  </Link>
-                );
-              })}
+              {profile.upcoming.map((p) => (
+                <OtherPlanRow key={p.id} plan={p} profileUserId={userId} />
+              ))}
             </div>
           </section>
         ) : null}
 
         {profile.interests.length > 0 && (
-          <>
-            <div className="profile-other-divider" />
-            <section className="profile-other-section">
-              <h3 className="profile-other-section-label">Interests</h3>
-              <div className="profile-interests">
-                {profile.interests.map((t) => (
-                  <span key={t} className="profile-interest-chip">
-                    {INTEREST_LABELS[t]}
-                  </span>
-                ))}
-              </div>
-            </section>
-          </>
+          <section className="profile-other-section">
+            <h3 className="profile-other-section-label">Interests</h3>
+            <div className="profile-interests">
+              {profile.interests.map((t) => (
+                <span key={t} className="profile-interest-chip">
+                  {INTEREST_LABELS[t]}
+                </span>
+              ))}
+            </div>
+          </section>
         )}
 
         {communities.length > 0 && (
-          <>
-            <div className="profile-other-divider" />
-            <section className="profile-other-section">
-              <h3 className="profile-other-section-label">Communities</h3>
+          <section className="profile-other-section">
+            <h3 className="profile-other-section-label">Communities</h3>
               <div className="profile-other-communities">
-                {communities.map((c) => (
+                {visibleCommunities.map((c) => (
                     <Link key={c.id} to={`/communities/${c.id}`} className="profile-other-community-row">
                       <CommunityCoverThumb
                         coverImage={c.coverImage}
@@ -457,19 +382,26 @@ export function ProfilePage() {
                       />
                       <span className="profile-other-community-info">
                         <span className="profile-other-community-name">{c.name}</span>
-                        <span className="profile-other-community-meta">
-                          {c.myRole === "organizer" ? "Organizer · " : ""}
-                          {communityCategoryLine(c)} · {c.memberCount}{" "}
-                          {c.memberCount === 1 ? "member" : "members"}
-                        </span>
                       </span>
-                      <CommunityStatusPill status={c.myMembershipStatus} />
+                      {c.myRole === "organizer" && <span className="profile-community-tag">Organizer</span>}
+                      {c.myMembershipStatus === "pending" && (
+                        <CommunityStatusPill status={c.myMembershipStatus} />
+                      )}
                       <ChevronRight size={13} strokeWidth={1.6} className="profile-other-community-chevron" aria-hidden="true" />
                     </Link>
                 ))}
+                {hiddenCommunityCount > 0 && (
+                  <button type="button" className="profile-show-more-row" onClick={() => setCommunitiesExpanded(true)}>
+                    Show {hiddenCommunityCount} more
+                  </button>
+                )}
+                {communitiesExpanded && communities.length > 3 && (
+                  <button type="button" className="profile-show-more-row" onClick={() => setCommunitiesExpanded(false)}>
+                    Show less
+                  </button>
+                )}
               </div>
             </section>
-          </>
         )}
 
         {actionSheetOpen && (
@@ -477,6 +409,12 @@ export function ProfilePage() {
             firstName={firstName}
             inNetwork={profile.network.inMyNetwork}
             onShare={() => void shareProfile()}
+            onMakePlan={() => {
+              setActionSheetOpen(false);
+              navigate(
+                `/plans/new?inviteUser=${encodeURIComponent(profile.user.id)}&inviteName=${encodeURIComponent(profile.user.firstName)}`,
+              );
+            }}
             onReport={() => void reportProfile()}
             onRemoveFromNetwork={() => void removeFromNetwork()}
             onBlock={blockFromSheet}
@@ -524,9 +462,6 @@ export function ProfilePage() {
                 {profile.neighborhood.name}
               </div>
             )}
-            {profile.user.bio && (
-              <p className="profile-bio">{profile.user.bio}</p>
-            )}
             <div className="profile-hero-stats-row">
               <div className="profile-stats profile-stats--inline" aria-label="Profile stats">
                 <div className="profile-stat">
@@ -545,21 +480,20 @@ export function ProfilePage() {
             </div>
           </div>
         </div>
+        {profile.user.bio && <p className="profile-bio">{profile.user.bio}</p>}
         <SocialPills
           isSelf
           instagram={profile.socialLinks?.instagram}
           tiktok={profile.socialLinks?.tiktok}
           onEdit={() => navigate(`/profile/${userId}/edit`)}
         />
-
-        <div className="profile-divider" />
       </section>
 
       <section className="profile-block" id="profile-communities">
         <h3 className="profile-section-label">Communities</h3>
         {communities.length > 0 ? (
           <div className="profile-plan-card">
-            {communities.map((c) => (
+            {visibleCommunities.map((c) => (
                 <Link key={c.id} to={`/communities/${c.id}`} className="profile-community-row">
                   <CommunityCoverThumb
                     coverImage={c.coverImage}
@@ -568,18 +502,24 @@ export function ProfilePage() {
                   />
                   <span className="profile-community-info">
                     <span className="profile-community-name">{c.name}</span>
-                    <span className="profile-community-meta">
-                      {c.myRole === "organizer" ? "Organizer · " : ""}
-                      {communityCategoryLine(c)} · {c.memberCount}{" "}
-                      {c.memberCount === 1 ? "member" : "members"}
-                    </span>
                   </span>
+                  {c.myRole === "organizer" && <span className="profile-community-tag">Organizer</span>}
                   {c.myMembershipStatus === "pending" && (
                     <CommunityStatusPill status={c.myMembershipStatus} />
                   )}
                   <ChevronRight size={16} strokeWidth={1.6} className="profile-community-chevron" aria-hidden="true" />
                 </Link>
             ))}
+            {hiddenCommunityCount > 0 && (
+              <button type="button" className="profile-show-more-row" onClick={() => setCommunitiesExpanded(true)}>
+                Show {hiddenCommunityCount} more
+              </button>
+            )}
+            {communitiesExpanded && communities.length > 3 && (
+              <button type="button" className="profile-show-more-row" onClick={() => setCommunitiesExpanded(false)}>
+                Show less
+              </button>
+            )}
           </div>
         ) : (
           <p className="profile-community-meta">Join a community and it’ll show up here.</p>
@@ -656,6 +596,65 @@ function OtherProfileNav({
   );
 }
 
+function OtherMessageButton({
+  sharedPlanId,
+  profileUserId,
+}: {
+  sharedPlanId: string | null;
+  profileUserId: string;
+}) {
+  const inner = (
+    <>
+      <MessageCircle size={15} strokeWidth={1.8} aria-hidden="true" />
+      Message
+    </>
+  );
+  if (!sharedPlanId) {
+    return (
+      <button type="button" className="profile-other-cta profile-other-cta--message" disabled>
+        {inner}
+      </button>
+    );
+  }
+  return (
+    <Link
+      to={`/plans/${sharedPlanId}/chat`}
+      state={{ from: "profile", profileUserId }}
+      className="profile-other-cta profile-other-cta--message"
+    >
+      {inner}
+    </Link>
+  );
+}
+
+function OtherPlanRow({ plan, profileUserId }: { plan: PlanDTO; profileUserId: string }) {
+  const going = plan.participants.going.length;
+  return (
+    <Link
+      to={`/plans/${plan.id}`}
+      state={{ from: "profile", profileUserId }}
+      className="profile-other-plan-card"
+    >
+      <span className="profile-other-plan-icon" aria-hidden="true">
+        {plan.hostEmoji || "✨"}
+      </span>
+      <span className="profile-other-plan-body">
+        <span className="profile-other-plan-title">{plan.title}</span>
+        <span className="profile-other-plan-date">
+          {formatPlanWhenLine(plan.date, plan.time, plan.isFlexibleTime, {
+            isFlexibleDate: plan.isFlexibleDate,
+            isThisWeek: plan.isThisWeek,
+          })}
+        </span>
+      </span>
+      <span className="profile-other-plan-going">
+        <Users size={12} strokeWidth={1.8} aria-hidden="true" />
+        {going}
+      </span>
+    </Link>
+  );
+}
+
 /** Bottom sheet portaled to body. Dismiss on a new pointerdown on the backdrop
  *  — not click — so iOS's delayed click from the opening ••• tap can't close it.
  *  Block confirmation stays in this sheet: native `window.confirm` freezes the
@@ -664,6 +663,7 @@ function ProfileActionSheet({
   firstName,
   inNetwork,
   onShare,
+  onMakePlan,
   onReport,
   onRemoveFromNetwork,
   onBlock,
@@ -672,6 +672,7 @@ function ProfileActionSheet({
   firstName: string;
   inNetwork: boolean;
   onShare: () => void;
+  onMakePlan: () => void;
   onReport: () => void;
   onRemoveFromNetwork: () => void;
   onBlock: () => Promise<void>;
@@ -732,6 +733,10 @@ function ProfileActionSheet({
             <button type="button" className="profile-action-row" onClick={onShare}>
               <Share2 size={16} strokeWidth={1.8} aria-hidden="true" />
               Share profile
+            </button>
+            <button type="button" className="profile-action-row" onClick={onMakePlan}>
+              <CalendarPlus size={16} strokeWidth={1.8} aria-hidden="true" />
+              Make a plan
             </button>
             {inNetwork && (
               <button type="button" className="profile-action-row" onClick={onRemoveFromNetwork}>

@@ -689,20 +689,26 @@ authRouter.get("/network", requireAuth, async (req, res) => {
     return;
   }
   const ids = viewer.networkIds ?? [];
+  const viewerNetwork = new Set(ids);
   const users = ids
     .map((id) => store.findUserById(id))
     .filter((u): u is UserRecord => !!u)
     .filter((u) => !store.isBlockedEitherWay(userId, u.id))
-    .map((u) => ({
-      id: u.id,
-      firstName: u.firstName,
-      lastName: u.lastName,
-      neighborhoodId: u.neighborhoodId ?? null,
-      avatarSeed: u.avatarSeed,
-      avatarStyle: u.avatarStyle,
-      avatarPhotoDataUrl: u.avatarPhotoDataUrl,
-      avatarParams: u.avatarParams,
-    }));
+    .map((u) => {
+      const hoodId = u.neighborhoodId ?? u.neighborhoodIds?.[0] ?? null;
+      return {
+        id: u.id,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        neighborhoodId: u.neighborhoodId ?? null,
+        avatarSeed: u.avatarSeed,
+        avatarStyle: u.avatarStyle,
+        avatarPhotoDataUrl: u.avatarPhotoDataUrl,
+        avatarParams: u.avatarParams,
+        neighborhoodName: hoodId ? (store.findNeighborhoodById(hoodId)?.name ?? null) : null,
+        mutualCount: (u.networkIds ?? []).filter((id) => viewerNetwork.has(id)).length,
+      };
+    });
   res.json({ users });
 });
 

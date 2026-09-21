@@ -1,96 +1,196 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Users } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
-import { LoadingScreen } from "../components/LoadingScreen";
-import { EmptyCard, ScreenTitle } from "../components/ui";
-import { useAuth } from "../context/AuthContext";
-import type { PublicUser } from "../types/shared";
+import { ScreenTitle } from "../components/ui";
+import type { NetworkLinkStatus, PersonSearchResultDTO, PublicUser, SearchResultsDTO } from "../types/shared";
 
+const DEBOUNCE_MS = 300;
+
+type NetworkMember = PublicUser & {
+  neighborhoodName?: string | null;
+  mutualCount?: number;
+};
+
+type Row = {
+  user: PublicUser;
+  neighborhoodName: string | null;
+  mutualCount: number;
+  networkStatus: NetworkLinkStatus;
+};
+
+/**
+ * People you know, plus a name search that can connect with anyone
+ * discoverable in the city.
+ */
 export function NetworkPage() {
-  const { user } = useAuth();
-  const [network, setNetwork] = useState<PublicUser[] | null>(null);
+  const [network, setNetwork] = useState<NetworkMember[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [query, setQuery] = useState("");
+  const [results, setResults] = useState<PersonSearchResultDTO[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [overrides, setOverrides] = useState<Record<string, NetworkLinkStatus>>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    void api<{ users: PublicUser[] }>("/api/auth/network")
+    void api<{ users: NetworkMember[] }>("/api/auth/network")
       .then((r) => setNetwork(r.users))
-      .catch(() => setNetwork([]));
+      .catch(() => setNetwork([]))
+      .finally(() => setLoaded(true));
   }, []);
 
-  const filtered = useMemo(() => {
-    if (!network) return [];
-    const q = query.trim().toLowerCase();
-    if (!q) return network;
-    return network.filter((u) => {
-      const full = [u.firstName, u.lastName].filter(Boolean).join(" ").toLowerCase();
-      return full.includes(q) || u.firstName.toLowerCase().includes(q);
-    });
-  }, [network, query]);
+  const trimmed = query.trim();
 
-  if (network === null) return <LoadingScreen tagline="Loading network" />;
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!trimmed) {
+      setResults(null);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    debounceRef.current = setTimeout(() => {
+      void api<SearchResultsDTO>(`/api/search?q=${encodeURIComponent(trimmed)}`)
+        .then((r) => setResults(r.people))
+        .catch(() => setResults([]))
+        .finally(() => setSearching(false));
+    }, DEBOUNCE_MS);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [trimmed]);
+
+  const rows: Row[] = trimmed
+    ? (results ?? []).map((p) => ({
+        user: p.user,
+        neighborhoodName: p.neighborhoodName,
+        mutualCount: p.mutualCount,
+        networkStatus: overrides[p.user.id] ?? p.networkStatus,
+      }))
+    : network.map((u) => ({
+        user: u,
+        neighborhoodName: u.neighborhoodName ?? null,
+        mutualCount: u.mutualCount ?? 0,
+        networkStatus: "connected" as const,
+      }));
+
+  async function connect(userId: string) {
+    setBusyId(userId);
+    try {
+      const r = await api<{ status?: string }>(`/api/auth/friend-add`, {
+        method: "POST",
+        body: JSON.stringify({ userId }),
+      });
+      setOverrides((prev) => ({
+        ...prev,
+        [userId]: r.status === "connected" ? "connected" : "pending",
+      }));
+    } catch {
+      /* leave the button as Connect */
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   return (
-    <main className="app-shell app-shell--with-nav app-shell--with-topbar">
-      <header className="app-header app-header--minimal">
-        <Link to={user ? `/profile/${user.id}` : "/"} className="detail-back">
-          <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" /> Profile
-        </Link>
-      </header>
-      <ScreenTitle
-        title="Network"
-        subtitle={`${network.length} ${network.length === 1 ? "person" : "people"} you've added`}
-      />
+    <main className="page network-page">
+      <ScreenTitle title="My network" subtitle="People you know in Philadelphia." />
 
-      {network.length > 0 && (
-        <div className="network-search-wrap">
-          <SearchIcon />
-          <input
-            type="search"
-            className="network-search-input"
-            placeholder="Search by name"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search your network by name"
-          />
-        </div>
+      <div className="network-search-wrap">
+        <SearchIcon />
+        <input
+          className="network-search-input"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search people"
+          aria-label="Search people"
+          enterKeyHint="search"
+        />
+        {query && (
+          <button type="button" className="network-search-clear" onClick={() => setQuery("")} aria-label="Clear search">
+            ×
+          </button>
+        )}
+      </div>
+
+      {trimmed && (
+        <p className="network-results-label">Results for “{trimmed}”</p>
       )}
 
-      {network.length === 0 ? (
-        <EmptyCard
-          icon={<Users size={22} strokeWidth={1.6} color="#3A6A3A" />}
-          tint="#C8DDC8"
-          title="It's just you for now."
-          body="Meet people at plans, or skip ahead and invite a friend."
-          cta={{ to: "/invite", label: "Invite friends →" }}
-        />
-      ) : filtered.length === 0 ? (
-        <p className="form-help">Nobody by that name.</p>
-      ) : (
-        <div className="profile-network-list">
-          {filtered.map((u) => (
-            <Link
-              key={u.id}
-              to={`/profile/${u.id}`}
-              state={{ from: "network" }}
-              className="profile-network-row"
-              aria-label={`Open ${u.firstName}'s profile`}
-            >
-              <Avatar
-                seed={u.avatarSeed}
-                style={u.avatarStyle}
-                photoDataUrl={u.avatarPhotoDataUrl}
-                params={u.avatarParams}
-                name={u.firstName}
-                size="md"
-              />
-              <span className="profile-network-name">{u.firstName}</span>
-            </Link>
+      {rows.length > 0 ? (
+        <div className="network-card">
+          {rows.map((row) => (
+            <NetworkRow
+              key={row.user.id}
+              row={row}
+              busy={busyId === row.user.id}
+              onConnect={() => void connect(row.user.id)}
+            />
           ))}
         </div>
+      ) : (
+        loaded &&
+        !searching && (
+          <p className="network-empty">{trimmed ? "Nobody by that name." : "It's just you for now."}</p>
+        )
       )}
+
+      <p className="network-invite">
+        Not finding someone? <Link to="/invite">Invite them →</Link>
+      </p>
     </main>
+  );
+}
+
+function NetworkRow({
+  row,
+  busy,
+  onConnect,
+}: {
+  row: Row;
+  busy: boolean;
+  onConnect: () => void;
+}) {
+  const { user, neighborhoodName, mutualCount, networkStatus } = row;
+  const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || "Friend";
+  const meta = [
+    neighborhoodName,
+    mutualCount > 0 ? `${mutualCount} mutual` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <div className="network-row">
+      <Link to={`/profile/${user.id}`} state={{ from: "profile" }} className="network-row-main">
+        <Avatar
+          seed={user.avatarSeed}
+          style={user.avatarStyle}
+          photoDataUrl={user.avatarPhotoDataUrl}
+          params={user.avatarParams}
+          name={user.firstName}
+          size="md"
+        />
+        <span className="network-row-copy">
+          <span className="network-row-name">{name}</span>
+          {meta && <span className="network-row-meta">{meta}</span>}
+        </span>
+      </Link>
+      {networkStatus === "connected" ? (
+        <Link to={`/profile/${user.id}`} state={{ from: "profile" }} className="network-action network-action--primary">
+          Message
+        </Link>
+      ) : networkStatus === "pending" ? (
+        <button type="button" className="network-action network-action--pending" disabled>
+          Pending
+        </button>
+      ) : (
+        <button type="button" className="network-action network-action--primary" onClick={onConnect} disabled={busy}>
+          {busy ? "…" : "Connect"}
+        </button>
+      )}
+    </div>
   );
 }
 

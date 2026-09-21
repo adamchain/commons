@@ -119,14 +119,19 @@ searchRouter.get("/", requireAuth, async (req, res) => {
     const fullName = `${u.firstName} ${u.lastName ?? ""}`.trim().toLowerCase();
     return fullName.includes(q) || u.firstName.toLowerCase().includes(q);
   });
+  const viewerNetwork = new Set(me.networkIds ?? []);
   const people: PersonSearchResultDTO[] = peopleCandidates.slice(0, PEOPLE_LIMIT).map((u) => {
     const theirPlanIds = planIdsForUser(u.id);
     let shared = 0;
     for (const id of myPlanIds) if (theirPlanIds.has(id)) shared++;
+    const inNetwork = viewerNetwork.has(u.id);
+    const requestSent = (u.incomingNetworkRequests ?? []).includes(userId);
     return {
       user: userToPublic(u),
       neighborhoodName: myHoodName(u),
       sharedPlansCount: shared,
+      networkStatus: inNetwork ? "connected" : requestSent ? "pending" : "none",
+      mutualCount: (u.networkIds ?? []).filter((id) => viewerNetwork.has(id)).length,
     };
   });
   // Most shared history first, then alphabetical.

@@ -842,12 +842,19 @@ export interface AdminForumPostDTO {
 
 // ---- Search ----
 
+/** How the signed-in user is linked to someone in search or on My Network. */
+export type NetworkLinkStatus = "connected" | "pending" | "none";
+
 /** A person result on the /search page. */
 export interface PersonSearchResultDTO {
   user: PublicUser;
   neighborhoodName: string | null;
   /** Count of plans the viewer and this person have both been part of (hosted or joined). */
   sharedPlansCount: number;
+  /** Connected, an outgoing request, or no link yet. */
+  networkStatus: NetworkLinkStatus;
+  /** People who are in both networks. */
+  mutualCount: number;
 }
 
 export interface SearchResultsDTO {
