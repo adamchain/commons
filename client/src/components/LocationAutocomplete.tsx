@@ -192,6 +192,11 @@ export function LocationAutocomplete({
               key={`${s.name}-${idx}`}
               type="button"
               className="location-suggestion"
+              onPointerDown={(e) => {
+                // Keep the field focused so the menu isn't clipped or dismissed
+                // before the tap lands — otherwise the row below swallows it.
+                e.preventDefault();
+              }}
               onClick={() => void pick(s)}
             >
               <div className="location-suggestion-name">{s.name}</div>

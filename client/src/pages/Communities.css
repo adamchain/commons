@@ -1624,9 +1624,18 @@ button.cmy-joined-pill {
   opacity: 0.4;
   cursor: not-allowed;
 }
-.cmy-create-city-row {
+.cmy-create .luma-card.cmy-create-city-row {
   gap: 10px;
   justify-content: flex-start;
+  /* Beat .luma-card's overflow:hidden. The venue menu hangs past this row;
+     clipping it makes a tap land on Visibility instead of a result. */
+  overflow: visible;
+  position: relative;
+  z-index: 4;
+}
+.cmy-create .luma-card.cmy-create-city-row:focus-within {
+  overflow: visible;
+  z-index: 80;
 }
 .cmy-create-city-row svg {
   color: var(--muted);
@@ -1635,12 +1644,14 @@ button.cmy-joined-pill {
 .cmy-create-city-row .location-autocomplete {
   flex: 1;
   min-width: 0;
+  /* Position the menu against the card, not the short input. */
+  position: static;
 }
 .cmy-create-city-row .location-autocomplete input {
   border: none;
   background: transparent;
-  padding: 0;
-  min-height: 0;
+  padding: 2px 0;
+  min-height: 24px;
   border-radius: 0;
   box-shadow: none;
   font-weight: 600;
@@ -1656,9 +1667,9 @@ button.cmy-joined-pill {
   box-shadow: none;
 }
 .cmy-create-city-row .location-suggestions {
+  left: 8px;
+  right: 8px;
   z-index: 80;
-  left: -42px;
-  right: -16px;
 }
 .cmy-create-vis-row {
   align-items: center;
