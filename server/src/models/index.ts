@@ -296,6 +296,17 @@ const CommunitySchema = new Schema<CommunityRecord>(
     id: { type: String, required: true },
     name: { type: String, required: true },
     description: { type: String, default: "" },
+    socialLinks: {
+      type: new Schema(
+        {
+          instagram: { type: String },
+          tiktok: { type: String },
+          linktree: { type: String },
+        },
+        { _id: false },
+      ),
+      default: undefined,
+    },
     coverImage: { type: String, default: null },
     category: {
       type: String,

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Calendar, MessageCircle, Users } from "lucide-react";
+import { Calendar, MessageCircle, Share2, Users } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
@@ -22,6 +22,7 @@ import {
   type CommunityMemberDTO,
   type CommunityPostDTO,
   type CommunityPostingPermission,
+  type CommunitySocialLinks,
   type PersonSearchResultDTO,
   type PlanDTO,
   type SearchResultsDTO,
@@ -57,6 +58,10 @@ export function CommunityDetailPage() {
   const [notFound, setNotFound] = useState(false);
   const [tab, setTab] = useState<Tab>(() => tabFromParam(searchParams.get("tab")) ?? "bulletin");
   const [joinConfirm, setJoinConfirm] = useState(false);
+  const [editSocials, setEditSocials] = useState(false);
+  const [leaveBusy, setLeaveBusy] = useState(false);
+  const [leaveErr, setLeaveErr] = useState<string | null>(null);
+  const [shareMsg, setShareMsg] = useState<string | null>(null);
 
   const loadMembers = useCallback(async () => {
     try {
@@ -127,6 +132,39 @@ export function CommunityDetailPage() {
   const canPostBulletin = community.canPostBulletin && (isActiveMember || community.isOrganizer);
   const canPostPlan = community.canPostPlan && (isActiveMember || community.isOrganizer);
   const canManage = community.isOrganizer;
+  const canLeave =
+    community.creationStatus === "approved" && isActiveMember && !community.isOrganizer;
+  const canShare = community.creationStatus === "approved";
+
+  async function leaveCommunity() {
+    if (leaveBusy || !canLeave) return;
+    setLeaveBusy(true);
+    setLeaveErr(null);
+    try {
+      const updated = await api<CommunityDTO>(`/api/communities/${id}/leave`, { method: "POST" });
+      setCommunity(updated);
+      await load();
+    } catch (e) {
+      setLeaveErr(parseApiError(e));
+    } finally {
+      setLeaveBusy(false);
+    }
+  }
+
+  async function shareCommunity() {
+    const url = `${window.location.origin}/communities/${community.id}`;
+    try {
+      if (typeof navigator.share === "function") {
+        await navigator.share({ title: community.name, text: `Join ${community.name} on COMMONS`, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setShareMsg("Link copied.");
+        window.setTimeout(() => setShareMsg(null), 2500);
+      }
+    } catch {
+      /* user cancelled share sheet */
+    }
+  }
 
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy">
@@ -159,7 +197,33 @@ export function CommunityDetailPage() {
           >
             ←
           </button>
-          {community.isFounding && <span className="cmy-cover-founding">Founding</span>}
+          {(community.isFounding || canLeave || canShare) && (
+            <div className="cmy-cover-actions">
+              {community.isFounding && <span className="cmy-cover-founding">Founding</span>}
+              {canLeave && (
+                <button
+                  type="button"
+                  className="cmy-cover-leave"
+                  disabled={leaveBusy}
+                  onClick={() => void leaveCommunity()}
+                >
+                  {leaveBusy ? "Leaving…" : "Leave"}
+                </button>
+              )}
+              {canShare && (
+                <button
+                  type="button"
+                  className="cmy-cover-share"
+                  aria-label={shareMsg ?? "Share"}
+                  onClick={() => void shareCommunity()}
+                >
+                  <Share2 size={18} strokeWidth={2} aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          )}
+          {leaveErr && <p className="cmy-cover-note">{leaveErr}</p>}
+          {shareMsg && <p className="cmy-cover-note">{shareMsg}</p>}
           <div className="cmy-cover-overlay">
             <div className="cmy-cover-kicker">{placeLabel}</div>
             <h1 className="cmy-name">{community.name}</h1>
@@ -212,6 +276,14 @@ export function CommunityDetailPage() {
               <p className="cmy-desc">{community.description}</p>
             </div>
           )}
+          <CommunitySocialPills
+            isOrganizer={community.isOrganizer}
+            links={community.socialLinks}
+            onEdit={() => {
+              setEditSocials(true);
+              setTab("settings");
+            }}
+          />
         </div>
       </header>
 
@@ -284,6 +356,8 @@ export function CommunityDetailPage() {
           community={community}
           members={members}
           pendingMembers={pendingMembers}
+          startOnAbout={editSocials}
+          onAboutOpened={() => setEditSocials(false)}
           onSaved={setCommunity}
           onRequestsChange={load}
           onLeft={() => navigate("/communities")}
@@ -520,7 +594,7 @@ function JoinControl({
   if (status === "active") {
     return (
       <div className="cmy-join-row">
-        <span className="cmy-joined-pill cmy-joined-pill--quiet">Joined</span>
+        <span className="cmy-joined-pill cmy-joined-pill--member">Joined</span>
         {!compact && !community.isOrganizer && (
           <button type="button" className="cmy-btn cmy-btn--ghost cmy-btn--sm" disabled={busy} onClick={() => void doLeave()}>
             {busy ? "Leaving…" : "Leave"}
@@ -951,7 +1025,6 @@ function MembersTab({
   const [addResults, setAddResults] = useState<PersonSearchResultDTO[]>([]);
   const [addBusy, setAddBusy] = useState(false);
   const [addErr, setAddErr] = useState<string | null>(null);
-  const [shareMsg, setShareMsg] = useState<string | null>(null);
   const addDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -990,21 +1063,6 @@ function MembersTab({
     }
   }
 
-  async function shareCommunity() {
-    const url = `${window.location.origin}/communities/${community.id}`;
-    try {
-      if (typeof navigator.share === "function") {
-        await navigator.share({ title: community.name, text: `Join ${community.name} on COMMONS`, url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        setShareMsg("Link copied.");
-        setTimeout(() => setShareMsg(null), 2500);
-      }
-    } catch {
-      /* user cancelled share sheet */
-    }
-  }
-
   async function remove(userId: string) {
     if (!canManage) return;
     await api(`/api/communities/${community.id}/members/${userId}`, { method: "DELETE" });
@@ -1013,15 +1071,6 @@ function MembersTab({
 
   return (
     <section className="cmy-tabpanel">
-      {canManage && community.creationStatus === "approved" && (
-        <div className="cmy-members-tools">
-          <button type="button" className="cmy-btn cmy-btn--ghost cmy-btn--sm" onClick={() => void shareCommunity()}>
-            Share community
-          </button>
-          {shareMsg && <span className="cmy-saved">{shareMsg}</span>}
-        </div>
-      )}
-
       {canManage && (
         <div className="cmy-add-member">
           {addErr && <p className="cmy-err">{addErr}</p>}
@@ -1107,10 +1156,106 @@ function MembersTab({
   );
 }
 
+function CommunitySocialPills({
+  isOrganizer,
+  links,
+  onEdit,
+}: {
+  isOrganizer: boolean;
+  links?: CommunitySocialLinks | null;
+  onEdit: () => void;
+}) {
+  const items = [
+    {
+      key: "instagram",
+      label: "Instagram",
+      handle: links?.instagram,
+      href: (h: string) => `https://instagram.com/${encodeURIComponent(h)}`,
+      Icon: InstagramGlyph,
+    },
+    {
+      key: "tiktok",
+      label: "TikTok",
+      handle: links?.tiktok,
+      href: (h: string) => `https://www.tiktok.com/@${encodeURIComponent(h)}`,
+      Icon: TikTokGlyph,
+    },
+    {
+      key: "linktree",
+      label: "Linktree",
+      handle: links?.linktree,
+      href: (h: string) => `https://linktr.ee/${encodeURIComponent(h)}`,
+      Icon: LinktreeGlyph,
+    },
+  ];
+  const visible = isOrganizer ? items : items.filter((it) => it.handle);
+  if (visible.length === 0) return null;
+
+  return (
+    <div className="cmy-socials">
+      {visible.map(({ key, label, handle, href, Icon }) =>
+        handle ? (
+          <a
+            key={key}
+            className={`social-pill social-pill--${key} is-active`}
+            href={href(handle)}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`@${handle} on ${label}`}
+          >
+            <Icon />
+          </a>
+        ) : (
+          <button
+            key={key}
+            type="button"
+            className={`social-pill social-pill--${key} is-empty`}
+            onClick={onEdit}
+            aria-label={`Add ${label}`}
+          >
+            <Icon />
+          </button>
+        ),
+      )}
+    </div>
+  );
+}
+
+function InstagramGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="2" width="20" height="20" rx="5.5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37Z" />
+      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+    </svg>
+  );
+}
+
+function TikTokGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07Z" />
+    </svg>
+  );
+}
+
+function LinktreeGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <rect x="10" y="2" width="4" height="7" rx="2" />
+      <rect x="3" y="9" width="4" height="7" rx="2" />
+      <rect x="17" y="9" width="4" height="7" rx="2" />
+      <rect x="10" y="9" width="4" height="13" rx="2" />
+    </svg>
+  );
+}
+
 function SettingsTab({
   community,
   members,
   pendingMembers,
+  startOnAbout = false,
+  onAboutOpened,
   onSaved,
   onRequestsChange,
   onLeft,
@@ -1119,6 +1264,8 @@ function SettingsTab({
   community: CommunityDTO;
   members: CommunityMemberDTO[];
   pendingMembers: CommunityMemberDTO[];
+  startOnAbout?: boolean;
+  onAboutOpened?: () => void;
   onSaved: (c: CommunityDTO) => void;
   onRequestsChange: () => Promise<void>;
   onLeft: () => void;
@@ -1127,6 +1274,9 @@ function SettingsTab({
   const coverRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(community.name);
   const [description, setDescription] = useState(community.description);
+  const [instagram, setInstagram] = useState(community.socialLinks?.instagram ?? "");
+  const [tiktok, setTiktok] = useState(community.socialLinks?.tiktok ?? "");
+  const [linktree, setLinktree] = useState(community.socialLinks?.linktree ?? "");
   const [categories, setCategories] = useState<CommunityCategory[]>(() => communityCategoriesOf(community));
   const [screening, setScreening] = useState(community.screeningQuestion ?? "");
   const [coverImage, setCoverImage] = useState<string | null>(community.coverImage ?? null);
@@ -1148,6 +1298,9 @@ function SettingsTab({
   useEffect(() => {
     setName(community.name);
     setDescription(community.description);
+    setInstagram(community.socialLinks?.instagram ?? "");
+    setTiktok(community.socialLinks?.tiktok ?? "");
+    setLinktree(community.socialLinks?.linktree ?? "");
     setCategories(communityCategoriesOf(community));
     setScreening(community.screeningQuestion ?? "");
     setCoverImage(community.coverImage ?? null);
@@ -1158,6 +1311,12 @@ function SettingsTab({
     setBulletinRequiresApproval(community.bulletinRequiresApproval);
     setVisibility(community.visibility);
   }, [community]);
+
+  useEffect(() => {
+    if (!startOnAbout) return;
+    setOpenRow("about");
+    onAboutOpened?.();
+  }, [startOnAbout, onAboutOpened]);
 
   async function applyCoverFile(file: File) {
     setCoverBusy(true);
@@ -1209,6 +1368,11 @@ function SettingsTab({
         body: JSON.stringify({
           name,
           description,
+          socialLinks: {
+            instagram,
+            tiktok,
+            linktree,
+          },
           category: categories[0],
           categories,
           screeningQuestion: screening,
@@ -1224,6 +1388,9 @@ function SettingsTab({
       onSaved(updated);
       setName(updated.name);
       setDescription(updated.description);
+      setInstagram(updated.socialLinks?.instagram ?? "");
+      setTiktok(updated.socialLinks?.tiktok ?? "");
+      setLinktree(updated.socialLinks?.linktree ?? "");
       setCategories(communityCategoriesOf(updated));
       setScreening(updated.screeningQuestion ?? "");
       setCoverImage(updated.coverImage ?? null);
@@ -1372,6 +1539,38 @@ function SettingsTab({
             placeholder="What is this community about?"
             onChange={(e) => setDescription(e.target.value)}
           />
+          <div className="cmy-social-fields">
+          <label className="cmy-field">
+            <span>Instagram</span>
+            <input
+              className="cmy-input"
+              value={instagram}
+              placeholder="@handle"
+              maxLength={200}
+              onChange={(e) => setInstagram(e.target.value)}
+            />
+          </label>
+          <label className="cmy-field">
+            <span>TikTok</span>
+            <input
+              className="cmy-input"
+              value={tiktok}
+              placeholder="@handle"
+              maxLength={200}
+              onChange={(e) => setTiktok(e.target.value)}
+            />
+          </label>
+          <label className="cmy-field">
+            <span>Linktree</span>
+            <input
+              className="cmy-input"
+              value={linktree}
+              placeholder="linktr.ee/you"
+              maxLength={200}
+              onChange={(e) => setLinktree(e.target.value)}
+            />
+          </label>
+          </div>
         </SettingsRow>
 
         <SettingsRow

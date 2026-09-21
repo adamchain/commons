@@ -385,6 +385,12 @@ export interface CommunityRecord {
   id: string;
   name: string;
   description: string;
+  /** Instagram / TikTok / Linktree handles, without @ or a URL. */
+  socialLinks?: {
+    instagram?: string;
+    tiktok?: string;
+    linktree?: string;
+  } | null;
   coverImage?: string | null;
   category: CommunityCategory;
   /** Up to 3 tags; `category` is the primary (first). Older rows may omit this. */

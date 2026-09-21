@@ -549,10 +549,18 @@ export interface CommunityMembershipView {
   status: CommunityMemberStatus;
 }
 
+/** Instagram, TikTok, and Linktree handles for a community. Stored without @ or a URL. */
+export interface CommunitySocialLinks {
+  instagram?: string;
+  tiktok?: string;
+  linktree?: string;
+}
+
 export interface CommunityDTO {
   id: string;
   name: string;
   description: string;
+  socialLinks?: CommunitySocialLinks | null;
   coverImage: string | null;
   category: CommunityCategory;
   /** Up to 3 tags; `category` is always the first (primary) for older clients. */

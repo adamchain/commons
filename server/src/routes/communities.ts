@@ -24,11 +24,59 @@ import {
   parseCommunityCategories,
   type CommunityCardDTO,
   type CommunityDTO,
+  type CommunitySocialLinks,
   type CommunityMemberDTO,
   type CommunityPostDTO,
   type CommunityPostingPermission,
   type PublicUser,
 } from "../types/shared.js";
+
+const SOCIAL_HANDLE = /^[A-Za-z0-9._]{1,40}$/;
+
+/** Accept a bare handle, @handle, or a profile URL and store just the handle. */
+function socialSlug(raw: unknown, hosts: string[]): { ok: true; value: string } | { ok: false } {
+  let s = String(raw ?? "").trim();
+  if (!s) return { ok: true, value: "" };
+  s = s.replace(/^https?:\/\//i, "").replace(/^www\./i, "");
+  const lower = s.toLowerCase();
+  for (const host of hosts) {
+    const prefix = `${host}/`;
+    if (lower.startsWith(prefix)) {
+      s = s.slice(prefix.length);
+      break;
+    }
+  }
+  s = s.replace(/^@+/, "").split(/[/?#]/)[0] ?? "";
+  if (!s) return { ok: true, value: "" };
+  if (!SOCIAL_HANDLE.test(s)) return { ok: false };
+  return { ok: true, value: s };
+}
+
+function publicSocialLinks(
+  links: CommunityRecord["socialLinks"],
+): CommunitySocialLinks | null {
+  if (!links) return null;
+  const out: CommunitySocialLinks = {};
+  if (links.instagram) out.instagram = links.instagram;
+  if (links.tiktok) out.tiktok = links.tiktok;
+  if (links.linktree) out.linktree = links.linktree;
+  return Object.keys(out).length ? out : null;
+}
+
+function parseCommunitySocialLinks(raw: unknown): CommunitySocialLinks | null | "invalid" {
+  if (raw == null) return null;
+  if (typeof raw !== "object") return "invalid";
+  const body = raw as Record<string, unknown>;
+  const ig = socialSlug(body.instagram, ["instagram.com"]);
+  const tt = socialSlug(body.tiktok, ["tiktok.com", "www.tiktok.com"]);
+  const lt = socialSlug(body.linktree, ["linktr.ee", "linktree.com"]);
+  if (!ig.ok || !tt.ok || !lt.ok) return "invalid";
+  const links: CommunitySocialLinks = {};
+  if (ig.value) links.instagram = ig.value;
+  if (tt.value) links.tiktok = tt.value;
+  if (lt.value) links.linktree = lt.value;
+  return Object.keys(links).length ? links : null;
+}
 
 export const communitiesRouter = Router();
 
@@ -63,6 +111,7 @@ async function toCommunityDTO(
     id: community.id,
     name: community.name,
     description: community.description,
+    socialLinks: publicSocialLinks(community.socialLinks),
     coverImage: community.coverImage ?? null,
     category: communityCategoriesOf(community)[0]!,
     categories: communityCategoriesOf(community),
@@ -397,7 +446,22 @@ communitiesRouter.patch("/:id", requireAuth, async (req, res) => {
     patch.screeningQuestion =
       typeof s === "string" && s.trim() ? s.trim().slice(0, 280) : null;
   }
-  const filtered = textBlockedReason(patch.name, patch.description, patch.screeningQuestion);
+  if ("socialLinks" in (req.body ?? {})) {
+    const links = parseCommunitySocialLinks(req.body.socialLinks);
+    if (links === "invalid") {
+      res.status(400).json({ error: "Use a handle for Instagram, TikTok, and Linktree." });
+      return;
+    }
+    patch.socialLinks = links ?? {};
+  }
+  const filtered = textBlockedReason(
+    patch.name,
+    patch.description,
+    patch.screeningQuestion,
+    patch.socialLinks?.instagram,
+    patch.socialLinks?.tiktok,
+    patch.socialLinks?.linktree,
+  );
   if (filtered) {
     res.status(400).json({ error: filtered });
     return;
