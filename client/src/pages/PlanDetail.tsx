@@ -470,6 +470,7 @@ export function PlanDetailPage() {
             planId={plan.id}
             messages={chatPreview}
             convId={chatConvId}
+            layout={!isHosting && !isLookingFor ? "meta" : "thread"}
             peopleCount={
               new Set([
                 plan.creator.id,
@@ -998,6 +999,7 @@ function ChatPreviewCard({
   messages,
   convId,
   peopleCount,
+  layout,
   navState,
   onSent,
 }: {
@@ -1005,6 +1007,7 @@ function ChatPreviewCard({
   messages: MessageDTO[] | null;
   convId: string | null;
   peopleCount: number;
+  layout: "meta" | "thread";
   navState: { from: string; planId: string };
   onSent: (msg: MessageDTO) => void;
 }) {
@@ -1028,6 +1031,80 @@ function ChatPreviewCard({
     } finally {
       setSending(false);
     }
+  }
+
+  if (layout === "meta") {
+    return (
+      <div className="plan-meta-card chat-preview-card chat-preview-card--meta">
+        <Link
+          to={`/plans/${planId}/chat`}
+          state={navState}
+          className="plan-meta-row chat-preview-messages-link"
+        >
+          <span className="plan-meta-icon" aria-hidden="true"><ChatBubbleIcon /></span>
+          <div className="plan-meta-text">
+            <span className="plan-meta-label">Chat</span>
+            {messages === null ? (
+              <span className="plan-meta-sub">Loading…</span>
+            ) : null}
+          </div>
+          <ChevronRight size={16} strokeWidth={2} color="var(--text-muted)" aria-hidden="true" />
+        </Link>
+        {hasMessages ? (
+          <Link
+            to={`/plans/${planId}/chat`}
+            state={navState}
+            className="chat-preview-messages-link chat-preview-messages-wrap"
+          >
+            <div className="chat-preview-messages">
+              {messages.map((msg) => (
+                <div key={msg.id} className="chat-preview-message">
+                  {msg.sender && (
+                    <Avatar
+                      seed={msg.sender.avatarSeed}
+                      style={msg.sender.avatarStyle}
+                      photoDataUrl={msg.sender.avatarPhotoDataUrl}
+                      params={msg.sender.avatarParams}
+                      name={msg.sender.firstName}
+                      size="sm"
+                    />
+                  )}
+                  <div className="chat-preview-message-body">
+                    {msg.sender && (
+                      <span className="chat-preview-message-sender">{msg.sender.firstName}</span>
+                    )}
+                    <span className="chat-preview-message-text">
+                      {msg.imageUrl ? "📷 Photo" : msg.body}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Link>
+        ) : null}
+        <div className={`chat-preview-compose${hasMessages ? " chat-preview-compose--below-msgs" : ""}`}>
+          <input
+            className="chat-preview-input"
+            type="text"
+            placeholder={placeholder}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); }
+            }}
+          />
+          <button
+            type="button"
+            className={`chat-composer-send${body.trim() ? " is-ready" : ""}`}
+            disabled={!body.trim() || sending || !convId}
+            onClick={() => void send()}
+            aria-label="Send"
+          >
+            <Send size={14} strokeWidth={2} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+    );
   }
 
   const compose = (
@@ -1055,7 +1132,7 @@ function ChatPreviewCard({
   );
 
   return (
-    <div className={`plan-meta-card chat-preview-card${hasMessages ? " chat-preview-card--thread" : ""}`}>
+    <div className={`plan-meta-card chat-preview-card${hasMessages ? " chat-preview-card--thread" : " chat-preview-card--composer"}`}>
       {hasMessages ? (
         <Link
           to={`/plans/${planId}/chat`}
