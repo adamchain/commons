@@ -36,6 +36,7 @@ import { BlockedListPage } from "./pages/BlockedList";
 import { PrivacyPage } from "./pages/Privacy";
 import { CommunitiesPage } from "./pages/Communities";
 import { CommunityDetailPage } from "./pages/CommunityDetail";
+import { CommunityDashboardPage } from "./pages/CommunityDashboard";
 import { CommunityChatPage } from "./pages/CommunityChat";
 import { SettingsForumsPage } from "./pages/SettingsForums";
 import { CreateCommunityPage } from "./pages/CreateCommunity";
@@ -170,6 +171,7 @@ export default function App() {
         <Route path="/communities" element={<Protected><CommunitiesPage /></Protected>} />
         <Route path="/communities/new" element={<Protected><CreateCommunityPage /></Protected>} />
         <Route path="/communities/:id" element={<Protected><CommunityDetailPage /></Protected>} />
+        <Route path="/communities/:id/dashboard" element={<Protected><CommunityDashboardPage /></Protected>} />
         <Route path="/communities/:id/chat" element={<Protected><CommunityChatPage /></Protected>} />
         <Route path="/notifications" element={<Protected><NotificationsPage /></Protected>} />
         <Route path="/messages" element={<Protected><MessagesPage /></Protected>} />

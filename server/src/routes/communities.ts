@@ -19,6 +19,7 @@ import {
   isCommunityOrganizer,
 } from "../lib/communityAccess.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
+import { buildCommunityAnalytics } from "../lib/communityDashboard.js";
 import {
   communityCategoriesOf,
   parseCommunityCategories,
@@ -26,6 +27,7 @@ import {
   type CommunityDTO,
   type CommunitySocialLinks,
   type CommunityMemberDTO,
+  type CommunityDashboardDTO,
   type CommunityPostDTO,
   type CommunityPostingPermission,
   type PublicUser,
@@ -392,6 +394,74 @@ communitiesRouter.get("/:id", requireAuth, async (req, res) => {
     return;
   }
   res.json(await toCommunityDTO(community, viewerId));
+});
+
+function sharedNetwork(
+  a: { networkIds?: string[] } | undefined,
+  b: { networkIds?: string[] } | undefined,
+): number {
+  const mine = new Set(a?.networkIds ?? []);
+  if (mine.size === 0) return 0;
+  let n = 0;
+  for (const id of b?.networkIds ?? []) if (mine.has(id)) n += 1;
+  return n;
+}
+
+// GET /api/communities/:id/dashboard — organizer metrics, join/post queue, members.
+communitiesRouter.get("/:id/dashboard", requireAuth, async (req, res) => {
+  const viewerId = String(req.userId);
+  const community = store.findCommunityById(String(req.params.id));
+  if (!community) {
+    res.status(404).json({ error: "Community not found" });
+    return;
+  }
+  if (!isCommunityOrganizer(community, viewerId)) {
+    res.status(403).json({ error: "Only the organizer can view the dashboard" });
+    return;
+  }
+
+  const active = store.listActiveCommunityMembers(community.id);
+  active.sort((a, b) => {
+    if (a.userId === community.organizerId) return -1;
+    if (b.userId === community.organizerId) return 1;
+    return b.joinedAt.localeCompare(a.joinedAt);
+  });
+  const pending = store.listPendingCommunityMembers(community.id);
+  const posts = store.listPendingCommunityPosts(community.id);
+  const users = await findUsersByIds([
+    ...active.map((m) => m.userId),
+    ...pending.map((m) => m.userId),
+    ...posts.map((p) => p.authorId),
+    community.organizerId,
+  ]);
+  const organizer = users.get(community.organizerId);
+  const analytics = buildCommunityAnalytics({
+    interactions: store.listCommunityInteractions(community.id),
+    joinedAt: active.map((m) => m.joinedAt),
+  });
+
+  const body: CommunityDashboardDTO = {
+    id: community.id,
+    name: community.name,
+    coverImage: community.coverImage ?? null,
+    category: community.category,
+    city: community.city ?? null,
+    visibility: community.visibility,
+    members: community.memberCount,
+    ...analytics,
+    requests: pending.map((m) => ({
+      ...memberDTO(m, users, community.organizerId, true),
+      mutualCount: sharedNetwork(organizer, users.get(m.userId)),
+    })),
+    pendingPosts: posts.map((p) => ({
+      id: p.id,
+      content: (p.content || (p.image ? "Photo" : "")).replace(/\s+/g, " ").trim().slice(0, 140),
+      createdAt: p.createdAt,
+      author: publicFor(p.authorId, users),
+    })),
+    memberList: active.map((m) => memberDTO(m, users, community.organizerId, false)),
+  };
+  res.json(body);
 });
 
 // PATCH /api/communities/:id — organizer settings (name/description/cover/category,

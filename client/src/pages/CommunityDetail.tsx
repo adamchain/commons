@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Calendar, MessageCircle, Share2, Users } from "lucide-react";
+import { Calendar, LayoutDashboard, MessageCircle, Share2, Users } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
@@ -286,6 +286,25 @@ export function CommunityDetailPage() {
               setTab("settings");
             }}
           />
+          {canManage && (
+            <Link
+              to={`/communities/${community.id}/dashboard${
+                community.pendingRequestCount + community.pendingBulletinCount > 0 ? "?section=approvals" : ""
+              }`}
+              className="cmy-dash-entry"
+            >
+              <LayoutDashboard size={18} strokeWidth={1.8} aria-hidden="true" />
+              <span className="cmy-dash-entry-copy">
+                <span className="cmy-dash-entry-title">Dashboard</span>
+                <span className="cmy-dash-entry-sub">Analytics, approvals, and members</span>
+              </span>
+              {community.pendingRequestCount + community.pendingBulletinCount > 0 && (
+                <span className="cmy-requests-count">
+                  {community.pendingRequestCount + community.pendingBulletinCount}
+                </span>
+              )}
+            </Link>
+          )}
         </div>
       </header>
 

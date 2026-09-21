@@ -612,6 +612,35 @@ export interface CommunityMemberDTO {
   joinedAt: string;
 }
 
+/** Organizer-only community dashboard. Counts come from joins, chat, bulletin, and event RSVPs. */
+export interface CommunityDashboardDTO {
+  id: string;
+  name: string;
+  coverImage: string | null;
+  category: CommunityCategory;
+  city: string | null;
+  visibility: CommunityAccessLevel;
+  members: number;
+  /** Distinct people who posted, chatted, or RSVP'd since Monday. */
+  activeThisWeek: number;
+  /** Posts, chat messages, and RSVPs since Monday. */
+  interactionsThisWeek: number;
+  /** Week-to-date vs the same weekdays last week. Null when last week was empty and this week is not. */
+  activityChangePct: number | null;
+  /** Monday through Sunday of the current week. */
+  activity: { label: string; count: number; isToday: boolean }[];
+  /** 0 = Sunday … 6 = Saturday, in America/New_York. */
+  todayWeekday: number;
+  activeTimes: {
+    weekdays: { weekday: number; label: string; hours: { label: string; count: number }[] }[];
+    days: { label: string; count: number }[];
+  };
+  growth: { newMembers: number; points: { label: string; count: number }[] };
+  requests: (CommunityMemberDTO & { mutualCount: number })[];
+  pendingPosts: { id: string; content: string; createdAt: string; author: PublicUser }[];
+  memberList: CommunityMemberDTO[];
+}
+
 export interface CommunityPostDTO {
   id: string;
   author: PublicUser;

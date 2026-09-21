@@ -2154,6 +2154,44 @@ export const store = {
       .filter((m) => m.communityId === communityId && m.status === "pending")
       .sort((a, b) => a.joinedAt.localeCompare(b.joinedAt));
   },
+  /**
+   * Timestamps the dashboard can count: approved bulletin posts and replies,
+   * non-system chat messages, and current event RSVPs.
+   */
+  listCommunityInteractions(communityId: string): { at: string; userId: string }[] {
+    const events: { at: string; userId: string }[] = [];
+    for (const post of snapshot.communityPosts) {
+      if (post.communityId !== communityId || post.deletedAt) continue;
+      if ((post.approvalStatus ?? "approved") !== "approved") continue;
+      if (!post.authorId || !post.createdAt) continue;
+      events.push({ at: post.createdAt, userId: post.authorId });
+    }
+    const conv = snapshot.conversations.find(
+      (c) => c.communityId === communityId && c.type === "group",
+    );
+    if (conv) {
+      for (const msg of snapshot.messages) {
+        if (msg.conversationId !== conv.id || msg.kind === "system") continue;
+        if (!msg.senderId || !msg.createdAt) continue;
+        events.push({ at: msg.createdAt, userId: msg.senderId });
+      }
+    }
+    const planIds = new Set(
+      snapshot.plans
+        .filter((p) => p.communityId === communityId && !p.cancelledAt)
+        .map((p) => p.id),
+    );
+    if (planIds.size > 0) {
+      for (const part of snapshot.participations) {
+        if (!planIds.has(part.planId)) continue;
+        if (part.state !== "going" && part.state !== "interested") continue;
+        const at = part.updatedAt || part.createdAt;
+        if (!at) continue;
+        events.push({ at, userId: part.userId });
+      }
+    }
+    return events;
+  },
   listCommunityMembershipsForUser(userId: string): CommunityMemberRecord[] {
     return snapshot.communityMembers.filter((m) => m.userId === userId);
   },
