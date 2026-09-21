@@ -15,7 +15,6 @@ import {
   INTEREST_LABELS,
   VIBE_OPTIONS,
   type InterestTag,
-  type JoinType,
   type NeighborhoodDTO,
   type PlanDTO,
   type PlanVisibility,
