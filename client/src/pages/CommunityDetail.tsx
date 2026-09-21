@@ -911,7 +911,7 @@ function EventsTab({
   return (
     <section className="cmy-tabpanel">
       {canPost && (
-        <button type="button" className="cmy-btn cmy-btn--ghost cmy-btn--block" onClick={onPostPlan}>
+        <button type="button" className="cmy-btn cmy-btn--primary cmy-btn--block" onClick={onPostPlan}>
           + Post a new event
         </button>
       )}
@@ -1062,7 +1062,7 @@ function MembersTab({
       {organizer && (
         <>
           <h3 className="cmy-subhead">Organizer</h3>
-          <ul className="cmy-member-list">
+          <ul className="cmy-member-list cmy-member-card">
             <li className="cmy-member-row">
               <Link to={`/profile/${organizer.user.id}`} state={{ from: "community", communityId: community.id }} className="cmy-member-link-row">
                 <Avatar seed={organizer.user.avatarSeed} style={organizer.user.avatarStyle} photoDataUrl={organizer.user.avatarPhotoDataUrl} params={organizer.user.avatarParams} size="sm" />
@@ -1077,30 +1077,32 @@ function MembersTab({
       <h3 className="cmy-subhead">
         Members <span className="cmy-header-count">{members.length}</span>
       </h3>
-      <ul className="cmy-member-list">
-        {rest.map((m) => (
-          <li key={m.user.id} className="cmy-member-row">
-            <Link to={`/profile/${m.user.id}`} state={{ from: "community", communityId: community.id }} className="cmy-member-link-row">
-              <Avatar seed={m.user.avatarSeed} style={m.user.avatarStyle} photoDataUrl={m.user.avatarPhotoDataUrl} params={m.user.avatarParams} size="sm" />
-              <span className="cmy-member-name">{m.user.firstName} {m.user.lastName ?? ""}</span>
-            </Link>
-            {canManage && (
-              <button type="button" className="cmy-icon-btn cmy-remove" onClick={() => void remove(m.user.id)} title="Remove">
-                Remove
-              </button>
-            )}
-            {user?.id === m.user.id && !community.isOrganizer && (
-              <button
-                type="button"
-                className="cmy-icon-btn cmy-remove"
-                onClick={() => void api(`/api/communities/${community.id}/leave`, { method: "POST" }).then(() => onCountChange())}
-              >
-                Leave
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
+      {rest.length > 0 && (
+        <ul className="cmy-member-list cmy-member-card">
+          {rest.map((m) => (
+            <li key={m.user.id} className="cmy-member-row">
+              <Link to={`/profile/${m.user.id}`} state={{ from: "community", communityId: community.id }} className="cmy-member-link-row">
+                <Avatar seed={m.user.avatarSeed} style={m.user.avatarStyle} photoDataUrl={m.user.avatarPhotoDataUrl} params={m.user.avatarParams} size="sm" />
+                <span className="cmy-member-name">{m.user.firstName} {m.user.lastName ?? ""}</span>
+              </Link>
+              {canManage && (
+                <button type="button" className="cmy-icon-btn cmy-remove" onClick={() => void remove(m.user.id)} title="Remove">
+                  Remove
+                </button>
+              )}
+              {user?.id === m.user.id && !community.isOrganizer && (
+                <button
+                  type="button"
+                  className="cmy-icon-btn cmy-remove"
+                  onClick={() => void api(`/api/communities/${community.id}/leave`, { method: "POST" }).then(() => onCountChange())}
+                >
+                  Leave
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

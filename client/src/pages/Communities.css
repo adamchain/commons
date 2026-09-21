@@ -1152,6 +1152,22 @@ button.cmy-joined-pill {
 
 /* ---- Members ---- */
 .cmy-subhead { font-size: var(--type-caption); text-transform: none; /* no caps — final pass */ letter-spacing: 0.06em; color: var(--text-subtle); font-weight: 700; margin: var(--s-2) 0 0; }
+/* Same grouped card as Messages: warm surface, 18px radius, card shadow, hairline rows. */
+.cmy-member-card {
+  gap: 0;
+  background: var(--surface);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+.cmy-member-card .cmy-member-row {
+  gap: 12px;
+  min-height: 72px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.cmy-member-card .cmy-member-row:last-child { border-bottom: none; }
+.cmy-member-card .cmy-member-row:hover { background: #f7f2eb; }
 .cmy-member-row { display: flex; align-items: center; gap: var(--s-2); }
 .cmy-member-link, .cmy-member-link-row {
   display: inline-flex;
