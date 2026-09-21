@@ -220,27 +220,25 @@ export function ParticipationButtons({
               onClick={() => void tapGoing()}
               disabled={pending || isApproveOnly}
             >
-              {goingActive
-                ? "I'm In"
-                : isApproveOnly
-                  ? "Application-only"
-                  : "I'm In"}
+              {goingActive ? "Drop Out" : "I'm In"}
             </button>
           )}
-          <button
-            type="button"
-            className={`btn-interested ${interestedActive ? "is-active" : ""}`}
-            onClick={() => void tapInterested()}
-            disabled={pending}
-          >
-            {interestedActive
-              ? isApproveOnly && !isFull
-                ? "Withdraw application"
-                : "Interested"
-              : isApproveOnly && !isFull
-                ? "Apply"
-                : "Interested"}
-          </button>
+          {!goingActive && (
+            <button
+              type="button"
+              className={`btn-interested ${interestedActive ? "is-active" : ""}`}
+              onClick={() => void tapInterested()}
+              disabled={pending}
+            >
+              {interestedActive
+                ? isApproveOnly && !isFull
+                  ? "Withdraw application"
+                  : "Interested"
+                : isApproveOnly && !isFull
+                  ? "Apply"
+                  : "Interested"}
+            </button>
+          )}
         </>
       )}
       {error && <p className="onboarding-error" style={{ marginTop: 8 }}>{error}</p>}
@@ -257,9 +255,9 @@ export function ParticipationButtons({
 
       {showGoingSheet && (
         <BottomSheet onClose={() => setShowGoingSheet(false)} labelledBy="rsvp-going-title">
-            <div id="rsvp-going-title" className="sheet-title">{loose ? "Drop Out" : "I'm in."}</div>
+            <div id="rsvp-going-title" className="sheet-title">Drop Out</div>
             <button type="button" className="sheet-link" onClick={() => void switchToInterested()}>
-              {loose ? "Switch to I'm Interested" : "Switch to Interested"}
+              Switch to I'm Interested
             </button>
             <button type="button" className="sheet-link sheet-link--danger" disabled={pending} onClick={() => void dropOutFromGoing()}>
               Drop out
