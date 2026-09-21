@@ -404,6 +404,8 @@ export interface CommunityRecord {
   /** Who can see inside (bulletin/events/members). Discovery info stays public either way. */
   visibility: CommunityAccessLevel;
   screeningQuestion?: string | null;
+  /** City, neighborhood, or venue chosen at creation. */
+  city?: string | null;
   /** Optional admin note captured on rejection, shown to the creator. */
   rejectionNote?: string | null;
   submittedAt: string;
@@ -473,7 +475,8 @@ export interface NotificationRecord {
     | "interestedNudge"
     | "didThisHappen"
     | "planSpotReopen"
-    | "welcome";
+    | "welcome"
+    | "communityReview";
   body: string;
   planId?: string;
   conversationId?: string;
@@ -1922,20 +1925,6 @@ export const store = {
       .filter((c) => c.creationStatus === "pending")
       .sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
   },
-  /** Promote legacy pending communities to live (review queue no longer gates go-live). */
-  promotePendingCommunities(): number {
-    const now = new Date().toISOString();
-    let promoted = 0;
-    for (const community of this.listPendingCommunities()) {
-      this.updateCommunity(community.id, {
-        creationStatus: "approved",
-        reviewedAt: community.reviewedAt ?? now,
-        rejectionNote: null,
-      });
-      promoted += 1;
-    }
-    return promoted;
-  },
   /**
    * Rewrite legacy 8-option community categories (run_club, book_club, …) to
    * the master InterestTag taxonomy. Idempotent — returns how many rows changed.
@@ -1964,9 +1953,9 @@ export const store = {
     return snapshot.communities.filter((c) => c.organizerId === organizerId);
   },
   /**
-   * Create a community (default `approved` — live immediately) and seed the
-   * organizer's active membership in one shot. `member_count` starts at 1.
-   * Pass `creationStatus: "pending"` only for explicit review-queue cases.
+   * Create a community and seed the organizer's active membership.
+   * `member_count` starts at 1. User submissions pass `pending` and stay off
+   * the feed until an admin approves. Admin founding and seeds pass `approved`.
    */
   createCommunity(input: {
     name: string;
@@ -1978,6 +1967,7 @@ export const store = {
     isFounding?: boolean;
     creationStatus?: CommunityCreationStatus;
     screeningQuestion?: string | null;
+    city?: string | null;
     visibility?: CommunityAccessLevel;
     bulletinPermission?: CommunityPostingPermission;
     planPostingPermission?: CommunityPostingPermission;
@@ -2006,6 +1996,7 @@ export const store = {
       bulletinRequiresApproval: false,
       visibility: input.visibility ?? "everyone",
       screeningQuestion: input.screeningQuestion ?? null,
+      city: input.city?.trim() ? input.city.trim().slice(0, 80) : null,
       rejectionNote: null,
       submittedAt: now,
       reviewedAt: approved ? now : null,

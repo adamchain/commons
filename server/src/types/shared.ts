@@ -425,7 +425,8 @@ export type NotificationKind =
   | "interestedNudge"
   | "didThisHappen"
   | "planSpotReopen"
-  | "welcome";
+  | "welcome"
+  | "communityReview";
 
 export interface NotificationDTO {
   id: string;
@@ -569,6 +570,8 @@ export interface CommunityDTO {
   bulletinRequiresApproval: boolean;
   /** Who can see inside (bulletin/events/members) — discovery info is always public. */
   visibility: CommunityAccessLevel;
+  /** City, neighborhood, or venue set when the community was created. */
+  city: string | null;
   /** Only exposed to the real organizer (others get null). */
   screeningQuestion: string | null;
   /** True when a screening question is set (all viewers, so Join can branch). */

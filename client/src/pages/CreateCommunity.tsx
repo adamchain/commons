@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Camera, ImagePlus, MapPin } from "lucide-react";
 import { api } from "../api/http";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
+import { LocationAutocomplete } from "../components/LocationAutocomplete";
 import { LegalContent } from "../components/LegalContent";
 import { Button } from "../components/ui/Button";
 import { Chip } from "../components/ui/Chip";
@@ -120,6 +121,7 @@ export function CreateCommunityPage() {
           screeningQuestion: screeningOn ? screening.trim() || undefined : undefined,
           coverImage,
           visibility,
+          city: city.trim() || undefined,
         }),
       });
       navigate(`/communities/${created.id}`);
@@ -264,17 +266,15 @@ export function CreateCommunityPage() {
               </div>
             </div>
 
-            <label className="luma-card luma-row cmy-create-city-row">
+            <div className="luma-card luma-row cmy-create-city-row">
               <MapPin size={16} strokeWidth={1.8} aria-hidden="true" />
-              <input
-                className="cmy-create-city"
-                value={city}
+              <LocationAutocomplete
+                name={city}
+                address=""
                 placeholder="City or neighborhood"
-                maxLength={80}
-                autoComplete="off"
-                onChange={(e) => setCity(e.target.value)}
+                onChange={(v) => setCity(v.name.slice(0, 80))}
               />
-            </label>
+            </div>
 
             <div className="luma-card luma-row cmy-create-vis-row">
               <div>

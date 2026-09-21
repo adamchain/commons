@@ -114,6 +114,7 @@ export function CommunityDetailPage() {
   }
 
   const catLabels = communityCategoriesOf(community).map((tag) => COMMUNITY_CATEGORY_LABELS[tag]);
+  const placeLabel = community.city?.trim() || "Philadelphia";
   const isActiveMember = community.myMembership?.status === "active";
   // isOrganizer is the real community organizer only (never a COMMONS admin).
   const showChatTab = community.chatEnabled && (isActiveMember || community.isOrganizer);
@@ -136,7 +137,7 @@ export function CommunityDetailPage() {
       )}
       {community.creationStatus === "rejected" && (
         <div className="cmy-review-banner cmy-review-banner--warn">
-          This community was taken offline. Edit any setting to republish it.
+          This community was taken offline. Edit any setting to send it back for review.
         </div>
       )}
 
@@ -160,7 +161,7 @@ export function CommunityDetailPage() {
           </button>
           {community.isFounding && <span className="cmy-cover-founding">Founding</span>}
           <div className="cmy-cover-overlay">
-            <div className="cmy-cover-kicker">Philadelphia</div>
+            <div className="cmy-cover-kicker">{placeLabel}</div>
             <h1 className="cmy-name">{community.name}</h1>
             <div className="cmy-cover-pills">
               {catLabels.map((label) => (
@@ -195,7 +196,7 @@ export function CommunityDetailPage() {
                 <span className="cmy-header-count">
                   {community.memberCount} {community.memberCount === 1 ? "member" : "members"}
                 </span>
-                <span className="cmy-header-org">Philadelphia</span>
+                <span className="cmy-header-org">{placeLabel}</span>
               </span>
             </button>
             <JoinControl

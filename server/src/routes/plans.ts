@@ -396,6 +396,10 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     }
     const rawCv = String(req.body?.communityVisibility ?? "public");
     communityVisibility = rawCv === "community_only" ? "community_only" : "public";
+    // A community still in review must not land on the public feed via a plan.
+    if (community.creationStatus !== "approved") {
+      communityVisibility = "community_only";
+    }
   }
 
   const rawCapacity = req.body?.capacity;

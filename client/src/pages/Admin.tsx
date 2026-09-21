@@ -1028,7 +1028,7 @@ function ReportsReview() {
   const openCount = rows?.filter((r) => r.status === "open").length ?? 0;
 
   return (
-    <section className="admin-section">
+    <section className="admin-section" id="safety-reports">
       <h2 className="admin-section-title">
         Safety reports{rows ? ` · ${openCount} open` : ""}
       </h2>
@@ -1185,7 +1185,7 @@ function CommunitiesReview() {
   }
 
   return (
-    <section className="admin-section">
+    <section className="admin-section" id="communities-review">
       <h2 className="admin-section-title">Pending communities</h2>
       <div className="admin-card">
         {error && <p className="error-text">{error}</p>}
@@ -1274,6 +1274,110 @@ function CommunitiesReview() {
           </button>
           {foundingMsg && <p style={{ fontSize: 13, margin: 0 }}>{foundingMsg}</p>}
         </div>
+      </div>
+    </section>
+  );
+}
+
+interface ReviewItem {
+  id: string;
+  href: string | null;
+  title: string;
+  meta: string;
+  at: string;
+}
+
+function ReviewInbox() {
+  const [items, setItems] = useState<ReviewItem[] | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const [communities, reports, posts] = await Promise.all([
+        api<{
+          communities: Array<{
+            id: string;
+            name: string;
+            organizer: { firstName: string; lastName: string };
+            submittedAt: string;
+          }>;
+        }>("/api/admin/communities?status=pending"),
+        api<{ reports: AdminReportRow[] }>("/api/admin/reports"),
+        api<{
+          posts: Array<{
+            id: string;
+            content: string;
+            sponsorName: string | null;
+            interestTag: string;
+            createdAt: string;
+          }>;
+        }>("/api/admin/forums/pending-posts"),
+      ]);
+      const rows: ReviewItem[] = [
+        ...communities.communities.map((c) => ({
+          id: `community-${c.id}`,
+          href: "#communities-review",
+          title: `${c.name} is waiting for review`,
+          meta: `Community · ${c.organizer.firstName} ${c.organizer.lastName}`.trim(),
+          at: c.submittedAt,
+        })),
+        ...reports.reports
+          .filter((r) => r.status === "open")
+          .map((r) => ({
+            id: `report-${r.id}`,
+            href: "#safety-reports",
+            title: `${r.reasonLabel} · ${r.target.firstName} ${r.target.lastName}`.trim(),
+            meta: `Safety report · ${r.reporter.firstName}`,
+            at: r.createdAt,
+          })),
+        ...posts.posts.map((p) => ({
+          id: `post-${p.id}`,
+          href: null,
+          title: p.content.trim().slice(0, 120) || "Sponsored post",
+          meta: `Forum post · ${p.sponsorName || p.interestTag}`,
+          at: p.createdAt,
+        })),
+      ];
+      rows.sort((a, b) => b.at.localeCompare(a.at));
+      setItems(rows);
+    } catch {
+      setItems([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return (
+    <section className="admin-section" id="review-inbox">
+      <h2 className="admin-section-title">
+        Needs review{items ? ` · ${items.length}` : ""}
+      </h2>
+      <div className="admin-card">
+        {!items ? (
+          <p className="admin-muted" style={{ margin: 0 }}>Loading…</p>
+        ) : items.length === 0 ? (
+          <p className="admin-muted" style={{ margin: 0 }}>Nothing waiting.</p>
+        ) : (
+          <ul className="admin-review-list">
+            {items.map((item) => {
+              const body = (
+                <>
+                  <span>
+                    <strong>{item.title}</strong>
+                    <span className="admin-muted admin-review-meta">{item.meta}</span>
+                  </span>
+                  <span className="admin-muted">{new Date(item.at).toLocaleDateString()}</span>
+                </>
+              );
+              return (
+                <li key={item.id}>
+                  {item.href ? <a href={item.href}>{body}</a> : <div className="admin-review-row">{body}</div>}
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </section>
   );
@@ -1397,6 +1501,8 @@ export function AdminPage() {
           <p className="admin-muted">Loading…</p>
         ) : summary ? (
           <>
+            <ReviewInbox />
+
             {behavior ? (
               <BehaviorAgentPanel report={behavior} onSelectUser={setSelectedUserId} />
             ) : null}

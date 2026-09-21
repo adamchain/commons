@@ -50,6 +50,8 @@ const PREF_KEY: Record<NotificationKind, keyof NotificationPrefs> = {
   // F.9 — one-time welcome ping on signup; rides the same toggle as other
   // person/system-to-user pings since there's no dedicated onboarding pref.
   welcome: "someoneJoinedYourPlan",
+  // Ops alert for COMMONS admins. Not gated by a member preference.
+  communityReview: "someoneJoinedYourPlan",
 };
 
 export async function emit(input: {
@@ -68,7 +70,7 @@ export async function emit(input: {
     ...DEFAULT_NOTIFICATION_PREFS,
     ...(user.notificationPrefs ?? {}),
   };
-  if (prefs[PREF_KEY[input.kind]] === false) return null;
+  if (input.kind !== "communityReview" && prefs[PREF_KEY[input.kind]] === false) return null;
   // Muted chats stay quiet — the conversation itself still works, it just
   // doesn't ping. Only applies to notifications tied to a specific thread.
   if (input.conversationId && (user.mutedConversationIds ?? []).includes(input.conversationId)) {
@@ -85,7 +87,7 @@ export async function emit(input: {
     communityId: input.communityId,
   });
   if (row) {
-    const data: Record<string, string> = {};
+    const data: Record<string, string> = { kind: input.kind };
     if (input.planId) data.planId = input.planId;
     if (input.conversationId) data.conversationId = input.conversationId;
     if (input.communityId) data.communityId = input.communityId;

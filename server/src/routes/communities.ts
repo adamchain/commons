@@ -9,7 +9,7 @@ import {
 import { findUserById, findUsersByIds } from "../userRepo.js";
 import { userToPublic, planSummary } from "./plans.js";
 import { emit } from "../lib/notify.js";
-import { isAdminPhone } from "../lib/adminPhones.js";
+import { listAdminPhones } from "../lib/adminPhones.js";
 import { isQaOrTestCommunityName } from "../lib/qaCommunities.js";
 import {
   canViewCommunityBoard,
@@ -35,7 +35,7 @@ export const communitiesRouter = Router();
 /** COMMONS admins — ops via /api/admin; not treated as community organizers. */
 async function isCommonsAdmin(userId: string): Promise<boolean> {
   const u = await findUserById(userId);
-  return !!u && isAdminPhone(u.phoneNumber);
+  return !!u && listAdminPhones().includes(u.phoneNumber);
 }
 
 function publicFor(uid: string, users: Map<string, Awaited<ReturnType<typeof findUserById>>>): PublicUser {
@@ -78,6 +78,7 @@ async function toCommunityDTO(
     bulletinEnabled: community.bulletinEnabled ?? true,
     bulletinRequiresApproval: community.bulletinRequiresApproval ?? false,
     visibility: community.visibility ?? "everyone",
+    city: community.city?.trim() || null,
     screeningQuestion: isOrganizer ? community.screeningQuestion ?? null : null,
     hasScreening: !!community.screeningQuestion,
     createdAt: community.createdAt,
@@ -267,7 +268,8 @@ function parseCoverImage(raw: unknown): string | null {
   return null;
 }
 
-// POST /api/communities — create a community (goes live immediately).
+// POST /api/communities — submit a community for COMMONS admin review.
+// Stays off Explore / search until approved.
 communitiesRouter.post("/", requireAuth, async (req, res) => {
   const userId = String(req.userId);
   const name = String(req.body?.name ?? "").trim().slice(0, 80);
@@ -295,7 +297,11 @@ communitiesRouter.post("/", requireAuth, async (req, res) => {
     res.status(400).json({ error: "Pick at least one category (up to 3)" });
     return;
   }
-  const filtered = textBlockedReason(name, description, screeningQuestion);
+  const cityRaw = req.body?.city;
+  const city =
+    typeof cityRaw === "string" && cityRaw.trim() ? cityRaw.trim().slice(0, 80) : null;
+
+  const filtered = textBlockedReason(name, description, screeningQuestion, city);
   if (filtered) {
     res.status(400).json({ error: filtered });
     return;
@@ -309,9 +315,10 @@ communitiesRouter.post("/", requireAuth, async (req, res) => {
     categories,
     organizerId: userId,
     screeningQuestion,
+    city,
     visibility:
       req.body?.visibility === "members_only" ? "members_only" : "everyone",
-    creationStatus: "approved",
+    creationStatus: "pending",
   });
   store.log("community_created", { communityId: community.id, organizerId: userId });
   res.status(201).json(await toCommunityDTO(community, userId));
@@ -416,12 +423,14 @@ communitiesRouter.patch("/:id", requireAuth, async (req, res) => {
   if (req.body?.visibility === "everyone" || req.body?.visibility === "members_only") {
     patch.visibility = req.body.visibility;
   }
-  // Rejected → edit republishes immediately (admin can reject again if needed).
+  // A rejected community goes back to the review queue — it does not go live
+  // again until an admin approves it.
   if (community.creationStatus === "rejected" && Object.keys(patch).length > 0) {
-    patch.creationStatus = "approved";
+    patch.creationStatus = "pending";
     patch.rejectionNote = null;
-    patch.reviewedAt = new Date().toISOString();
+    patch.reviewedAt = null;
     patch.reviewedBy = null;
+    patch.submittedAt = new Date().toISOString();
   }
   const updated = store.updateCommunity(community.id, patch) ?? community;
   res.json(await toCommunityDTO(updated, viewerId));

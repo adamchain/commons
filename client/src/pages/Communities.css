@@ -1616,21 +1616,33 @@ button.cmy-joined-pill {
   color: var(--muted);
   flex-shrink: 0;
 }
-.cmy-create-city {
+.cmy-create-city-row .location-autocomplete {
   flex: 1;
   min-width: 0;
+}
+.cmy-create-city-row .location-autocomplete input {
   border: none;
   background: transparent;
-  font: inherit;
+  padding: 0;
+  min-height: 0;
+  border-radius: 0;
+  box-shadow: none;
   font-weight: 600;
   color: var(--ink);
 }
-.cmy-create-city::placeholder {
+.cmy-create-city-row .location-autocomplete input::placeholder {
   color: var(--faint);
   font-weight: 500;
 }
-.cmy-create-city:focus {
+.cmy-create-city-row .location-autocomplete input:focus {
   outline: none;
+  border: none;
+  box-shadow: none;
+}
+.cmy-create-city-row .location-suggestions {
+  z-index: 80;
+  left: -42px;
+  right: -16px;
 }
 .cmy-create-vis-row {
   align-items: center;
@@ -1653,7 +1665,12 @@ button.cmy-joined-pill {
 .cmy-create-desc {
   border: none;
   background: transparent;
-  padding: 0;
+  /* Bold glyphs (the label sets font-weight) draw past the text origin.
+     Zero padding clips that overhang — the left arm of "T" disappears.
+     Padding holds the overhang; the negative margin keeps the text
+     aligned with the DESCRIPTION label. */
+  padding: 0 0 0 4px;
+  margin-left: -4px;
   min-height: 110px;
   font-size: var(--text-body);
   line-height: 1.55;

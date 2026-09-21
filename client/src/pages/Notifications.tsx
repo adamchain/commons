@@ -13,6 +13,7 @@ import {
   PartyPopper,
   RefreshCw,
   Search,
+  Shield,
   Trash2,
   Unlock,
   UserPlus,
@@ -202,6 +203,8 @@ function hrefFor(n: NotificationDTO): string | null {
   if ((n.kind === "networkRequest" || n.kind === "networkAccepted") && n.profileUserId) {
     return `/profile/${n.profileUserId}`;
   }
+  // A new community waiting on COMMONS admin review opens the review queue.
+  if (n.kind === "communityReview") return "/admin#communities-review";
   // Join requests land in Settings so the organizer can approve/decline.
   if (n.kind === "communityJoinRequest" && n.communityId) {
     return `/communities/${n.communityId}?tab=settings`;
@@ -260,5 +263,7 @@ function iconFor(kind: NotificationKind): ReactNode {
       return <Pin {...props} />;
     case "welcome":
       return <Users {...props} />;
+    case "communityReview":
+      return <Shield {...props} />;
   }
 }

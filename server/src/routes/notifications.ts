@@ -7,7 +7,9 @@ export const notificationsRouter = Router();
 
 notificationsRouter.get("/", requireAuth, (req, res) => {
   const userId = String(req.userId);
-  const rows = store.listNotificationsForUser(userId, 50);
+  const rows = store
+    .listNotificationsForUser(userId, 50)
+    .filter((n) => n.kind !== "communityReview");
   const dtos: NotificationDTO[] = rows.map((n) => ({
     id: n.id,
     kind: n.kind,
