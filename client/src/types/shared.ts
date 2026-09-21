@@ -382,6 +382,8 @@ export interface ConversationSummaryDTO {
   coverImage?: string | null;
   /** Unlocked looking-for plan — thumb uses the idea mark, not a stock cover. */
   isIdea?: boolean;
+  /** Viewer pinned this thread to the top of their inbox. */
+  pinned?: boolean;
 }
 
 /** One option in a poll, with the ids of everyone who picked it. */
@@ -474,6 +476,8 @@ export interface MeDTO {
   mutedConversationIds?: string[];
   /** Conversations the user explicitly left / removed from inbox. */
   leftConversationIds?: string[];
+  /** Inbox pins, most recently pinned first. */
+  pinnedConversationIds?: string[];
 }
 
 export interface NetworkPromptDTO {

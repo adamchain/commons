@@ -4836,17 +4836,32 @@ a.action-btn--stack {
 .messages-list > .messages-row:last-child {
   border-bottom: none;
 }
-.messages-swipe-action {
+.messages-swipe-actions {
   position: absolute;
   inset: 0 0 0 auto;
+  display: flex;
+  width: 176px;
+}
+.messages-swipe-action {
+  flex: 1;
   width: 88px;
   border: none;
-  background: var(--red);
   color: #fff;
   font-size: var(--text-body-small);
   font-weight: 700;
   letter-spacing: 0.02em;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.messages-swipe-action--pin {
+  background: var(--ink);
+}
+.messages-swipe-action--remove {
+  background: var(--red);
 }
 .messages-swipe-front {
   position: relative;
@@ -13441,9 +13456,19 @@ button.xpl-photo-tile {
   color: var(--ink);
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.messages-row-title-text {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.messages-row-pin {
+  flex-shrink: 0;
+  color: var(--ink);
 }
 .messages-row-preview {
   font-size: var(--text-body-small);

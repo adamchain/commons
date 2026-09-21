@@ -107,6 +107,7 @@ function meFromUser(user: UserRecord): MeDTO {
     discoverableBySearch: user.discoverableBySearch !== false,
     mutedConversationIds: user.mutedConversationIds?.length ? user.mutedConversationIds : [],
     leftConversationIds: user.leftConversationIds?.length ? user.leftConversationIds : [],
+    pinnedConversationIds: user.pinnedConversationIds?.length ? user.pinnedConversationIds : [],
   };
 }
 

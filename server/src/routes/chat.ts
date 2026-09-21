@@ -88,6 +88,7 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
     if (plan && !plan.cancelledAt) roleByPlan.set(part.planId, part.state);
   }
 
+  const pinRank = new Map(store.pinnedConversationIds(userId).map((id, i) => [id, i]));
   const summaries: ConversationSummaryDTO[] = [];
   for (const [planId, myRole] of roleByPlan) {
     const plan = store.findPlanById(planId);
@@ -124,6 +125,7 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
       myRole,
       coverImage: plan.flyerDataUrl ?? plan.flyerLinkPreview?.image ?? null,
       isIdea: plan.planKind === "looking_for" && !plan.lockedAt,
+      pinned: conv ? pinRank.has(conv.id) : false,
     });
   }
 
@@ -154,11 +156,19 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
       communityId: community.id,
       communityName: community.name,
       coverImage: community.coverImage ?? null,
+      pinned: conv ? pinRank.has(conv.id) : false,
     });
   }
 
-  // Most recent chatter first; then upcoming-but-quiet plans by date.
+  // Pinned threads stay at the top (most recently pinned first). Everything
+  // else is most recent chatter, then upcoming-but-quiet plans by date.
   summaries.sort((a, b) => {
+    const aPin = a.conversationId != null ? pinRank.get(a.conversationId) : undefined;
+    const bPin = b.conversationId != null ? pinRank.get(b.conversationId) : undefined;
+    const aPinned = aPin !== undefined;
+    const bPinned = bPin !== undefined;
+    if (aPinned !== bPinned) return aPinned ? -1 : 1;
+    if (aPinned && bPinned && aPin !== bPin) return aPin - bPin;
     if (a.lastMessageAt && b.lastMessageAt) return a.lastMessageAt < b.lastMessageAt ? 1 : -1;
     if (a.lastMessageAt) return -1;
     if (b.lastMessageAt) return 1;
@@ -499,6 +509,27 @@ chatRouter.post("/conversations/:id/leave", requireAuth, (req, res) => {
   }
   store.removeConversationParticipant(convId, userId);
   res.json({ ok: true });
+});
+
+// POST /api/conversations/:id/pin { pinned: boolean } — keep this thread at the
+// top of the viewer's inbox. Toggle-only; body is optional (defaults to
+// flipping the current state). Most recently pinned lands first.
+chatRouter.post("/conversations/:id/pin", requireAuth, (req, res) => {
+  const convId = String(req.params.id);
+  const userId = String(req.userId);
+  const conv = store.findConversationById(convId);
+  if (!conv) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
+  if (!conv.participantIds.includes(userId)) {
+    res.status(403).json({ error: "Not a participant" });
+    return;
+  }
+  const next =
+    typeof req.body?.pinned === "boolean" ? req.body.pinned : !store.isConversationPinned(userId, convId);
+  store.setConversationPinned(userId, convId, next);
+  res.json({ ok: true, pinned: next });
 });
 
 // POST /api/conversations/:id/mute { muted: boolean } — quiets notifications

@@ -80,6 +80,8 @@ export interface UserRecord {
   /** Conversations the user explicitly left / removed from inbox. ensure* must
    *  not re-add them until they open the thread again (which clears this). */
   leftConversationIds?: string[];
+  /** Inbox pins, most recently pinned first. Those rows stay above the rest. */
+  pinnedConversationIds?: string[];
   /** Set when COMMONS ejects the account for Terms / UGC violations. Blocks sign-in. */
   ejectedAt?: string | null;
 }
@@ -1001,6 +1003,24 @@ export const store = {
   },
   isConversationMuted(userId: string, conversationId: string): boolean {
     return (snapshot.users.find((u) => u.id === userId)?.mutedConversationIds ?? []).includes(conversationId);
+  },
+
+  // ---- Pinned inbox conversations (most recently pinned first) ----
+  setConversationPinned(userId: string, conversationId: string, pinned: boolean): UserRecord | undefined {
+    const user = snapshot.users.find((u) => u.id === userId);
+    if (!user) return undefined;
+    const list = (user.pinnedConversationIds ?? []).filter((id) => id !== conversationId);
+    if (pinned) list.unshift(conversationId);
+    user.pinnedConversationIds = list;
+    persist();
+    mongoMirror.upsertUser(user);
+    return user;
+  },
+  isConversationPinned(userId: string, conversationId: string): boolean {
+    return (snapshot.users.find((u) => u.id === userId)?.pinnedConversationIds ?? []).includes(conversationId);
+  },
+  pinnedConversationIds(userId: string): string[] {
+    return [...(snapshot.users.find((u) => u.id === userId)?.pinnedConversationIds ?? [])];
   },
 
   // ---- Left / hidden-from-inbox conversations ----

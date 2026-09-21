@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { BarChart2, MessageCircle } from "lucide-react";
+import { BarChart2, MessageCircle, Pin, Trash2 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { InterestCover, PlanCoverThumb } from "../components/CoverThumb";
 import { EmptyCard, ScreenTitle } from "../components/ui";
@@ -44,18 +44,36 @@ function formatInboxTime(iso: string | null | undefined): string {
   return d.toLocaleDateString(undefined, { month: "numeric", day: "numeric" });
 }
 
-const SWIPE_ACTION_W = 88;
+const SWIPE_BTN_W = 88;
+const SWIPE_ACTION_W = SWIPE_BTN_W * 2;
 const SWIPE_LOCK_PX = 6;
-const SWIPE_OPEN_PX = 28;
+const SWIPE_OPEN_PX = 36;
 const SWIPE_FLICK_PX_MS = 0.4;
 const SWIPE_CLOSE_EVENT = "commons:messages-swipe-close";
 
+function byInboxRecency(a: ConversationSummaryDTO, b: ConversationSummaryDTO): number {
+  const at = a.lastMessageAt ?? a.planDate;
+  const bt = b.lastMessageAt ?? b.planDate;
+  return bt.localeCompare(at);
+}
+
+/** Pinned rows stay on top in their current order; the rest sort by recency. */
+function sortInbox(rows: ConversationSummaryDTO[]): ConversationSummaryDTO[] {
+  const pinned = rows.filter((row) => row.pinned);
+  const rest = rows.filter((row) => !row.pinned).sort(byInboxRecency);
+  return [...pinned, ...rest];
+}
+
 function SwipeRemoveRow({
   enabled,
+  pinned,
+  onPin,
   onRemove,
   children,
 }: {
   enabled: boolean;
+  pinned: boolean;
+  onPin: () => void;
   onRemove: () => void;
   children: ReactNode;
 }) {
@@ -164,9 +182,23 @@ function SwipeRemoveRow({
 
   return (
     <div className="messages-swipe">
-      <button type="button" className="messages-swipe-action" onClick={onRemove}>
-        Remove
-      </button>
+      <div className="messages-swipe-actions">
+        <button
+          type="button"
+          className="messages-swipe-action messages-swipe-action--pin"
+          onClick={() => {
+            applyX(0);
+            onPin();
+          }}
+        >
+          <Pin size={16} strokeWidth={2.2} aria-hidden="true" />
+          {pinned ? "Unpin" : "Pin"}
+        </button>
+        <button type="button" className="messages-swipe-action messages-swipe-action--remove" onClick={onRemove}>
+          <Trash2 size={16} strokeWidth={2.2} aria-hidden="true" />
+          Remove
+        </button>
+      </div>
       <div
         ref={frontRef}
         className={`messages-swipe-front${dragging ? " is-dragging" : ""}`}
@@ -202,17 +234,12 @@ export function MessagesPage() {
   const [dismissTarget, setDismissTarget] = useState<string | null>(null);
   const [dismissBusy, setDismissBusy] = useState(false);
   const [dismissErr, setDismissErr] = useState<string | null>(null);
+  const [pinErr, setPinErr] = useState<string | null>(null);
 
   useEffect(() => {
     void api<ConversationSummaryDTO[]>("/api/conversations")
       .then((rows) => {
-        setItems(
-          [...rows].sort((a, b) => {
-            const at = a.lastMessageAt ?? a.planDate;
-            const bt = b.lastMessageAt ?? b.planDate;
-            return bt.localeCompare(at);
-          }),
-        );
+        setItems(sortInbox(rows));
         setReady(true);
       })
       .catch(() => {
@@ -220,6 +247,41 @@ export function MessagesPage() {
         setReady(true);
       });
   }, []);
+
+  async function togglePin(conversationId: string) {
+    const current = items.find((c) => c.conversationId === conversationId);
+    if (!current) return;
+    const next = !current.pinned;
+    setPinErr(null);
+    setItems((prev) => {
+      const row = prev.find((c) => c.conversationId === conversationId);
+      if (!row) return prev;
+      const rest = prev.filter((c) => c.conversationId !== conversationId);
+      const updated = { ...row, pinned: next };
+      if (next) return [updated, ...rest];
+      const stillPinned = rest.filter((c) => c.pinned);
+      const unpinned = [...rest.filter((c) => !c.pinned), updated].sort(byInboxRecency);
+      return [...stillPinned, ...unpinned];
+    });
+    try {
+      await api(`/api/conversations/${conversationId}/pin`, {
+        method: "POST",
+        body: JSON.stringify({ pinned: next }),
+      });
+    } catch (e) {
+      setPinErr(parseApiError(e));
+      setItems((prev) => {
+        const row = prev.find((c) => c.conversationId === conversationId);
+        if (!row) return prev;
+        const rest = prev.filter((c) => c.conversationId !== conversationId);
+        const reverted = { ...row, pinned: !next };
+        if (!next) return [reverted, ...rest];
+        const stillPinned = rest.filter((c) => c.pinned);
+        const unpinned = [...rest.filter((c) => !c.pinned), reverted].sort(byInboxRecency);
+        return [...stillPinned, ...unpinned];
+      });
+    }
+  }
 
   async function dismissPastChat(conversationId: string) {
     setDismissBusy(true);
@@ -311,7 +373,9 @@ export function MessagesPage() {
                           <InterestCover tag={f.interestTag} />
                           <div className="messages-row-body">
                             <div className="messages-row-top">
-                              <span className="messages-row-title">{f.label}</span>
+                              <span className="messages-row-title">
+                                <span className="messages-row-title-text">{f.label}</span>
+                              </span>
                               {f.latestPost?.createdAt ? (
                                 <span className={`messages-row-time${f.hasUnread ? " is-unread" : ""}`}>
                                   {formatInboxTime(f.latestPost.createdAt)}
@@ -389,6 +453,7 @@ export function MessagesPage() {
         />
       ) : (
         <>
+          {pinErr && <p className="error-text" style={{ marginBottom: 8 }}>{pinErr}</p>}
           <div className="messages-card">
             <div className="messages-list">
               {items.map((c) => {
@@ -410,7 +475,12 @@ export function MessagesPage() {
                     />
                     <div className="messages-row-body">
                       <div className="messages-row-top">
-                        <span className="messages-row-title">{title}</span>
+                        <span className="messages-row-title">
+                          {c.pinned ? (
+                            <Pin size={13} strokeWidth={2.2} className="messages-row-pin" aria-label="Pinned" />
+                          ) : null}
+                          <span className="messages-row-title-text">{title}</span>
+                        </span>
                         {time ? (
                           <span className={`messages-row-time${unread ? " is-unread" : ""}`}>{time}</span>
                         ) : null}
@@ -433,6 +503,10 @@ export function MessagesPage() {
                   <SwipeRemoveRow
                     key={c.communityId ? `comm-${c.communityId}` : c.planId}
                     enabled={canDismiss}
+                    pinned={Boolean(c.pinned)}
+                    onPin={() => {
+                      if (c.conversationId) void togglePin(c.conversationId);
+                    }}
                     onRemove={() => {
                       setDismissErr(null);
                       setDismissTarget(c.conversationId!);
