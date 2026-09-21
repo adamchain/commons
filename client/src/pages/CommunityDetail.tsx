@@ -135,6 +135,8 @@ export function CommunityDetailPage() {
   const canLeave =
     community.creationStatus === "approved" && isActiveMember && !community.isOrganizer;
   const canShare = community.creationStatus === "approved";
+  const communityId = community.id;
+  const communityName = community.name;
 
   async function leaveCommunity() {
     if (leaveBusy || !canLeave) return;
@@ -152,10 +154,10 @@ export function CommunityDetailPage() {
   }
 
   async function shareCommunity() {
-    const url = `${window.location.origin}/communities/${community.id}`;
+    const url = `${window.location.origin}/communities/${communityId}`;
     try {
       if (typeof navigator.share === "function") {
-        await navigator.share({ title: community.name, text: `Join ${community.name} on COMMONS`, url });
+        await navigator.share({ title: communityName, text: `Join ${communityName} on COMMONS`, url });
       } else {
         await navigator.clipboard.writeText(url);
         setShareMsg("Link copied.");
