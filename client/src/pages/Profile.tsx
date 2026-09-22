@@ -26,10 +26,10 @@ import { ReportModal } from "../components/PlanSafetyMenu";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanWhenLine } from "../lib/format";
+import { interestVisual } from "../lib/interestIcons";
 import { isIdeaPlan } from "../lib/planTime";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import {
-  INTEREST_LABELS,
   type CommunityCardDTO,
   type InterestTag,
   type MeDTO,
@@ -295,6 +295,7 @@ export function ProfilePage() {
                   <span className="profile-other-stat-num">{profile.stats.hosted}</span>
                   <span className="profile-other-stat-label">Started</span>
                 </div>
+                <span className="profile-other-stat-divider" aria-hidden="true" />
                 <div className="profile-other-stat">
                   <span className="profile-other-stat-num">{profile.stats.joined}</span>
                   <span className="profile-other-stat-label">Joined</span>
@@ -319,27 +320,27 @@ export function ProfilePage() {
               inNetwork={profile.network.inMyNetwork}
             />
           </div>
-        </section>
 
-        {profile.network.mutualCount > 0 && mutualLabel && (
-          <div className="profile-other-mutuals">
-            <div className="profile-other-mutuals-avatars">
-              {mutuals.map((u) => (
-                <span key={u.id} className="profile-other-mutuals-avatar">
-                  <Avatar
-                    seed={u.avatarSeed}
-                    style={u.avatarStyle}
-                    photoDataUrl={u.avatarPhotoDataUrl}
-                    params={u.avatarParams}
-                    name={u.firstName}
-                    size="sm"
-                  />
-                </span>
-              ))}
+          {profile.network.mutualCount > 0 && mutualLabel && (
+            <div className="profile-other-mutuals">
+              <div className="profile-other-mutuals-avatars">
+                {mutuals.map((u) => (
+                  <span key={u.id} className="profile-other-mutuals-avatar">
+                    <Avatar
+                      seed={u.avatarSeed}
+                      style={u.avatarStyle}
+                      photoDataUrl={u.avatarPhotoDataUrl}
+                      params={u.avatarParams}
+                      name={u.firstName}
+                      size="sm"
+                    />
+                  </span>
+                ))}
+              </div>
+              <span className="profile-other-mutuals-text">{mutualLabel}</span>
             </div>
-            <span className="profile-other-mutuals-text">{mutualLabel}</span>
-          </div>
-        )}
+          )}
+        </section>
 
         {profile.plansGated ? (
           <section className="profile-other-section">
@@ -379,19 +380,6 @@ export function ProfilePage() {
             </div>
           </section>
         ) : null}
-
-        {profile.interests.length > 0 && (
-          <section className="profile-other-section">
-            <h3 className="profile-other-section-label">Interests</h3>
-            <div className="profile-interests">
-              {profile.interests.map((t) => (
-                <span key={t} className="profile-interest-chip">
-                  {INTEREST_LABELS[t]}
-                </span>
-              ))}
-            </div>
-          </section>
-        )}
 
         {profile.network.inMyNetwork && (profile.communities?.length ?? 0) > 0 && (
           <section className="profile-other-section">
@@ -621,8 +609,9 @@ function OtherProfileNav({
   // and the global TopBar (z-index 41) can't cover ← or •••.
   return createPortal(
     <header className="profile-other-nav">
-      <button type="button" className="back-circle" aria-label={backLabel} onClick={onBack}>
+      <button type="button" className="profile-other-back" aria-label={backLabel} onClick={onBack}>
         <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
+        <span>Back</span>
       </button>
       {title ? <div className="profile-other-nav-title">{title}</div> : <span />}
       {onMore ? (
@@ -736,25 +725,46 @@ function PreviewRows<T extends { id: string }>({
   );
 }
 
+function formatCompactPlanTime(time: string): string {
+  const [hStr, mStr = "00"] = time.split(":");
+  const h = Number(hStr);
+  if (Number.isNaN(h)) return time;
+  const ampm = h >= 12 ? "pm" : "am";
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  const minutes = mStr.padStart(2, "0");
+  return minutes === "00" ? `${hour12}${ampm}` : `${hour12}:${minutes}${ampm}`;
+}
+
+function formatOtherPlanWhen(plan: PlanDTO): string {
+  const flexibleTime = plan.isFlexibleTime || plan.time === "Flexible" || !plan.time?.trim();
+  if (flexibleTime) {
+    return formatPlanWhenLine(plan.date, plan.time, plan.isFlexibleTime, {
+      isFlexibleDate: plan.isFlexibleDate,
+      isThisWeek: plan.isThisWeek,
+    });
+  }
+  const day = formatPlanDate(plan.date, {
+    isFlexibleDate: plan.isFlexibleDate,
+    isThisWeek: plan.isThisWeek,
+  });
+  return `${day} · ${formatCompactPlanTime(plan.time)}`;
+}
+
 function OtherPlanRow({ plan, profileUserId }: { plan: PlanDTO; profileUserId: string }) {
   const going = plan.participants.going.length;
+  const { Icon, iconColor, tint } = interestVisual(plan.tags?.[0]);
   return (
     <Link
       to={`/plans/${plan.id}`}
       state={{ from: "profile", profileUserId }}
       className="profile-other-plan-card"
     >
-      <span className="profile-other-plan-icon" aria-hidden="true">
-        {plan.hostEmoji || "✨"}
+      <span className="profile-other-plan-icon" style={{ background: tint, color: iconColor }} aria-hidden="true">
+        <Icon size={18} strokeWidth={1.8} />
       </span>
       <span className="profile-other-plan-body">
         <span className="profile-other-plan-title">{plan.title}</span>
-        <span className="profile-other-plan-date">
-          {formatPlanWhenLine(plan.date, plan.time, plan.isFlexibleTime, {
-            isFlexibleDate: plan.isFlexibleDate,
-            isThisWeek: plan.isThisWeek,
-          })}
-        </span>
+        <span className="profile-other-plan-date">{formatOtherPlanWhen(plan)}</span>
       </span>
       <span className="profile-other-plan-going">
         <Users size={12} strokeWidth={1.8} aria-hidden="true" />

@@ -15167,9 +15167,16 @@ button.xpl-photo-tile {
 }
 .profile-other-back {
   justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   min-height: 44px;
-  min-width: 44px;
-  padding: 0 4px 0 0;
+  padding: 0 8px 0 0;
+  background: none;
+  border: none;
+  font-size: var(--text-body);
+  font-weight: 500;
+  cursor: pointer;
   touch-action: manipulation;
   position: relative;
   z-index: 1;
@@ -15247,7 +15254,7 @@ button.xpl-photo-tile {
   gap: 4px;
   font-size: var(--text-body-small);
   font-weight: 600;
-  color: var(--ink);
+  color: var(--red);
   margin-bottom: 10px;
 }
 .profile-other-location svg {
@@ -15315,14 +15322,19 @@ button.xpl-photo-tile {
   background: var(--red);
   color: #fff;
 }
-.profile-other-cta--connected,
-.profile-other-cta--message {
+.profile-other-cta--connected {
   background: var(--tan-mid);
   color: var(--ink);
 }
+.profile-other-cta--message {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--tan-mid);
+  font-weight: 600;
+}
 .profile-other-cta--message:disabled {
   opacity: 1;
-  background: var(--tan-mid);
+  background: var(--surface);
   color: var(--ink);
   cursor: default;
 }
@@ -15330,11 +15342,10 @@ button.xpl-photo-tile {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 0 4px;
-  background: var(--surface);
-  border-radius: 16px;
-  padding: 12px 14px;
-  box-shadow: var(--shadow-card);
+  margin: 14px 0 0;
+  background: var(--bg);
+  border-radius: 14px;
+  padding: 10px 12px;
 }
 .profile-other-mutuals-avatars {
   display: flex;
@@ -15347,7 +15358,7 @@ button.xpl-photo-tile {
   height: 26px;
   border-radius: 13px;
   overflow: hidden;
-  border: 2px solid var(--card);
+  border: 2px solid var(--bg);
   margin-left: -8px;
 }
 .profile-other-mutuals-avatar:first-child {
@@ -15437,8 +15448,10 @@ button.xpl-photo-tile {
   justify-content: center;
   flex-shrink: 0;
   background: #f3ebe3;
-  font-size: 18px;
   line-height: 1;
+}
+.profile-other-plan-icon svg {
+  display: block;
 }
 .profile-other-plan-body {
   flex: 1;
