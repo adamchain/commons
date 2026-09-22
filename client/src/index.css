@@ -4866,6 +4866,7 @@ a.action-btn--stack {
 }
 .messages-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0;
 }
 .messages-swipe {
@@ -4934,6 +4935,8 @@ a.action-btn--stack {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
   min-height: 72px;
   padding: 10px 16px;
   background: transparent;
@@ -13587,6 +13590,12 @@ button.xpl-photo-tile {
   gap: 6px;
   flex: 1;
   min-width: 0;
+}
+.messages-row-preview > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .messages-row-meta {
   font-size: var(--text-body-small);
