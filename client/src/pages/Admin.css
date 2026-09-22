@@ -44,6 +44,7 @@
   gap: 0.25rem;
   margin: -0.25rem 0 1.25rem;
   border-bottom: 1px solid var(--border);
+  overflow-x: auto;
 }
 
 .admin-tab {
@@ -58,6 +59,7 @@
   font-weight: 600;
   color: var(--text-muted);
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .admin-tab.is-active {
@@ -579,10 +581,14 @@
   background: var(--surface-2, #f0f0f0);
 }
 
+.admin-cardimg-frame {
+  aspect-ratio: 4 / 3;
+  background: var(--surface-2, #f0f0f0);
+}
 .admin-cardimg img {
   display: block;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  height: 100%;
   object-fit: cover;
 }
 

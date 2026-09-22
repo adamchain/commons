@@ -423,6 +423,48 @@ type CoverCatalogCategory = { id: string; label: string; images: CoverCatalogIma
 
 const COVER_CATEGORY_OPTIONS = [...new Set([...Object.values(INTEREST_LABELS), "Other", "Library"])];
 
+type AdminTab = "overview" | "users" | "communities" | "reports" | "images";
+
+const ADMIN_TABS: { id: AdminTab; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "users", label: "Users" },
+  { id: "communities", label: "Communities" },
+  { id: "reports", label: "Reports" },
+  { id: "images", label: "Images" },
+];
+
+/** Sets the image src only once the tile is near the viewport. */
+function LazyCardImage({ src, alt }: { src: string; alt: string }) {
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [active, setActive] = useState(false);
+
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el || active) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setActive(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setActive(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "240px 0px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [active]);
+
+  return (
+    <div ref={frameRef} className="admin-cardimg-frame">
+      {active ? <img src={src} alt={alt} title={alt} decoding="async" /> : null}
+    </div>
+  );
+}
+
 /**
  * Event-card image library — admins add/remove the cover art used on plan
  * cards (for plans without their own flyer) without touching the codebase.
@@ -683,7 +725,7 @@ function CardImagesManager() {
             <div className="admin-cardimg-grid">
               {visible.map((img) => (
                 <figure key={`${img.libraryId ?? "gcs"}:${img.url}`} className="admin-cardimg">
-                  <img src={img.url} alt={img.label || "Card image"} title={img.label} loading="lazy" />
+                  <LazyCardImage src={img.url} alt={img.label || "Card image"} />
                   <figcaption className="admin-cardimg-cap">
                     <select
                       className="admin-cardimg-cat"
@@ -1390,7 +1432,7 @@ export function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [userQuery, setUserQuery] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [tab, setTab] = useState<"overview" | "images">("overview");
+  const [tab, setTab] = useState<AdminTab>("overview");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1487,28 +1529,26 @@ export function AdminPage() {
         </header>
 
         <nav className="admin-tabs" role="tablist" aria-label="Admin">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === "overview"}
-            className={`admin-tab${tab === "overview" ? " is-active" : ""}`}
-            onClick={() => setTab("overview")}
-          >
-            Overview
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === "images"}
-            className={`admin-tab${tab === "images" ? " is-active" : ""}`}
-            onClick={() => setTab("images")}
-          >
-            Images
-          </button>
+          {ADMIN_TABS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === item.id}
+              className={`admin-tab${tab === item.id ? " is-active" : ""}`}
+              onClick={() => setTab(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
         </nav>
 
         {tab === "images" ? (
           <CardImagesManager />
+        ) : tab === "communities" ? (
+          <CommunitiesReview />
+        ) : tab === "reports" ? (
+          <ReportsReview />
         ) : (
           <>
         {error ? (
@@ -1527,6 +1567,8 @@ export function AdminPage() {
           <p className="admin-muted">Loading…</p>
         ) : summary ? (
           <>
+            {tab === "overview" && (
+            <>
             <ReviewInbox />
 
             {behavior ? (
@@ -1679,10 +1721,28 @@ export function AdminPage() {
               </div>
             </section>
 
-            <ReportsReview />
+            <section className="admin-section">
+              <h2 className="admin-section-title">Recent server logs</h2>
+              <div className="admin-card">
+                {summary.recentLogs.length === 0 ? (
+                  <p className="admin-muted">No log rows in store.</p>
+                ) : (
+                  <ul className="admin-log-list">
+                    {summary.recentLogs.map((l) => (
+                      <li key={l.id}>
+                        <span className="admin-log-time">{new Date(l.createdAt).toLocaleString()}</span>
+                        <span>{l.event}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </section>
+            </>
+            )}
 
-            <CommunitiesReview />
-
+            {tab === "users" && (
+            <>
             <section className="admin-section">
               <h2 className="admin-section-title">Users</h2>
               <div className="admin-card">
@@ -1741,11 +1801,9 @@ export function AdminPage() {
               </div>
             </section>
 
-            <section className="admin-section admin-grid-2">
+            <section className="admin-section">
+              <h2 className="admin-section-title">Recently joined</h2>
               <div className="admin-card">
-                <h3 className="admin-section-title" style={{ marginBottom: "0.5rem" }}>
-                  Recently joined
-                </h3>
                 <ul className="admin-log-list">
                   {summary.recentUsers.map((u) => (
                     <li
@@ -1764,24 +1822,9 @@ export function AdminPage() {
                   ))}
                 </ul>
               </div>
-              <div className="admin-card">
-                <h3 className="admin-section-title" style={{ marginBottom: "0.5rem" }}>
-                  Recent server logs
-                </h3>
-                {summary.recentLogs.length === 0 ? (
-                  <p className="admin-muted">No log rows in store.</p>
-                ) : (
-                  <ul className="admin-log-list">
-                    {summary.recentLogs.map((l) => (
-                      <li key={l.id}>
-                        <span className="admin-log-time">{new Date(l.createdAt).toLocaleString()}</span>
-                        <span>{l.event}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
             </section>
+            </>
+            )}
           </>
         ) : null}
           </>
