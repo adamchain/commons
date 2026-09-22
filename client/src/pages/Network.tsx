@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { ScreenTitle } from "../components/ui";
+import { useAuth } from "../context/AuthContext";
 import type { NetworkLinkStatus, PersonSearchResultDTO, PublicUser, SearchResultsDTO } from "../types/shared";
 
 const DEBOUNCE_MS = 300;
@@ -24,14 +26,14 @@ type Row = {
  * discoverable in the city.
  */
 export function NetworkPage() {
+  const { user } = useAuth();
   const [network, setNetwork] = useState<NetworkMember[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<PersonSearchResultDTO[] | null>(null);
+  const [results, setResults] = useState<{ q: string; people: PersonSearchResultDTO[] } | null>(null);
   const [searching, setSearching] = useState(false);
   const [overrides, setOverrides] = useState<Record<string, NetworkLinkStatus>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     void api<{ users: NetworkMember[] }>("/api/auth/network")
@@ -43,37 +45,55 @@ export function NetworkPage() {
   const trimmed = query.trim();
 
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!trimmed) {
       setResults(null);
       setSearching(false);
       return;
     }
-    setSearching(true);
-    debounceRef.current = setTimeout(() => {
-      void api<SearchResultsDTO>(`/api/search?q=${encodeURIComponent(trimmed)}`)
-        .then((r) => setResults(r.people))
-        .catch(() => setResults([]))
-        .finally(() => setSearching(false));
+    const ac = new AbortController();
+    const timer = window.setTimeout(() => {
+      setSearching(true);
+      void api<SearchResultsDTO>(`/api/search?q=${encodeURIComponent(trimmed)}`, { signal: ac.signal })
+        .then((r) => {
+          if (!ac.signal.aborted) setResults({ q: trimmed, people: r.people });
+        })
+        .catch((err: unknown) => {
+          if (ac.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) return;
+          setResults({ q: trimmed, people: [] });
+        })
+        .finally(() => {
+          if (!ac.signal.aborted) setSearching(false);
+        });
     }, DEBOUNCE_MS);
     return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      window.clearTimeout(timer);
+      ac.abort();
     };
   }, [trimmed]);
 
-  const rows: Row[] = trimmed
-    ? (results ?? []).map((p) => ({
+  const serverPeople = results && results.q === trimmed ? results.people : null;
+  const needle = trimmed.toLowerCase();
+  const localMatches = trimmed
+    ? network.filter((u) =>
+        [u.firstName, u.lastName].filter(Boolean).join(" ").toLowerCase().includes(needle),
+      )
+    : network;
+  // Keep the current list up while a search is in flight so the rows don't
+  // blank out and pop back on every keystroke.
+  const rows: Row[] = serverPeople
+    ? serverPeople.map((p) => ({
         user: p.user,
         neighborhoodName: p.neighborhoodName,
         mutualCount: p.mutualCount,
         networkStatus: overrides[p.user.id] ?? p.networkStatus,
       }))
-    : network.map((u) => ({
+    : localMatches.map((u) => ({
         user: u,
         neighborhoodName: u.neighborhoodName ?? null,
         mutualCount: u.mutualCount ?? 0,
         networkStatus: "connected" as const,
       }));
+  const waitingForResults = Boolean(trimmed) && serverPeople === null;
 
   async function connect(userId: string) {
     setBusyId(userId);
@@ -93,8 +113,15 @@ export function NetworkPage() {
     }
   }
 
+  const profileTo = user ? `/profile/${user.id}` : "/";
+
   return (
-    <main className="page network-page">
+    <main className="app-shell app-shell--with-nav app-shell--with-topbar network-page">
+      <header className="app-header app-header--minimal">
+        <Link to={profileTo} className="detail-back">
+          <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" /> Profile
+        </Link>
+      </header>
       <ScreenTitle title="My network" subtitle="People you know in Philadelphia." />
 
       <div className="network-search-wrap">
@@ -106,15 +133,22 @@ export function NetworkPage() {
           placeholder="Search people"
           aria-label="Search people"
           enterKeyHint="search"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
         />
-        {query && (
-          <button type="button" className="network-search-clear" onClick={() => setQuery("")} aria-label="Clear search">
-            ×
-          </button>
-        )}
+        <button
+          type="button"
+          className={`network-search-clear${query ? " is-on" : ""}`}
+          onClick={() => setQuery("")}
+          aria-label="Clear search"
+          tabIndex={query ? 0 : -1}
+        >
+          ×
+        </button>
       </div>
 
-      {trimmed && (
+      {serverPeople && (
         <p className="network-results-label">Results for “{trimmed}”</p>
       )}
 
@@ -131,7 +165,8 @@ export function NetworkPage() {
         </div>
       ) : (
         loaded &&
-        !searching && (
+        !searching &&
+        !waitingForResults && (
           <p className="network-empty">{trimmed ? "Nobody by that name." : "It's just you for now."}</p>
         )
       )}

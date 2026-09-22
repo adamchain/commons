@@ -13572,11 +13572,17 @@ button.xpl-photo-tile {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
+  min-width: 0;
   padding: 10px 14px;
   margin-bottom: 16px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-control);
+  box-sizing: border-box;
+}
+.network-search-wrap:focus-within {
+  border-color: var(--accent);
 }
 .network-search-wrap svg {
   width: 18px;
@@ -13585,26 +13591,42 @@ button.xpl-photo-tile {
   flex-shrink: 0;
 }
 .network-search-input {
-  flex: 1;
+  /* width:0 lets flex own the size. A 100% input plus the icon and clear
+     button overflows the row and shifts the page when the field focuses. */
+  flex: 1 1 0;
+  width: 0;
   min-width: 0;
   border: none;
+  border-radius: 0;
   background: transparent;
-  font-size: var(--text-body);
+  box-shadow: none;
+  font-size: 16px;
   color: var(--text);
   padding: 2px 0;
   line-height: 1.35;
+  appearance: none;
+  -webkit-appearance: none;
 }
 .network-search-input:focus {
   outline: none;
+  border-color: transparent;
+  box-shadow: none;
 }
 .network-search-clear {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
   border: none;
   background: transparent;
   color: var(--text-muted);
   font-size: 20px;
   line-height: 1;
-  padding: 0 2px;
+  padding: 0;
   cursor: pointer;
+  visibility: hidden;
+}
+.network-search-clear.is-on {
+  visibility: visible;
 }
 .network-results-label {
   margin: 2px 2px 10px;

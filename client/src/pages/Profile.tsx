@@ -107,6 +107,7 @@ export function ProfilePage() {
   const [network, setNetwork] = useState<PublicUser[] | null>(null);
   const [communities, setCommunities] = useState<CommunityCardDTO[]>([]);
   const [communitiesExpanded, setCommunitiesExpanded] = useState(false);
+  const [communityFilter, setCommunityFilter] = useState<"all" | "running">("all");
   const [plansView, setPlansView] = useState<"list" | "calendar">("list");
   const [actionSheetOpen, setActionSheetOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -119,6 +120,7 @@ export function ProfilePage() {
     reloadProfile();
     setPlansView("list");
     setCommunitiesExpanded(false);
+    setCommunityFilter("all");
   }, [userId, location.pathname, location.key]);
 
   // Refetch when returning to the tab so joins show up without a hard reload.
@@ -185,8 +187,10 @@ export function ProfilePage() {
   }
 
   const displayName = [profile.user.firstName, profile.user.lastName].filter(Boolean).join(" ") || "Unnamed";
-  const visibleCommunities = communitiesExpanded ? communities : communities.slice(0, 3);
-  const hiddenCommunityCount = Math.max(0, communities.length - visibleCommunities.length);
+  const shownCommunities =
+    communityFilter === "running" ? communities.filter((c) => c.myRole === "organizer") : communities;
+  const visibleCommunities = communitiesExpanded ? shownCommunities : shownCommunities.slice(0, 3);
+  const hiddenCommunityCount = Math.max(0, shownCommunities.length - visibleCommunities.length);
   const firstName = profile.user.firstName || "them";
   const locationLabel = profile.neighborhood?.name ?? null;
 
@@ -395,7 +399,7 @@ export function ProfilePage() {
                     Show {hiddenCommunityCount} more
                   </button>
                 )}
-                {communitiesExpanded && communities.length > 3 && (
+                {communitiesExpanded && shownCommunities.length > 3 && (
                   <button type="button" className="profile-show-more-row" onClick={() => setCommunitiesExpanded(false)}>
                     Show less
                   </button>
@@ -490,8 +494,36 @@ export function ProfilePage() {
       </section>
 
       <section className="profile-block" id="profile-communities">
-        <h3 className="profile-section-label">Communities</h3>
-        {communities.length > 0 ? (
+        <div className="profile-block-heading-row">
+          <h3 className="profile-section-label profile-section-label--inline">Communities</h3>
+          <div className="profile-plans-toggle" role="tablist" aria-label="Communities">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={communityFilter === "all"}
+              className={communityFilter === "all" ? "is-active" : ""}
+              onClick={() => {
+                setCommunityFilter("all");
+                setCommunitiesExpanded(false);
+              }}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={communityFilter === "running"}
+              className={communityFilter === "running" ? "is-active" : ""}
+              onClick={() => {
+                setCommunityFilter("running");
+                setCommunitiesExpanded(false);
+              }}
+            >
+              You run
+            </button>
+          </div>
+        </div>
+        {shownCommunities.length > 0 ? (
           <div className="profile-plan-card">
             {visibleCommunities.map((c) => (
                 <Link key={c.id} to={`/communities/${c.id}`} className="profile-community-row">
@@ -515,14 +547,18 @@ export function ProfilePage() {
                 Show {hiddenCommunityCount} more
               </button>
             )}
-            {communitiesExpanded && communities.length > 3 && (
+            {communitiesExpanded && shownCommunities.length > 3 && (
               <button type="button" className="profile-show-more-row" onClick={() => setCommunitiesExpanded(false)}>
                 Show less
               </button>
             )}
           </div>
         ) : (
-          <p className="profile-community-meta">Join a community and it’ll show up here.</p>
+          <p className="profile-community-meta">
+            {communityFilter === "running"
+              ? "You’re not running a community yet."
+              : "Join a community and it’ll show up here."}
+          </p>
         )}
       </section>
 
