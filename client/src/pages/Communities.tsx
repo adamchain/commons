@@ -21,6 +21,8 @@ import {
 } from "../types/shared";
 import "./Communities.css";
 
+const COMMUNITY_PAGE = 10;
+
 export function CommunitiesPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -28,6 +30,7 @@ export function CommunitiesPage() {
   const [loaded, setLoaded] = useState(false);
   const [category, setCategory] = useState<CommunityCategory | "all">("all");
   const [joinConfirm, setJoinConfirm] = useState(false);
+  const [shown, setShown] = useState(COMMUNITY_PAGE);
 
   useEffect(() => {
     let live = true;
@@ -48,8 +51,10 @@ export function CommunitiesPage() {
   const matchesCat = (c: CommunityCardDTO) =>
     category === "all" || communityCategoriesOf(c).includes(category);
   const browse = all.filter(matchesCat);
-  const hero = browse[0] ?? null;
-  const rest = browse.slice(1);
+  const visible = browse.slice(0, shown);
+  const hero = visible[0] ?? null;
+  const rest = visible.slice(1);
+  const hasMore = browse.length > shown;
   const catLabel = category === "all" ? null : COMMUNITY_CATEGORY_LABELS[category];
   const showBrowseEmpty = loaded && browse.length === 0;
 
@@ -86,7 +91,10 @@ export function CommunitiesPage() {
           role="tab"
           aria-selected={category === "all"}
           className={`cmy-cat-pill ${category === "all" ? "is-active" : ""}`}
-          onClick={() => setCategory("all")}
+          onClick={() => {
+            setCategory("all");
+            setShown(COMMUNITY_PAGE);
+          }}
         >
           All
         </button>
@@ -97,7 +105,10 @@ export function CommunitiesPage() {
             role="tab"
             aria-selected={category === cat}
             className={`cmy-cat-pill ${category === cat ? "is-active" : ""}`}
-            onClick={() => setCategory(cat)}
+            onClick={() => {
+              setCategory(cat);
+              setShown(COMMUNITY_PAGE);
+            }}
           >
             {COMMUNITY_CATEGORY_LABELS[cat]}
           </button>
@@ -132,6 +143,15 @@ export function CommunitiesPage() {
               <CommunityCompactCard key={c.id} c={c} onJoined={absorbJoin} />
             ))}
           </div>
+        )}
+        {hasMore && (
+          <button
+            type="button"
+            className="cmy-btn cmy-btn--ghost cmy-list-more"
+            onClick={() => setShown((n) => n + COMMUNITY_PAGE)}
+          >
+            Keep scrolling
+          </button>
         )}
       </section>
       {joinConfirm && <JoinConfirmPopup kind="community" onClose={() => setJoinConfirm(false)} />}

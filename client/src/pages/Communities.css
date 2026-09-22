@@ -138,6 +138,7 @@
   z-index: 0;
 }
 .cmy-list-section { display: flex; flex-direction: column; gap: var(--s-3); }
+.cmy-list-more { align-self: center; }
 
 .cmy-feed-grid {
   display: grid;
