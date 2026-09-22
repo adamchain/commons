@@ -470,6 +470,12 @@ export function PlanDetailPage() {
             planId={plan.id}
             messages={chatPreview}
             convId={chatConvId}
+            canOpenChat={
+              isHosting ||
+              (plan.coHosts?.some((h) => h.id === user.id) ?? false) ||
+              plan.myState === "going" ||
+              plan.myState === "interested"
+            }
             peopleCount={
               new Set([
                 plan.creator.id,
@@ -997,6 +1003,7 @@ function ChatPreviewCard({
   planId,
   messages,
   convId,
+  canOpenChat,
   peopleCount,
   navState,
   onSent,
@@ -1004,13 +1011,17 @@ function ChatPreviewCard({
   planId: string;
   messages: MessageDTO[] | null;
   convId: string | null;
+  canOpenChat: boolean;
   peopleCount: number;
   navState: { from: string; planId: string };
   onSent: (msg: MessageDTO) => void;
 }) {
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
-  const hasMessages = messages && messages.length > 0;
+  const loaded = messages !== null;
+  const hasMessages = loaded && messages.length > 0;
+  // Interested, joined, and hosts can open the thread before anyone has spoken.
+  const showThread = hasMessages || (canOpenChat && loaded);
   const placeholder = hasMessages ? "Add to the chat..." : "nothing yet — say hi 👋";
 
   async function send() {
@@ -1055,45 +1066,53 @@ function ChatPreviewCard({
   );
 
   return (
-    <div className={`plan-meta-card chat-preview-card${hasMessages ? " chat-preview-card--thread" : " chat-preview-card--composer"}`}>
-      {hasMessages ? (
+    <div className={`plan-meta-card chat-preview-card${showThread ? " chat-preview-card--thread" : " chat-preview-card--composer"}`}>
+      {showThread ? (
         <Link
           to={`/plans/${planId}/chat`}
           state={navState}
           className="chat-preview-messages-link chat-preview-messages-wrap"
+          aria-label="Open full chat"
         >
           <div className="chat-preview-header">
             <span className="chat-preview-title">Chat</span>
-            {peopleCount > 0 && (
-              <span className="chat-preview-people">
-                {peopleCount} {peopleCount === 1 ? "person" : "people"}
-              </span>
-            )}
+            <span className="chat-preview-header-meta">
+              {peopleCount > 0 && (
+                <span className="chat-preview-people">
+                  {peopleCount} {peopleCount === 1 ? "person" : "people"}
+                </span>
+              )}
+              <ChevronRight className="chat-preview-open-chevron" size={18} strokeWidth={2} aria-hidden="true" />
+            </span>
           </div>
-          <div className="chat-preview-messages">
-            {messages.map((msg) => (
-              <div key={msg.id} className="chat-preview-message">
-                {msg.sender && (
-                  <Avatar
-                    seed={msg.sender.avatarSeed}
-                    style={msg.sender.avatarStyle}
-                    photoDataUrl={msg.sender.avatarPhotoDataUrl}
-                    params={msg.sender.avatarParams}
-                    name={msg.sender.firstName}
-                    size="sm"
-                  />
-                )}
-                <div className="chat-preview-message-body">
+          {hasMessages ? (
+            <div className="chat-preview-messages">
+              {messages.map((msg) => (
+                <div key={msg.id} className="chat-preview-message">
                   {msg.sender && (
-                    <span className="chat-preview-message-sender">{msg.sender.firstName}</span>
+                    <Avatar
+                      seed={msg.sender.avatarSeed}
+                      style={msg.sender.avatarStyle}
+                      photoDataUrl={msg.sender.avatarPhotoDataUrl}
+                      params={msg.sender.avatarParams}
+                      name={msg.sender.firstName}
+                      size="sm"
+                    />
                   )}
-                  <span className="chat-preview-message-text">
-                    {msg.imageUrl ? "📷 Photo" : msg.body}
-                  </span>
+                  <div className="chat-preview-message-body">
+                    {msg.sender && (
+                      <span className="chat-preview-message-sender">{msg.sender.firstName}</span>
+                    )}
+                    <span className="chat-preview-message-text">
+                      {msg.imageUrl ? "📷 Photo" : msg.body}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="chat-preview-empty">Nothing yet — open the chat</p>
+          )}
         </Link>
       ) : null}
       {compose}
