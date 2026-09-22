@@ -311,7 +311,11 @@ export function ProfilePage() {
             {!profile.network.inMyNetwork && (
               <FriendButton profile={profile} onUpdated={reloadProfile} variant="other" />
             )}
-            <OtherMessageButton sharedPlanId={profile.sharedPlanId} profileUserId={userId} />
+            <OtherMessageButton
+              sharedPlanId={profile.sharedPlanId}
+              profileUserId={userId}
+              inNetwork={profile.network.inMyNetwork}
+            />
           </div>
         </section>
 
@@ -643,9 +647,11 @@ function OtherProfileNav({
 function OtherMessageButton({
   sharedPlanId,
   profileUserId,
+  inNetwork,
 }: {
   sharedPlanId: string | null;
   profileUserId: string;
+  inNetwork: boolean;
 }) {
   const inner = (
     <>
@@ -653,7 +659,13 @@ function OtherMessageButton({
       Message
     </>
   );
-  if (!sharedPlanId) {
+  // Someone in your network gets the direct chat. Otherwise the shared plan chat.
+  const to = inNetwork
+    ? `/dm/${profileUserId}`
+    : sharedPlanId
+      ? `/plans/${sharedPlanId}/chat`
+      : null;
+  if (!to) {
     return (
       <button type="button" className="profile-other-cta profile-other-cta--message" disabled>
         {inner}
@@ -662,7 +674,7 @@ function OtherMessageButton({
   }
   return (
     <Link
-      to={`/plans/${sharedPlanId}/chat`}
+      to={to}
       state={{ from: "profile", profileUserId }}
       className="profile-other-cta profile-other-cta--message"
     >
