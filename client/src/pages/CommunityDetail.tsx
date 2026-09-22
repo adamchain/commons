@@ -34,6 +34,7 @@ import {
 import { EmptyCard } from "../components/ui";
 import { formatRelative } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
+import { planHasEnded } from "../lib/planTime";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import { isNative } from "../lib/platform";
@@ -1029,6 +1030,9 @@ function EventsTab({
     void load();
   }, [load]);
 
+  const upcoming = plans.filter((p) => !p.cancelledAt && !planHasEnded(p));
+  const past = plans.filter((p) => Boolean(p.cancelledAt) || planHasEnded(p));
+
   return (
     <section className="cmy-tabpanel">
       {canPost && (
@@ -1043,11 +1047,26 @@ function EventsTab({
           body="Host something. The regulars will come."
         />
       )}
-      <div className="cmy-events">
-        {plans.map((p) => (
-          <PlanCard key={p.id} plan={p} onPlanRefresh={load} />
-        ))}
-      </div>
+      {upcoming.length > 0 && (
+        <div className="cmy-events">
+          {upcoming.map((p) => (
+            <PlanCard key={p.id} plan={p} onPlanRefresh={load} hideHappened navFrom={{ from: "community", communityId: community.id }} />
+          ))}
+        </div>
+      )}
+      {past.length > 0 && (
+        <details className="cmy-past-events">
+          <summary>
+            Past events
+            <span>{past.length}</span>
+          </summary>
+          <div className="cmy-events">
+            {past.map((p) => (
+              <PlanCard key={p.id} plan={p} onPlanRefresh={load} hideHappened navFrom={{ from: "community", communityId: community.id }} />
+            ))}
+          </div>
+        </details>
+      )}
     </section>
   );
 }

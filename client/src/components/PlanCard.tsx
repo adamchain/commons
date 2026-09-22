@@ -22,10 +22,13 @@ export function PlanCard({
   plan,
   onPlanRefresh,
   navFrom = { from: "feed" },
+  hideHappened = false,
 }: {
   plan: PlanDTO;
   onPlanRefresh?: () => void;
   navFrom?: NavFromState;
+  /** Hub past list already groups these, so the card doesn't repeat the tag. */
+  hideHappened?: boolean;
 }) {
   const title = sentenceCaseTitle(plan.title);
   const isLooking = isIdeaPlan(plan);
@@ -105,7 +108,7 @@ export function PlanCard({
             <span className="plan-card-posted-by">{plan.creator.firstName}</span>
             {isCancelled ? (
               <span className="plan-card-kind-pill is-cancelled">Cancelled</span>
-            ) : hasEnded ? (
+            ) : hasEnded && !hideHappened ? (
               <span className="plan-card-kind-pill is-happened">Happened</span>
             ) : null}
             {plan.communityId && plan.communityName ? (
