@@ -13,6 +13,7 @@ import {
   COMMUNITY_CATEGORY_LABELS,
   communityCategoriesOf,
   communityCategoryLine,
+  communityRequiresJoinApproval,
   type CommunityCardDTO,
   type CommunityCategory,
   type CommunityDTO,
@@ -253,8 +254,7 @@ function CommunityCompactCard({
   );
 }
 
-/** Plain red “Join →” text — auto-joins instantly-joinable communities;
- *  screened ones route through to the full request flow. */
+/** Instant-joins public communities. Private and screened ones request approval. */
 function CommunityJoinLink({ c, onJoined }: { c: CommunityCardDTO; onJoined: (updated: CommunityCardDTO) => void }) {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
@@ -294,7 +294,7 @@ function CommunityJoinLink({ c, onJoined }: { c: CommunityCardDTO; onJoined: (up
 
   return (
     <button type="button" className="cmy-joined-pill cmy-joined-pill--quiet cmy-compact-join" disabled={busy} onClick={handleClick}>
-      {busy ? "…" : c.hasScreening ? "Request" : "Join"}
+      {busy ? "…" : communityRequiresJoinApproval(c) ? "Request" : "Join"}
     </button>
   );
 }

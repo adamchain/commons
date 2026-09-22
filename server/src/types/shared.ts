@@ -674,6 +674,8 @@ export interface CommunityCardDTO {
   myMembershipStatus: CommunityMemberStatus | null;
   /** True when a screening question is set (join CTA reads "Request" instead of "Join"). */
   hasScreening: boolean;
+  /** Private communities also show Request — network ties do not skip approval. */
+  visibility: CommunityAccessLevel;
   /** Up to 3 active members for the card facepile. */
   memberPreview: PublicUser[];
 }

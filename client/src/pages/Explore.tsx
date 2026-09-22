@@ -8,7 +8,7 @@ import { JoinConfirmPopup } from "../components/JoinConfirmPopup";
 import { PhotoHero } from "../components/PhotoHero";
 import { EmptyCard, Label } from "../components/ui";
 import { HERO_PHOTO, PLACE_CATEGORIES, PLACE_TILES } from "../lib/placePhotos";
-import { communityCategoryLine, type CommunityCardDTO, type CommunityDTO } from "../types/shared";
+import { communityCategoryLine, communityRequiresJoinApproval, type CommunityCardDTO, type CommunityDTO } from "../types/shared";
 
 export function ExplorePage() {
   const navigate = useNavigate();
@@ -224,7 +224,7 @@ function CommunityJoinCta({
 
   return (
     <button type="button" className="xpl-comm-tag xpl-comm-join" disabled={busy} onClick={handleClick}>
-      {busy ? "…" : community.hasScreening ? "Request" : "Join"}
+      {busy ? "…" : communityRequiresJoinApproval(community) ? "Request" : "Join"}
     </button>
   );
 }

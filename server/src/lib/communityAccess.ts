@@ -13,9 +13,20 @@ export function isActiveCommunityMember(communityId: string, userId: string): bo
 }
 
 /**
+ * Private communities and communities with a screening question both need the
+ * organizer to approve. Network connections do not skip this.
+ */
+export function communityRequiresJoinApproval(
+  community: Pick<CommunityRecord, "screeningQuestion" | "visibility">,
+): boolean {
+  return (
+    !!community.screeningQuestion || (community.visibility ?? "everyone") === "members_only"
+  );
+}
+
+/**
  * Board view (bulletin / events / members) stays open for instant-join /
- * "Everyone" communities. Locked when the community requires a join request
- * (screening question) or the organizer set visibility to members_only.
+ * "Everyone" communities. Locked when the community requires a join request.
  */
 export function canViewCommunityBoard(
   community: Pick<
@@ -24,9 +35,7 @@ export function canViewCommunityBoard(
   >,
   userId: string,
 ): boolean {
-  const restricted =
-    !!community.screeningQuestion || (community.visibility ?? "everyone") === "members_only";
-  if (!restricted) return true;
+  if (!communityRequiresJoinApproval(community)) return true;
   return (
     isCommunityOrganizer(community, userId) || isActiveCommunityMember(community.id, userId)
   );

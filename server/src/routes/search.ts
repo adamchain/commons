@@ -56,6 +56,7 @@ function toCommunityCard(
     myRole: membership?.status === "active" ? membership.role : null,
     myMembershipStatus: membership?.status ?? null,
     hasScreening: !!community.screeningQuestion,
+    visibility: community.visibility ?? "everyone",
     memberPreview: ordered.slice(0, 3).map((m) => publicFor(m.userId, users)),
   };
 }

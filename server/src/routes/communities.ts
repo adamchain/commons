@@ -15,6 +15,7 @@ import {
   canViewCommunityBoard,
   communityCreationBlockReason,
   communityMembershipBlockReason,
+  communityRequiresJoinApproval,
   isActiveCommunityMember,
   isCommunityOrganizer,
 } from "../lib/communityAccess.js";
@@ -174,6 +175,7 @@ function toCommunityCard(
     myRole: membership?.status === "active" ? membership.role : null,
     myMembershipStatus: membership?.status ?? null,
     hasScreening: !!community.screeningQuestion,
+    visibility: community.visibility ?? "everyone",
     memberPreview: ordered.slice(0, 3).map((m) => publicFor(m.userId, users)),
   };
 }
@@ -570,8 +572,9 @@ communitiesRouter.patch("/:id", requireAuth, async (req, res) => {
   res.json(await toCommunityDTO(updated, viewerId));
 });
 
-// POST /api/communities/:id/join — instant join, or request-to-join if a
-// screening question is set (creates a pending membership with the answer).
+// POST /api/communities/:id/join — instant join for public communities.
+// Private communities and screening questions create a pending request.
+// Being in the organizer's network does not skip approval.
 communitiesRouter.post("/:id/join", requireAuth, async (req, res) => {
   const userId = String(req.userId);
   const community = store.findCommunityById(String(req.params.id));
@@ -585,9 +588,9 @@ communitiesRouter.post("/:id/join", requireAuth, async (req, res) => {
     return;
   }
   const me = await findUserById(userId);
-  if (community.screeningQuestion) {
+  if (communityRequiresJoinApproval(community)) {
     const answer = String(req.body?.screeningAnswer ?? "").trim().slice(0, 1000);
-    if (!answer) {
+    if (community.screeningQuestion && !answer) {
       res.status(400).json({ error: "Answer the screening question to request to join" });
       return;
     }
@@ -596,7 +599,7 @@ communitiesRouter.post("/:id/join", requireAuth, async (req, res) => {
       userId,
       role: "member",
       status: "pending",
-      screeningAnswer: answer,
+      screeningAnswer: answer || null,
     });
     // Notify the organizer (in-app + push). Never fail the join if notify hiccups.
     try {

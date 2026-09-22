@@ -15,6 +15,7 @@ import {
   MAX_COMMUNITY_CATEGORIES,
   communityCategoriesOf,
   communityCategoryLine,
+  communityRequiresJoinApproval,
   toggleCommunityCategory,
   type CommunityAccessLevel,
   type CommunityCategory,
@@ -126,8 +127,7 @@ export function CommunityDetailPage() {
   // Board view is open for instant-join / "Everyone" communities. Locked for
   // request-to-join (screening) or visibility=members_only. Posting / chat /
   // manage still require membership regardless.
-  const boardRestricted =
-    community.hasScreening || community.visibility === "members_only";
+  const boardRestricted = communityRequiresJoinApproval(community);
   const canSeeInside = !boardRestricted || isActiveMember || community.isOrganizer;
   const canPostBulletin = community.canPostBulletin && (isActiveMember || community.isOrganizer);
   const canPostPlan = community.canPostPlan && (isActiveMember || community.isOrganizer);
@@ -611,6 +611,7 @@ function JoinControl({
 
   const status = community.myMembership?.status;
   const isPending = status === "pending" || requested;
+  const needsApproval = communityRequiresJoinApproval(community);
 
   if (status === "active") {
     return (
@@ -677,10 +678,10 @@ function JoinControl({
         onClick={() => (community.hasScreening ? setAsking(true) : void doJoin())}
       >
         {busy
-          ? community.hasScreening
+          ? needsApproval
             ? "Sending…"
             : "Joining…"
-          : community.hasScreening
+          : needsApproval
             ? "Request to join"
             : "Join"}
       </button>
@@ -1120,7 +1121,7 @@ function MembersTab({
         </div>
       )}
 
-      {canManage && (community.hasScreening || community.pendingRequestCount > 0) && (
+      {canManage && (communityRequiresJoinApproval(community) || community.pendingRequestCount > 0) && (
         <JoinRequestsPanel
           communityId={community.id}
           canManage={canManage}
@@ -1435,7 +1436,7 @@ function SettingsTab({
 
   return (
     <section className="cmy-tabpanel cmy-settings">
-      {canManage && (community.hasScreening || community.pendingRequestCount > 0) && (
+      {canManage && (communityRequiresJoinApproval(community) || community.pendingRequestCount > 0) && (
         <JoinRequestsPanel
           communityId={community.id}
           canManage={canManage}
@@ -1597,12 +1598,20 @@ function SettingsTab({
         <SettingsRow
           id="screening"
           label="Screening"
-          summary={screening.trim() ? "Question set" : "Anyone can join"}
+          summary={
+            screening.trim()
+              ? "Question set"
+              : visibility === "members_only"
+                ? "Approval required"
+                : "Anyone can join"
+          }
           open={openRow === "screening"}
           onToggle={() => setOpenRow((r) => (r === "screening" ? null : "screening"))}
         >
           <p className="cmy-hint" style={{ margin: "0 0 8px" }}>
-            Leave blank and anyone can walk in.
+            {visibility === "members_only"
+              ? "Optional. People still need your approval to join."
+              : "Leave blank and anyone can walk in."}
           </p>
           <textarea
             className="cmy-textarea"
