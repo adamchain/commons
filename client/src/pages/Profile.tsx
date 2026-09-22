@@ -21,6 +21,7 @@ import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityStatusPill } from "../components/CommunityStatusPill";
 import { CommunityCoverThumb, PlanCoverThumb, planPhotoUrl } from "../components/CoverThumb";
+import { LinkedText } from "../components/LinkedText";
 import { ReportModal } from "../components/PlanSafetyMenu";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
@@ -300,7 +301,11 @@ export function ProfilePage() {
             </div>
           </div>
 
-          {profile.user.bio && <p className="profile-other-bio">{profile.user.bio}</p>}
+          {profile.user.bio && (
+            <p className="profile-other-bio">
+              <LinkedText text={profile.user.bio} />
+            </p>
+          )}
 
           <div className="profile-other-ctas">
             {!profile.network.inMyNetwork && (
@@ -484,7 +489,11 @@ export function ProfilePage() {
             </div>
           </div>
         </div>
-        {profile.user.bio && <p className="profile-bio">{profile.user.bio}</p>}
+        {profile.user.bio && (
+          <p className="profile-bio">
+            <LinkedText text={profile.user.bio} />
+          </p>
+        )}
         <SocialPills
           isSelf
           instagram={profile.socialLinks?.instagram}

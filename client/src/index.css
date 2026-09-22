@@ -13171,6 +13171,12 @@ button.xpl-photo-tile {
   line-height: 1.45;
   color: var(--text-muted);
 }
+.linked-text-link {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 .profile-edit-bio {
   resize: vertical;
   min-height: 72px;

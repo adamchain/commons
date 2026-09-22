@@ -21,6 +21,7 @@ import { PublicEventPage } from "./pages/PublicEvent";
 import { AdminPage } from "./pages/Admin";
 import { ProfilePage } from "./pages/Profile";
 import { EditProfilePage } from "./pages/EditProfile";
+import { DmChatPage } from "./pages/DmChat";
 import { NetworkPage } from "./pages/Network";
 import { InvitePage } from "./pages/Invite";
 import { SettingsPage } from "./pages/Settings";
@@ -184,6 +185,7 @@ export default function App() {
         <Route path="/plans/:id" element={<PlanRoute />} />
         <Route path="/plans/:planId/chat" element={<Protected><ChatPage /></Protected>} />
         <Route path="/network" element={<Protected><NetworkPage /></Protected>} />
+        <Route path="/dm/:userId" element={<Protected><DmChatPage /></Protected>} />
         <Route path="/invite" element={<Protected><InvitePage /></Protected>} />
         <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />
         <Route path="/settings/interests" element={<Protected><SettingsInterestsPage /></Protected>} />

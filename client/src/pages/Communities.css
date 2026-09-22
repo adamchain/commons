@@ -895,6 +895,18 @@ button.cmy-joined-pill {
   font-size: var(--text-body);
   line-height: 1.35;
   margin: 0;
+  white-space: pre-wrap;
+}
+.cmy-owner-line {
+  margin: 8px 0 0;
+  font-size: var(--text-body-small);
+  color: var(--text-muted);
+}
+.cmy-owner-line a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .cmy-socials {
   display: flex;
@@ -1904,12 +1916,33 @@ button.cmy-joined-pill {
 
 .cmy-dash { gap: var(--s-3); }
 .cmy-dash-head {
-  display: flex;
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
   align-items: center;
-  gap: var(--s-2);
+  gap: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: var(--shadow-card);
 }
-.cmy-dash-head .detail-back { position: static; }
-.cmy-dash-head-copy { min-width: 0; }
+.cmy-dash-back {
+  appearance: none;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+.cmy-dash-head-copy {
+  min-width: 0;
+  text-align: center;
+}
 .cmy-dash-head-copy h1 {
   margin: 0;
   font-size: var(--type-title);

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
@@ -171,8 +172,8 @@ export function CommunityDashboardPage() {
   if (missing || !data) {
     return (
       <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy">
-        <button type="button" className="detail-back" onClick={() => navigate(`/communities/${id}`)}>
-          ← Back
+        <button type="button" className="cmy-dash-back" aria-label="Back" onClick={() => navigate(`/communities/${id}`)}>
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </button>
         <p className="cmy-muted">{err ?? "This dashboard isn’t available."}</p>
       </main>
@@ -195,13 +196,14 @@ export function CommunityDashboardPage() {
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy cmy-dash">
       <header className="cmy-dash-head">
-        <button type="button" className="detail-back" onClick={() => navigate(`/communities/${id}`)}>
-          ← Back
+        <button type="button" className="cmy-dash-back" aria-label="Back" onClick={() => navigate(`/communities/${id}`)}>
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </button>
         <div className="cmy-dash-head-copy">
           <h1>{data.name}</h1>
           <p>Dashboard</p>
         </div>
+        <span className="cmy-dash-head-spacer" aria-hidden="true" />
       </header>
 
       <nav className="cmy-dash-tabs" role="tablist">

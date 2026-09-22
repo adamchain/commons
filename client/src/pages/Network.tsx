@@ -198,7 +198,7 @@ function NetworkRow({
 
   return (
     <div className="network-row">
-      <Link to={`/profile/${user.id}`} state={{ from: "profile" }} className="network-row-main">
+      <Link to={`/profile/${user.id}`} state={{ from: "network" }} className="network-row-main">
         <Avatar
           seed={user.avatarSeed}
           style={user.avatarStyle}
@@ -213,7 +213,7 @@ function NetworkRow({
         </span>
       </Link>
       {networkStatus === "connected" ? (
-        <Link to={`/profile/${user.id}`} state={{ from: "profile" }} className="network-action network-action--primary">
+        <Link to={`/dm/${user.id}`} state={{ from: "network" }} className="network-action network-action--primary">
           Message
         </Link>
       ) : networkStatus === "pending" ? (

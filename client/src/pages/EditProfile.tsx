@@ -267,7 +267,7 @@ function EditProfileForm({
         onChange={(e) => setBio(e.target.value)}
         maxLength={160}
         rows={3}
-        placeholder="A short line about you…"
+        placeholder="A short line about you. Paste a community link to connect it."
       />
 
       <label className="form-question" style={{ marginTop: 14 }}>

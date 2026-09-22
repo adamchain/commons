@@ -501,7 +501,7 @@ export function MessagesPage() {
                 );
                 return (
                   <SwipeRemoveRow
-                    key={c.communityId ? `comm-${c.communityId}` : c.planId}
+                    key={c.dmUserId ? `dm-${c.dmUserId}` : c.communityId ? `comm-${c.communityId}` : c.planId}
                     enabled={canDismiss}
                     pinned={Boolean(c.pinned)}
                     onPin={() => {
@@ -514,9 +514,11 @@ export function MessagesPage() {
                   >
                     <Link
                       to={
-                        c.communityId
-                          ? `/communities/${c.communityId}/chat`
-                          : `/plans/${c.planId}/chat`
+                        c.dmUserId
+                          ? `/dm/${c.dmUserId}`
+                          : c.communityId
+                            ? `/communities/${c.communityId}/chat`
+                            : `/plans/${c.planId}/chat`
                       }
                       state={{ from: "messages" }}
                       className="messages-row"

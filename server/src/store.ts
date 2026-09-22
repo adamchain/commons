@@ -1455,6 +1455,40 @@ export const store = {
     mongoMirror.upsertConversation(conv);
     return conv;
   },
+  /** Network DM — not tied to a plan. Reopens the thread if the caller had left it. */
+  listDirectDms(userId: string): ConversationRecord[] {
+    return snapshot.conversations.filter(
+      (c) => c.type === "dm" && c.planId === "" && !c.communityId && c.participantIds.includes(userId),
+    );
+  },
+  ensureDirectDm(a: string, b: string): ConversationRecord {
+    const existing = snapshot.conversations.find(
+      (c) =>
+        c.type === "dm" &&
+        c.planId === "" &&
+        !c.communityId &&
+        c.participantIds.length === 2 &&
+        c.participantIds.includes(a) &&
+        c.participantIds.includes(b),
+    );
+    if (existing) {
+      this.setConversationLeft(a, existing.id, false);
+      return existing;
+    }
+    const now = new Date().toISOString();
+    const conv: ConversationRecord = {
+      id: randomUUID(),
+      planId: "",
+      type: "dm",
+      participantIds: [a, b],
+      createdAt: now,
+      lastMessageAt: now,
+    };
+    snapshot.conversations.push(conv);
+    persist();
+    mongoMirror.upsertConversation(conv);
+    return conv;
+  },
   createDm(planId: string, a: string, b: string): ConversationRecord {
     if (this.isBlockedEitherWay(a, b)) {
       const existing = this.findDmInPlan(planId, a, b);

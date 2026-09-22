@@ -37,6 +37,7 @@ export function TopBar() {
     /^\/plans\/[^/]+(\/chat)?$/.test(pathname) ||
     /^\/plans\/[^/]+\/edit$/.test(pathname) ||
     /^\/communities\/[^/]+\/chat$/.test(pathname) ||
+    /^\/dm\/[^/]+$/.test(pathname) ||
     pathname === "/helpchat" ||
     isOtherUserProfile;
 

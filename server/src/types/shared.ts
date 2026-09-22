@@ -272,6 +272,8 @@ export interface ConversationSummaryDTO {
    */
   communityId?: string;
   communityName?: string;
+  /** Set on a network direct message. The client opens /dm/:dmUserId. */
+  dmUserId?: string;
   /** Plan flyer / community cover when one exists. */
   coverImage?: string | null;
   /** Unlocked looking-for plan — thumb uses the idea mark, not a stock cover. */

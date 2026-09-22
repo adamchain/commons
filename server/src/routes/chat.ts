@@ -69,10 +69,35 @@ function communityPostBlockReason(
   return communityMembershipBlockReason(community, userId);
 }
 
-// GET /api/conversations — unified inbox: group chats for every plan the user
-// is hosting / going to / interested in. Upcoming plans always show; past plans
-// only show once there's been real (non-system) chatter.
-chatRouter.get("/conversations", requireAuth, (req, res) => {
+// POST /api/dm { userId } — open or create a direct chat with someone in your network.
+chatRouter.post("/dm", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const otherId = String(req.body?.userId ?? "").trim();
+  if (!otherId || otherId === userId) {
+    res.status(400).json({ error: "Pick someone else to message." });
+    return;
+  }
+  const [me, other] = await Promise.all([findUserById(userId), findUserById(otherId)]);
+  if (!me || !other) {
+    res.status(404).json({ error: "Couldn't find that person." });
+    return;
+  }
+  if (store.isBlockedEitherWay(userId, otherId)) {
+    res.status(403).json({ error: "You can't message this person." });
+    return;
+  }
+  if (!(me.networkIds ?? []).includes(otherId)) {
+    res.status(403).json({ error: "Add them to your network before messaging." });
+    return;
+  }
+  const conv = store.ensureDirectDm(userId, otherId);
+  res.json(await toConversationDto(conv, userId));
+});
+
+// GET /api/conversations — unified inbox: plan chats, community chats, and
+// network DMs. Upcoming plans always show; past plans only show once there's
+// been real (non-system) chatter.
+chatRouter.get("/conversations", requireAuth, async (req, res) => {
   const userId = String(req.userId);
   const todayIso = new Date().toISOString().slice(0, 10);
 
@@ -157,6 +182,33 @@ chatRouter.get("/conversations", requireAuth, (req, res) => {
       communityName: community.name,
       coverImage: community.coverImage ?? null,
       pinned: conv ? pinRank.has(conv.id) : false,
+    });
+  }
+
+  for (const conv of store.listDirectDms(userId)) {
+    if (store.hasLeftConversation(userId, conv.id)) continue;
+    if (!conv.participantIds.includes(userId)) continue;
+    const otherId = conv.participantIds.find((id) => id !== userId);
+    if (!otherId || store.isBlockedEitherWay(userId, otherId)) continue;
+    const other = await findUserById(otherId);
+    const msgs = store.listMessagesForConversation(conv.id);
+    const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
+    const name = [other?.firstName, other?.lastName].filter(Boolean).join(" ") || "Message";
+    summaries.push({
+      planId: "",
+      planTitle: name,
+      hostEmoji: "💬",
+      planDate: conv.createdAt.slice(0, 10),
+      conversationId: conv.id,
+      lastMessageAt: msgs.length ? conv.lastMessageAt : null,
+      lastMessagePreview: lastMsg ? messagePreview(lastMsg) : null,
+      lastMessageSender: lastSenderName(lastMsg),
+      unreadCount: msgs.filter((m) => !m.readBy.includes(userId)).length,
+      participantCount: 2,
+      myRole: "going",
+      dmUserId: otherId,
+      coverImage: other?.avatarPhotoDataUrl ?? null,
+      pinned: pinRank.has(conv.id),
     });
   }
 

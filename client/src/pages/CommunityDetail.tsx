@@ -4,6 +4,7 @@ import { Calendar, LayoutDashboard, MessageCircle, Send, Users } from "lucide-re
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
+import { LinkedText } from "../components/LinkedText";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
 import { JoinConfirmPopup } from "../components/JoinConfirmPopup";
 import { PlanCard } from "../components/PlanCard";
@@ -282,9 +283,22 @@ export function CommunityDetailPage() {
               compact
             />
           </div>
-          {community.description && (
+          {(community.description || community.organizer) && (
             <div className="cmy-about">
-              <p className="cmy-desc">{community.description}</p>
+              {community.description && (
+                <p className="cmy-desc">
+                  <LinkedText text={community.description} />
+                </p>
+              )}
+              <p className="cmy-owner-line">
+                Organized by{" "}
+                <Link
+                  to={`/profile/${community.organizer.id}`}
+                  state={{ from: "community", communityId: community.id }}
+                >
+                  {community.organizer.firstName}
+                </Link>
+              </p>
             </div>
           )}
           <CommunitySocialPills
@@ -1633,7 +1647,7 @@ function SettingsTab({
             className="cmy-textarea"
             rows={4}
             value={description}
-            placeholder="What is this community about?"
+            placeholder="What is this community about? Paste your profile link to connect it."
             onChange={(e) => setDescription(e.target.value)}
           />
           <div className="cmy-social-fields">
