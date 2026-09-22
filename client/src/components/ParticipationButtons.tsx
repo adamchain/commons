@@ -183,7 +183,7 @@ export function ParticipationButtons({
             ? "This one's full — tap Interested in case a spot opens."
             : isApproveOnly
               ? capacity !== null
-                ? `${goingCount}/${capacity} spots — apply and the host lets you in.`
+                ? `${goingCount}/${capacity} spots — let the host know you're interested.`
                 : "Application-only."
               : `${goingCount}/${capacity} spots taken.`}
         </p>
@@ -232,7 +232,7 @@ export function ParticipationButtons({
             >
               {interestedActive
                 ? isApproveOnly && !isFull
-                  ? "Withdraw application"
+                  ? "Pending"
                   : "You're Interested"
                 : isApproveOnly && !isFull
                   ? "Apply"
