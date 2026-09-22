@@ -15293,9 +15293,9 @@ button.xpl-photo-tile {
 }
 .profile-other-bio {
   margin: 0 0 14px;
-  font-size: var(--text-body-small);
+  font-size: var(--text-body);
   line-height: 1.45;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 .profile-other-ctas {
   display: flex;
@@ -15317,6 +15317,10 @@ button.xpl-photo-tile {
   border: none;
   cursor: pointer;
   line-height: 1.2;
+  white-space: nowrap;
+}
+span.profile-other-cta {
+  cursor: default;
 }
 .profile-other-cta--primary {
   background: var(--red);
@@ -15480,6 +15484,15 @@ button.xpl-photo-tile {
   font-size: var(--text-body-small);
   color: var(--faint);
   flex-shrink: 0;
+}
+.profile-other-communities-card {
+  background: var(--surface);
+  border-radius: 20px;
+  box-shadow: var(--shadow-card);
+  padding: 14px 14px 8px;
+}
+.profile-other-communities-card .profile-other-section-label {
+  margin-bottom: 8px;
 }
 .profile-other-communities {
   display: flex;

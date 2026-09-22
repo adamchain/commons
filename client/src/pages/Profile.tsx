@@ -304,16 +304,14 @@ export function ProfilePage() {
             </div>
           </div>
 
-          {profile.user.bio && (
+          {profile.user.bio?.trim() && (
             <p className="profile-other-bio">
-              <LinkedText text={profile.user.bio} />
+              <LinkedText text={profile.user.bio.trim()} />
             </p>
           )}
 
           <div className="profile-other-ctas">
-            {!profile.network.inMyNetwork && (
-              <FriendButton profile={profile} onUpdated={reloadProfile} variant="other" />
-            )}
+            <FriendButton profile={profile} onUpdated={reloadProfile} variant="other" />
             <OtherMessageButton
               sharedPlanId={profile.sharedPlanId}
               profileUserId={userId}
@@ -383,6 +381,7 @@ export function ProfilePage() {
 
         {profile.network.inMyNetwork && (profile.communities?.length ?? 0) > 0 && (
           <section className="profile-other-section">
+            <div className="profile-other-communities-card">
             <h3 className="profile-other-section-label">Communities</h3>
             <div className="profile-other-communities">
               <PreviewRows
@@ -404,6 +403,7 @@ export function ProfilePage() {
                   </Link>
                 )}
               />
+            </div>
             </div>
           </section>
         )}
@@ -1012,15 +1012,10 @@ function FriendButton({
   if (inNet) {
     if (other) {
       return (
-        <button
-          type="button"
-          className="profile-other-cta profile-other-cta--connected"
-          onClick={() => void call("/api/auth/friend-remove")}
-          disabled={busy}
-        >
+        <span className="profile-other-cta profile-other-cta--primary">
           <Check size={13} strokeWidth={2.5} aria-hidden="true" />
-          {busy ? "…" : "In your network"}
-        </button>
+          In Your Network
+        </span>
       );
     }
     return (
@@ -1100,7 +1095,7 @@ function FriendButton({
         disabled={busy}
       >
         <UserPlus size={13} strokeWidth={2} aria-hidden="true" />
-        {busy ? "…" : "Add to network"}
+        {busy ? "…" : "Add to Network"}
       </button>
     );
   }
