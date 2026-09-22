@@ -357,7 +357,7 @@ export function CommunityDetailPage() {
             canPost={canPostPlan}
             onPostPlan={() =>
               navigate(
-                `/plans/new?communityId=${encodeURIComponent(community.id)}&communityName=${encodeURIComponent(community.name)}`,
+                `/plans/new?communityId=${encodeURIComponent(community.id)}&communityName=${encodeURIComponent(community.name)}&returnTo=events`,
               )
             }
           />

@@ -126,6 +126,8 @@ export function CreatePlanPage() {
   // header banner (same pattern as inviteNames from group chat).
   const communityId = searchParams.get("communityId");
   const communityNameParam = searchParams.get("communityName");
+  // Hub "Post a new event" — come back to that community's Events tab, not the feed.
+  const returnToCommunityEvents = searchParams.get("returnTo") === "events" && Boolean(communityId);
   const prefillVibe: VibeIcon | null = useMemo(() => {
     if (!prefillTagParam) return null;
     const opt = VIBE_OPTIONS.find((o) => o.tag === prefillTagParam);
@@ -228,7 +230,11 @@ export function CreatePlanPage() {
       return;
     }
     if (communityId) {
-      navigate(`/communities/${communityId}`);
+      navigate(
+        returnToCommunityEvents
+          ? `/communities/${communityId}?tab=events`
+          : `/communities/${communityId}`,
+      );
       return;
     }
     if (window.history.length > 1) navigate(-1);
@@ -664,9 +670,13 @@ export function CreatePlanPage() {
           /* best-effort — user can invite again from the plan */
         }
       }
-      // F.3 — land on the feed with a "you're live" success sheet (Invite
-      // someone / Done) rather than dropping straight into the invite sheet.
-      navigate("/", { state: { justPostedId: created.id, showPostSuccess: true } });
+      // Hub posts stay on that community's Events tab. Everywhere else lands
+      // on the feed with a "you're live" success sheet.
+      if (returnToCommunityEvents && effectiveCommunityId) {
+        navigate(`/communities/${effectiveCommunityId}?tab=events`);
+      } else {
+        navigate("/", { state: { justPostedId: created.id, showPostSuccess: true } });
+      }
     } catch (err) {
       setError(parseApiError(err) || "Couldn't post — check your connection and try again.");
     } finally {
