@@ -528,7 +528,7 @@ export function ProfilePage() {
                 setCommunitiesExpanded(false);
               }}
             >
-              You run
+              Running
             </button>
           </div>
         </div>
