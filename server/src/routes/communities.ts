@@ -181,6 +181,27 @@ function toCommunityCard(
   };
 }
 
+/** Approved communities this person actively belongs to. Organizer roles come first. */
+export async function communityCardsForUser(userId: string): Promise<CommunityCardDTO[]> {
+  const seen = new Set<string>();
+  const list: CommunityRecord[] = [];
+  for (const membership of store.listCommunityMembershipsForUser(userId)) {
+    if (membership.status !== "active" || seen.has(membership.communityId)) continue;
+    const community = store.findCommunityById(membership.communityId);
+    if (!community || community.creationStatus !== "approved") continue;
+    if (isQaOrTestCommunityName(community.name)) continue;
+    seen.add(community.id);
+    list.push(community);
+  }
+  list.sort((a, b) => {
+    const aOrg = a.organizerId === userId ? 0 : 1;
+    const bOrg = b.organizerId === userId ? 0 : 1;
+    if (aOrg !== bOrg) return aOrg - bOrg;
+    return a.name.localeCompare(b.name);
+  });
+  return toCommunityCards(list, userId);
+}
+
 async function toCommunityCards(
   communities: CommunityRecord[],
   viewerId: string,

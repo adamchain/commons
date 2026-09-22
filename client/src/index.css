@@ -15333,6 +15333,22 @@ button.xpl-photo-tile {
   flex-direction: column;
   gap: 8px;
 }
+.profile-preview-row > a {
+  display: flex;
+}
+.profile-other-plans .profile-preview-row > a,
+.profile-other-communities .profile-preview-row > a {
+  width: 100%;
+  box-sizing: border-box;
+}
+.profile-more {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.profile-more-toggle {
+  margin-top: 0;
+}
 .profile-other-plan-card {
   display: flex;
   align-items: center;

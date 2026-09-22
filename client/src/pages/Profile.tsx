@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -94,6 +94,8 @@ interface ProfilePayload {
     mutualCount: number;
     mutuals: PublicUser[];
   };
+  /** Present when this person is in the viewer's network. */
+  communities?: CommunityCardDTO[];
 }
 
 export function ProfilePage() {
@@ -362,9 +364,18 @@ export function ProfilePage() {
               </span>
             </div>
             <div className="profile-other-plans">
-              {profile.upcoming.map((p) => (
-                <OtherPlanRow key={p.id} plan={p} profileUserId={userId} />
-              ))}
+              {profile.network.inMyNetwork ? (
+                <PreviewRows
+                  key={`${userId}-plans`}
+                  items={profile.upcoming}
+                  moreSingular="plan"
+                  renderItem={(p) => <OtherPlanRow plan={p} profileUserId={userId} />}
+                />
+              ) : (
+                profile.upcoming.map((p) => (
+                  <OtherPlanRow key={p.id} plan={p} profileUserId={userId} />
+                ))
+              )}
             </div>
           </section>
         ) : null}
@@ -382,39 +393,31 @@ export function ProfilePage() {
           </section>
         )}
 
-        {communities.length > 0 && (
+        {profile.network.inMyNetwork && (profile.communities?.length ?? 0) > 0 && (
           <section className="profile-other-section">
             <h3 className="profile-other-section-label">Communities</h3>
-              <div className="profile-other-communities">
-                {visibleCommunities.map((c) => (
-                    <Link key={c.id} to={`/communities/${c.id}`} className="profile-other-community-row">
-                      <CommunityCoverThumb
-                        coverImage={c.coverImage}
-                        category={c.category}
-                        className="cover-thumb-frame--sm"
-                      />
-                      <span className="profile-other-community-info">
-                        <span className="profile-other-community-name">{c.name}</span>
-                      </span>
-                      {c.myRole === "organizer" && <span className="profile-community-tag">Organizer</span>}
-                      {c.myMembershipStatus === "pending" && (
-                        <CommunityStatusPill status={c.myMembershipStatus} />
-                      )}
-                      <ChevronRight size={13} strokeWidth={1.6} className="profile-other-community-chevron" aria-hidden="true" />
-                    </Link>
-                ))}
-                {hiddenCommunityCount > 0 && (
-                  <button type="button" className="profile-show-more-row" onClick={() => setCommunitiesExpanded(true)}>
-                    Show {hiddenCommunityCount} more
-                  </button>
+            <div className="profile-other-communities">
+              <PreviewRows
+                key={`${userId}-communities`}
+                items={profile.communities ?? []}
+                moreSingular="community"
+                renderItem={(c) => (
+                  <Link to={`/communities/${c.id}`} state={{ from: "profile", profileUserId: userId }} className="profile-other-community-row">
+                    <CommunityCoverThumb
+                      coverImage={c.coverImage}
+                      category={c.category}
+                      className="cover-thumb-frame--sm"
+                    />
+                    <span className="profile-other-community-info">
+                      <span className="profile-other-community-name">{c.name}</span>
+                    </span>
+                    {c.myRole === "organizer" && <span className="profile-community-tag">Organizer</span>}
+                    <ChevronRight size={13} strokeWidth={1.6} className="profile-other-community-chevron" aria-hidden="true" />
+                  </Link>
                 )}
-                {communitiesExpanded && shownCommunities.length > 3 && (
-                  <button type="button" className="profile-show-more-row" onClick={() => setCommunitiesExpanded(false)}>
-                    Show less
-                  </button>
-                )}
-              </div>
-            </section>
+              />
+            </div>
+          </section>
         )}
 
         {actionSheetOpen && (
@@ -680,6 +683,51 @@ function OtherMessageButton({
     >
       {inner}
     </Link>
+  );
+}
+
+const PREVIEW_COUNT = 3;
+
+function moreCountLabel(count: number, singular: string): string {
+  const noun = count === 1 ? singular : singular === "community" ? "communities" : `${singular}s`;
+  return `${count} more ${noun}`;
+}
+
+/** First three stay visible. Anything past that opens from a dropdown. */
+function PreviewRows<T extends { id: string }>({
+  items,
+  moreSingular,
+  renderItem,
+}: {
+  items: T[];
+  moreSingular: string;
+  renderItem: (item: T) => ReactElement;
+}) {
+  const [open, setOpen] = useState(false);
+  const preview = items.slice(0, PREVIEW_COUNT);
+  const rest = items.slice(PREVIEW_COUNT);
+  return (
+    <>
+      {preview.map((item) => (
+        <div key={item.id} className="profile-preview-row">{renderItem(item)}</div>
+      ))}
+      {rest.length > 0 && (
+        <div className="profile-more">
+          <button
+            type="button"
+            className="profile-past-toggle profile-more-toggle"
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+          >
+            <span>{open ? "Show less" : moreCountLabel(rest.length, moreSingular)}</span>
+            <span className={`profile-past-chevron ${open ? "is-open" : ""}`} aria-hidden="true">›</span>
+          </button>
+          {open && rest.map((item) => (
+            <div key={item.id} className="profile-preview-row">{renderItem(item)}</div>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { store } from "../store.js";
 import { findUserById } from "../userRepo.js";
+import { communityCardsForUser } from "./communities.js";
 import { planSummary, userToPublic } from "./plans.js";
 
 export const profileRouter = Router();
@@ -130,6 +131,9 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
       mutualCount: mutualIds.length,
       mutuals,
     },
+    // Someone in your network: their communities, from their point of view
+    // so an Organizer tag means they run it.
+    communities: inMyNetwork ? await communityCardsForUser(targetId) : [],
   });
 });
 
