@@ -211,6 +211,15 @@ export function FeedPage() {
   useEffect(() => {
     const onStart = (e: TouchEvent) => {
       if (refreshingRef.current) return;
+      // A downward swipe inside an open sheet (filters, invite, etc.) is for
+      // that sheet. Arming pull-to-refresh here steals the gesture and rubber-
+      // bands the feed behind the overlay.
+      const target = e.target;
+      if (target instanceof Element && target.closest(".sheet-backdrop")) {
+        pullRef.current.armed = false;
+        if (pullRef.current.distance > 0) resetPullVisual();
+        return;
+      }
       if (window.scrollY <= 1 && e.touches.length === 1) {
         pullRef.current.startY = e.touches[0]!.clientY;
         pullRef.current.armed = true;

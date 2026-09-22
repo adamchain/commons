@@ -9,7 +9,9 @@ function resolveApiBase(): string {
       "VITE_API_URL must be set for native builds — relative URLs cannot reach the backend from a Capacitor WebView.",
     );
   }
-  if (import.meta.env.DEV) return "http://localhost:4000";
+  // Same origin as the page. Vite proxies /api to the server on :4000, so an
+  // ngrok HTTPS session is not blocked from calling http://localhost.
+  if (import.meta.env.DEV) return "";
   return "";
 }
 

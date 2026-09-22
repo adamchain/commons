@@ -656,6 +656,7 @@ function OtherMessageButton({
   profileUserId: string;
   inNetwork: boolean;
 }) {
+  const navigate = useNavigate();
   const inner = (
     <>
       <MessageCircle size={15} strokeWidth={1.8} aria-hidden="true" />
@@ -676,13 +677,17 @@ function OtherMessageButton({
     );
   }
   return (
-    <Link
-      to={to}
-      state={{ from: "profile", profileUserId }}
+    <button
+      type="button"
       className="profile-other-cta profile-other-cta--message"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        navigate(to, { state: { from: "profile", profileUserId } });
+      }}
     >
       {inner}
-    </Link>
+    </button>
   );
 }
 

@@ -68,23 +68,27 @@
 .cmy-btn--block { width: 100%; }
 
 /* ---- List page ---- */
-/* One-column grid — never sit Create beside the 40px title. A nowrap flex-row
-   (and iOS column+wrap) painted the pill over “Communities” and the top bar. */
+/* Title on the left, Create pill on the right. The pill stays in flow (no
+   absolute positioning) so it cannot paint over the heading or the top bar. */
 .cmy-list .cmy-list-masthead {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  justify-items: start;
-  align-items: start;
-  gap: var(--s-3);
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   position: relative;
   z-index: 0;
   width: 100%;
   min-width: 0;
 }
 .cmy-list .cmy-list-masthead-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   min-width: 0;
+  flex: 1 1 auto;
   max-width: 100%;
-  width: 100%;
 }
 .cmy-list-section-title {
   font-family: var(--font-ui);
@@ -128,17 +132,37 @@
   max-width: 34ch;
 }
 .cmy-list .cmy-list-create {
-  justify-self: start;
-  max-width: 100%;
-  white-space: normal;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  margin-top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
   text-align: center;
-  padding: 10px 20px;
-  font-size: var(--text-body);
+  padding: 8px 14px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 999px;
   position: relative;
   z-index: 0;
 }
-.cmy-list .cmy-search {
+.cmy-list .cmy-search.network-search-wrap {
   margin-bottom: 0;
+  gap: 8px;
+  padding: 5px 12px;
+}
+.cmy-list .cmy-search svg {
+  width: 16px;
+  height: 16px;
+}
+.cmy-list .cmy-search .network-search-input {
+  /* 16px keeps iOS from zooming the page when the field focuses. */
+  font-size: 16px;
+  line-height: 1.2;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 .cmy-list-section { display: flex; flex-direction: column; gap: var(--s-3); }
 .cmy-list-gate {
@@ -440,16 +464,11 @@ button.cmy-joined-pill {
   line-height: 1.15;
   margin: 0;
 }
-.cmy-hero-cats {
-  margin: 6px 0 10px;
-  font-size: var(--text-body-small);
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.82);
-}
 .cmy-hero-members {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-top: 10px;
 }
 .cmy-hero-members .cmy-header-avatars > * {
   box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25);
@@ -530,15 +549,6 @@ button.cmy-joined-pill {
   letter-spacing: -0.01em;
   line-height: 1.2;
   color: var(--ink);
-}
-.cmy-compact-cats {
-  font-size: var(--text-body-small);
-  font-weight: 500;
-  color: var(--muted);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .cmy-compact-footer {
   display: flex;
@@ -2060,6 +2070,8 @@ button.cmy-joined-pill {
   display: flex;
   gap: 4px;
   border-bottom: 1px solid var(--hairline);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .cmy-dash-tab {
   appearance: none;
@@ -2068,6 +2080,7 @@ button.cmy-joined-pill {
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   padding: 8px 10px 10px;
+  flex-shrink: 0;
   font-family: var(--font-ui);
   font-size: var(--type-body);
   font-weight: 600;

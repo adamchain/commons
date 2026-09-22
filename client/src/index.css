@@ -4297,7 +4297,8 @@ a.action-btn--stack {
   /* Above the fixed bottom nav (z-index 50) so the sheet's lower buttons
      (Cancel, Copy link…) aren't hidden behind the footer bar. */
   z-index: 200;
-  overflow-y: auto;
+  overflow: hidden;
+  overscroll-behavior: contain;
 }
 .sheet,
 .filter-sheet,
@@ -4315,6 +4316,8 @@ a.action-btn--stack {
   gap: 8px;
   max-height: 92dvh;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.18);
 }
 .sheet-handle,
@@ -5554,6 +5557,20 @@ a.action-btn--stack {
   padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   overflow: hidden;
 }
+.dm-hold-note {
+  margin: 0;
+  padding: 8px 8px 0;
+  text-align: center;
+}
+.dm-hold-note p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-body);
+  line-height: 1.45;
+}
+.dm-hold-note .btn-link {
+  margin-top: 6px;
+}
 .app-shell--chat .chat-header-bar--thread.app-header--sticky {
   top: 0;
   margin-left: -15px;
@@ -5578,6 +5595,32 @@ a.action-btn--stack {
   flex: 1;
   min-height: 0;
   gap: 14px;
+}
+.dm-gate {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-height: 0;
+  padding: 8px 0 12px;
+}
+.dm-gate .ref-empty-card {
+  width: 100%;
+}
+.dm-gate .ref-empty-glyph {
+  overflow: hidden;
+}
+.dm-gate-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+.dm-gate-actions .btn-block {
+  margin-top: 0;
+}
+.dm-gate-actions .btn-link {
+  align-self: center;
+  margin-top: 2px;
 }
 
 .chat-header-card {
@@ -5914,8 +5957,9 @@ a.action-btn--stack {
 .chat-header-menu button:hover {
   background: var(--surface-2);
 }
-/* "Leave chat" reads as red text, no underline, no filled background. */
-.chat-header-menu-leave {
+/* "Leave chat" reads as red text, no underline, no filled background.
+   The button rule above is more specific, so this has to match it. */
+.chat-header-menu button.chat-header-menu-leave {
   color: var(--danger);
 }
 
@@ -13381,6 +13425,8 @@ button.xpl-photo-tile {
 .chat-header-bar--thread .detail-back,
 .chat-header-bar--thread .chat-back-link,
 .chat-header-bar--thread .chat-header-menu-btn {
+  border: none;
+  cursor: pointer;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -13652,6 +13698,16 @@ button.xpl-photo-tile {
 .network-search-wrap:focus-within {
   border-color: var(--accent);
 }
+.network-page .network-search-wrap,
+.cmy-list .cmy-search {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.network-page .network-search-input,
+.cmy-list .cmy-search .network-search-input {
+  padding-top: 0;
+  padding-bottom: 0;
+}
 .network-search-wrap svg {
   width: 18px;
   height: 18px;
@@ -13751,7 +13807,10 @@ button.xpl-photo-tile {
   line-height: 1.3;
 }
 .network-action {
+  position: relative;
+  z-index: 2;
   flex-shrink: 0;
+  font-family: inherit;
   border: none;
   border-radius: 999px;
   padding: 8px 14px;

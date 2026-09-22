@@ -13,10 +13,12 @@ import {
 import { formatRelative } from "../lib/format";
 import "./Communities.css";
 
-type Section = "analytics" | "approvals" | "members";
+type Section = "analytics" | "requests" | "bulletin" | "members";
 
 function sectionFromParam(raw: string | null): Section {
-  if (raw === "approvals" || raw === "members" || raw === "analytics") return raw;
+  if (raw === "requests" || raw === "bulletin" || raw === "members" || raw === "analytics") return raw;
+  // Older links used one combined approvals tab.
+  if (raw === "approvals") return "requests";
   return "analytics";
 }
 
@@ -28,12 +30,6 @@ function visibilityLabel(value: CommunityDashboardDTO["visibility"]): string {
   return value === "members_only" ? "Members" : "Public";
 }
 
-function pendingSummary(requests: number, posts: number): string {
-  const parts: string[] = [];
-  if (requests > 0) parts.push(`${requests} join ${requests === 1 ? "request" : "requests"}`);
-  if (posts > 0) parts.push(`${posts} ${posts === 1 ? "post" : "posts"}`);
-  return `${parts.join(" and ")} waiting for approval`;
-}
 
 function Bars({
   items,
@@ -180,8 +176,8 @@ export function CommunityDashboardPage() {
     );
   }
 
-  const waiting = data.requests.length + data.pendingPosts.length;
-  const pendingNotice = pendingSummary(data.requests.length, data.pendingPosts.length);
+  const requestCount = data.requests.length;
+  const bulletinCount = data.pendingPosts.length;
   const place = data.city?.trim() || "Philadelphia";
   const meta = [place, COMMUNITY_CATEGORY_LABELS[data.category], visibilityLabel(data.visibility)].join(" · ");
   const members = data.memberList.filter((m) => {
@@ -209,11 +205,12 @@ export function CommunityDashboardPage() {
       <nav className="cmy-dash-tabs" role="tablist">
         {(
           [
-            ["analytics", "Analytics"],
-            ["approvals", "Approvals"],
-            ["members", "Members"],
+            ["analytics", "Analytics", 0],
+            ["requests", "Join requests", requestCount],
+            ["bulletin", "Bulletin", bulletinCount],
+            ["members", "Members", 0],
           ] as const
-        ).map(([key, label]) => (
+        ).map(([key, label, count]) => (
           <button
             key={key}
             type="button"
@@ -223,16 +220,26 @@ export function CommunityDashboardPage() {
             onClick={() => openSection(key)}
           >
             {label}
-            {key === "approvals" && waiting > 0 && <span className="cmy-dash-tab-badge">{waiting}</span>}
+            {count > 0 && <span className="cmy-dash-tab-badge">{count}</span>}
           </button>
         ))}
       </nav>
 
       {err && <p className="cmy-err">{err}</p>}
 
-      {waiting > 0 && section !== "approvals" && (
-        <button type="button" className="cmy-dash-notice" onClick={() => openSection("approvals")}>
-          <span>{pendingNotice}</span>
+      {requestCount > 0 && section !== "requests" && (
+        <button type="button" className="cmy-dash-notice" onClick={() => openSection("requests")}>
+          <span>
+            {requestCount} join {requestCount === 1 ? "request" : "requests"} waiting
+          </span>
+          <span className="cmy-dash-notice-go">Review</span>
+        </button>
+      )}
+      {bulletinCount > 0 && section !== "bulletin" && (
+        <button type="button" className="cmy-dash-notice" onClick={() => openSection("bulletin")}>
+          <span>
+            {bulletinCount} bulletin {bulletinCount === 1 ? "post" : "posts"} waiting
+          </span>
           <span className="cmy-dash-notice-go">Review</span>
         </button>
       )}
@@ -337,7 +344,7 @@ export function CommunityDashboardPage() {
         </div>
       )}
 
-      {section === "approvals" && (
+      {section === "requests" && (
         <div className="cmy-dash-stack">
           <section className="cmy-dash-card">
             <div className="cmy-dash-card-head">
@@ -401,13 +408,19 @@ export function CommunityDashboardPage() {
               </ul>
             )}
           </section>
+        </div>
+      )}
 
-          {data.pendingPosts.length > 0 && (
-            <section className="cmy-dash-card">
-              <div className="cmy-dash-card-head">
-                <h2>Posts</h2>
-                <span className="cmy-dash-count">{data.pendingPosts.length}</span>
-              </div>
+      {section === "bulletin" && (
+        <div className="cmy-dash-stack">
+          <section className="cmy-dash-card">
+            <div className="cmy-dash-card-head">
+              <h2>Bulletin approvals</h2>
+              {data.pendingPosts.length > 0 && <span className="cmy-dash-count">{data.pendingPosts.length}</span>}
+            </div>
+            {data.pendingPosts.length === 0 ? (
+              <p className="cmy-dash-empty">No bulletin posts waiting.</p>
+            ) : (
               <ul className="cmy-dash-people">
                 {data.pendingPosts.map((post) => (
                   <li key={post.id} className="cmy-dash-person">
@@ -451,8 +464,8 @@ export function CommunityDashboardPage() {
                   </li>
                 ))}
               </ul>
-            </section>
-          )}
+            )}
+          </section>
         </div>
       )}
 

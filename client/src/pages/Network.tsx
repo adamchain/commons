@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
@@ -187,6 +187,7 @@ function NetworkRow({
   busy: boolean;
   onConnect: () => void;
 }) {
+  const navigate = useNavigate();
   const { user, neighborhoodName, mutualCount, networkStatus } = row;
   const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || "Friend";
   const meta = [
@@ -213,9 +214,17 @@ function NetworkRow({
         </span>
       </Link>
       {networkStatus === "connected" ? (
-        <Link to={`/dm/${user.id}`} state={{ from: "network" }} className="network-action network-action--primary">
+        <button
+          type="button"
+          className="network-action network-action--primary"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            navigate(`/dm/${user.id}`, { state: { from: "network" } });
+          }}
+        >
           Message
-        </Link>
+        </button>
       ) : networkStatus === "pending" ? (
         <button type="button" className="network-action network-action--pending" disabled>
           Pending

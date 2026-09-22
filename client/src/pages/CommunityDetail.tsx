@@ -320,7 +320,11 @@ export function CommunityDetailPage() {
           {canManage && (
             <Link
               to={`/communities/${community.id}/dashboard${
-                community.pendingRequestCount + community.pendingBulletinCount > 0 ? "?section=approvals" : ""
+                community.pendingRequestCount > 0
+                  ? "?section=requests"
+                  : community.pendingBulletinCount > 0
+                    ? "?section=bulletin"
+                    : ""
               }`}
               className="cmy-dash-entry"
             >

@@ -537,29 +537,16 @@ authRouter.post("/network-add", requireAuth, async (req, res) => {
  * `/network-accept`. If the target had ALREADY requested the viewer, this
  * second tap auto-accepts (mutual intent) and connects both immediately.
  */
-authRouter.post("/friend-add", requireAuth, async (req, res) => {
-  const userId = String(req.userId);
-  const targetId = String(req.body?.userId ?? "");
-  if (!targetId || targetId === userId) {
-    res.status(400).json({ error: "userId required" });
-    return;
-  }
+/** Send a connect request, or connect immediately if they already asked. */
+export async function ensureConnectRequest(
+  userId: string,
+  targetId: string,
+): Promise<"connected" | "requested"> {
   const viewer = await findUserById(userId);
   const target = await findUserById(targetId);
-  if (!viewer || !target) {
-    res.status(404).json({ error: "User not found" });
-    return;
-  }
-  if (store.isBlockedEitherWay(userId, targetId)) {
-    res.status(403).json({ error: "You can't connect with this person" });
-    return;
-  }
-  // Already connected — no-op.
-  if ((viewer.networkIds ?? []).includes(targetId)) {
-    res.json({ ok: true, status: "connected", me: await userToMe(userId) });
-    return;
-  }
-  // The target already requested the viewer → mutual intent, connect both now.
+  if (!viewer || !target) throw new Error("User not found");
+  if (store.isBlockedEitherWay(userId, targetId)) throw new Error("You can't connect with this person");
+  if ((viewer.networkIds ?? []).includes(targetId)) return "connected";
   if ((viewer.incomingNetworkRequests ?? []).includes(targetId)) {
     await connectNetwork(userId, targetId);
     await emit({
@@ -569,10 +556,8 @@ authRouter.post("/friend-add", requireAuth, async (req, res) => {
       dedupKey: `networkAccepted:${userId}:${targetId}`,
       profileUserId: userId,
     });
-    res.json({ ok: true, status: "connected", me: await userToMe(userId) });
-    return;
+    return "connected";
   }
-  // Otherwise record an incoming request on the target + notify them.
   const targetIncoming = new Set(target.incomingNetworkRequests ?? []);
   if (!targetIncoming.has(userId)) {
     targetIncoming.add(userId);
@@ -585,7 +570,24 @@ authRouter.post("/friend-add", requireAuth, async (req, res) => {
       profileUserId: userId,
     });
   }
-  res.json({ ok: true, status: "requested", me: await userToMe(userId) });
+  return "requested";
+}
+
+authRouter.post("/friend-add", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const targetId = String(req.body?.userId ?? "");
+  if (!targetId || targetId === userId) {
+    res.status(400).json({ error: "userId required" });
+    return;
+  }
+  try {
+    const status = await ensureConnectRequest(userId, targetId);
+    res.json({ ok: true, status, me: await userToMe(userId) });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Couldn't send that request";
+    const status = message === "User not found" ? 404 : 403;
+    res.status(status).json({ error: message });
+  }
 });
 
 /** Accept a pending network request from `userId` — connects both directions. */
@@ -657,6 +659,21 @@ async function connectNetwork(aId: string, bId: string): Promise<void> {
 
   store.upsertRelationship({ userId: aId, targetId: bId, kind: "network", source: "profile_friend_add" });
   store.upsertRelationship({ userId: bId, targetId: aId, kind: "network", source: "profile_friend_add" });
+  const released = store.releaseHeldDmBetween(aId, bId);
+  if (!released) return;
+  const sender = await findUserById(released.senderId);
+  const senderName = sender?.firstName || "Someone";
+  for (const recipientId of released.revealedTo) {
+    if (recipientId === released.senderId) continue;
+    await emit({
+      userId: recipientId,
+      kind: "newGroupChatMessage",
+      body: `${senderName}: ${released.preview}`,
+      conversationId: released.conversationId,
+      profileUserId: released.senderId,
+      dedupKey: `heldDmReveal:${released.conversationId}:${recipientId}`,
+    });
+  }
 }
 
 authRouter.post("/friend-remove", requireAuth, async (req, res) => {

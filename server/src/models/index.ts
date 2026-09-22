@@ -155,6 +155,7 @@ const ConversationSchema = new Schema<ConversationRecord>(
     communityId: { type: String, default: null },
     type: { type: String, enum: ["group", "dm"], required: true },
     participantIds: { type: [String], default: [] },
+    hiddenFromUserIds: { type: [String], default: undefined },
     createdAt: { type: String, required: true },
     lastMessageAt: { type: String, required: true },
   },

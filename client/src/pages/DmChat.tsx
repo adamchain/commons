@@ -1,17 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, MessageCircle, MoreVertical, Plus } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { PollCard } from "../components/PollCard";
 import { PollSheet } from "../components/PollSheet";
+import { BottomSheet } from "../components/ui/BottomSheet";
+import { Button } from "../components/ui/Button";
+import { EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
-import { hrefForBack, type NavFromState } from "../lib/navState";
+import type { NavFromState } from "../lib/navState";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
 import { useStickToBottom } from "../lib/useStickToBottom";
-import type { ConversationDTO, MessageDTO } from "../types/shared";
+import type { ConversationDTO, MeDTO, MessageDTO, PublicUser } from "../types/shared";
 
 const POLL_MS = 4000;
 const CHAT_IMAGE_MAX_PX = 1024;
@@ -25,10 +28,8 @@ export function DmChatPage() {
   const { userId = "" } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const navFrom = (location.state as NavFromState | null) ?? null;
-  const backState: NavFromState = navFrom?.from ? navFrom : { from: "network" };
-  const backHref = hrefForBack(backState);
   const backLabel =
     navFrom?.from === "messages" ? "Messages" : navFrom?.from === "profile" ? "Profile" : "Network";
   const [conv, setConv] = useState<ConversationDTO | null>(null);
@@ -41,9 +42,18 @@ export function DmChatPage() {
   const [pollModalOpen, setPollModalOpen] = useState(false);
   const [creatingPoll, setCreatingPoll] = useState(false);
   const [busyPollId, setBusyPollId] = useState<string | null>(null);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [leaveBusy, setLeaveBusy] = useState(false);
+  const [leaveErr, setLeaveErr] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [gate, setGate] = useState<DmGate | null>(null);
+  const [gateBusy, setGateBusy] = useState(false);
+  const [connectErr, setConnectErr] = useState<string | null>(null);
+  const [openAttempt, setOpenAttempt] = useState(0);
   const [ready, setReady] = useState(false);
   const composerMenuRef = useRef<HTMLDivElement>(null);
+  const headerMenuRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const lastId = messages[messages.length - 1]?.id ?? "";
   const { scrollRef, endRef, shellRef, stickOnSend } = useStickToBottom(ready, `${lastId}:${messages.length}`);
@@ -59,12 +69,20 @@ export function DmChatPage() {
           body: JSON.stringify({ userId }),
         });
         if (!live) return;
+        setError(null);
+        setConnectErr(null);
+        setGate(null);
         setConv(c);
         const msgs = await api<MessageDTO[]>(`/api/conversations/${c.id}/messages`);
         if (!live) return;
         setMessages(msgs.sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
       } catch (e) {
-        if (live) setError(parseApiError(e) || "Couldn't open this chat.");
+        if (!live) return;
+        const message = parseApiError(e) || "Couldn't open this chat.";
+        setError(message);
+        const profile = await peekProfile(userId);
+        if (!live) return;
+        setGate(gateFromError(message, profile));
       } finally {
         if (live) setReady(true);
       }
@@ -72,7 +90,7 @@ export function DmChatPage() {
     return () => {
       live = false;
     };
-  }, [userId]);
+  }, [userId, openAttempt]);
 
   useEffect(() => {
     if (!conv) return;
@@ -83,6 +101,17 @@ export function DmChatPage() {
     }, POLL_MS);
     return () => clearInterval(interval);
   }, [conv]);
+
+  useEffect(() => {
+    if (!headerMenuOpen) return;
+    const close = (e: MouseEvent) => {
+      if (headerMenuRef.current && !headerMenuRef.current.contains(e.target as Node)) {
+        setHeaderMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [headerMenuOpen]);
 
   useEffect(() => {
     if (!composerMenuOpen) return;
@@ -96,7 +125,64 @@ export function DmChatPage() {
   }, [composerMenuOpen]);
 
   const other = conv?.participants.find((p) => p.id !== user?.id) ?? conv?.participants[0];
-  const title = [other?.firstName, other?.lastName].filter(Boolean).join(" ") || "Message";
+  const gateName = personName(gate?.person ?? null);
+  const title = other
+    ? [other.firstName, other.lastName].filter(Boolean).join(" ") || "Message"
+    : gateName || "Message";
+  const blocked = ready && !conv && gate;
+
+  async function acceptRequest() {
+    if (!userId || gateBusy) return;
+    setGateBusy(true);
+    setConnectErr(null);
+    try {
+      const r = await api<{ me?: MeDTO }>("/api/auth/network-accept", {
+        method: "POST",
+        body: JSON.stringify({ userId }),
+      });
+      if (r.me) setUser(r.me);
+      setOpenAttempt((n) => n + 1);
+    } catch (e) {
+      setConnectErr(parseApiError(e) || "Couldn't accept that request.");
+    } finally {
+      setGateBusy(false);
+    }
+  }
+
+  async function connectThenOpen() {
+    if (!userId || gateBusy) return;
+    setGateBusy(true);
+    setConnectErr(null);
+    try {
+      const path = gate?.kind === "incoming" ? "/api/auth/network-accept" : "/api/auth/friend-add";
+      const r = await api<{ status?: string; me?: MeDTO }>(path, {
+        method: "POST",
+        body: JSON.stringify({ userId }),
+      });
+      if (r.me) setUser(r.me);
+      if (r.status === "connected" || gate?.kind === "incoming") {
+        setOpenAttempt((n) => n + 1);
+        return;
+      }
+      setGate((prev) => (prev ? { ...prev, kind: "pending" } : prev));
+    } catch (e) {
+      setConnectErr(parseApiError(e) || "Couldn't send that request.");
+    } finally {
+      setGateBusy(false);
+    }
+  }
+
+  function goBack() {
+    if (navFrom?.from === "messages") {
+      navigate("/messages");
+      return;
+    }
+    if (navFrom?.from === "profile" && navFrom.profileUserId) {
+      navigate(`/profile/${navFrom.profileUserId}`, { state: { from: "network" } });
+      return;
+    }
+    navigate("/network");
+  }
 
   async function send() {
     const text = body.trim();
@@ -114,6 +200,13 @@ export function DmChatPage() {
         }),
       });
       setMessages((prev) => [...prev, msg]);
+      if (conv.awaitingAccept) {
+        const next = await api<ConversationDTO>("/api/dm", {
+          method: "POST",
+          body: JSON.stringify({ userId }),
+        });
+        setConv(next);
+      }
       stickOnSend();
     } catch (e) {
       setBody(text);
@@ -189,6 +282,48 @@ export function DmChatPage() {
     }
   }
 
+  async function toggleHeart(messageId: string) {
+    if (!conv) return;
+    try {
+      const updated = await api<MessageDTO>(`/api/conversations/${conv.id}/messages/${messageId}/react`, {
+        method: "POST",
+        body: JSON.stringify({ emoji: "❤️" }),
+      });
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? updated : m)));
+    } catch {
+      /* they can tap again */
+    }
+  }
+
+  async function toggleMute() {
+    if (!conv) return;
+    setHeaderMenuOpen(false);
+    try {
+      const r = await api<{ ok: boolean; muted: boolean }>(`/api/conversations/${conv.id}/mute`, {
+        method: "POST",
+        body: JSON.stringify({ muted: !conv.muted }),
+      });
+      setConv((prev) => (prev ? { ...prev, muted: r.muted } : prev));
+    } catch {
+      /* they can tap again */
+    }
+  }
+
+  async function leaveChat() {
+    if (!conv) return;
+    setLeaveBusy(true);
+    setLeaveErr(null);
+    try {
+      await api(`/api/conversations/${conv.id}/leave`, { method: "POST" });
+      setConfirmLeave(false);
+      goBack();
+    } catch (e) {
+      setLeaveErr(parseApiError(e) || "Couldn't leave this chat.");
+    } finally {
+      setLeaveBusy(false);
+    }
+  }
+
   async function closePoll(messageId: string) {
     if (!conv) return;
     if (!window.confirm("Close this poll? Votes lock in.")) return;
@@ -222,19 +357,82 @@ export function DmChatPage() {
   }
 
   return (
-    <main ref={shellRef} className="app-shell app-shell--chat">
+    <main ref={shellRef} className={`app-shell app-shell--chat${conv?.awaitingAccept ? " dm-hold" : ""}`}>
       <header className="app-header app-header--minimal chat-header-bar chat-header-bar--thread app-header--sticky">
-        <Link to={backHref} className="detail-back chat-back-link" aria-label={backLabel}>
+        <button type="button" className="detail-back chat-back-link" aria-label={backLabel} onClick={goBack}>
           <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
-        </Link>
+        </button>
         <div className="chat-thread-heading">
           <div className="chat-thread-title">{title}</div>
+          {conv && (
+            <div className="chat-thread-sub">
+              {conv.muted ? "Muted" : conv.awaitingAccept ? "Not visible to them yet" : "Direct message"}
+            </div>
+          )}
         </div>
-        <span className="profile-other-more-spacer" aria-hidden="true" />
+        {conv ? (
+        <div className="chat-header-menu-wrap" ref={headerMenuRef}>
+          <button
+            type="button"
+            className="chat-header-menu-btn"
+            onClick={() => setHeaderMenuOpen((v) => !v)}
+            aria-label="Chat options"
+            aria-expanded={headerMenuOpen}
+            disabled={!conv}
+          >
+            <MoreVertical size={20} strokeWidth={1.8} aria-hidden="true" />
+          </button>
+          {headerMenuOpen && conv && (
+            <div className="chat-header-menu" role="menu">
+              <button type="button" role="menuitem" onClick={() => void toggleMute()}>
+                {conv.muted ? "Unmute chat" : "Mute chat"}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="chat-header-menu-leave"
+                onClick={() => {
+                  setHeaderMenuOpen(false);
+                  setLeaveErr(null);
+                  setConfirmLeave(true);
+                }}
+              >
+                Leave chat
+              </button>
+            </div>
+          )}
+        </div>
+        ) : (
+          <span className="chat-header-menu-wrap" aria-hidden="true" />
+        )}
       </header>
 
       <div className="chat-shell">
-        {other && (
+        {gate && ready && !conv && (
+          <DmUnavailable
+            gate={gate}
+            busy={gateBusy}
+            note={connectErr}
+            onProfile={() => navigate(`/profile/${userId}`, { state: { from: "network" } })}
+            onConnect={() => void connectThenOpen()}
+          />
+        )}
+        {conv?.awaitingAccept && (
+          <div className="dm-hold-note">
+            <p>
+              {conv.incomingRequest
+                ? `${other?.firstName ?? "They"} asked to connect. They won't see this until you accept.`
+                : `${other?.firstName ?? "They"} won't see this until they accept your request to connect.`}
+            </p>
+            {conv.incomingRequest && (
+              <Button variant="link" disabled={gateBusy} onClick={() => void acceptRequest()}>
+                {gateBusy ? "Accepting…" : "Accept request"}
+              </Button>
+            )}
+            {connectErr && <p className="error-text">{connectErr}</p>}
+          </div>
+        )}
+        {!blocked && other && !conv?.awaitingAccept && (
           <Link to={`/profile/${other.id}`} state={{ from: "network" }} className="chat-header-card chat-header-card--compact">
             <Avatar
               seed={other.avatarSeed}
@@ -250,17 +448,10 @@ export function DmChatPage() {
           </Link>
         )}
 
+        {!blocked && (
         <div ref={scrollRef} className="chat-messages">
           {!ready && <p className="network-empty">Opening chat…</p>}
-          {ready && error && !conv && (
-            <p className="error-text">
-              {error}{" "}
-              <button type="button" className="btn-link" onClick={() => navigate(backHref)}>
-                Back
-              </button>
-            </p>
-          )}
-          {ready && conv && messages.length === 0 && (
+          {ready && conv && messages.length === 0 && !conv.awaitingAccept && (
             <p className="network-empty">Say hi — this chat is just the two of you.</p>
           )}
           {messages.map((m) => {
@@ -312,12 +503,29 @@ export function DmChatPage() {
                       {new Date(m.createdAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
                     </div>
                   </div>
+                  {user && (() => {
+                    const hearts = m.reactions?.["❤️"] ?? [];
+                    const iReacted = hearts.includes(user.id);
+                    return (
+                      <button
+                        type="button"
+                        className={`chat-react-btn ${iReacted ? "is-reacted" : ""} ${hearts.length > 0 ? "has-count" : ""}`}
+                        onClick={() => void toggleHeart(m.id)}
+                        aria-label={iReacted ? "Remove heart" : "React with heart"}
+                        aria-pressed={iReacted}
+                      >
+                        <span aria-hidden="true">❤️</span>
+                        {hearts.length > 0 && <span className="chat-react-count">{hearts.length}</span>}
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             );
           })}
           <div ref={endRef} className="chat-messages-end" aria-hidden="true" />
         </div>
+        )}
 
         {error && conv && <p className="error-text">{error}</p>}
         {conv && (
@@ -423,6 +631,27 @@ export function DmChatPage() {
           </form>
         )}
       </div>
+      {confirmLeave && (
+        <BottomSheet
+          onClose={() => !leaveBusy && setConfirmLeave(false)}
+          closeDisabled={leaveBusy}
+          labelledBy="leave-dm-title"
+        >
+          <h2 id="leave-dm-title" className="sheet-title">Leave this chat?</h2>
+          <p className="sheet-copy">
+            It leaves your Messages inbox. A new message brings it back, or you can open it again from your network.
+          </p>
+          {leaveErr && <p className="error-text">{leaveErr}</p>}
+          <div className="sheet-actions">
+            <Button variant="primary" block disabled={leaveBusy} onClick={() => void leaveChat()}>
+              {leaveBusy ? "Leaving…" : "Leave chat"}
+            </Button>
+            <Button variant="secondary" block disabled={leaveBusy} onClick={() => setConfirmLeave(false)}>
+              Cancel
+            </Button>
+          </div>
+        </BottomSheet>
+      )}
       {pollModalOpen && (
         <PollSheet
           submitting={creatingPoll}
@@ -431,6 +660,126 @@ export function DmChatPage() {
         />
       )}
     </main>
+  );
+}
+
+type DmGateKind = "network" | "pending" | "incoming" | "blocked" | "missing" | "other";
+
+type DmGate = {
+  kind: DmGateKind;
+  person: PublicUser | null;
+};
+
+type ProfilePeek = {
+  user: PublicUser;
+  network?: { inMyNetwork?: boolean; requestSent?: boolean; requestReceived?: boolean };
+};
+
+function personName(person: PublicUser | null): string {
+  if (!person) return "";
+  return [person.firstName, person.lastName].filter(Boolean).join(" ");
+}
+
+async function peekProfile(userId: string): Promise<ProfilePeek | null> {
+  try {
+    return await api<ProfilePeek>(`/api/profile/${userId}`);
+  } catch {
+    return null;
+  }
+}
+
+function gateFromError(message: string, profile: ProfilePeek | null): DmGate {
+  const person = profile?.user ?? null;
+  if (/find that person/i.test(message)) return { kind: "missing", person };
+  if (/can't message this person/i.test(message)) return { kind: "blocked", person };
+  if (/network/i.test(message)) {
+    if (profile?.network?.requestReceived) return { kind: "incoming", person };
+    if (profile?.network?.requestSent) return { kind: "pending", person };
+    return { kind: "network", person };
+  }
+  return { kind: "other", person };
+}
+
+function DmUnavailable({
+  gate,
+  busy,
+  note,
+  onProfile,
+  onConnect,
+}: {
+  gate: DmGate;
+  busy: boolean;
+  note: string | null;
+  onProfile: () => void;
+  onConnect: () => void;
+}) {
+  const named = gate.person?.firstName?.trim();
+  let title = "Couldn't open this chat";
+  let body = "Something went wrong. Go back and try again.";
+  if (gate.kind === "network") {
+    title = "You can't message them yet";
+    body = named
+      ? `Chats like this are only for people in your network. Send ${named} a request. After they accept, you can message them here.`
+      : "Chats like this are only for people in your network. Send a request from their profile. After they accept, you can message them here.";
+  } else if (gate.kind === "pending") {
+    title = named ? `Waiting for ${named}` : "Request sent";
+    body = named
+      ? `You already asked to connect with ${named}. This chat opens once they accept.`
+      : "You already sent a request. This chat opens once they accept.";
+  } else if (gate.kind === "incoming") {
+    title = named ? `${named} wants to connect` : "They want to connect";
+    body = "Accept their request and this chat will open.";
+  } else if (gate.kind === "blocked") {
+    title = "You can't message them";
+    body = "This chat isn't available.";
+  } else if (gate.kind === "missing") {
+    title = "Couldn't find them";
+    body = "This profile isn't here anymore.";
+  }
+
+  const showConnect = gate.kind === "network" || gate.kind === "incoming";
+
+  return (
+    <div className="dm-gate">
+      <EmptyCard
+        icon={
+          gate.person ? (
+            <Avatar
+              seed={gate.person.avatarSeed}
+              style={gate.person.avatarStyle}
+              photoDataUrl={gate.person.avatarPhotoDataUrl}
+              params={gate.person.avatarParams}
+              name={gate.person.firstName}
+              size="md"
+            />
+          ) : (
+            <MessageCircle size={22} strokeWidth={1.6} color="var(--red)" />
+          )
+        }
+        tint={gate.person ? "transparent" : undefined}
+        title={title}
+        body={body}
+        footer={
+          <div className="dm-gate-actions">
+            {showConnect ? (
+              <Button variant="primary" block disabled={busy} onClick={onConnect}>
+                {busy ? "Sending…" : gate.kind === "incoming" ? "Accept" : "Send a request"}
+              </Button>
+            ) : gate.kind !== "missing" ? (
+              <Button variant="primary" block onClick={onProfile}>
+                View profile
+              </Button>
+            ) : null}
+            {showConnect && gate.kind !== "missing" && (
+              <Button variant="link" onClick={onProfile}>
+                View profile
+              </Button>
+            )}
+            {note && <p className="error-text">{note}</p>}
+          </div>
+        }
+      />
+    </div>
   );
 }
 

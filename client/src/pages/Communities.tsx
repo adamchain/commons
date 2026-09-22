@@ -1,6 +1,6 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Search, Users } from "lucide-react";
+import { ArrowLeft, Plus, Search, Users } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
@@ -12,7 +12,6 @@ import {
   ALL_COMMUNITY_CATEGORIES,
   COMMUNITY_CATEGORY_LABELS,
   communityCategoriesOf,
-  communityCategoryLine,
   communityRequiresJoinApproval,
   type CommunityCardDTO,
   type CommunityCategory,
@@ -109,11 +108,12 @@ export function CommunitiesPage() {
           className="cmy-btn cmy-btn--primary cmy-list-create"
           onClick={() => navigate("/communities/new")}
         >
-          Create a Community
+          <Plus size={15} strokeWidth={2.4} aria-hidden="true" />
+          Create
         </button>
       </header>
       <div className="network-search-wrap cmy-search">
-        <Search size={18} strokeWidth={1.8} aria-hidden="true" />
+        <Search size={16} strokeWidth={1.8} aria-hidden="true" />
         <input
           className="network-search-input"
           value={query}
@@ -121,7 +121,7 @@ export function CommunitiesPage() {
             setQuery(e.target.value);
             setShown(COMMUNITY_PAGE);
           }}
-          placeholder="Search communities"
+          placeholder="Search communities…"
           aria-label="Search communities"
           enterKeyHint="search"
           autoComplete="off"
@@ -175,9 +175,11 @@ export function CommunitiesPage() {
 
       <section className="cmy-list-section">
         {hero && <CommunityHeroCard c={hero} onJoined={absorbJoin} />}
-        <h2 className="cmy-list-section-title">
-          {searching ? "Results" : catLabel ? `Browse · ${catLabel}` : "Browse"}
-        </h2>
+        {(searching || catLabel) && (
+          <h2 className="cmy-list-section-title">
+            {searching ? "Results" : `Browse · ${catLabel}`}
+          </h2>
+        )}
         {showBrowseEmpty && (
           <EmptyCard
             icon={<Users size={22} strokeWidth={1.6} color="#3A6A3A" />}
@@ -233,10 +235,6 @@ export function CommunitiesPage() {
 
 function memberCountLabel(c: CommunityCardDTO) {
   return `${c.memberCount} ${c.memberCount === 1 ? "member" : "members"}`;
-}
-
-function categoryLine(c: CommunityCardDTO): string {
-  return communityCategoryLine(c);
 }
 
 function MemberFacepile({ people }: { people: PublicUser[] }) {
@@ -297,7 +295,6 @@ function CommunityHeroCard({
             <span className="cmy-hero-org-name">{c.organizer.firstName}</span>
           </div>
           <h3 className="cmy-hero-name">{c.name}</h3>
-          <p className="cmy-hero-cats">{categoryLine(c)}</p>
           <div className="cmy-hero-members">
             <MemberFacepile people={c.memberPreview ?? []} />
             <span className="cmy-hero-count">{memberCountLabel(c)}</span>
@@ -329,7 +326,6 @@ function CommunityCompactCard({
           <span className="cmy-compact-org-name">{c.organizer.firstName}</span>
         </span>
         <span className="cmy-compact-title">{c.name}</span>
-        <span className="cmy-compact-cats">{categoryLine(c)}</span>
         <span className="cmy-compact-footer">
           <span className="cmy-compact-members">
             <MemberFacepile people={c.memberPreview ?? []} />

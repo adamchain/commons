@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { BarChart2, MessageCircle, Pin, Trash2 } from "lucide-react";
+import { BarChart2, BellOff, MessageCircle, Pin, Trash2 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { InterestCover, PlanCoverThumb } from "../components/CoverThumb";
 import { EmptyCard, ScreenTitle } from "../components/ui";
@@ -478,6 +478,9 @@ export function MessagesPage() {
                         <span className="messages-row-title">
                           {c.pinned ? (
                             <Pin size={13} strokeWidth={2.2} className="messages-row-pin" aria-label="Pinned" />
+                          ) : null}
+                          {c.muted ? (
+                            <BellOff size={13} strokeWidth={2.2} className="messages-row-pin" aria-label="Muted" />
                           ) : null}
                           <span className="messages-row-title-text">{title}</span>
                         </span>

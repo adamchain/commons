@@ -246,6 +246,10 @@ export interface ConversationDTO {
   unreadCount: number;
   /** True when the viewer has muted this conversation — chat still works, notifications go quiet. */
   muted: boolean;
+  /** Network DM the other person cannot see until they accept a connect request. */
+  awaitingAccept?: boolean;
+  /** They already asked to connect with the viewer. */
+  incomingRequest?: boolean;
   /** True when the viewer hosts the underlying plan — drives the "Block host" chat menu option. */
   isHost: boolean;
   hostId: string;
@@ -282,6 +286,8 @@ export interface ConversationSummaryDTO {
   isIdea?: boolean;
   /** Viewer pinned this thread to the top of their inbox. */
   pinned?: boolean;
+  /** Viewer muted this thread — it stays in the inbox, notifications stay quiet. */
+  muted?: boolean;
 }
 
 /** One option in a poll, with the ids of everyone who picked it. */

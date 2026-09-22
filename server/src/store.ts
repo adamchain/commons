@@ -223,6 +223,8 @@ export interface ConversationRecord {
   participantIds: string[];
   createdAt: string;
   lastMessageAt: string;
+  /** Network DM: these users cannot see the thread until they accept a connect request. */
+  hiddenFromUserIds?: string[];
 }
 
 export interface PollOption {
@@ -1489,6 +1491,49 @@ export const store = {
     mongoMirror.upsertConversation(conv);
     return conv;
   },
+  /** Hide or reveal a network DM for one participant. The thread stays intact. */
+  setDmHiddenFrom(convId: string, userId: string, hidden: boolean): void {
+    const conv = snapshot.conversations.find((c) => c.id === convId);
+    if (!conv) return;
+    const set = new Set(conv.hiddenFromUserIds ?? []);
+    if (hidden) set.add(userId);
+    else set.delete(userId);
+    conv.hiddenFromUserIds = set.size > 0 ? [...set] : undefined;
+    persist();
+    mongoMirror.upsertConversation(conv);
+  },
+  /**
+   * Both people are connected. Drop the hold on their network DM and report
+   * who can see it now, plus the latest real message, so they can be pinged.
+   */
+  releaseHeldDmBetween(
+    aId: string,
+    bId: string,
+  ): { conversationId: string; revealedTo: string[]; senderId: string; preview: string } | undefined {
+    const conv = snapshot.conversations.find(
+      (c) =>
+        c.type === "dm" &&
+        c.planId === "" &&
+        !c.communityId &&
+        c.participantIds.includes(aId) &&
+        c.participantIds.includes(bId),
+    );
+    if (!conv) return undefined;
+    const revealedTo = (conv.hiddenFromUserIds ?? []).filter((id) => id === aId || id === bId);
+    if (revealedTo.length === 0) return undefined;
+    const rest = (conv.hiddenFromUserIds ?? []).filter((id) => id !== aId && id !== bId);
+    conv.hiddenFromUserIds = rest.length > 0 ? rest : undefined;
+    persist();
+    mongoMirror.upsertConversation(conv);
+    const last = this.listMessagesForConversation(conv.id).filter((m) => m.kind !== "system").at(-1);
+    if (!last) return undefined;
+    return {
+      conversationId: conv.id,
+      revealedTo,
+      senderId: last.senderId,
+      preview: last.body.length <= 80 ? last.body : last.body.slice(0, 79) + "…",
+    };
+  },
   createDm(planId: string, a: string, b: string): ConversationRecord {
     if (this.isBlockedEitherWay(a, b)) {
       const existing = this.findDmInPlan(planId, a, b);
@@ -1517,6 +1562,18 @@ export const store = {
     return snapshot.messages
       .filter((m) => m.conversationId === conversationId)
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  },
+  /** Opening a thread marks every message read so the inbox badge can drop. */
+  markConversationRead(conversationId: string, userId: string): number {
+    let count = 0;
+    for (const m of snapshot.messages) {
+      if (m.conversationId !== conversationId || m.readBy.includes(userId)) continue;
+      m.readBy.push(userId);
+      mongoMirror.upsertMessage(m);
+      count++;
+    }
+    if (count > 0) persist();
+    return count;
   },
   /** Wipe a thread for every participant. The conversation row stays. */
   clearConversationMessages(conversationId: string): void {
@@ -1902,6 +1959,20 @@ export const store = {
     persist();
     mongoMirror.upsertNotification(row);
     return row;
+  },
+  /** Clear message pings for a thread the user has now opened. */
+  markMessageNotificationsRead(userId: string, conversationId: string): number {
+    const now = new Date().toISOString();
+    let count = 0;
+    for (const n of snapshot.notifications) {
+      if (n.userId !== userId || n.readAt !== null) continue;
+      if (n.kind !== "newGroupChatMessage" || n.conversationId !== conversationId) continue;
+      n.readAt = now;
+      mongoMirror.upsertNotification(n);
+      count++;
+    }
+    if (count > 0) persist();
+    return count;
   },
   markAllNotificationsRead(userId: string): number {
     const now = new Date().toISOString();

@@ -196,6 +196,7 @@ function NotifRow({ item, onDismiss }: { item: NotificationDTO; onDismiss: () =>
 }
 
 function hrefFor(n: NotificationDTO): string | null {
+  if (n.kind === "newGroupChatMessage" && n.profileUserId && !n.planId) return `/dm/${n.profileUserId}`;
   if (n.kind === "newGroupChatMessage" && n.planId) return `/plans/${n.planId}/chat`;
   if (n.kind === "welcome") return "/settings/interests";
   // Network request/accept link to the other person's profile, where the
@@ -206,11 +207,11 @@ function hrefFor(n: NotificationDTO): string | null {
   // A new community waiting on COMMONS admin review opens the review queue.
   if (n.kind === "communityReview") return "/admin#communities-review";
   // Join requests and posts waiting on the organizer open the dashboard queue.
-  if (
-    (n.kind === "communityJoinRequest" || n.kind === "communityPostPending") &&
-    n.communityId
-  ) {
-    return `/communities/${n.communityId}/dashboard?section=approvals`;
+  if (n.kind === "communityJoinRequest" && n.communityId) {
+    return `/communities/${n.communityId}/dashboard?section=requests`;
+  }
+  if (n.kind === "communityPostPending" && n.communityId) {
+    return `/communities/${n.communityId}/dashboard?section=bulletin`;
   }
   // Other community pings route to the community page.
   if (n.communityId) return `/communities/${n.communityId}`;
