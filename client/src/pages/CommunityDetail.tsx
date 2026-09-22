@@ -797,6 +797,20 @@ function BulletinTab({
     onPendingChange?.();
   }
 
+  function postMenu(p: CommunityPostDTO) {
+    const canReport = Boolean(user && user.id !== p.author.id);
+    if (!p.canDelete && !canReport) return null;
+    return (
+      <PlanSafetyMenu
+        targetUserId={p.author.id}
+        targetFirstName={p.author.firstName}
+        contentKind="community_post"
+        contentId={p.id}
+        onDelete={p.canDelete ? () => del(p.id) : undefined}
+      />
+    );
+  }
+
   const livePosts = posts.filter((p) => p.approvalStatus === "approved");
   const myPending = posts.filter((p) => p.approvalStatus === "pending");
   const composerHint = community.bulletinRequiresApproval && !community.isOrganizer
@@ -865,11 +879,7 @@ function BulletinTab({
                   <span className="cmy-post-name">{p.author.firstName}</span>
                   <span className="cmy-pending-badge">Pending</span>
                   <span className="cmy-post-time">{formatRelative(p.createdAt)}</span>
-                  {p.canDelete && (
-                    <div className="cmy-post-actions">
-                      <button type="button" className="cmy-icon-btn" onClick={() => del(p.id)} title="Delete">×</button>
-                    </div>
-                  )}
+                  <div className="cmy-post-actions">{postMenu(p)}</div>
                 </div>
                 {p.content && <p className="cmy-post-body">{p.content}</p>}
                 {p.image && <img className="cmy-post-image" src={p.image} alt="" loading="lazy" />}
@@ -901,17 +911,7 @@ function BulletinTab({
                     {p.pinned ? "📌" : "📍"}
                   </button>
                 )}
-                {p.canDelete && (
-                  <button type="button" className="cmy-icon-btn" onClick={() => del(p.id)} title="Delete">×</button>
-                )}
-                {user && user.id !== p.author.id && (
-                  <PlanSafetyMenu
-                    targetUserId={p.author.id}
-                    targetFirstName={p.author.firstName}
-                    contentKind="community_post"
-                    contentId={p.id}
-                  />
-                )}
+                {postMenu(p)}
               </div>
             </div>
             {p.content && <p className="cmy-post-body">{p.content}</p>}
@@ -925,9 +925,7 @@ function BulletinTab({
                       <div className="cmy-reply-top">
                         <span className="cmy-post-name">{r.author.firstName}</span>
                         <span className="cmy-post-time">{formatRelative(r.createdAt)}</span>
-                        {r.canDelete && (
-                          <button type="button" className="cmy-icon-btn" onClick={() => del(r.id)} title="Delete">×</button>
-                        )}
+                        {postMenu(r)}
                       </div>
                       {r.content && <p className="cmy-post-body">{r.content}</p>}
                     </div>

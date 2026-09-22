@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Ban, Flag, MoreVertical } from "lucide-react";
+import { Ban, Flag, MoreVertical, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { api, parseApiError } from "../api/http";
 import { useAuth } from "../context/AuthContext";
@@ -18,6 +18,9 @@ export function PlanSafetyMenu({
   planTitle,
   contentKind,
   contentId,
+  onDelete,
+  deleteTitle = "Delete this message?",
+  deleteBody = "This removes it for everyone in the community. This can't be undone.",
 }: {
   targetUserId: string;
   targetFirstName: string;
@@ -25,13 +28,21 @@ export function PlanSafetyMenu({
   planTitle?: string;
   contentKind?: "user" | "plan" | "message" | "forum_post" | "community_post";
   contentId?: string;
+  /** When set, Delete appears above Report and confirms before calling this. */
+  onDelete?: () => Promise<void>;
+  deleteTitle?: string;
+  deleteBody?: string;
 }) {
-  const { refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [blockOpen, setBlockOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const isSelf = user?.id === targetUserId;
+  const showDelete = Boolean(onDelete);
+  const showSafety = !isSelf;
 
   useEffect(() => {
     if (!open) return;
@@ -51,6 +62,8 @@ export function PlanSafetyMenu({
     };
   }, [open]);
 
+  if (!showDelete && !showSafety) return null;
+
   return (
     <div className="plan-safety-menu" ref={wrapRef}>
       <button
@@ -69,31 +82,58 @@ export function PlanSafetyMenu({
       </button>
       {open && (
         <div className="plan-safety-dropdown" role="menu">
-          <button
-            type="button"
-            className="plan-safety-dropdown-item"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              setReportOpen(true);
-            }}
-          >
-            <Flag size={14} strokeWidth={1.8} aria-hidden="true" />
-            Report
-          </button>
-          <button
-            type="button"
-            className="plan-safety-dropdown-item is-danger"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              setBlockOpen(true);
-            }}
-          >
-            <Ban size={14} strokeWidth={1.8} aria-hidden="true" />
-            Block User
-          </button>
+          {showDelete && (
+            <button
+              type="button"
+              className="plan-safety-dropdown-item is-danger"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                setDeleteOpen(true);
+              }}
+            >
+              <Trash2 size={14} strokeWidth={1.8} aria-hidden="true" />
+              Delete
+            </button>
+          )}
+          {showSafety && (
+            <>
+              <button
+                type="button"
+                className="plan-safety-dropdown-item"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  setReportOpen(true);
+                }}
+              >
+                <Flag size={14} strokeWidth={1.8} aria-hidden="true" />
+                Report
+              </button>
+              <button
+                type="button"
+                className="plan-safety-dropdown-item is-danger"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  setBlockOpen(true);
+                }}
+              >
+                <Ban size={14} strokeWidth={1.8} aria-hidden="true" />
+                Block User
+              </button>
+            </>
+          )}
         </div>
+      )}
+      {deleteOpen && onDelete && (
+        <DeleteConfirmModal
+          title={deleteTitle}
+          body={deleteBody}
+          titleId={`delete-content-${contentId ?? targetUserId}`}
+          onClose={() => setDeleteOpen(false)}
+          onConfirm={onDelete}
+        />
       )}
       {reportOpen && (
         <ReportModal
@@ -118,6 +158,59 @@ export function PlanSafetyMenu({
         />
       )}
     </div>
+  );
+}
+
+function DeleteConfirmModal({
+  title,
+  body,
+  titleId,
+  onClose,
+  onConfirm,
+}: {
+  title: string;
+  body: string;
+  titleId: string;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function confirm() {
+    setBusy(true);
+    setError(null);
+    try {
+      await onConfirm();
+      onClose();
+    } catch (e) {
+      setError(parseApiError(e) || "Couldn't delete. Try again.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <BottomSheet
+      onClose={() => {
+        if (!busy) onClose();
+      }}
+      closeDisabled={busy}
+      labelledBy={titleId}
+    >
+      <h2 id={titleId} className="sheet-title">
+        {title}
+      </h2>
+      <p className="sheet-copy">{body}</p>
+      {error && <p className="error-text">{error}</p>}
+      <div className="sheet-actions">
+        <Button variant="primary" block disabled={busy} onClick={() => void confirm()}>
+          {busy ? "Deleting…" : "Delete"}
+        </Button>
+        <Button variant="secondary" block disabled={busy} onClick={onClose}>
+          Cancel
+        </Button>
+      </div>
+    </BottomSheet>
   );
 }
 

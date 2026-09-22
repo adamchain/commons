@@ -1105,7 +1105,9 @@ button.cmy-joined-pill {
 .cmy-post-time { color: var(--text-subtle); font-size: var(--type-caption); margin-left: auto; white-space: nowrap; }
 .cmy-post-body { color: var(--ink-700); font-size: var(--type-body); line-height: 1.5; margin: 0; white-space: pre-wrap; }
 .cmy-post-image { width: 100%; border-radius: var(--r-md); }
-.cmy-post-actions { display: flex; gap: var(--s-1); }
+.cmy-post-actions { display: flex; gap: var(--s-1); align-items: center; }
+.cmy-post-actions .plan-safety-menu,
+.cmy-reply-top .plan-safety-menu { margin-top: 0; }
 .cmy-org-badge {
   color: var(--community-pink);
   font-size: var(--type-label);

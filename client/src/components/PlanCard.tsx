@@ -257,9 +257,6 @@ function GoingCount({
           {goingCount} <span className="plan-card-going-label">Going</span>
         </button>
       )}
-      {showGoingLabel && showInterestedLabel && (
-        <span className="plan-card-going-sep" aria-hidden="true">|</span>
-      )}
       {showInterestedLabel && (
         <button
           type="button"
