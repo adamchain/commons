@@ -1282,6 +1282,15 @@ button.cmy-joined-pill {
   cursor: default;
   color: var(--text-muted);
 }
+.cmy-network-btn--add {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+.cmy-network-btn--add:disabled {
+  color: #fff;
+  opacity: 0.7;
+}
 .cmy-network-status {
   flex-shrink: 0;
   font-size: var(--type-caption);

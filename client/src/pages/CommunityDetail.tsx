@@ -1068,9 +1068,7 @@ export function MemberNetworkButton({
   const [busy, setBusy] = useState(false);
   const current = override ?? status;
   if (!current) return null;
-  if (current === "connected") {
-    return <span className="cmy-network-status">In network</span>;
-  }
+  if (current === "connected") return null;
 
   async function add() {
     if (busy) return;
@@ -1100,7 +1098,7 @@ export function MemberNetworkButton({
   }
 
   return (
-    <button type="button" className="cmy-network-btn" disabled={busy} onClick={() => void add()}>
+    <button type="button" className="cmy-network-btn cmy-network-btn--add" disabled={busy} onClick={() => void add()}>
       {busy ? "…" : incoming ? "Accept" : "Add to network"}
     </button>
   );
