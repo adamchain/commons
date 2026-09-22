@@ -15,10 +15,12 @@ export function FilterSheet({
   selectedHoodId,
   selectedAgeRange,
   hideCancelled,
+  networkOnly,
   onTagChange,
   onHoodChange,
   onAgeRangeChange,
   onHideCancelledChange,
+  onNetworkOnlyChange,
   onClose,
   onClear,
 }: {
@@ -29,10 +31,12 @@ export function FilterSheet({
   selectedHoodId: string | null;
   selectedAgeRange: AgeRange | null;
   hideCancelled: boolean;
+  networkOnly: boolean;
   onTagChange: (t: InterestTag | null) => void;
   onHoodChange: (id: string | null) => void;
   onAgeRangeChange: (r: AgeRange | null) => void;
   onHideCancelledChange: (v: boolean) => void;
+  onNetworkOnlyChange: (v: boolean) => void;
   onClose: () => void;
   onClear: () => void;
 }) {
@@ -54,6 +58,19 @@ export function FilterSheet({
           <button type="button" className="btn-link" onClick={onClear}>
             Clear
           </button>
+        </div>
+
+        <div className="filter-sheet-group">
+          <div className="filter-sheet-chips">
+            <button
+              type="button"
+              className={`community-chip ${networkOnly ? "is-active" : ""}`}
+              onClick={() => onNetworkOnlyChange(!networkOnly)}
+              aria-pressed={networkOnly}
+            >
+              Your Network
+            </button>
+          </div>
         </div>
 
         <div className="filter-sheet-group">

@@ -30,6 +30,7 @@ type PersistedFilters = {
   selectedHoodId: string | null;
   selectedAgeRange: AgeRange | null;
   hideCancelled: boolean;
+  networkOnly: boolean;
 };
 
 const PULL_THRESHOLD = 52;
@@ -47,6 +48,7 @@ const EMPTY_FILTERS: PersistedFilters = {
   selectedHoodId: null,
   selectedAgeRange: null,
   hideCancelled: false,
+  networkOnly: false,
 };
 
 function loadPersistedFilters(): PersistedFilters {
@@ -69,6 +71,7 @@ export function FeedPage() {
   const [selectedHoodId, setSelectedHoodId] = useState<string | null>(() => loadPersistedFilters().selectedHoodId);
   const [selectedAgeRange, setSelectedAgeRange] = useState<AgeRange | null>(() => loadPersistedFilters().selectedAgeRange);
   const [hideCancelled, setHideCancelled] = useState(() => loadPersistedFilters().hideCancelled);
+  const [networkOnly, setNetworkOnly] = useState(() => loadPersistedFilters().networkOnly);
   const [filterOpen, setFilterOpen] = useState(false);
   const [view, setView] = useState<"plans" | "ideas">("plans");
   const { user, setUser } = useAuth();
@@ -307,12 +310,12 @@ export function FeedPage() {
     try {
       localStorage.setItem(
         FEED_FILTERS_KEY,
-        JSON.stringify({ selectedTag, selectedHoodId, selectedAgeRange, hideCancelled }),
+        JSON.stringify({ selectedTag, selectedHoodId, selectedAgeRange, hideCancelled, networkOnly }),
       );
     } catch {
       /* storage unavailable — non-fatal */
     }
-  }, [selectedTag, selectedHoodId, selectedAgeRange, hideCancelled]);
+  }, [selectedTag, selectedHoodId, selectedAgeRange, hideCancelled, networkOnly]);
 
   useEffect(() => {
     if (!justPostedId) return;
@@ -328,6 +331,10 @@ export function FeedPage() {
     if (selectedAgeRange) list = list.filter((p) => p.creator.ageRange === selectedAgeRange);
     if (selectedDayIso) list = list.filter((p) => p.date.slice(0, 10) === selectedDayIso);
     if (hideCancelled) list = list.filter((p) => !p.cancelledAt);
+    if (networkOnly) {
+      const networkIds = new Set(user?.networkUserIds ?? []);
+      list = list.filter((p) => networkIds.has(p.creator.id));
+    }
     // Past plans never appear in the main feed.
     list = list.filter((p) => !p.cancelledAt && !planHasEnded(p));
 
@@ -358,7 +365,7 @@ export function FeedPage() {
       }
     }
     return active;
-  }, [plans, view, selectedTag, selectedHoodId, selectedAgeRange, selectedDayIso, hideCancelled, justPostedId]);
+  }, [plans, view, selectedTag, selectedHoodId, selectedAgeRange, selectedDayIso, hideCancelled, networkOnly, user?.networkUserIds, justPostedId]);
 
   const filteredPlans = activePlans;
 
@@ -366,7 +373,8 @@ export function FeedPage() {
     (selectedTag ? 1 : 0) +
     (selectedHoodId ? 1 : 0) +
     (selectedAgeRange ? 1 : 0) +
-    (hideCancelled ? 1 : 0);
+    (hideCancelled ? 1 : 0) +
+    (networkOnly ? 1 : 0);
 
   if (!feedReady) {
     return (
@@ -513,16 +521,19 @@ export function FeedPage() {
           selectedHoodId={selectedHoodId}
           selectedAgeRange={selectedAgeRange}
           hideCancelled={hideCancelled}
+          networkOnly={networkOnly}
           onTagChange={setSelectedTag}
           onHoodChange={setSelectedHoodId}
           onAgeRangeChange={setSelectedAgeRange}
           onHideCancelledChange={setHideCancelled}
+          onNetworkOnlyChange={setNetworkOnly}
           onClose={() => setFilterOpen(false)}
           onClear={() => {
             setSelectedTag(null);
             setSelectedHoodId(null);
             setSelectedAgeRange(null);
             setHideCancelled(false);
+            setNetworkOnly(false);
           }}
         />
       )}
