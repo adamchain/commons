@@ -8,6 +8,7 @@ import { emit } from "../lib/notify.js";
 import {
   communityCreationBlockReason,
   communityMembershipBlockReason,
+  isCommunityOrganizer,
 } from "../lib/communityAccess.js";
 import { isGcsConfigured, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
@@ -546,6 +547,25 @@ chatRouter.post("/conversations/:id/messages/:msgId/reopen-poll", requireAuth, a
     return;
   }
   res.json(await toMessageDto(updated, userId, hostId));
+});
+
+// POST /api/conversations/:id/clear — organizer wipes the community thread for everyone.
+chatRouter.post("/conversations/:id/clear", requireAuth, (req, res) => {
+  const convId = String(req.params.id);
+  const userId = String(req.userId);
+  const conv = store.findConversationById(convId);
+  if (!conv?.communityId) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
+  const community = store.findCommunityById(conv.communityId);
+  if (!community || !isCommunityOrganizer(community, userId)) {
+    res.status(403).json({ error: "Only the organizer can delete this chat for everyone" });
+    return;
+  }
+  store.clearConversationMessages(convId);
+  store.createSystemMessage(convId, "The organizer cleared this chat for everyone.");
+  res.json({ ok: true });
 });
 
 // POST /api/conversations/:id/leave — drop yourself from a group chat. Works

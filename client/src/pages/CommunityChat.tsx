@@ -260,6 +260,18 @@ export function CommunityChatPage() {
     }
   }
 
+  async function deleteChatForEveryone() {
+    if (!conv) return;
+    if (!window.confirm("Delete this chat for everyone? Messages will be gone for the whole group.")) return;
+    try {
+      await api(`/api/conversations/${conv.id}/clear`, { method: "POST" });
+      const msgs = await api<MessageDTO[]>(`/api/conversations/${conv.id}/messages`);
+      setMessages(msgs.sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+    } catch {
+      window.alert("Couldn't delete that chat.");
+    }
+  }
+
   async function leaveChat() {
     if (!conv) return;
     if (!window.confirm("Leave this chat? It leaves the inbox. You're still in.")) return;
@@ -421,6 +433,19 @@ export function CommunityChatPage() {
                     Block organizer
                   </button>
                 </>
+              )}
+              {conv.isHost && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="chat-header-menu-leave"
+                  onClick={() => {
+                    setHeaderMenuOpen(false);
+                    void deleteChatForEveryone();
+                  }}
+                >
+                  Delete for everyone
+                </button>
               )}
               <button
                 type="button"

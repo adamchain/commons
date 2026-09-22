@@ -1518,6 +1518,12 @@ export const store = {
       .filter((m) => m.conversationId === conversationId)
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   },
+  /** Wipe a thread for every participant. The conversation row stays. */
+  clearConversationMessages(conversationId: string): void {
+    snapshot.messages = snapshot.messages.filter((m) => m.conversationId !== conversationId);
+    mongoMirror.deleteMessagesByConversation(conversationId);
+    persist();
+  },
   findMessageById(messageId: string): MessageRecord | undefined {
     return snapshot.messages.find((m) => m.id === messageId);
   },
