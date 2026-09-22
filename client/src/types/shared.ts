@@ -355,6 +355,8 @@ export interface ConversationDTO {
   /** True when the viewer hosts the underlying plan — drives the "Block host" chat menu option. */
   isHost: boolean;
   hostId: string;
+  /** Host or community organizer may wipe the thread. Plan chats only after the plan. */
+  canClearForEveryone?: boolean;
 }
 
 /** A row in the unified Messages inbox — one per accessible plan group chat. */

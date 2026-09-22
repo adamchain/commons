@@ -13,6 +13,7 @@ import {
 import { isGcsConfigured, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
 import { planVisibleToViewer } from "../lib/feedScope.js";
+import { planHasEnded } from "../lib/planTime.js";
 import type { ConversationDTO, ConversationSummaryDTO, MessageDTO, PollDTO } from "../types/shared.js";
 
 const MAX_CHAT_IMAGE_CHARS = 1_600_000;
@@ -549,22 +550,47 @@ chatRouter.post("/conversations/:id/messages/:msgId/reopen-poll", requireAuth, a
   res.json(await toMessageDto(updated, userId, hostId));
 });
 
-// POST /api/conversations/:id/clear — organizer wipes the community thread for everyone.
+// POST /api/conversations/:id/clear — wipe a thread for everyone.
+// Community group chats: the organizer, any time.
+// Plan chats: the host, or that plan's community organizer, only after the plan.
 chatRouter.post("/conversations/:id/clear", requireAuth, (req, res) => {
   const convId = String(req.params.id);
   const userId = String(req.userId);
   const conv = store.findConversationById(convId);
-  if (!conv?.communityId) {
+  if (!conv) {
     res.status(404).json({ error: "Conversation not found" });
     return;
   }
-  const community = store.findCommunityById(conv.communityId);
-  if (!community || !isCommunityOrganizer(community, userId)) {
-    res.status(403).json({ error: "Only the organizer can delete this chat for everyone" });
+  if (conv.communityId) {
+    const community = store.findCommunityById(conv.communityId);
+    if (!community || !isCommunityOrganizer(community, userId)) {
+      res.status(403).json({ error: "Only the organizer can delete this chat for everyone" });
+      return;
+    }
+    store.clearConversationMessages(convId);
+    store.createSystemMessage(convId, "The organizer cleared this chat for everyone.");
+    res.json({ ok: true });
+    return;
+  }
+  const plan = conv.planId ? store.findPlanById(conv.planId) : undefined;
+  if (!plan) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
+  if (!plan.cancelledAt && !planHasEnded(plan)) {
+    res.status(403).json({ error: "You can delete this chat for everyone after the plan" });
+    return;
+  }
+  const planCommunity = plan.communityId ? store.findCommunityById(plan.communityId) : undefined;
+  const allowed =
+    plan.creatorId === userId ||
+    (planCommunity ? isCommunityOrganizer(planCommunity, userId) : false);
+  if (!allowed) {
+    res.status(403).json({ error: "Only the host can delete this chat for everyone" });
     return;
   }
   store.clearConversationMessages(convId);
-  store.createSystemMessage(convId, "The organizer cleared this chat for everyone.");
+  store.createSystemMessage(convId, "The host cleared this chat for everyone.");
   res.json({ ok: true });
 });
 
@@ -659,6 +685,21 @@ function truncate(s: string, n: number): string {
   return s.length <= n ? s : s.slice(0, n - 1) + "…";
 }
 
+function viewerCanClearConversation(
+  conv: NonNullable<ReturnType<typeof store.findConversationById>>,
+  viewerId: string,
+): boolean {
+  if (conv.communityId) {
+    const community = store.findCommunityById(conv.communityId);
+    return !!community && isCommunityOrganizer(community, viewerId);
+  }
+  const plan = conv.planId ? store.findPlanById(conv.planId) : undefined;
+  if (!plan || (!plan.cancelledAt && !planHasEnded(plan))) return false;
+  if (plan.creatorId === viewerId) return true;
+  const planCommunity = plan.communityId ? store.findCommunityById(plan.communityId) : undefined;
+  return !!planCommunity && isCommunityOrganizer(planCommunity, viewerId);
+}
+
 function conversationHostId(
   conv: NonNullable<ReturnType<typeof store.findConversationById>>,
 ): string {
@@ -690,6 +731,7 @@ async function toConversationDto(
     muted: store.isConversationMuted(_viewerId, conv.id),
     isHost: hostId === _viewerId,
     hostId,
+    canClearForEveryone: viewerCanClearConversation(conv, _viewerId),
   };
 }
 

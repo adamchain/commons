@@ -227,6 +227,18 @@ export function ChatPage() {
     }
   }
 
+  async function deleteChatForEveryone() {
+    if (!conv) return;
+    if (!window.confirm("Delete this chat for everyone? Messages will be gone for the whole group.")) return;
+    try {
+      await api(`/api/conversations/${conv.id}/clear`, { method: "POST" });
+      const msgs = await api<MessageDTO[]>(`/api/conversations/${conv.id}/messages`);
+      setMessages(msgs.sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+    } catch (e) {
+      window.alert(parseApiError(e) || "Couldn't delete that chat.");
+    }
+  }
+
   async function leaveChat() {
     if (!conv) return;
     setLeaveBusy(true);
@@ -406,6 +418,19 @@ export function ChatPage() {
                     Block organizer
                   </button>
                 </>
+              )}
+              {conv.canClearForEveryone && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="chat-header-menu-leave"
+                  onClick={() => {
+                    setHeaderMenuOpen(false);
+                    void deleteChatForEveryone();
+                  }}
+                >
+                  Delete for everyone
+                </button>
               )}
               <button
                 type="button"
