@@ -69,6 +69,11 @@ export function CommunityDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [tab, setTab] = useState<Tab>(() => tabFromParam(searchParams.get("tab")) ?? "bulletin");
+  const tabParam = searchParams.get("tab");
+  useEffect(() => {
+    const next = tabFromParam(tabParam);
+    if (next) setTab(next);
+  }, [tabParam]);
   const [joinConfirm, setJoinConfirm] = useState(false);
   const [editSocials, setEditSocials] = useState(false);
   const [leaveBusy, setLeaveBusy] = useState(false);
@@ -1242,7 +1247,6 @@ function MembersTab({
                 status={organizer.networkStatus}
                 requestReceived={organizer.networkRequestReceived}
               />
-              <span className="cmy-org-badge cmy-org-badge--pill">Organizer</span>
             </li>
           </ul>
         </>

@@ -111,7 +111,7 @@ export function PlanCard({
             ) : hasEnded && !hideHappened ? (
               <span className="plan-card-kind-pill is-happened">Happened</span>
             ) : null}
-            {plan.communityId && plan.communityName ? (
+            {plan.communityId && plan.communityName && navFrom.from !== "community" ? (
               <span
                 className="plan-card-community-pill"
                 role="link"
@@ -129,7 +129,7 @@ export function PlanCard({
                   }
                 }}
               >
-                {plan.communityName}
+                <span className="plan-card-community-pill-text">{plan.communityName}</span>
               </span>
             ) : null}
             {capacityFill && (
@@ -207,6 +207,7 @@ export function PlanCard({
                   isFull={isFull}
                   requiresApproval={planRequiresHostApproval(plan)}
                   onPlanRefresh={onPlanRefresh}
+                  goingConfirm={navFrom.from === "community" ? "You're In" : undefined}
                 />
               )}
             </footer>
@@ -302,6 +303,7 @@ function QuickJoin({
   isFull,
   requiresApproval,
   onPlanRefresh,
+  goingConfirm,
 }: {
   planId: string;
   isLooking: boolean;
@@ -309,6 +311,8 @@ function QuickJoin({
   isFull: boolean;
   requiresApproval: boolean;
   onPlanRefresh?: () => void;
+  /** Heading on the confirmation after I'm In. Home feed keeps the default. */
+  goingConfirm?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const [showSheet, setShowSheet] = useState(false);
@@ -374,13 +378,19 @@ function QuickJoin({
       >
         {busy ? "…" : label}
       </button>
-      {confirm && <JoinConfirmPopup kind={confirm} onClose={() => setConfirm(null)} />}
+      {confirm && (
+        <JoinConfirmPopup
+          kind={confirm}
+          title={confirm === "going" ? goingConfirm : undefined}
+          onClose={() => setConfirm(null)}
+        />
+      )}
       {showSheet && (
           <BottomSheet
             onClose={() => setShowSheet(false)}
             labelledBy="plan-card-rsvp-title"
           >
-              <div id="plan-card-rsvp-title" className="sheet-title">{goingActive ? "I'm in." : "You're Interested"}</div>
+              <div id="plan-card-rsvp-title" className="sheet-title">{goingActive ? (goingConfirm ?? "I'm in.") : "You're Interested"}</div>
               {goingActive && (
                 <button type="button" className="sheet-link" onClick={() => void setState("interested")}>
                   Switch to Interested

@@ -159,8 +159,10 @@ function EditForm({
           siteName: preview.siteName,
         },
       }));
-    } catch (err) {
-      setLinkErr(err instanceof Error ? err.message : "Couldn't load preview");
+    } catch {
+      setLinkErr(
+        "We couldn't load a preview of this page. Your link is still saved. Some sites don't let us read them.",
+      );
       setForm((f) => ({ ...f, flyerLinkUrl: withScheme, flyerLinkPreview: null }));
     } finally {
       setLinkBusy(false);
@@ -659,7 +661,7 @@ function EditForm({
             disabled={linkBusy}
           />
           {linkBusy && <p className="form-help">Loading preview…</p>}
-          {linkErr && <p className="form-help" style={{ color: "var(--accent)" }}>{linkErr}</p>}
+          {linkErr && <p className="link-preview-notice" role="status">{linkErr}</p>}
           {form.flyerLinkPreview && (
             <div className="link-preview" style={{ marginTop: 8 }}>
               {form.flyerLinkPreview.image && (

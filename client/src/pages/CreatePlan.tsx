@@ -127,7 +127,15 @@ export function CreatePlanPage() {
   const communityId = searchParams.get("communityId");
   const communityNameParam = searchParams.get("communityName");
   // Hub "Post a new event" — come back to that community's Events tab, not the feed.
-  const returnToCommunityEvents = searchParams.get("returnTo") === "events" && Boolean(communityId);
+  // Remember the id in a ref: /plans/new often stays mounted, so a mid-form URL
+  // change must not drop the return. A fresh create (no community) clears it.
+  const hubEventsReturnId = useRef<string | null>(null);
+  if (searchParams.get("returnTo") === "events" && communityId) {
+    hubEventsReturnId.current = communityId;
+  } else if (!communityId) {
+    hubEventsReturnId.current = null;
+  }
+  const returnToCommunityEvents = Boolean(hubEventsReturnId.current);
   const prefillVibe: VibeIcon | null = useMemo(() => {
     if (!prefillTagParam) return null;
     const opt = VIBE_OPTIONS.find((o) => o.tag === prefillTagParam);
@@ -672,8 +680,9 @@ export function CreatePlanPage() {
       }
       // Hub posts stay on that community's Events tab. Everywhere else lands
       // on the feed with a "you're live" success sheet.
-      if (returnToCommunityEvents && effectiveCommunityId) {
-        navigate(`/communities/${effectiveCommunityId}?tab=events`);
+      const hubId = hubEventsReturnId.current || (returnToCommunityEvents ? effectiveCommunityId : null);
+      if (hubId) {
+        navigate(`/communities/${hubId}?tab=events`, { replace: true });
       } else {
         navigate("/", { state: { justPostedId: created.id, showPostSuccess: true } });
       }
@@ -867,10 +876,10 @@ export function CreatePlanPage() {
           siteName: preview.siteName,
         },
       }));
-    } catch (err) {
-      setLinkError(err instanceof Error ? err.message : "Couldn't load preview");
-      // Keep the URL string so the user can still post even if the preview
-      // failed (some sites block scrapers).
+    } catch {
+      setLinkError(
+        "We couldn't load a preview of this page. Your link is still saved. Some sites don't let us read them.",
+      );
       setForm((f) => ({ ...f, flyerLinkUrl: withScheme, flyerLinkPreview: null }));
     } finally {
       setLinkBusy(false);
@@ -1581,7 +1590,7 @@ export function CreatePlanPage() {
             disabled={linkBusy}
           />
           {linkBusy && <p className="form-help">Loading preview…</p>}
-          {linkError && <p className="form-help" style={{ color: "var(--accent)" }}>{linkError}</p>}
+          {linkError && <p className="link-preview-notice" role="status">{linkError}</p>}
           {form.flyerLinkPreview && (
             <div className="link-preview link-preview--form">
               {form.flyerLinkPreview.image && (
@@ -2201,12 +2210,12 @@ function IdeaForm({
                       disabled={linkBusy}
                     />
                     {linkBusy && <span className="plan-meta-sub">Loading preview…</span>}
-                    {linkError && <span className="plan-meta-sub">{linkError}</span>}
                     {form.flyerLinkPreview?.title && (
                       <span className="plan-meta-sub">{form.flyerLinkPreview.title}</span>
                     )}
                   </label>
                 </div>
+                {linkError && <p className="link-preview-notice" role="status">{linkError}</p>}
               </div>
 
               <div className="plan-detail-card plan-detail-card--composer idea-notes-card">

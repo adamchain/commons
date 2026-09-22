@@ -6635,25 +6635,30 @@ a.action-btn--stack {
   border-radius: var(--r-control);
 }
 
-/* Community pill on a plan card — taps through to the community page. */
+/* Community pill on a plan card — taps through to the community page.
+   Shrink and ellipsis so a long name stays inside the card. */
 .plan-card-community-pill {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   margin-left: auto;
-  max-width: 46%;
+  min-width: 0;
+  max-width: 58%;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: var(--type-label);
   font-weight: 600;
   padding: 2px 8px;
-  border-radius: var(--r-control);
+  border-radius: var(--r-pill);
   color: var(--community-pink);
   background: var(--community-pink-soft);
   border: 1px solid var(--community-pink-border);
   cursor: pointer;
-  flex-shrink: 0;
+  flex: 0 1 auto;
+}
+.plan-card-community-pill-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 /* When both a kind pill and community pill show, don't fight over margin-left:auto. */
 .plan-card-poster-row .plan-card-kind-pill + .plan-card-community-pill {
@@ -6667,6 +6672,7 @@ a.action-btn--stack {
   gap: 8px;
   margin-bottom: 4px;
   padding-right: 0;
+  min-width: 0;
 }
 .plan-card-poster-row .plan-card-kind-pill {
   margin-left: auto;
@@ -7415,6 +7421,15 @@ a.action-btn--stack {
   margin: -4px 0 8px;
   color: var(--text-muted);
   font-size: var(--text-body);
+}
+.link-preview-notice {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  background: var(--tan);
+  border-radius: var(--r-md);
+  color: var(--ink);
+  font-size: var(--text-body);
+  line-height: 1.4;
 }
 
 /* Zoom-style weekday picker shown under the Repeats dropdown. */

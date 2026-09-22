@@ -1,6 +1,6 @@
 import { useEffect, useState, type MouseEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Users } from "lucide-react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { ArrowLeft, Search, Users } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
@@ -23,14 +23,24 @@ import "./Communities.css";
 
 const COMMUNITY_PAGE = 10;
 
+function readCategory(raw: string | null): CommunityCategory | "all" {
+  if (raw && (ALL_COMMUNITY_CATEGORIES as string[]).includes(raw)) return raw as CommunityCategory;
+  return "all";
+}
+
 export function CommunitiesPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const directory = searchParams.get("view") === "all";
   const [all, setAll] = useState<CommunityCardDTO[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [category, setCategory] = useState<CommunityCategory | "all">("all");
+  const [category, setCategory] = useState<CommunityCategory | "all">(() =>
+    readCategory(searchParams.get("category")),
+  );
   const [joinConfirm, setJoinConfirm] = useState(false);
   const [shown, setShown] = useState(COMMUNITY_PAGE);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     let live = true;
@@ -48,15 +58,35 @@ export function CommunitiesPage() {
     };
   }, []);
 
+  const q = query.trim().toLowerCase();
   const matchesCat = (c: CommunityCardDTO) =>
     category === "all" || communityCategoriesOf(c).includes(category);
-  const browse = all.filter(matchesCat);
-  const visible = browse.slice(0, shown);
+  const matchesQuery = (c: CommunityCardDTO) => {
+    if (!q) return true;
+    const hay = [
+      c.name,
+      c.organizer.firstName,
+      ...communityCategoriesOf(c).map((cat) => COMMUNITY_CATEGORY_LABELS[cat]),
+    ]
+      .join(" ")
+      .toLowerCase();
+    return hay.includes(q);
+  };
+  const browse = all.filter((c) => matchesCat(c) && matchesQuery(c));
+  const visible = directory ? browse : browse.slice(0, shown);
   const hero = visible[0] ?? null;
   const rest = visible.slice(1);
-  const hasMore = browse.length > shown;
+  const hasMore = !directory && browse.length > shown;
   const catLabel = category === "all" ? null : COMMUNITY_CATEGORY_LABELS[category];
   const showBrowseEmpty = loaded && browse.length === 0;
+  const searching = q.length > 0;
+  const seeAllTo =
+    category === "all" ? "/communities?view=all" : `/communities?view=all&category=${category}`;
+
+  function selectCategory(next: CommunityCategory | "all") {
+    setCategory(next);
+    setShown(COMMUNITY_PAGE);
+  }
 
   function absorbJoin(updated: CommunityCardDTO) {
     setAll((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
@@ -66,8 +96,13 @@ export function CommunitiesPage() {
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy-list">
       <header className="cmy-list-masthead">
+        {directory && (
+          <Link to="/communities" className="back-circle" aria-label="Back to communities">
+            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
+          </Link>
+        )}
         <div className="cmy-list-masthead-copy">
-          <h1 className="cmy-list-title">Communities</h1>
+          <h1 className="cmy-list-title">{directory ? "All communities" : "Communities"}</h1>
         </div>
         <button
           type="button"
@@ -77,6 +112,35 @@ export function CommunitiesPage() {
           Create a Community
         </button>
       </header>
+      <div className="network-search-wrap cmy-search">
+        <Search size={18} strokeWidth={1.8} aria-hidden="true" />
+        <input
+          className="network-search-input"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setShown(COMMUNITY_PAGE);
+          }}
+          placeholder="Search communities"
+          aria-label="Search communities"
+          enterKeyHint="search"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
+        />
+        <button
+          type="button"
+          className={`network-search-clear${query ? " is-on" : ""}`}
+          onClick={() => {
+            setQuery("");
+            setShown(COMMUNITY_PAGE);
+          }}
+          aria-label="Clear search"
+          tabIndex={query ? 0 : -1}
+        >
+          ×
+        </button>
+      </div>
       <div className="cmy-cat-pills">
         {user && (
           <Link
@@ -91,10 +155,7 @@ export function CommunitiesPage() {
           role="tab"
           aria-selected={category === "all"}
           className={`cmy-cat-pill ${category === "all" ? "is-active" : ""}`}
-          onClick={() => {
-            setCategory("all");
-            setShown(COMMUNITY_PAGE);
-          }}
+          onClick={() => selectCategory("all")}
         >
           All
         </button>
@@ -105,10 +166,7 @@ export function CommunitiesPage() {
             role="tab"
             aria-selected={category === cat}
             className={`cmy-cat-pill ${category === cat ? "is-active" : ""}`}
-            onClick={() => {
-              setCategory(cat);
-              setShown(COMMUNITY_PAGE);
-            }}
+            onClick={() => selectCategory(cat)}
           >
             {COMMUNITY_CATEGORY_LABELS[cat]}
           </button>
@@ -118,23 +176,27 @@ export function CommunitiesPage() {
       <section className="cmy-list-section">
         {hero && <CommunityHeroCard c={hero} onJoined={absorbJoin} />}
         <h2 className="cmy-list-section-title">
-          {catLabel ? `Browse · ${catLabel}` : "Browse"}
+          {searching ? "Results" : catLabel ? `Browse · ${catLabel}` : "Browse"}
         </h2>
         {showBrowseEmpty && (
           <EmptyCard
             icon={<Users size={22} strokeWidth={1.6} color="#3A6A3A" />}
             tint="#C8DDC8"
             title={
-              catLabel
-                ? `Quiet on ${catLabel.toLowerCase()}.`
-                : "Nobody's started one yet."
+              searching
+                ? "No communities match."
+                : catLabel
+                  ? `Quiet on ${catLabel.toLowerCase()}.`
+                  : "Nobody's started one yet."
             }
             body={
-              catLabel
-                ? "Try another category, or start this scene."
-                : "Run clubs, book clubs, the regulars — go first."
+              searching
+                ? "Try a different name."
+                : catLabel
+                  ? "Try another category, or start this scene."
+                  : "Run clubs, book clubs, the regulars — go first."
             }
-            cta={{ to: "/communities/new", label: "Create a community" }}
+            cta={searching ? undefined : { to: "/communities/new", label: "Create a community" }}
           />
         )}
         {rest.length > 0 && (
@@ -145,13 +207,23 @@ export function CommunitiesPage() {
           </div>
         )}
         {hasMore && (
-          <button
-            type="button"
-            className="cmy-btn cmy-btn--ghost cmy-list-more"
-            onClick={() => setShown((n) => n + COMMUNITY_PAGE)}
-          >
-            Keep scrolling
-          </button>
+          <div className="cmy-list-gate">
+            <p className="cmy-list-gate-copy">
+              Showing {Math.min(shown, browse.length)} of {browse.length}.
+            </p>
+            <div className="cmy-list-gate-actions">
+              <Link to={seeAllTo} className="cmy-btn cmy-btn--primary">
+                {catLabel ? `See all ${catLabel}` : "See all communities"}
+              </Link>
+              <button
+                type="button"
+                className="cmy-btn cmy-btn--ghost cmy-list-more"
+                onClick={() => setShown((n) => n + COMMUNITY_PAGE)}
+              >
+                Keep scrolling
+              </button>
+            </div>
+          </div>
         )}
       </section>
       {joinConfirm && <JoinConfirmPopup kind="community" onClose={() => setJoinConfirm(false)} />}

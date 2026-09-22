@@ -36,14 +36,18 @@ const COPY: Record<JoinConfirmKind, { title: string; sub: string; celebrate: boo
 /** Centered confirmation card — replaces the inline plan-card toast that collided with Going. */
 export function JoinConfirmPopup({
   kind,
+  title: titleOverride,
   onClose,
   autoDismissMs = 2200,
 }: {
   kind: JoinConfirmKind;
+  /** Replaces the default heading for this kind. */
+  title?: string;
   onClose: () => void;
   autoDismissMs?: number;
 }) {
-  const { title, sub, celebrate } = COPY[kind];
+  const { title: defaultTitle, sub, celebrate } = COPY[kind];
+  const title = titleOverride ?? defaultTitle;
   const dismiss = useEffectEvent(onClose);
   const dismissAfter = kind === "idea_interested" ? Math.max(autoDismissMs, 3200) : autoDismissMs;
 
