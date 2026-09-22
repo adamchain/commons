@@ -357,13 +357,14 @@ function QuickJoin({
   }
 
   const label = goingActive ? "I'm In" : interestedActive ? "You're Interested" : interestedCta ? "Interested" : "I'm In";
+  const imIn = label === "I'm In";
 
   return (
     <>
       <button
         type="button"
-        className={`plan-card-quick-join ${goingActive ? "is-active" : ""} ${
-          interestedCta ? "is-interested" : ""
+        className={`plan-card-quick-join ${imIn ? "is-imin" : "is-interested"} ${
+          goingActive ? "is-active" : ""
         }`}
         onClick={(e) => void onTap(e)}
         disabled={busy}

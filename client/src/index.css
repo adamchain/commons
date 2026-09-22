@@ -7709,7 +7709,7 @@ a.action-btn--stack {
   color: var(--accent-hover);
 }
 
-/* Join CTA on feed cards — primary red. */
+/* Join CTA on feed cards. I'm In is a red pill; Interested stays the soft pill. */
 .plan-card-quick-join {
   display: inline-flex;
   align-items: center;
@@ -7723,7 +7723,7 @@ a.action-btn--stack {
   color: var(--accent-on);
   background: var(--red);
   border: none;
-  border-radius: var(--r-control);
+  border-radius: var(--r-pill);
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
@@ -7733,13 +7733,14 @@ a.action-btn--stack {
   background: var(--accent-hover);
   color: var(--accent-on);
 }
+.plan-card-quick-join.is-imin,
+.plan-card-quick-join.is-imin:hover:not(:disabled),
 .plan-card-quick-join.is-active {
   background: var(--red);
   color: var(--accent-on);
 }
 .plan-card-quick-join.is-interested,
-.plan-card-quick-join.is-interested:hover:not(:disabled),
-.plan-card-quick-join.is-interested.is-active {
+.plan-card-quick-join.is-interested:hover:not(:disabled) {
   background: var(--btn-soft);
   color: var(--btn-soft-on);
 }
