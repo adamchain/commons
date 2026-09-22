@@ -69,8 +69,8 @@ export function SettingsForumsPage() {
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">
       <header className="app-header app-header--minimal">
-        <Link to="/settings" className="detail-back">
-          <ArrowLeft size={14} strokeWidth={2} aria-hidden="true" /> Settings
+        <Link to="/settings" className="back-circle" aria-label="Back">
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </Link>
       </header>
       <ScreenTitle

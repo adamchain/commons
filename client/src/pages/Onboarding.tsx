@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import type { CSSProperties, ReactNode } from "react";
-import { Check, Coffee, Flame, MapPin, Star, Wine, type LucideIcon } from "lucide-react";
+import { ArrowLeft, Check, Coffee, Flame, MapPin, Star, Wine, type LucideIcon } from "lucide-react";
 import { api } from "../api/http";
 import { formatPhoneInput, isValidPhoneInput } from "../lib/format";
 import { APP_STORE_URL } from "../lib/appStore";
@@ -745,7 +745,7 @@ function OnboardingShell({
       >
         {onBack && (
           <button type="button" className="onboarding-back" onClick={onBack} aria-label="Back">
-            ← Back
+            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
           </button>
         )}
         {landing ? (
@@ -827,7 +827,7 @@ function LocationStep({
         <div className="onboarding-location-hero-gradient" aria-hidden="true" />
         {onBack && (
           <button type="button" className="onboarding-back onboarding-back--on-photo" onClick={onBack} aria-label="Back">
-            ← Back
+            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
           </button>
         )}
         <p className="onboarding-location-city">

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Calendar, LayoutDashboard, MessageCircle, Send, Users } from "lucide-react";
+import { ArrowLeft, Calendar, LayoutDashboard, MessageCircle, Send, Users } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
@@ -114,8 +114,8 @@ export function CommunityDetailPage() {
   if (loading) {
     return (
       <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy">
-        <button type="button" className="detail-back" onClick={() => navigate(backHref)}>
-          ← Back
+        <button type="button" className="back-circle" aria-label="Back" onClick={() => navigate(backHref)}>
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </button>
         <p className="cmy-muted">Loading…</p>
       </main>
@@ -125,7 +125,9 @@ export function CommunityDetailPage() {
     return (
       <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy">
         <p className="cmy-muted">This community isn’t available.</p>
-        <Link to={backHref} className="cmy-btn cmy-btn--ghost">← All communities</Link>
+        <Link to={backHref} className="back-circle" aria-label="Back">
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
+        </Link>
       </main>
     );
   }
@@ -208,7 +210,7 @@ export function CommunityDetailPage() {
             aria-label="Back"
             onClick={() => navigate(backHref)}
           >
-            ←
+            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
           </button>
           {(community.isFounding || canLeave || canShare) && (
             <div className="cmy-cover-actions">

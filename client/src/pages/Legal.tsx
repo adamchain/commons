@@ -1,4 +1,5 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { LegalContent } from "../components/LegalContent";
 import { LEGAL_DOCS } from "../content/legal";
 
@@ -22,8 +23,8 @@ export function LegalPage() {
   if (!doc) {
     return (
       <div className="legal-page">
-        <button type="button" className="legal-page-back" onClick={goBack}>
-          ← Back
+        <button type="button" className="legal-page-back" aria-label="Back" onClick={goBack}>
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </button>
         <p>That document doesn’t exist.</p>
       </div>
@@ -32,8 +33,8 @@ export function LegalPage() {
 
   return (
     <div className="legal-page">
-      <button type="button" className="legal-page-back" onClick={goBack}>
-        ← Back
+      <button type="button" className="legal-page-back" aria-label="Back" onClick={goBack}>
+        <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
       </button>
       <div className="legal-page-tabs">
         <Link

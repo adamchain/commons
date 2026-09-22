@@ -881,8 +881,8 @@ export function CreatePlanPage() {
     return (
       <main className="app-shell app-shell--mid">
         <header className="app-header app-header--minimal app-header--sticky">
-          <button type="button" className="detail-back" onClick={leaveCreatePlan}>
-            <ArrowLeft size={13} strokeWidth={2} aria-hidden="true" /> Back
+          <button type="button" className="back-circle" aria-label="Back" onClick={leaveCreatePlan}>
+            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
           </button>
         </header>
         <p>Loading…</p>
@@ -894,8 +894,8 @@ export function CreatePlanPage() {
     return (
       <main className="app-shell app-shell--mid">
         <header className="app-header app-header--minimal app-header--sticky">
-          <button type="button" className="detail-back" onClick={leaveCreatePlan}>
-            <ArrowLeft size={13} strokeWidth={2} aria-hidden="true" /> Back
+          <button type="button" className="back-circle" aria-label="Back" onClick={leaveCreatePlan}>
+            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
           </button>
         </header>
         <p className="error-text">{error ?? "Couldn't load that plan."}</p>
@@ -908,8 +908,8 @@ export function CreatePlanPage() {
     return (
       <main className="app-shell app-shell--mid path-picker-page">
         <header className="app-header app-header--minimal app-header--sticky path-picker-header">
-          <button type="button" className="detail-back" onClick={leaveCreatePlan}>
-            <ArrowLeft size={13} strokeWidth={2} aria-hidden="true" /> Back
+          <button type="button" className="back-circle" aria-label="Back" onClick={leaveCreatePlan}>
+            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
           </button>
         </header>
         <h1 className="path-picker-intent-head">
@@ -1052,8 +1052,8 @@ export function CreatePlanPage() {
   return (
     <main className="app-shell app-shell--wide plan-detail-page plan-detail-page--create">
       <header className="create-plan-topbar">
-        <button type="button" className="detail-back" onClick={leaveCreatePlan}>
-          <ArrowLeft size={13} strokeWidth={2} aria-hidden="true" /> Back
+        <button type="button" className="back-circle" aria-label="Back" onClick={leaveCreatePlan}>
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </button>
       </header>
       <form id="create-plan-form" onSubmit={submit}>
@@ -1906,9 +1906,8 @@ function IdeaForm({
   return (
     <main className="app-shell app-shell--mid idea-form-page">
       <header className="idea-form-header">
-        <button type="button" className="idea-form-back" onClick={onBack}>
-          <ArrowLeft size={14} strokeWidth={2} aria-hidden="true" />
-          Back
+        <button type="button" className="back-circle" aria-label="Back" onClick={onBack}>
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </button>
       </header>
 

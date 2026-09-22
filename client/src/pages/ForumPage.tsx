@@ -167,9 +167,8 @@ export function ForumPage() {
         eyebrow="Philadelphia"
         title={data.label}
         topLeft={
-          <Link to={backHref} className="xpl-hero-search" aria-label={`Back to ${backLabel}`}>
-            <ArrowLeft size={14} strokeWidth={2} aria-hidden="true" />
-            {backLabel}
+          <Link to={backHref} className="back-circle" aria-label={`Back to ${backLabel}`}>
+            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
           </Link>
         }
         topRight={

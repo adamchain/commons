@@ -1075,6 +1075,35 @@ a.btn-primary[aria-disabled="true"] {
   color: var(--text);
 }
 
+.back-circle {
+  appearance: none;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--ink);
+  border: none;
+  box-shadow: var(--shadow-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  gap: 0;
+  text-decoration: none;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.back-circle:hover {
+  color: var(--ink);
+}
+.create-plan-topbar .back-circle,
+.create-header .back-circle {
+  min-height: 40px;
+  max-width: none;
+  padding: 0;
+}
+
 .plan-hero {
   background: transparent;
   border: none;
@@ -2904,13 +2933,17 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   top: calc(16px + env(safe-area-inset-top, 0px));
   left: 16px;
   z-index: 3;
-  padding: 8px 12px;
-  font-size: var(--text-body);
-  font-weight: 600;
-  color: var(--text-muted);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-control);
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  color: var(--ink);
+  background: #fff;
+  border: none;
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
 }
 .onboarding-back:hover {
@@ -12879,11 +12912,15 @@ button.xpl-photo-tile {
 .legal-page-back {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
   margin-bottom: 18px;
-  font-size: var(--text-body);
-  font-weight: 600;
-  color: var(--text-muted);
+  padding: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
   text-decoration: none;
 }
 .legal-page-back:hover {
@@ -13323,8 +13360,8 @@ button.xpl-photo-tile {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: var(--bg);
-  box-shadow: none;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
   color: var(--ink);
   display: inline-flex;
   align-items: center;
@@ -13336,7 +13373,7 @@ button.xpl-photo-tile {
 .chat-header-bar--thread .chat-header-menu-btn:hover,
 .chat-header-bar--thread .detail-back:hover,
 .chat-header-bar--thread .chat-back-link:hover {
-  background: var(--bg);
+  background: #fff;
   color: var(--ink);
 }
 .chat-header-card--compact {

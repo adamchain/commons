@@ -160,8 +160,8 @@ export function CreateCommunityPage() {
   return (
     <main className="app-shell create-plan cmy cmy-create">
       <header className="app-header app-header--sticky create-header">
-        <button type="button" className="detail-back" onClick={goBack}>
-          <ArrowLeft size={13} strokeWidth={2} aria-hidden="true" /> Back
+        <button type="button" className="back-circle" aria-label="Back" onClick={goBack}>
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </button>
         <div className="create-header-title cmy-create-title-block">
           <span>New community</span>

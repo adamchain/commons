@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { useAuth } from "../context/AuthContext";
@@ -50,8 +51,8 @@ export function NotificationPrefsPage() {
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">
       <header className="app-header app-header--minimal">
-        <Link to="/settings" className="detail-back">
-          ← Settings
+        <Link to="/settings" className="back-circle" aria-label="Back">
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </Link>
       </header>
       <h1 className="brand" style={{ marginBottom: 6 }}>

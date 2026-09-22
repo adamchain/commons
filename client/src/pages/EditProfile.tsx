@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { LoadingScreen } from "../components/LoadingScreen";
@@ -21,8 +22,8 @@ export function EditProfilePage() {
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar profile-shell">
       <header className="app-header app-header--minimal">
-        <Link to={`/profile/${userId}`} className="detail-back">
-          ← Profile
+        <Link to={`/profile/${userId}`} className="back-circle" aria-label="Back">
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </Link>
       </header>
       <h1 className="brand" style={{ marginBottom: 8 }}>Edit profile</h1>

@@ -70,7 +70,9 @@ export function EditPlanPage() {
     return (
       <main className="app-shell app-shell--mid">
         <header className="app-header app-header--minimal app-header--sticky">
-          <Link to={`/plans/${id}`} className="detail-back">← Back</Link>
+          <Link to={`/plans/${id}`} className="back-circle" aria-label="Back">
+            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
+          </Link>
         </header>
         {error ? <p className="error-text">{error}</p> : <p>Loading…</p>}
       </main>
@@ -344,8 +346,8 @@ function EditForm({
   return (
     <main className="app-shell app-shell--mid edit-plan-page">
       <header className="app-header app-header--minimal app-header--sticky edit-plan-top">
-        <Link to={`/plans/${plan.id}`} className="detail-back">
-          <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" /> Back to plan
+        <Link to={`/plans/${plan.id}`} className="back-circle" aria-label="Back">
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </Link>
         {savedFlash && (
           <span className="edit-saved-flash" role="status">

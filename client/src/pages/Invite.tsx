@@ -56,8 +56,8 @@ export function InvitePage() {
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">
       <header className="app-header app-header--minimal">
-        <Link to={`/profile/${user?.id ?? ""}`} className="detail-back">
-          <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" /> Profile
+        <Link to={`/profile/${user?.id ?? ""}`} className="back-circle" aria-label="Back">
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </Link>
       </header>
       <ScreenTitle

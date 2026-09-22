@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ImagePlus, MessageCircle } from "lucide-react";
+import { ArrowLeft, ImagePlus, MessageCircle } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
@@ -133,8 +133,8 @@ export function ForumPostPage() {
   return (
     <main className="app-shell app-shell--mid app-shell--with-nav app-shell--with-topbar forum-page">
       <header className="app-header create-header">
-        <Link to={`/forums/${tag}`} state={location.state} className="detail-back">
-          ← Forum
+        <Link to={`/forums/${tag}`} state={location.state} className="back-circle" aria-label="Back">
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </Link>
         <span className="create-header-title">Post</span>
         {isOwner ? (

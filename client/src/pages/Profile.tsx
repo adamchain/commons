@@ -614,9 +614,8 @@ function OtherProfileNav({
   // and the global TopBar (z-index 41) can't cover ← or •••.
   return createPortal(
     <header className="profile-other-nav">
-      <button type="button" className="detail-back profile-other-back" onClick={onBack}>
-        <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
-        {backLabel}
+      <button type="button" className="back-circle" aria-label={backLabel} onClick={onBack}>
+        <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
       </button>
       {title ? <div className="profile-other-nav-title">{title}</div> : <span />}
       {onMore ? (

@@ -118,8 +118,8 @@ export function NetworkPage() {
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar network-page">
       <header className="app-header app-header--minimal">
-        <Link to={profileTo} className="detail-back">
-          <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" /> Profile
+        <Link to={profileTo} className="back-circle" aria-label="Back">
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </Link>
       </header>
       <ScreenTitle title="My network" subtitle="People you know in Philadelphia." />

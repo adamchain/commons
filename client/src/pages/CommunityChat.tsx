@@ -48,7 +48,7 @@ export function CommunityChatPage() {
   const backTo = fromMessages
     ? "/messages"
     : `/communities/${communityIdFromState || id}`;
-  const backLabel = fromMessages ? "← Messages" : "← Community";
+  const backLabel = fromMessages ? "Messages" : "Community";
   const { user } = useAuth();
   const [conv, setConv] = useState<CommunityConversation | null>(null);
   const [messages, setMessages] = useState<MessageDTO[]>([]);

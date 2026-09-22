@@ -251,8 +251,8 @@ export function HelpChatPage() {
   return (
     <main className="helpchat-shell">
       <header className="helpchat-header">
-        <Link to="/settings" className="detail-back">
-          <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" /> Settings
+        <Link to="/settings" className="back-circle" aria-label="Back">
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </Link>
         <div className="helpchat-header-title">
           <Bot size={16} strokeWidth={1.8} aria-hidden="true" />
