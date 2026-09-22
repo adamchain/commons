@@ -128,10 +128,15 @@ export function CreatePlanPage() {
   const communityNameParam = searchParams.get("communityName");
   // Hub "Post a new event" — come back to that community's Events tab, not the feed.
   // Remember the id in a ref: /plans/new often stays mounted, so a mid-form URL
-  // change must not drop the return. A fresh create (no community) clears it.
+  // change must not drop the return. Router state covers the same case if the
+  // query string is replaced. A fresh create (no community) clears it.
   const hubEventsReturnId = useRef<string | null>(null);
+  const hubEventsFromState =
+    (location.state as { hubEventsReturnId?: string } | null)?.hubEventsReturnId ?? null;
   if (searchParams.get("returnTo") === "events" && communityId) {
     hubEventsReturnId.current = communityId;
+  } else if (hubEventsFromState) {
+    hubEventsReturnId.current = hubEventsFromState;
   } else if (!communityId) {
     hubEventsReturnId.current = null;
   }
@@ -237,12 +242,13 @@ export function CreatePlanPage() {
       });
       return;
     }
+    const hubId = hubEventsReturnId.current;
+    if (hubId) {
+      navigate(`/communities/${hubId}?tab=events`);
+      return;
+    }
     if (communityId) {
-      navigate(
-        returnToCommunityEvents
-          ? `/communities/${communityId}?tab=events`
-          : `/communities/${communityId}`,
-      );
+      navigate(`/communities/${communityId}`);
       return;
     }
     if (window.history.length > 1) navigate(-1);

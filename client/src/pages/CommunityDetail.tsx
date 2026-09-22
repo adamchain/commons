@@ -380,6 +380,7 @@ export function CommunityDetailPage() {
             onPostPlan={() =>
               navigate(
                 `/plans/new?communityId=${encodeURIComponent(community.id)}&communityName=${encodeURIComponent(community.name)}&returnTo=events`,
+                { state: { hubEventsReturnId: community.id } },
               )
             }
           />
