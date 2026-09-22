@@ -77,8 +77,9 @@ Shows full info about a plan:
 **Header:** Title, host info ("Hosted by [first name]" — tap to view their profile), neighborhood tag
 
 **Participation buttons:**
-- **I'm in** — marks you as Going (strong commitment)
-- **Interested** — softer opt-in; you're on the list but not fully committed
+- **Join** — marks you as Going. After you tap it, the button reads **Joined**
+- **Interested** — softer opt-in. After you tap it, the button reads **Interested ✓**
+- Ideas and plans with a capacity only start with **Interested**
 
 **Participants section:**
 - Going (bigger avatars, listed first)
@@ -91,7 +92,7 @@ Shows full info about a plan:
 
 **Chat row:**
 - Opens the plan's group thread
-- Only visible/accessible once you've tapped "I'm in" or "Interested"
+- Only visible/accessible once you've tapped "Join" or "Interested"
 
 **Action buttons:**
 - **Share** — share the plan in-app (search contacts) or via SMS link

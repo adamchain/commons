@@ -1143,9 +1143,9 @@ function planRelationshipBadge(
     return { label: "Your plan", className: "profile-plan-chip--host" };
   }
   if (plan.participants.going.some((u) => u.id === profileUserId)) {
-    return { label: "I'm In", className: "profile-plan-chip--going" };
+    return { label: "Joined", className: "profile-plan-chip--going" };
   }
-  return { label: "Interested", className: "profile-plan-chip--interested" };
+  return { label: "Interested ✓", className: "profile-plan-chip--interested" };
 }
 
 /**

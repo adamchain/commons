@@ -756,7 +756,7 @@ a.btn-primary[aria-disabled="true"] {
   color: var(--accent-on);
   font-size: var(--text-body);
   padding: 15px;
-  border-radius: var(--r-control);
+  border-radius: var(--r-pill);
   border: none;
   box-shadow: none;
   font-weight: 600;
@@ -783,7 +783,7 @@ a.btn-primary[aria-disabled="true"] {
   background: var(--btn-soft);
   color: var(--btn-soft-on);
   border: none;
-  border-radius: var(--r-control);
+  border-radius: var(--r-pill);
   padding: 15px;
   font-size: var(--text-body);
   font-weight: 600;
@@ -7757,7 +7757,7 @@ a.action-btn--stack {
   color: var(--accent-hover);
 }
 
-/* Join CTA on feed cards. I'm In is a red pill; Interested stays the soft pill. */
+/* Feed CTA. Join/Joined is solid maroon. Interested is solid dusty rose, with a check once chosen. */
 .plan-card-quick-join {
   display: inline-flex;
   align-items: center;
@@ -7781,9 +7781,8 @@ a.action-btn--stack {
   background: var(--accent-hover);
   color: var(--accent-on);
 }
-.plan-card-quick-join.is-imin,
-.plan-card-quick-join.is-imin:hover:not(:disabled),
-.plan-card-quick-join.is-active {
+.plan-card-quick-join.is-join,
+.plan-card-quick-join.is-join:hover:not(:disabled) {
   background: var(--red);
   color: var(--accent-on);
 }

@@ -207,7 +207,6 @@ export function PlanCard({
                   isFull={isFull}
                   requiresApproval={planRequiresHostApproval(plan)}
                   onPlanRefresh={onPlanRefresh}
-                  goingConfirm={navFrom.from === "community" ? "You're In" : undefined}
                 />
               )}
             </footer>
@@ -303,7 +302,6 @@ function QuickJoin({
   isFull,
   requiresApproval,
   onPlanRefresh,
-  goingConfirm,
 }: {
   planId: string;
   isLooking: boolean;
@@ -311,8 +309,6 @@ function QuickJoin({
   isFull: boolean;
   requiresApproval: boolean;
   onPlanRefresh?: () => void;
-  /** Heading on the confirmation after I'm In. Home feed keeps the default. */
-  goingConfirm?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const [showSheet, setShowSheet] = useState(false);
@@ -320,10 +316,9 @@ function QuickJoin({
 
   const goingActive = state === "going";
   const interestedActive = state === "interested";
-  // Full or host-review capacity: this CTA is Interested, not I'm In — unless
-  // this person already has a Going seat.
-  const waitlist = (isFull || requiresApproval) && !goingActive;
-  const interestedCta = interestedActive || isLooking || waitlist;
+  // Ideas and capacity-limited plans only offer Interested up front.
+  // An existing Going seat still reads Joined.
+  const interestedOnly = (isLooking || isFull || requiresApproval) && !goingActive;
 
   async function setState(next: "going" | "interested" | null) {
     if (busy) return;
@@ -356,41 +351,35 @@ function QuickJoin({
       return;
     }
     if (interestedActive) {
-      // Soft state — open sheet to drop, or upgrade to I'm In if a spot opened.
+      // Soft state — open sheet to drop, or upgrade to Join if a spot opened.
       setShowSheet(true);
       return;
     }
-    await setState(interestedCta ? "interested" : "going");
+    await setState(interestedOnly ? "interested" : "going");
   }
 
-  const label = goingActive ? "I'm In" : interestedActive ? "You're Interested" : interestedCta ? "Interested" : "I'm In";
-  const imIn = label === "I'm In";
+  const label = goingActive ? "Joined" : interestedActive ? "Interested ✓" : interestedOnly ? "Interested" : "Join";
+  const isCommit = label === "Join" || label === "Joined";
 
   return (
     <>
       <button
         type="button"
-        className={`plan-card-quick-join ${imIn ? "is-imin" : "is-interested"} ${
-          goingActive ? "is-active" : ""
-        }`}
+        className={`plan-card-quick-join ${isCommit ? "is-join" : "is-interested"}`}
         onClick={(e) => void onTap(e)}
         disabled={busy}
       >
         {busy ? "…" : label}
       </button>
       {confirm && (
-        <JoinConfirmPopup
-          kind={confirm}
-          title={confirm === "going" ? goingConfirm : undefined}
-          onClose={() => setConfirm(null)}
-        />
+        <JoinConfirmPopup kind={confirm} onClose={() => setConfirm(null)} />
       )}
       {showSheet && (
           <BottomSheet
             onClose={() => setShowSheet(false)}
             labelledBy="plan-card-rsvp-title"
           >
-              <div id="plan-card-rsvp-title" className="sheet-title">{goingActive ? (goingConfirm ?? "I'm in.") : "You're Interested"}</div>
+              <div id="plan-card-rsvp-title" className="sheet-title">{goingActive ? "Joined" : "Interested"}</div>
               {goingActive && (
                 <button type="button" className="sheet-link" onClick={() => void setState("interested")}>
                   Switch to Interested
@@ -398,7 +387,7 @@ function QuickJoin({
               )}
               {interestedActive && !isLooking && !isFull && !requiresApproval && (
                 <button type="button" className="sheet-link" onClick={() => void setState("going")}>
-                  Switch to I&apos;m In
+                  Switch to Join
                 </button>
               )}
               <button

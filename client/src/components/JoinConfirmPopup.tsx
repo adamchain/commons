@@ -7,17 +7,17 @@ export type JoinConfirmKind = ParticipationState | "dropped" | "community" | "id
 
 const COPY: Record<JoinConfirmKind, { title: string; sub: string; celebrate: boolean }> = {
   going: {
-    title: "I'm in.",
+    title: "Joined",
     sub: "You're on the list — see you there.",
     celebrate: true,
   },
   interested: {
-    title: "You're Interested",
+    title: "Interested ✓",
     sub: "We'll keep you posted.",
     celebrate: true,
   },
   idea_interested: {
-    title: "You're Interested.",
+    title: "Interested ✓",
     sub: "Head to the chat to coordinate the details",
     celebrate: true,
   },

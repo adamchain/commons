@@ -64,7 +64,7 @@ export function ParticipationButtons({
   joinType?: JoinType;
   /** Host bypasses capacity and approve gates. */
   isHosting?: boolean;
-  /** Called the first time someone confirms I'm In — opens the invite sheet. */
+  /** Called the first time someone confirms Join — opens the invite sheet. */
   onJustMarkedGoing?: () => void;
   onConfirmClose?: (kind: JoinConfirmKind) => void;
 }) {
@@ -171,9 +171,9 @@ export function ParticipationButtons({
     !isHosting &&
     (joinType === "approve" || planCapacityValue(capacity) !== null) &&
     !goingActive;
-  // Full / host-review plans can't take another Going RSVP, but anyone can
-  // waitlist as Interested until the host lets them in.
-  const waitlistOnly = isFull || isApproveOnly;
+  // Ideas and capacity-limited plans start on Interested. Join is only the
+  // initial option on an open plan. A seat you already hold still reads Joined.
+  const interestedOnly = (loose || isFull || isApproveOnly) && !goingActive;
 
   return (
     <div className={`participation ${loose ? "participation--loose" : ""}`}>
@@ -184,61 +184,46 @@ export function ParticipationButtons({
             : isApproveOnly
               ? capacity !== null
                 ? `${goingCount}/${capacity} spots — let the host know you're interested.`
-                : "Application-only."
+                : "The host confirms who's in."
               : `${goingCount}/${capacity} spots taken.`}
         </p>
       )}
-      {loose ? (
-        <>
-          {!goingActive && (
-            <button
-              type="button"
-              className={`btn-interested ${interestedActive ? "is-active" : ""}`}
-              onClick={() => void tapInterested()}
-              disabled={pending}
-            >
-              {interestedActive ? "You're Interested" : "Interested"}
-            </button>
-          )}
-          {!waitlistOnly && (
-            <button
-              type="button"
-              className={`btn-going ${goingActive ? "is-active" : ""}`}
-              onClick={() => void tapGoing()}
-              disabled={pending || isApproveOnly}
-            >
-              {goingActive ? "Drop Out" : "I'm In"}
-            </button>
-          )}
-        </>
+      {goingActive ? (
+        <button
+          type="button"
+          className="btn-going is-active"
+          onClick={() => void tapGoing()}
+          disabled={pending}
+        >
+          Joined
+        </button>
+      ) : interestedOnly ? (
+        <button
+          type="button"
+          className={`btn-interested ${interestedActive ? "is-active" : ""}`}
+          onClick={() => void tapInterested()}
+          disabled={pending}
+        >
+          {interestedActive ? "Interested ✓" : "Interested"}
+        </button>
       ) : (
         <>
-          {!waitlistOnly && (
-            <button
-              type="button"
-              className={`btn-going ${goingActive ? "is-active" : ""}`}
-              onClick={() => void tapGoing()}
-              disabled={pending || isApproveOnly}
-            >
-              {goingActive ? "Drop Out" : "I'm In"}
-            </button>
-          )}
-          {!goingActive && (
-            <button
-              type="button"
-              className={`btn-interested ${interestedActive ? "is-active" : ""}`}
-              onClick={() => void tapInterested()}
-              disabled={pending}
-            >
-              {interestedActive
-                ? isApproveOnly && !isFull
-                  ? "Pending"
-                  : "You're Interested"
-                : isApproveOnly && !isFull
-                  ? "Apply"
-                  : "Interested"}
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn-going"
+            onClick={() => void tapGoing()}
+            disabled={pending}
+          >
+            Join
+          </button>
+          <button
+            type="button"
+            className={`btn-interested ${interestedActive ? "is-active" : ""}`}
+            onClick={() => void tapInterested()}
+            disabled={pending}
+          >
+            {interestedActive ? "Interested ✓" : "Interested"}
+          </button>
         </>
       )}
       {error && <p className="onboarding-error" style={{ marginTop: 8 }}>{error}</p>}
@@ -255,9 +240,9 @@ export function ParticipationButtons({
 
       {showGoingSheet && (
         <BottomSheet onClose={() => setShowGoingSheet(false)} labelledBy="rsvp-going-title">
-            <div id="rsvp-going-title" className="sheet-title">Drop Out</div>
+            <div id="rsvp-going-title" className="sheet-title">Joined</div>
             <button type="button" className="sheet-link" onClick={() => void switchToInterested()}>
-              Switch to I'm Interested
+              Switch to Interested
             </button>
             <button type="button" className="sheet-link sheet-link--danger" disabled={pending} onClick={() => void dropOutFromGoing()}>
               Drop out
@@ -270,10 +255,10 @@ export function ParticipationButtons({
 
       {showInterestedSheet && (
         <BottomSheet onClose={() => setShowInterestedSheet(false)} labelledBy="rsvp-interested-title">
-            <div id="rsvp-interested-title" className="sheet-title">You're Interested</div>
+            <div id="rsvp-interested-title" className="sheet-title">Interested</div>
             {!loose && !isApproveOnly && !isFull && (
               <button type="button" className="sheet-link" onClick={() => void switchToGoing()}>
-                Switch to I&apos;m In
+                Switch to Join
               </button>
             )}
             <button
