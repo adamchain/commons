@@ -40,6 +40,7 @@ const PREF_KEY: Record<NotificationKind, keyof NotificationPrefs> = {
   // Community pings ride on the "someone joined your plan" toggle — all four are
   // person-to-group activity. (A dedicated community toggle is a V2 refinement.)
   communityJoinRequest: "someoneJoinedYourPlan",
+  communityPostPending: "someoneJoinedYourPlan",
   communityRequestApproved: "someoneJoinedYourPlan",
   communityRequestDeclined: "someoneJoinedYourPlan",
   communityPlanPosted: "someoneJoinedYourPlan",

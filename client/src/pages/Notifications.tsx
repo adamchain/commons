@@ -205,9 +205,12 @@ function hrefFor(n: NotificationDTO): string | null {
   }
   // A new community waiting on COMMONS admin review opens the review queue.
   if (n.kind === "communityReview") return "/admin#communities-review";
-  // Join requests land in Settings so the organizer can approve/decline.
-  if (n.kind === "communityJoinRequest" && n.communityId) {
-    return `/communities/${n.communityId}?tab=settings`;
+  // Join requests and posts waiting on the organizer open the dashboard queue.
+  if (
+    (n.kind === "communityJoinRequest" || n.kind === "communityPostPending") &&
+    n.communityId
+  ) {
+    return `/communities/${n.communityId}/dashboard?section=approvals`;
   }
   // Other community pings route to the community page.
   if (n.communityId) return `/communities/${n.communityId}`;
@@ -255,6 +258,8 @@ function iconFor(kind: NotificationKind): ReactNode {
       return <Handshake {...props} />;
     case "communityJoinRequest":
       return <UserPlus {...props} />;
+    case "communityPostPending":
+      return <MessageCircle {...props} />;
     case "communityRequestApproved":
       return <PartyPopper {...props} />;
     case "communityRequestDeclined":

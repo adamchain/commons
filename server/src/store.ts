@@ -476,6 +476,7 @@ export interface NotificationRecord {
     | "networkRequest"
     | "networkAccepted"
     | "communityJoinRequest"
+    | "communityPostPending"
     | "communityRequestApproved"
     | "communityRequestDeclined"
     | "communityPlanPosted"

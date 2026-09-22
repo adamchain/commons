@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
+import { MemberNetworkButton } from "./CommunityDetail";
 import {
   COMMUNITY_CATEGORY_LABELS,
   type CommunityDashboardDTO,
@@ -24,6 +25,13 @@ function personName(user: PublicUser): string {
 
 function visibilityLabel(value: CommunityDashboardDTO["visibility"]): string {
   return value === "members_only" ? "Members" : "Public";
+}
+
+function pendingSummary(requests: number, posts: number): string {
+  const parts: string[] = [];
+  if (requests > 0) parts.push(`${requests} join ${requests === 1 ? "request" : "requests"}`);
+  if (posts > 0) parts.push(`${posts} ${posts === 1 ? "post" : "posts"}`);
+  return `${parts.join(" and ")} waiting for approval`;
 }
 
 function Bars({
@@ -172,6 +180,7 @@ export function CommunityDashboardPage() {
   }
 
   const waiting = data.requests.length + data.pendingPosts.length;
+  const pendingNotice = pendingSummary(data.requests.length, data.pendingPosts.length);
   const place = data.city?.trim() || "Philadelphia";
   const meta = [place, COMMUNITY_CATEGORY_LABELS[data.category], visibilityLabel(data.visibility)].join(" · ");
   const members = data.memberList.filter((m) => {
@@ -218,6 +227,13 @@ export function CommunityDashboardPage() {
       </nav>
 
       {err && <p className="cmy-err">{err}</p>}
+
+      {waiting > 0 && section !== "approvals" && (
+        <button type="button" className="cmy-dash-notice" onClick={() => openSection("approvals")}>
+          <span>{pendingNotice}</span>
+          <span className="cmy-dash-notice-go">Review</span>
+        </button>
+      )}
 
       {section === "analytics" && (
         <div className="cmy-dash-stack">
@@ -468,6 +484,11 @@ export function CommunityDashboardPage() {
                     <span className="cmy-dash-person-name">{personName(m.user)}</span>
                     <span className="cmy-dash-person-sub">Joined {formatRelative(m.joinedAt)}</span>
                   </div>
+                  <MemberNetworkButton
+                    userId={m.user.id}
+                    status={m.networkStatus}
+                    requestReceived={m.networkRequestReceived}
+                  />
                   {m.role === "organizer" ? (
                     <span className="cmy-org-badge cmy-org-badge--pill">Organizer</span>
                   ) : (

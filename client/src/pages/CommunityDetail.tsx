@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Calendar, LayoutDashboard, MessageCircle, Share2, Users } from "lucide-react";
+import { Calendar, LayoutDashboard, MessageCircle, Send, Users } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
@@ -22,6 +22,8 @@ import {
   type CommunityDTO,
   type CommunityMemberDTO,
   type CommunityPostDTO,
+  type MeDTO,
+  type NetworkLinkStatus,
   type CommunityPostingPermission,
   type CommunitySocialLinks,
   type PersonSearchResultDTO,
@@ -35,6 +37,13 @@ import { pickPhotoNative } from "../lib/photoPicker";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import { isNative } from "../lib/platform";
 import "./Communities.css";
+
+function pendingApprovalSummary(requests: number, posts: number): string {
+  const parts: string[] = [];
+  if (requests > 0) parts.push(`${requests} join ${requests === 1 ? "request" : "requests"}`);
+  if (posts > 0) parts.push(`${posts} ${posts === 1 ? "post" : "posts"}`);
+  return `${parts.join(" and ")} waiting for approval`;
+}
 
 type Tab = "bulletin" | "events" | "chat" | "members" | "settings";
 
@@ -219,7 +228,7 @@ export function CommunityDetailPage() {
                   aria-label={shareMsg ?? "Share"}
                   onClick={() => void shareCommunity()}
                 >
-                  <Share2 size={18} strokeWidth={2} aria-hidden="true" />
+                  <Send size={18} strokeWidth={2} aria-hidden="true" />
                 </button>
               )}
             </div>
@@ -296,7 +305,11 @@ export function CommunityDetailPage() {
               <LayoutDashboard size={18} strokeWidth={1.8} aria-hidden="true" />
               <span className="cmy-dash-entry-copy">
                 <span className="cmy-dash-entry-title">Dashboard</span>
-                <span className="cmy-dash-entry-sub">Analytics, approvals, and members</span>
+                <span className="cmy-dash-entry-sub">
+                  {community.pendingRequestCount + community.pendingBulletinCount > 0
+                    ? pendingApprovalSummary(community.pendingRequestCount, community.pendingBulletinCount)
+                    : "Analytics, approvals, and members"}
+                </span>
               </span>
               {community.pendingRequestCount + community.pendingBulletinCount > 0 && (
                 <span className="cmy-requests-count">
@@ -1027,6 +1040,60 @@ function EventsTab({
   );
 }
 
+/** Add this community member to the viewer's network. Hidden on your own row and once connected. */
+export function MemberNetworkButton({
+  userId,
+  status,
+  requestReceived = false,
+}: {
+  userId: string;
+  status?: NetworkLinkStatus;
+  requestReceived?: boolean;
+}) {
+  const { setUser } = useAuth();
+  const [override, setOverride] = useState<NetworkLinkStatus | null>(null);
+  const [incoming, setIncoming] = useState(requestReceived);
+  const [busy, setBusy] = useState(false);
+  const current = override ?? status;
+  if (!current) return null;
+  if (current === "connected") {
+    return <span className="cmy-network-status">In network</span>;
+  }
+
+  async function add() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const accept = incoming;
+      const r = await api<{ status?: string; me: MeDTO }>(
+        accept ? "/api/auth/network-accept" : "/api/auth/friend-add",
+        { method: "POST", body: JSON.stringify({ userId }) },
+      );
+      setUser(r.me);
+      setIncoming(false);
+      setOverride(accept || r.status === "connected" ? "connected" : "pending");
+    } catch {
+      /* leave the button so they can retry */
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (current === "pending") {
+    return (
+      <button type="button" className="cmy-network-btn" disabled>
+        Requested
+      </button>
+    );
+  }
+
+  return (
+    <button type="button" className="cmy-network-btn" disabled={busy} onClick={() => void add()}>
+      {busy ? "…" : incoming ? "Accept" : "Add to network"}
+    </button>
+  );
+}
+
 function MembersTab({
   community,
   members,
@@ -1139,6 +1206,11 @@ function MembersTab({
                 <Avatar seed={organizer.user.avatarSeed} style={organizer.user.avatarStyle} photoDataUrl={organizer.user.avatarPhotoDataUrl} params={organizer.user.avatarParams} size="sm" />
                 <span className="cmy-member-name">{organizer.user.firstName} {organizer.user.lastName ?? ""}</span>
               </Link>
+              <MemberNetworkButton
+                userId={organizer.user.id}
+                status={organizer.networkStatus}
+                requestReceived={organizer.networkRequestReceived}
+              />
               <span className="cmy-org-badge cmy-org-badge--pill">Organizer</span>
             </li>
           </ul>
@@ -1156,6 +1228,11 @@ function MembersTab({
                 <Avatar seed={m.user.avatarSeed} style={m.user.avatarStyle} photoDataUrl={m.user.avatarPhotoDataUrl} params={m.user.avatarParams} size="sm" />
                 <span className="cmy-member-name">{m.user.firstName} {m.user.lastName ?? ""}</span>
               </Link>
+              <MemberNetworkButton
+                userId={m.user.id}
+                status={m.networkStatus}
+                requestReceived={m.networkRequestReceived}
+              />
               {canManage && (
                 <button type="button" className="cmy-icon-btn cmy-remove" onClick={() => void remove(m.user.id)} title="Remove">
                   Remove

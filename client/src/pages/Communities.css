@@ -1249,6 +1249,31 @@ button.cmy-joined-pill {
 }
 .cmy-member-link-row:hover .cmy-member-name { color: var(--community-pink); }
 .cmy-member-name { font-weight: 600; color: var(--ink-900); font-size: var(--type-body); flex: 1; }
+.cmy-network-btn {
+  appearance: none;
+  flex-shrink: 0;
+  border: 1px solid var(--border, #e6dfd6);
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption);
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: var(--r-control);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cmy-network-btn:disabled {
+  cursor: default;
+  color: var(--text-muted);
+}
+.cmy-network-status {
+  flex-shrink: 0;
+  font-size: var(--type-caption);
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
 .cmy-members-tools {
   display: flex;
   align-items: center;
@@ -1895,6 +1920,29 @@ button.cmy-joined-pill {
   margin: 0;
   color: var(--muted);
   font-size: var(--type-caption);
+}
+.cmy-dash-notice {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--community-pink-border);
+  background: var(--surface);
+  color: var(--community-pink);
+  font-family: var(--font-ui);
+  font-size: var(--type-body);
+  font-weight: 700;
+  cursor: pointer;
+}
+.cmy-dash-notice-go {
+  flex-shrink: 0;
+  font-size: var(--type-caption);
+  text-decoration: underline;
 }
 .cmy-dash-tabs {
   display: flex;

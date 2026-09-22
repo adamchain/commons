@@ -31,6 +31,7 @@ import {
   type CommunityDashboardDTO,
   type CommunityPostDTO,
   type CommunityPostingPermission,
+  type NetworkLinkStatus,
   type PublicUser,
 } from "../types/shared.js";
 
@@ -223,13 +224,24 @@ function memberDTO(
   users: Map<string, Awaited<ReturnType<typeof findUserById>>>,
   organizerId: string,
   includeAnswer: boolean,
+  viewer?: { id: string; networkIds?: string[]; incomingNetworkRequests?: string[] } | null,
 ): CommunityMemberDTO {
-  return {
+  const dto: CommunityMemberDTO = {
     user: publicFor(m.userId, users),
     role: m.userId === organizerId ? "organizer" : m.role,
     status: m.status,
     screeningAnswer: includeAnswer ? m.screeningAnswer ?? null : null,
     joinedAt: m.joinedAt,
+  };
+  if (!viewer || viewer.id === m.userId) return dto;
+  const inNetwork = (viewer.networkIds ?? []).includes(m.userId);
+  const requestSent = (users.get(m.userId)?.incomingNetworkRequests ?? []).includes(viewer.id);
+  const requestReceived = (viewer.incomingNetworkRequests ?? []).includes(m.userId);
+  const networkStatus: NetworkLinkStatus = inNetwork ? "connected" : requestSent ? "pending" : "none";
+  return {
+    ...dto,
+    networkStatus,
+    networkRequestReceived: !inNetwork && requestReceived,
   };
 }
 
@@ -461,7 +473,7 @@ communitiesRouter.get("/:id/dashboard", requireAuth, async (req, res) => {
       createdAt: p.createdAt,
       author: publicFor(p.authorId, users),
     })),
-    memberList: active.map((m) => memberDTO(m, users, community.organizerId, false)),
+    memberList: active.map((m) => memberDTO(m, users, community.organizerId, false, organizer)),
   };
   res.json(body);
 });
@@ -791,10 +803,11 @@ communitiesRouter.get("/:id/members", requireAuth, async (req, res) => {
   const pending = isOrganizer ? store.listPendingCommunityMembers(community.id) : [];
   const allIds = [...active, ...pending].map((m) => m.userId);
   const users = await findUsersByIds(allIds);
+  const viewer = await findUserById(viewerId);
 
   res.json({
-    members: active.map((m) => memberDTO(m, users, community.organizerId, false)),
-    pending: pending.map((m) => memberDTO(m, users, community.organizerId, true)),
+    members: active.map((m) => memberDTO(m, users, community.organizerId, false, viewer)),
+    pending: pending.map((m) => memberDTO(m, users, community.organizerId, true, viewer)),
   });
 });
 
@@ -1059,6 +1072,23 @@ communitiesRouter.post("/:id/posts", requireAuth, async (req, res) => {
     approvalStatus: needsApproval ? "pending" : "approved",
     parentId,
   });
+  if (needsApproval) {
+    const author = await findUserById(viewerId);
+    try {
+      await emit({
+        userId: community.organizerId,
+        kind: "communityPostPending",
+        body: `${author?.firstName || "Someone"} posted in ${community.name} — waiting for your approval`,
+        communityId: community.id,
+        dedupKey: `communityPostPending:${post.id}`,
+      });
+    } catch (err) {
+      console.error(
+        "[communities] post-approval notify failed",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
   const users = await findUsersByIds([post.authorId]);
   store.log("community_post_created", {
     communityId: community.id,

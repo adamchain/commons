@@ -422,6 +422,7 @@ export type NotificationKind =
   | "networkRequest"
   | "networkAccepted"
   | "communityJoinRequest"
+  | "communityPostPending"
   | "communityRequestApproved"
   | "communityRequestDeclined"
   | "communityPlanPosted"
@@ -610,6 +611,10 @@ export interface CommunityMemberDTO {
   /** Screening answer — only populated for the organizer viewing requests. */
   screeningAnswer: string | null;
   joinedAt: string;
+  /** Viewer's link to this member. Omitted on the viewer's own row. */
+  networkStatus?: NetworkLinkStatus;
+  /** They already asked to join the viewer's network. */
+  networkRequestReceived?: boolean;
 }
 
 /** Organizer-only community dashboard. Counts come from joins, chat, bulletin, and event RSVPs. */
