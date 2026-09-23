@@ -366,7 +366,11 @@ export function DmChatPage() {
           <div className="chat-thread-title">{title}</div>
           {conv && (
             <div className="chat-thread-sub">
-              {conv.muted ? "Muted" : conv.awaitingAccept ? "Not visible to them yet" : "Direct message"}
+              {conv.muted
+                ? "Muted"
+                : conv.awaitingAccept
+                  ? "Not visible to them yet"
+                  : "Direct message"}
             </div>
           )}
         </div>
@@ -417,11 +421,13 @@ export function DmChatPage() {
             onConnect={() => void connectThenOpen()}
           />
         )}
-        {conv?.awaitingAccept && (
+        {(conv?.awaitingAccept || conv?.incomingRequest) && (
           <div className="dm-hold-note">
             <p>
               {conv.incomingRequest
-                ? `${other?.firstName ?? "They"} asked to connect. They won't see this until you accept.`
+                ? conv.awaitingAccept
+                  ? `${other?.firstName ?? "They"} asked to connect. They won't see this until you accept.`
+                  : `${other?.firstName ?? "They"} asked to connect.`
                 : `${other?.firstName ?? "They"} won't see this until they accept your request to connect.`}
             </p>
             {conv.incomingRequest && (

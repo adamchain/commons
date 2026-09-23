@@ -8,6 +8,7 @@ import { LinkedText } from "../components/LinkedText";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
 import { JoinConfirmPopup } from "../components/JoinConfirmPopup";
 import { PlanCard } from "../components/PlanCard";
+import { CommunityShareSheet } from "../components/ShareSheet";
 import { PlanSafetyMenu } from "../components/PlanSafetyMenu";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -78,7 +79,7 @@ export function CommunityDetailPage() {
   const [editSocials, setEditSocials] = useState(false);
   const [leaveBusy, setLeaveBusy] = useState(false);
   const [leaveErr, setLeaveErr] = useState<string | null>(null);
-  const [shareMsg, setShareMsg] = useState<string | null>(null);
+  const [showShare, setShowShare] = useState(false);
 
   const loadMembers = useCallback(async () => {
     try {
@@ -153,8 +154,6 @@ export function CommunityDetailPage() {
   const canLeave =
     community.creationStatus === "approved" && isActiveMember && !community.isOrganizer;
   const canShare = community.creationStatus === "approved";
-  const communityId = community.id;
-  const communityName = community.name;
 
   async function leaveCommunity() {
     if (leaveBusy || !canLeave) return;
@@ -168,21 +167,6 @@ export function CommunityDetailPage() {
       setLeaveErr(parseApiError(e));
     } finally {
       setLeaveBusy(false);
-    }
-  }
-
-  async function shareCommunity() {
-    const url = `${window.location.origin}/communities/${communityId}`;
-    try {
-      if (typeof navigator.share === "function") {
-        await navigator.share({ title: communityName, text: `Join ${communityName} on COMMONS`, url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        setShareMsg("Link copied.");
-        window.setTimeout(() => setShareMsg(null), 2500);
-      }
-    } catch {
-      /* user cancelled share sheet */
     }
   }
 
@@ -234,8 +218,8 @@ export function CommunityDetailPage() {
                 <button
                   type="button"
                   className="cmy-cover-share"
-                  aria-label={shareMsg ?? "Share"}
-                  onClick={() => void shareCommunity()}
+                  aria-label="Share"
+                  onClick={() => setShowShare(true)}
                 >
                   <Send size={18} strokeWidth={2} aria-hidden="true" />
                 </button>
@@ -243,7 +227,6 @@ export function CommunityDetailPage() {
             </div>
           )}
           {leaveErr && <p className="cmy-cover-note">{leaveErr}</p>}
-          {shareMsg && <p className="cmy-cover-note">{shareMsg}</p>}
           <div className="cmy-cover-overlay">
             <div className="cmy-cover-kicker">{placeLabel}</div>
             <h1 className="cmy-name">{community.name}</h1>
@@ -426,6 +409,13 @@ export function CommunityDetailPage() {
         />
       )}
       {joinConfirm && <JoinConfirmPopup kind="community" onClose={() => setJoinConfirm(false)} />}
+      {showShare && (
+        <CommunityShareSheet
+          name={community.name}
+          communityId={community.id}
+          onClose={() => setShowShare(false)}
+        />
+      )}
     </main>
   );
 }

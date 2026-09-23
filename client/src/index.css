@@ -7815,6 +7815,16 @@ a.action-btn--stack {
 }
 
 /* Feed CTA. Join/Joined is solid maroon. Interested is solid dusty rose, with a check once chosen. */
+.plan-card-rsvp {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.plan-card-rsvp .plan-card-quick-join {
+  flex: 1 1 0;
+  justify-content: center;
+  margin-left: 0;
+}
 .plan-card-quick-join {
   display: inline-flex;
   align-items: center;
@@ -13858,8 +13868,30 @@ button.xpl-photo-tile {
   text-decoration: none;
 }
 
+.plan-participation-slot {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--nav-height, 58px) + env(safe-area-inset-bottom, 0px));
+  z-index: 40;
+  padding: 8px 16px 10px;
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.plan-detail-body:has(.plan-participation-slot) {
+  padding-bottom: 96px;
+}
 .plan-participation-slot .participation {
   margin: 0;
+  grid-template-columns: 1fr 1fr;
+}
+.plan-participation-slot .participation:has(> button:only-child) {
+  grid-template-columns: 1fr;
+}
+.plan-participation-slot .participation-hint {
+  grid-column: 1 / -1;
+  margin-bottom: 0;
 }
 
 .plan-past-action-btn {
@@ -14486,16 +14518,16 @@ button.xpl-photo-tile {
   cursor: not-allowed;
 }
 
-/* Messages Plans / Interests tab switcher */
+/* Messages Plans / Interests tab switcher.
+   Stays in flow under the title. The list scrolls in .messages-scroll, so a
+   sticky top (top bar + notch) drops this bar onto the first rows on iOS. */
 .messages-tabs {
   display: flex;
   align-items: stretch;
   gap: 8px;
   margin: 0 0 12px;
   width: 100%;
-  position: sticky;
-  top: calc(var(--topbar-height, 56px) + env(safe-area-inset-top, 0px));
-  z-index: 4;
+  position: static;
   background: var(--bg);
   padding-bottom: 2px;
 }

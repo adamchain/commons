@@ -156,11 +156,7 @@ export function PlanCard({
             <p className="plan-card-description">{plan.description}</p>
           )}
 
-          {(facepile.length > 0 ||
-            showWentLabel ||
-            showGoingLabel ||
-            showInterestedLabel ||
-            (!isHosting && !hasEnded && !isCancelled)) && (
+          {(facepile.length > 0 || showWentLabel || showGoingLabel || showInterestedLabel) && (
             <footer className="plan-card-footer-row">
               <div className="plan-card-attendees">
                 {facepile.length > 0 && (
@@ -199,17 +195,17 @@ export function PlanCard({
                   />
                 )}
               </div>
-              {!isHosting && !hasEnded && !isCancelled && (
-                <QuickJoin
-                  planId={plan.id}
-                  isLooking={isLooking}
-                  state={plan.myState ?? null}
-                  isFull={isFull}
-                  requiresApproval={planRequiresHostApproval(plan)}
-                  onPlanRefresh={onPlanRefresh}
-                />
-              )}
             </footer>
+          )}
+          {!isHosting && !hasEnded && !isCancelled && (
+            <QuickJoin
+              planId={plan.id}
+              isLooking={isLooking}
+              state={plan.myState ?? null}
+              isFull={isFull}
+              requiresApproval={planRequiresHostApproval(plan)}
+              onPlanRefresh={onPlanRefresh}
+            />
           )}
         </div>
       </Link>
@@ -316,9 +312,8 @@ function QuickJoin({
 
   const goingActive = state === "going";
   const interestedActive = state === "interested";
-  // Ideas and capacity-limited plans only offer Interested up front.
-  // An existing Going seat still reads Joined.
-  const interestedOnly = (isLooking || isFull || requiresApproval) && !goingActive;
+  // Capped and host-review plans can't take a direct Join. Ideas still can.
+  const interestedOnly = (isFull || requiresApproval) && !goingActive;
 
   async function setState(next: "going" | "interested" | null) {
     if (busy) return;
@@ -342,35 +337,53 @@ function QuickJoin({
     }
   }
 
-  async function onTap(e: MouseEvent) {
+  function stopNav(e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
+  }
+
+  async function onJoin(e: MouseEvent) {
+    stopNav(e);
     if (busy) return;
     if (goingActive) {
       setShowSheet(true);
       return;
     }
+    await setState("going");
+  }
+
+  async function onInterested(e: MouseEvent) {
+    stopNav(e);
+    if (busy) return;
     if (interestedActive) {
-      // Soft state — open sheet to drop, or upgrade to Join if a spot opened.
       setShowSheet(true);
       return;
     }
-    await setState(interestedOnly ? "interested" : "going");
+    await setState("interested");
   }
-
-  const label = goingActive ? "Joined" : interestedActive ? "Interested ✓" : interestedOnly ? "Interested" : "Join";
-  const isCommit = label === "Join" || label === "Joined";
 
   return (
     <>
-      <button
-        type="button"
-        className={`plan-card-quick-join ${isCommit ? "is-join" : "is-interested"}`}
-        onClick={(e) => void onTap(e)}
-        disabled={busy}
-      >
-        {busy ? "…" : label}
-      </button>
+      <div className="plan-card-rsvp" onClick={stopNav}>
+        {!interestedOnly && (
+          <button
+            type="button"
+            className="plan-card-quick-join is-join"
+            onClick={(e) => void onJoin(e)}
+            disabled={busy}
+          >
+            {busy ? "…" : goingActive ? "Joined" : "Join"}
+          </button>
+        )}
+        <button
+          type="button"
+          className={`plan-card-quick-join is-interested${interestedActive ? " is-active" : ""}`}
+          onClick={(e) => void onInterested(e)}
+          disabled={busy}
+        >
+          {busy ? "…" : interestedActive ? "Interested ✓" : "Interested"}
+        </button>
+      </div>
       {confirm && (
         <JoinConfirmPopup kind={confirm} onClose={() => setConfirm(null)} />
       )}

@@ -90,10 +90,20 @@ chatRouter.post("/dm", requireAuth, async (req, res) => {
     return;
   }
   const connected = (me.networkIds ?? []).includes(otherId);
+  const preexisting = store.findDirectDm(userId, otherId);
   const conv = store.ensureDirectDm(userId, otherId);
-  // Not connected yet: they can write, but the other person can't see it
-  // until they accept the request to connect.
-  store.setDmHiddenFrom(conv.id, otherId, !connected);
+  // Opening always reveals the thread to the opener. A previous hold could
+  // leave them in hiddenFromUserIds, and the message fetch then 403s with
+  // "This chat isn't available yet."
+  store.setDmHiddenFrom(conv.id, userId, false);
+  if (connected) {
+    store.setDmHiddenFrom(conv.id, otherId, false);
+  } else if (!preexisting && !(me.incomingNetworkRequests ?? []).includes(otherId)) {
+    // First open is the request: they can't see it until they accept.
+    // Later opens must not hide the other person — that locked the sender
+    // out of a thread they had already started.
+    store.setDmHiddenFrom(conv.id, otherId, true);
+  }
   res.json(await toConversationDto(conv, userId));
 });
 
@@ -787,11 +797,15 @@ async function dmHoldFields(
 ): Promise<{ awaitingAccept?: boolean; incomingRequest?: boolean }> {
   if (conv.type !== "dm" || conv.planId || conv.communityId) return {};
   const otherId = conv.participantIds.find((id) => id !== viewerId);
-  if (!otherId || !(conv.hiddenFromUserIds ?? []).includes(otherId)) return {};
+  if (!otherId) return {};
   const me = await findUserById(viewerId);
+  if ((me?.networkIds ?? []).includes(otherId)) return {};
+  const otherHidden = (conv.hiddenFromUserIds ?? []).includes(otherId);
+  const incoming = (me?.incomingNetworkRequests ?? []).includes(otherId);
+  if (!otherHidden && !incoming) return {};
   return {
-    awaitingAccept: true,
-    incomingRequest: (me?.incomingNetworkRequests ?? []).includes(otherId),
+    awaitingAccept: otherHidden,
+    incomingRequest: incoming,
   };
 }
 

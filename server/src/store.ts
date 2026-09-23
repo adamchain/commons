@@ -1457,14 +1457,8 @@ export const store = {
     mongoMirror.upsertConversation(conv);
     return conv;
   },
-  /** Network DM — not tied to a plan. Reopens the thread if the caller had left it. */
-  listDirectDms(userId: string): ConversationRecord[] {
-    return snapshot.conversations.filter(
-      (c) => c.type === "dm" && c.planId === "" && !c.communityId && c.participantIds.includes(userId),
-    );
-  },
-  ensureDirectDm(a: string, b: string): ConversationRecord {
-    const existing = snapshot.conversations.find(
+  findDirectDm(a: string, b: string): ConversationRecord | undefined {
+    return snapshot.conversations.find(
       (c) =>
         c.type === "dm" &&
         c.planId === "" &&
@@ -1473,6 +1467,15 @@ export const store = {
         c.participantIds.includes(a) &&
         c.participantIds.includes(b),
     );
+  },
+  /** Network DM — not tied to a plan. Reopens the thread if the caller had left it. */
+  listDirectDms(userId: string): ConversationRecord[] {
+    return snapshot.conversations.filter(
+      (c) => c.type === "dm" && c.planId === "" && !c.communityId && c.participantIds.includes(userId),
+    );
+  },
+  ensureDirectDm(a: string, b: string): ConversationRecord {
+    const existing = this.findDirectDm(a, b);
     if (existing) {
       this.setConversationLeft(a, existing.id, false);
       return existing;
@@ -1498,7 +1501,9 @@ export const store = {
     const set = new Set(conv.hiddenFromUserIds ?? []);
     if (hidden) set.add(userId);
     else set.delete(userId);
-    conv.hiddenFromUserIds = set.size > 0 ? [...set] : undefined;
+    // Empty array, not undefined: the mongo mirror $sets the record, and a
+    // missing field would leave the previous hide list in place.
+    conv.hiddenFromUserIds = [...set];
     persist();
     mongoMirror.upsertConversation(conv);
   },
@@ -1522,7 +1527,7 @@ export const store = {
     const revealedTo = (conv.hiddenFromUserIds ?? []).filter((id) => id === aId || id === bId);
     if (revealedTo.length === 0) return undefined;
     const rest = (conv.hiddenFromUserIds ?? []).filter((id) => id !== aId && id !== bId);
-    conv.hiddenFromUserIds = rest.length > 0 ? rest : undefined;
+    conv.hiddenFromUserIds = rest;
     persist();
     mongoMirror.upsertConversation(conv);
     const last = this.listMessagesForConversation(conv.id).filter((m) => m.kind !== "system").at(-1);

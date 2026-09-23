@@ -171,9 +171,9 @@ export function ParticipationButtons({
     !isHosting &&
     (joinType === "approve" || planCapacityValue(capacity) !== null) &&
     !goingActive;
-  // Ideas and capacity-limited plans start on Interested. Join is only the
-  // initial option on an open plan. A seat you already hold still reads Joined.
-  const interestedOnly = (loose || isFull || isApproveOnly) && !goingActive;
+  // A capped or host-review plan can't take a direct Join. Everything else,
+  // including ideas, offers Join and Interested together.
+  const interestedOnly = (isFull || isApproveOnly) && !goingActive;
 
   return (
     <div className={`participation ${loose ? "participation--loose" : ""}`}>
@@ -189,14 +189,24 @@ export function ParticipationButtons({
         </p>
       )}
       {goingActive ? (
-        <button
-          type="button"
-          className="btn-going is-active"
-          onClick={() => void tapGoing()}
-          disabled={pending}
-        >
-          Joined
-        </button>
+        <>
+          <button
+            type="button"
+            className="btn-going is-active"
+            onClick={() => void tapGoing()}
+            disabled={pending}
+          >
+            Joined
+          </button>
+          <button
+            type="button"
+            className="btn-interested"
+            onClick={() => void switchToInterested()}
+            disabled={pending}
+          >
+            Interested
+          </button>
+        </>
       ) : interestedOnly ? (
         <button
           type="button"

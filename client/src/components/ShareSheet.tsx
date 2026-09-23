@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Clipboard } from "@capacitor/clipboard";
 import type { PlanDTO } from "../types/shared";
 import { getPublicWebOrigin } from "../lib/platform";
 import { getActiveInviteCode } from "../lib/inviteCode";
@@ -174,6 +175,83 @@ export function ShareSheet({ plan, isOwn = false, onClose }: { plan: PlanDTO; is
         </button>
     </BottomSheet>
   );
+}
+
+// Community header share. The system share call can hang or reject inside the
+// iOS webview and on desktop without ever showing a sheet, so the header tap
+// opens this panel first. Copy always has its own click.
+export function CommunityShareSheet({
+  name,
+  communityId,
+  onClose,
+}: {
+  name: string;
+  communityId: string;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const url = `${getPublicWebOrigin()}/communities/${communityId}`;
+  const shareText = `Join ${name} on COMMONS`;
+  const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+
+  async function copyLink() {
+    try {
+      // Call the browser clipboard in this click. The Capacitor bridge is async,
+      // so using it first drops the user gesture and the write is denied.
+      if (typeof navigator.clipboard?.writeText === "function") {
+        await navigator.clipboard.writeText(url);
+      } else {
+        await Clipboard.write({ string: url });
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      try {
+        await Clipboard.write({ string: url });
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      } catch {
+        window.prompt("Copy this link", url);
+      }
+    }
+  }
+
+  async function nativeShare() {
+    try {
+      await navigator.share({ title: name, text: shareText, url });
+      onClose();
+    } catch (err) {
+      if (isShareCancel(err)) return;
+      await copyLink();
+    }
+  }
+
+  return (
+    <BottomSheet onClose={onClose} labelledBy="community-share-title">
+      <div id="community-share-title" className="sheet-title">Share this community</div>
+      <div className="share-preview">
+        <div className="share-preview-fallback">
+          <div className="share-preview-fallback-title">{name}</div>
+        </div>
+        <div className="share-preview-caption">Send a link so people can open this community.</div>
+      </div>
+      <button type="button" className="share-primary-btn" onClick={() => void copyLink()}>
+        {copied ? "Link copied" : "Copy link"}
+      </button>
+      {canNativeShare && (
+        <button type="button" className="btn-secondary btn-block" onClick={() => void nativeShare()}>
+          Share…
+        </button>
+      )}
+      <button type="button" className="btn-link sheet-cancel" onClick={onClose}>
+        Cancel
+      </button>
+    </BottomSheet>
+  );
+}
+
+function isShareCancel(err: unknown): boolean {
+  return typeof err === "object" && err !== null && "name" in err && (err as { name?: string }).name === "AbortError";
 }
 
 function ShareGlyph() {
