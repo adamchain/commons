@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 /**
@@ -22,8 +22,8 @@ export function BottomSheet({
 }) {
   const ignoreUntil = useRef(Date.now() + 450);
   const sheetRef = useRef<HTMLDivElement>(null);
-  const [dragY, setDragY] = useState(0);
-  const [dragging, setDragging] = useState(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     const sheet = sheetRef.current;
@@ -31,54 +31,100 @@ export function BottomSheet({
 
     const drag = {
       active: false,
+      tracking: false,
       fromHandle: false,
       startY: 0,
       startX: 0,
       dy: 0,
+      grab: 0,
+      lastY: 0,
+      lastT: 0,
+      velocity: 0,
+    };
+    let settled = false;
+
+    const place = (y: number, animate: boolean) => {
+      sheet.style.transition = animate
+        ? "transform 220ms cubic-bezier(0.16, 1, 0.3, 1)"
+        : "none";
+      sheet.style.transform = y > 0 ? `translate3d(0, ${y}px, 0)` : "translate3d(0, 0, 0)";
+    };
+
+    const resetDrag = () => {
+      drag.active = false;
+      drag.tracking = false;
+      drag.fromHandle = false;
+      drag.dy = 0;
+      drag.velocity = 0;
     };
 
     const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length !== 1) return;
+      if (e.touches.length !== 1 || settled) return;
       const touch = e.touches[0]!;
       const target = e.target;
       drag.active = true;
+      drag.tracking = false;
       drag.fromHandle = target instanceof Element && Boolean(target.closest(".sheet-handle-hit"));
       drag.startY = touch.clientY;
       drag.startX = touch.clientX;
       drag.dy = 0;
+      drag.lastY = 0;
+      drag.lastT = performance.now();
+      drag.velocity = 0;
     };
 
     const onTouchMove = (e: TouchEvent) => {
-      if (!drag.active || e.touches.length !== 1) return;
+      if (!drag.active || settled || e.touches.length !== 1) return;
       const touch = e.touches[0]!;
       const dy = touch.clientY - drag.startY;
       const dx = touch.clientX - drag.startX;
-      if (drag.dy === 0 && Math.abs(dx) > Math.abs(dy)) {
-        drag.active = false;
-        return;
+      if (!drag.tracking) {
+        if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+          drag.active = false;
+          return;
+        }
+        if (dy < 8) return;
+        const body = sheet.querySelector(".sheet-body");
+        const atTop = !(body instanceof HTMLElement) || body.scrollTop <= 0;
+        if (!drag.fromHandle && !atTop) {
+          drag.active = false;
+          return;
+        }
+        drag.tracking = true;
+        drag.grab = dy;
       }
-      const body = sheet.querySelector(".sheet-body");
-      const atTop = !(body instanceof HTMLElement) || body.scrollTop <= 0;
-      const dismiss = drag.fromHandle || (atTop && dy > 0);
-      if (!dismiss || dy < 10) return;
       e.preventDefault();
-      drag.dy = dy;
-      setDragging(true);
-      setDragY(dy);
+      const y = Math.max(0, dy - drag.grab);
+      const now = performance.now();
+      const dt = now - drag.lastT;
+      if (dt > 0) drag.velocity = (y - drag.lastY) / dt;
+      drag.lastY = y;
+      drag.lastT = now;
+      drag.dy = y;
+      place(y, false);
+    };
+
+    const finishClose = () => {
+      if (settled) return;
+      settled = true;
+      onCloseRef.current();
     };
 
     const onTouchEnd = () => {
-      if (!drag.active && drag.dy === 0) return;
-      const dy = drag.dy;
-      drag.active = false;
-      drag.fromHandle = false;
-      drag.dy = 0;
-      if (dy > 64) {
-        onClose();
+      if (!drag.tracking) {
+        drag.active = false;
         return;
       }
-      setDragging(false);
-      requestAnimationFrame(() => setDragY(0));
+      const y = drag.dy;
+      const flung = drag.velocity > 0.55;
+      resetDrag();
+      if (y > 72 || flung) {
+        place(sheet.offsetHeight + 24, true);
+        sheet.addEventListener("transitionend", finishClose);
+        window.setTimeout(finishClose, 260);
+        return;
+      }
+      place(0, true);
     };
 
     sheet.addEventListener("touchstart", onTouchStart, { passive: true });
@@ -90,8 +136,9 @@ export function BottomSheet({
       sheet.removeEventListener("touchmove", onTouchMove);
       sheet.removeEventListener("touchend", onTouchEnd);
       sheet.removeEventListener("touchcancel", onTouchEnd);
+      sheet.removeEventListener("transitionend", finishClose);
     };
-  }, [onClose, closeDisabled]);
+  }, [closeDisabled]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -121,12 +168,11 @@ export function BottomSheet({
     >
       <div
         ref={sheetRef}
-        className={`sheet ${dragging ? "is-dragging" : ""} ${className}`.trim()}
+        className={`sheet ${className}`.trim()}
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}
         aria-label={labelledBy ? undefined : ariaLabel}
-        style={dragY > 0 ? { transform: `translateY(${dragY}px)` } : undefined}
         onPointerDown={(e: ReactPointerEvent) => e.stopPropagation()}
       >
         <div className="sheet-handle-hit">
