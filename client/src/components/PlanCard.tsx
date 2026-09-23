@@ -312,8 +312,10 @@ function QuickJoin({
 
   const goingActive = state === "going";
   const interestedActive = state === "interested";
-  // Capped and host-review plans can't take a direct Join. Ideas still can.
-  const interestedOnly = (isFull || requiresApproval) && !goingActive;
+  // One action per card: Join on an open plan, Interested on an idea.
+  // A full or host-review plan can't take a direct Join, so it stays Interested.
+  const joinablePlan = !isLooking && !isFull && !requiresApproval;
+  const showJoin = goingActive || (joinablePlan && !interestedActive);
 
   async function setState(next: "going" | "interested" | null) {
     if (busy) return;
@@ -365,7 +367,7 @@ function QuickJoin({
   return (
     <>
       <div className="plan-card-rsvp" onClick={stopNav}>
-        {!interestedOnly && (
+        {showJoin ? (
           <button
             type="button"
             className="plan-card-quick-join is-join"
@@ -374,15 +376,16 @@ function QuickJoin({
           >
             {busy ? "…" : goingActive ? "Joined" : "Join"}
           </button>
+        ) : (
+          <button
+            type="button"
+            className={`plan-card-quick-join is-interested${interestedActive ? " is-active" : ""}`}
+            onClick={(e) => void onInterested(e)}
+            disabled={busy}
+          >
+            {busy ? "…" : interestedActive ? "Interested ✓" : "Interested"}
+          </button>
         )}
-        <button
-          type="button"
-          className={`plan-card-quick-join is-interested${interestedActive ? " is-active" : ""}`}
-          onClick={(e) => void onInterested(e)}
-          disabled={busy}
-        >
-          {busy ? "…" : interestedActive ? "Interested ✓" : "Interested"}
-        </button>
       </div>
       {confirm && (
         <JoinConfirmPopup kind={confirm} onClose={() => setConfirm(null)} />
@@ -393,12 +396,7 @@ function QuickJoin({
             labelledBy="plan-card-rsvp-title"
           >
               <div id="plan-card-rsvp-title" className="sheet-title">{goingActive ? "Joined" : "Interested"}</div>
-              {goingActive && (
-                <button type="button" className="sheet-link" onClick={() => void setState("interested")}>
-                  Switch to Interested
-                </button>
-              )}
-              {interestedActive && !isLooking && !isFull && !requiresApproval && (
+              {interestedActive && joinablePlan && (
                 <button type="button" className="sheet-link" onClick={() => void setState("going")}>
                   Switch to Join
                 </button>

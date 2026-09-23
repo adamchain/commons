@@ -7845,9 +7845,9 @@ a.action-btn--stack {
   margin-top: 10px;
 }
 .plan-card-rsvp .plan-card-quick-join {
-  flex: 1 1 0;
+  flex: 0 0 auto;
   justify-content: center;
-  margin-left: 0;
+  margin-left: auto;
 }
 .plan-card-quick-join {
   display: inline-flex;
