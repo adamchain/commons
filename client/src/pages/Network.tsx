@@ -122,7 +122,7 @@ export function NetworkPage() {
           <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </Link>
       </header>
-      <ScreenTitle title="My network" subtitle="People you know in Philadelphia." />
+      <ScreenTitle title="My network" />
 
       <div className="network-search-wrap">
         <SearchIcon />

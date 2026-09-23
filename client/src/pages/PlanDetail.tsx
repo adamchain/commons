@@ -519,10 +519,8 @@ export function PlanDetailPage() {
                 </div>
               </div>
             )}
-            {isHosting && plan.happenedOutcome && (
-              <p className="did-happen-saved">
-                Saved: {plan.happenedOutcome === "yes" ? "Yes, it happened" : "No"}
-              </p>
+            {isHosting && plan.happenedOutcome === "yes" && (
+              <p className="did-happen-saved">Saved: Yes, it happened</p>
             )}
             <button
               type="button"

@@ -810,7 +810,18 @@ export interface CommunityCardDTO {
   visibility: CommunityAccessLevel;
   /** Up to 3 active members for the card facepile. */
   memberPreview: PublicUser[];
+  /**
+   * Recent bulletin posts, chat, RSVPs, and upcoming events. Set on the
+   * communities feed so the featured card can prefer an active community.
+   */
+  activityScore?: number;
+  /** Where this community sits relative to the viewer's neighborhoods. */
+  proximity?: CommunityProximity | null;
+  /** Kilometers from the viewer's nearest neighborhood, when both can be placed. */
+  distanceKm?: number | null;
 }
+
+export type CommunityProximity = "here" | "nearby" | "far";
 
 /** Private communities and screening questions both wait on organizer approval. */
 export function communityRequiresJoinApproval(c: {

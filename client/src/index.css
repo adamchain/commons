@@ -4320,6 +4320,30 @@ a.action-btn--stack {
   -webkit-overflow-scrolling: touch;
   box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.18);
 }
+.sheet {
+  overflow: hidden;
+  transition: transform 200ms ease;
+}
+.sheet.is-dragging {
+  transition: none;
+}
+.sheet-body {
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.sheet-handle-hit {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: -6px -20px 2px;
+  padding: 14px 20px 16px;
+  touch-action: none;
+  cursor: grab;
+}
 .sheet-handle,
 .profile-action-handle {
   width: 40px;
@@ -4328,7 +4352,7 @@ a.action-btn--stack {
   background: var(--faint);
   opacity: 0.45;
   border-radius: 4px;
-  margin: 4px auto 10px;
+  margin: 0 auto;
 }
 .sheet-title {
   font-size: var(--type-title);
@@ -13314,12 +13338,6 @@ button.xpl-photo-tile {
   overflow: hidden;
   padding: 0;
 }
-.profile-menu-row--settings {
-  margin-top: 4px;
-  border-top: 1px solid var(--border);
-  padding-top: 14px;
-}
-
 .profile-month-header {
   display: flex;
   align-items: center;

@@ -21,6 +21,7 @@ import {
 } from "../lib/communityAccess.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
 import { buildCommunityAnalytics } from "../lib/communityDashboard.js";
+import { communityFeedSignals, type CommunityFeedSignal } from "../lib/communityFeed.js";
 import {
   communityCategoriesOf,
   parseCommunityCategories,
@@ -157,6 +158,7 @@ function toCommunityCard(
   community: CommunityRecord,
   viewerId: string,
   users: Awaited<ReturnType<typeof findUsersByIds>>,
+  signal?: CommunityFeedSignal,
 ): CommunityCardDTO {
   const membership = store.findCommunityMembership(community.id, viewerId);
   const active = store.listActiveCommunityMembers(community.id);
@@ -178,6 +180,9 @@ function toCommunityCard(
     hasScreening: !!community.screeningQuestion,
     visibility: community.visibility ?? "everyone",
     memberPreview: ordered.slice(0, 3).map((m) => publicFor(m.userId, users)),
+    activityScore: signal?.activityScore,
+    proximity: signal?.proximity,
+    distanceKm: signal?.distanceKm,
   };
 }
 
@@ -205,6 +210,7 @@ export async function communityCardsForUser(userId: string): Promise<CommunityCa
 async function toCommunityCards(
   communities: CommunityRecord[],
   viewerId: string,
+  signals?: Map<string, CommunityFeedSignal>,
 ): Promise<CommunityCardDTO[]> {
   const ids = new Set<string>();
   for (const c of communities) {
@@ -214,7 +220,7 @@ async function toCommunityCards(
     }
   }
   const users = await findUsersByIds([...ids]);
-  return communities.map((c) => toCommunityCard(c, viewerId, users));
+  return communities.map((c) => toCommunityCard(c, viewerId, users, signals?.get(c.id)));
 }
 
 function postDTO(
@@ -326,7 +332,8 @@ communitiesRouter.get("/", requireAuth, async (req, res) => {
       if (a.isFounding !== b.isFounding) return a.isFounding ? -1 : 1;
       return b.memberCount - a.memberCount;
     });
-  res.json({ communities: await toCommunityCards(list, viewerId) });
+  const signals = communityFeedSignals(list, store.findUserById(viewerId));
+  res.json({ communities: await toCommunityCards(list, viewerId, signals) });
 });
 
 // GET /api/communities/mine — communities the viewer organizes, is an active

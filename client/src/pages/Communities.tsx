@@ -16,11 +16,50 @@ import {
   type CommunityCardDTO,
   type CommunityCategory,
   type CommunityDTO,
+  type CommunityProximity,
   type PublicUser,
 } from "../types/shared";
 import "./Communities.css";
 
 const COMMUNITY_PAGE = 10;
+
+function proximityRank(proximity: CommunityProximity | null | undefined): number {
+  if (proximity === "here") return 0;
+  if (proximity === "nearby") return 1;
+  if (proximity === "far") return 2;
+  return 3;
+}
+
+/**
+ * Large header: the most active community close to the viewer.
+ * A category filter narrows that to the most active one in the category.
+ * Distance only separates communities that aren't in or next to the viewer's neighborhoods.
+ */
+function pickFeatured(
+  list: CommunityCardDTO[],
+  category: CommunityCategory | "all",
+  interests: string[],
+): CommunityCardDTO | null {
+  if (list.length === 0) return null;
+  const interestSet = new Set(interests);
+  return [...list].sort((a, b) => {
+    const byPlace = proximityRank(a.proximity) - proximityRank(b.proximity);
+    if (byPlace !== 0) return byPlace;
+    if (a.proximity === "far" && b.proximity === "far") {
+      const byDistance =
+        (a.distanceKm ?? Number.POSITIVE_INFINITY) - (b.distanceKm ?? Number.POSITIVE_INFINITY);
+      if (byDistance !== 0) return byDistance;
+    }
+    const byActivity = (b.activityScore ?? 0) - (a.activityScore ?? 0);
+    if (byActivity !== 0) return byActivity;
+    if (category === "all" && interestSet.size > 0) {
+      const aMatch = a.categories.some((tag) => interestSet.has(tag)) ? 0 : 1;
+      const bMatch = b.categories.some((tag) => interestSet.has(tag)) ? 0 : 1;
+      if (aMatch !== bMatch) return aMatch - bMatch;
+    }
+    return b.memberCount - a.memberCount;
+  })[0]!;
+}
 
 function readCategory(raw: string | null): CommunityCategory | "all" {
   if (raw && (ALL_COMMUNITY_CATEGORIES as string[]).includes(raw)) return raw as CommunityCategory;
@@ -72,7 +111,9 @@ export function CommunitiesPage() {
     return hay.includes(q);
   };
   const browse = all.filter((c) => matchesCat(c) && matchesQuery(c));
-  const visible = directory ? browse : browse.slice(0, shown);
+  const featured = pickFeatured(browse, category, user?.interests ?? []);
+  const ordered = featured ? [featured, ...browse.filter((c) => c.id !== featured.id)] : browse;
+  const visible = directory ? ordered : ordered.slice(0, shown);
   const hero = visible[0] ?? null;
   const rest = visible.slice(1);
   const hasMore = !directory && browse.length > shown;

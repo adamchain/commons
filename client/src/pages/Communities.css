@@ -459,7 +459,7 @@ button.cmy-joined-pill {
 .cmy-hero-name {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: var(--text-card-large);
+  font-size: 17px;
   letter-spacing: -0.01em;
   line-height: 1.15;
   margin: 0;
@@ -494,12 +494,12 @@ button.cmy-joined-pill {
   color: inherit;
   background: var(--card);
   border-radius: var(--r-lg);
-  padding: 8px 12px;
+  padding: 12px 14px;
   box-shadow: var(--shadow-sm);
 }
 .cmy-compact-thumb {
-  width: 72px;
-  height: 72px;
+  width: 80px;
+  height: 80px;
   border-radius: var(--r-control);
   overflow: hidden;
   flex-shrink: 0;
@@ -516,7 +516,7 @@ button.cmy-joined-pill {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 2px;
+  gap: 4px;
 }
 .cmy-compact-org {
   display: flex;
@@ -544,11 +544,14 @@ button.cmy-joined-pill {
 }
 .cmy-compact-title {
   font-family: var(--font-display);
-  font-size: var(--type-title);
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.01em;
   line-height: 1.2;
   color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .cmy-compact-footer {
   display: flex;
