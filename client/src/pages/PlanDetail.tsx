@@ -494,6 +494,27 @@ export function PlanDetailPage() {
           />
         )}
 
+        {!isPast && !(isHosting && isLookingFor) && !isHosting && (
+          <div className="plan-participation-slot">
+            <ParticipationButtons
+              planId={plan.id}
+              initialState={plan.myState}
+              onChange={onStateChange}
+              planKind={plan.planKind}
+              capacity={plan.capacity}
+              goingCount={plan.participants.going.length}
+              joinType={plan.joinType}
+              isHosting={isHosting}
+              onJustMarkedGoing={() => setShowInvite(true)}
+              onConfirmClose={(kind) => {
+                if (kind === "idea_interested") {
+                  navigate(`/plans/${plan.id}/chat`, { state: { from: "plan", planId: plan.id } });
+                }
+              }}
+            />
+          </div>
+        )}
+
         {isPast && (
           <div className="plan-past-actions">
             <p className="plan-past-note">This one's a wrap. Want to run it back?</p>
@@ -542,28 +563,6 @@ export function PlanDetailPage() {
             </Link>
           </div>
         )}
-
-        {!isPast && !(isHosting && isLookingFor) && !isHosting && (
-          <div className="plan-participation-slot">
-            <ParticipationButtons
-              planId={plan.id}
-              initialState={plan.myState}
-              onChange={onStateChange}
-              planKind={plan.planKind}
-              capacity={plan.capacity}
-              goingCount={plan.participants.going.length}
-              joinType={plan.joinType}
-              isHosting={isHosting}
-              onJustMarkedGoing={() => setShowInvite(true)}
-              onConfirmClose={(kind) => {
-                if (kind === "idea_interested") {
-                  navigate(`/plans/${plan.id}/chat`, { state: { from: "plan", planId: plan.id } });
-                }
-              }}
-            />
-          </div>
-        )}
-
 
         {plan.cancelledAt && (
           <div className="plan-cancelled-banner" role="alert">

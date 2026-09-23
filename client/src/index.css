@@ -7842,7 +7842,10 @@ a.action-btn--stack {
 .plan-card-rsvp {
   display: flex;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 0;
+  margin-left: auto;
+  flex-shrink: 0;
+  align-self: center;
 }
 .plan-card-rsvp .plan-card-quick-join {
   flex: 0 0 auto;
@@ -13887,25 +13890,18 @@ button.xpl-photo-tile {
 }
 
 .plan-participation-slot {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: calc(var(--nav-height, 58px) + env(safe-area-inset-bottom, 0px));
-  z-index: 40;
-  padding: 8px 16px 10px;
-  background: color-mix(in srgb, var(--bg) 94%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-.plan-detail-body:has(.plan-participation-slot) {
-  padding-bottom: 96px;
+  margin-top: 4px;
 }
 .plan-participation-slot .participation {
   margin: 0;
-  grid-template-columns: 1fr 1fr;
-}
-.plan-participation-slot .participation:has(> button:only-child) {
   grid-template-columns: 1fr;
+  gap: 8px;
+}
+.plan-participation-slot .participation .btn-going,
+.plan-participation-slot .participation .btn-interested {
+  width: 100%;
+  border-radius: var(--r-control);
+  padding: 14px 16px;
 }
 .plan-participation-slot .participation-hint {
   grid-column: 1 / -1;

@@ -156,8 +156,9 @@ export function PlanCard({
             <p className="plan-card-description">{plan.description}</p>
           )}
 
-          {(facepile.length > 0 || showWentLabel || showGoingLabel || showInterestedLabel) && (
+          {(facepile.length > 0 || showWentLabel || showGoingLabel || showInterestedLabel || (!isHosting && !hasEnded && !isCancelled)) && (
             <footer className="plan-card-footer-row">
+              {(facepile.length > 0 || showWentLabel || showGoingLabel || showInterestedLabel) && (
               <div className="plan-card-attendees">
                 {facepile.length > 0 && (
                   <div className="avatar-stack">
@@ -195,17 +196,18 @@ export function PlanCard({
                   />
                 )}
               </div>
+              )}
+              {!isHosting && !hasEnded && !isCancelled && (
+                <QuickJoin
+                  planId={plan.id}
+                  isLooking={isLooking}
+                  state={plan.myState ?? null}
+                  isFull={isFull}
+                  requiresApproval={planRequiresHostApproval(plan)}
+                  onPlanRefresh={onPlanRefresh}
+                />
+              )}
             </footer>
-          )}
-          {!isHosting && !hasEnded && !isCancelled && (
-            <QuickJoin
-              planId={plan.id}
-              isLooking={isLooking}
-              state={plan.myState ?? null}
-              isFull={isFull}
-              requiresApproval={planRequiresHostApproval(plan)}
-              onPlanRefresh={onPlanRefresh}
-            />
           )}
         </div>
       </Link>

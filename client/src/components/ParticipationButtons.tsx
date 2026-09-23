@@ -196,7 +196,7 @@ export function ParticipationButtons({
             onClick={() => void tapGoing()}
             disabled={pending}
           >
-            Joined
+            I&apos;m In ✓
           </button>
           <button
             type="button"
@@ -224,7 +224,7 @@ export function ParticipationButtons({
             onClick={() => void tapGoing()}
             disabled={pending}
           >
-            Join
+            I&apos;m In
           </button>
           <button
             type="button"
@@ -250,7 +250,7 @@ export function ParticipationButtons({
 
       {showGoingSheet && (
         <BottomSheet onClose={() => setShowGoingSheet(false)} labelledBy="rsvp-going-title">
-            <div id="rsvp-going-title" className="sheet-title">Joined</div>
+            <div id="rsvp-going-title" className="sheet-title">I&apos;m In</div>
             <button type="button" className="sheet-link" onClick={() => void switchToInterested()}>
               Switch to Interested
             </button>
@@ -268,7 +268,7 @@ export function ParticipationButtons({
             <div id="rsvp-interested-title" className="sheet-title">Interested</div>
             {!loose && !isApproveOnly && !isFull && (
               <button type="button" className="sheet-link" onClick={() => void switchToGoing()}>
-                Switch to Join
+                Switch to I&apos;m In
               </button>
             )}
             <button
