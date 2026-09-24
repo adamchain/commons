@@ -7,7 +7,6 @@ import { Avatar } from "../components/Avatar";
 import { IdeaCoverFallback, planPhotoUrl } from "../components/CoverThumb";
 import { GetThereSheet } from "../components/GetThereSheet";
 import { InviteSheet } from "../components/InviteSheet";
-import { LoadingScreen } from "../components/LoadingScreen";
 import { ParticipationButtons } from "../components/ParticipationButtons";
 import { PlanSafetyMenu } from "../components/PlanSafetyMenu";
 import { ShareSheet } from "../components/ShareSheet";
@@ -59,8 +58,11 @@ export function PlanDetailPage() {
   const location = useLocation();
   const navFrom = (location.state as NavFromState | null) ?? null;
   const backHref = hrefForBack(navFrom);
-  const [plan, setPlan] = useState<PlanDTO | null>(null);
+  const [plan, setPlan] = useState<PlanDTO | null>(
+    (location.state as { initialPlan?: PlanDTO } | null)?.initialPlan ?? null,
+  );
   const [showShare, setShowShare] = useState(false);
+  const [showMapsConfirm, setShowMapsConfirm] = useState(false);
   const [showGetThere, setShowGetThere] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [showGuestsModal, setShowGuestsModal] = useState(false);
@@ -122,7 +124,16 @@ export function PlanDetailPage() {
   }, [plan?.id, user?.id]);
 
   if (!plan || !user) {
-    return <LoadingScreen tagline="Loading plan" />;
+    return (
+      <main className="app-shell app-shell--wide app-shell--with-nav plan-detail-page">
+        <div className="plan-detail-hero plan-detail-hero--empty" />
+        <div className="plan-detail-body">
+          <div className="feed-skeleton-card" style={{ marginBottom: 12 }} />
+          <div className="feed-skeleton-card" style={{ marginBottom: 12 }} />
+          <div className="feed-skeleton-card" />
+        </div>
+      </main>
+    );
   }
 
   const onStateChange = (next: ParticipationState | null) => {
@@ -371,6 +382,10 @@ export function PlanDetailPage() {
                 href={mapsHref}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setShowMapsConfirm(true);
+                }}
               >
                 <span className="plan-meta-icon" aria-hidden="true"><PinIcon /></span>
                 <div className="plan-meta-text">
@@ -720,6 +735,25 @@ export function PlanDetailPage() {
             </button>
             <button type="button" className="btn-link sheet-cancel" onClick={() => setShowHostSheet(false)}>
               Dismiss
+            </button>
+        </BottomSheet>
+      )}
+
+      {showMapsConfirm && (
+        <BottomSheet onClose={() => setShowMapsConfirm(false)}>
+            <div className="sheet-title">Open in Maps?</div>
+            <p className="sheet-copy">{plan.location.name}</p>
+            <a
+              href={mapsHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="sheet-link"
+              onClick={() => setShowMapsConfirm(false)}
+            >
+              Open in Maps
+            </a>
+            <button type="button" className="btn-link sheet-cancel" onClick={() => setShowMapsConfirm(false)}>
+              Cancel
             </button>
         </BottomSheet>
       )}

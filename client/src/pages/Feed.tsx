@@ -11,7 +11,6 @@ import { WeekStrip } from "../components/WeekStrip";
 import { EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { FLEXIBLE_DATE_PLACEHOLDER, isIdeaPlan, planHasEnded } from "../lib/planTime";
-import { getCurrentCoords } from "../lib/geolocate";
 import { consumeFeedScroll } from "../lib/navState";
 import { FORUM_INTERESTS, INTEREST_LABELS } from "../types/shared";
 import type { AgeRange, InterestTag, MeDTO, NetworkPromptDTO, PlanDTO } from "../types/shared";
@@ -69,7 +68,7 @@ export function FeedPage() {
   const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState<InterestTag | null>(() => loadPersistedFilters().selectedTag);
   const [nearbyOnly, setNearbyOnly] = useState(() => loadPersistedFilters().nearbyOnly);
-  const [sharingLocation, setSharingLocation] = useState(false);
+
   const [selectedAgeRange, setSelectedAgeRange] = useState<AgeRange | null>(() => loadPersistedFilters().selectedAgeRange);
   const [hideCancelled, setHideCancelled] = useState(() => loadPersistedFilters().hideCancelled);
   const [networkOnly, setNetworkOnly] = useState(() => loadPersistedFilters().networkOnly);
@@ -395,23 +394,6 @@ export function FeedPage() {
 
   const filteredPlans = activePlans;
 
-  async function shareLocationFromFeed() {
-    setSharingLocation(true);
-    try {
-      const coords = await getCurrentCoords({ timeoutMs: 8000 });
-      if (!coords) return;
-      const me = await api<MeDTO>("/api/auth/me", {
-        method: "PATCH",
-        body: JSON.stringify({ location: coords }),
-      });
-      setUser(me);
-      await fetchPlans();
-    } catch {
-      /* permission denied or save failed — the prompt stays so they can retry */
-    } finally {
-      setSharingLocation(false);
-    }
-  }
 
   const activeFilterCount =
     (selectedTag ? 1 : 0) +
@@ -453,19 +435,6 @@ export function FeedPage() {
 
         <div className="feed-divider" />
 
-        {!user?.location && (
-          <div className="feed-location-prompt" role="status">
-            <p>Share your location and plans within 15 miles show up first.</p>
-            <button
-              type="button"
-              className="btn-secondary"
-              disabled={sharingLocation}
-              onClick={() => void shareLocationFromFeed()}
-            >
-              {sharingLocation ? "Getting location…" : "Share location"}
-            </button>
-          </div>
-        )}
 
         {!forumSuggestionDismissed && suggestedForumTag && (
           <div className="feed-forum-suggestion" role="status">

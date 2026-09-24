@@ -1,4 +1,4 @@
-import { useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 /**
@@ -153,10 +153,11 @@ export function BottomSheet({
     };
   }, [onClose, closeDisabled]);
 
-  function onBackdropPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+  function onBackdropClick(e: ReactMouseEvent<HTMLDivElement>) {
     if (e.target !== e.currentTarget) return;
     if (closeDisabled) return;
     if (Date.now() < ignoreUntil.current) return;
+    e.stopPropagation();
     onClose();
   }
 
@@ -164,7 +165,7 @@ export function BottomSheet({
     <div
       className="sheet-backdrop"
       role="presentation"
-      onPointerDown={onBackdropPointerDown}
+      onClick={onBackdropClick}
     >
       <div
         ref={sheetRef}
@@ -174,6 +175,7 @@ export function BottomSheet({
         aria-labelledby={labelledBy}
         aria-label={labelledBy ? undefined : ariaLabel}
         onPointerDown={(e: ReactPointerEvent) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="sheet-handle-hit">
           <div className="sheet-handle" aria-hidden="true" />

@@ -251,12 +251,14 @@ export function ParticipationButtons({
       {showGoingSheet && (
         <BottomSheet onClose={() => setShowGoingSheet(false)} labelledBy="rsvp-going-title">
             <div id="rsvp-going-title" className="sheet-title">I&apos;m In</div>
-            <button type="button" className="sheet-link" onClick={() => void switchToInterested()}>
-              Switch to Interested
-            </button>
-            <button type="button" className="sheet-link sheet-link--danger" disabled={pending} onClick={() => void dropOutFromGoing()}>
-              Drop out
-            </button>
+            <div className="sheet-actions">
+              <button type="button" className="sheet-link" onClick={() => void switchToInterested()}>
+                Switch to Interested
+              </button>
+              <button type="button" className="sheet-link sheet-link--danger" disabled={pending} onClick={() => void dropOutFromGoing()}>
+                Drop out
+              </button>
+            </div>
             <button type="button" className="btn-link sheet-cancel" onClick={() => setShowGoingSheet(false)}>
               Cancel
             </button>
@@ -266,19 +268,21 @@ export function ParticipationButtons({
       {showInterestedSheet && (
         <BottomSheet onClose={() => setShowInterestedSheet(false)} labelledBy="rsvp-interested-title">
             <div id="rsvp-interested-title" className="sheet-title">Interested</div>
-            {!loose && !isApproveOnly && !isFull && (
-              <button type="button" className="sheet-link" onClick={() => void switchToGoing()}>
-                Switch to I&apos;m In
+            <div className="sheet-actions">
+              {!loose && !isApproveOnly && !isFull && (
+                <button type="button" className="sheet-link" onClick={() => void switchToGoing()}>
+                  Switch to I&apos;m In
+                </button>
+              )}
+              <button
+                type="button"
+                className="sheet-link sheet-link--danger"
+                disabled={pending}
+                onClick={() => void dropOutFromInterested()}
+              >
+                Drop out
               </button>
-            )}
-            <button
-              type="button"
-              className="sheet-link sheet-link--danger"
-              disabled={pending}
-              onClick={() => void dropOutFromInterested()}
-            >
-              Drop out
-            </button>
+            </div>
             <button type="button" className="btn-link sheet-cancel" onClick={() => setShowInterestedSheet(false)}>
               Cancel
             </button>

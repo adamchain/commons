@@ -64,7 +64,7 @@ export function PlanCard({
 
   const openPlan = (hash?: string) => {
     if (navFrom.from === "feed") saveFeedScroll();
-    cardNavigate(`/plans/${plan.id}${hash ?? ""}`, { state: navFrom });
+    cardNavigate(`/plans/${plan.id}${hash ?? ""}`, { state: { ...navFrom, initialPlan: plan } });
   };
 
   const openProfile = (userId: string) => {
@@ -81,7 +81,7 @@ export function PlanCard({
     >
       <Link
         to={`/plans/${plan.id}`}
-        state={navFrom}
+        state={{ ...navFrom, initialPlan: plan }}
         onClick={() => {
           if (navFrom.from === "feed") saveFeedScroll();
         }}
@@ -398,18 +398,25 @@ function QuickJoin({
             labelledBy="plan-card-rsvp-title"
           >
               <div id="plan-card-rsvp-title" className="sheet-title">{goingActive ? "Joined" : "Interested"}</div>
-              {interestedActive && joinablePlan && (
-                <button type="button" className="sheet-link" onClick={() => void setState("going")}>
-                  Switch to Join
+              <div className="sheet-actions">
+                {goingActive && (
+                  <button type="button" className="sheet-link" onClick={() => void setState("interested")}>
+                    Switch to Interested
+                  </button>
+                )}
+                {interestedActive && joinablePlan && (
+                  <button type="button" className="sheet-link" onClick={() => void setState("going")}>
+                    Switch to Join
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="sheet-link sheet-link--danger"
+                  onClick={() => void setState(null)}
+                >
+                  Drop out
                 </button>
-              )}
-              <button
-                type="button"
-                className="sheet-link sheet-link--danger"
-                onClick={() => void setState(null)}
-              >
-                Drop out
-              </button>
+              </div>
               <button type="button" className="btn-link sheet-cancel" onClick={() => setShowSheet(false)}>
                 Cancel
               </button>
