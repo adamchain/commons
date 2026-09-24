@@ -41,14 +41,9 @@ const AGE_ERA_ICONS: Record<AgeRange, LucideIcon> = {
   "50_plus": Star,
 };
 
-// Warm one-time interstitial shown right after onboarding completes (F.1).
-// Keyed per account so a new signup always sees it, even on a shared device.
+// Mark welcome seen so back-navigation never re-shows it mid-session.
 function welcomeSeenKey(userId: string): string {
   return `commons_welcome_seen_${userId}`;
-}
-function hasSeenWelcome(userId: string): boolean {
-  if (typeof window === "undefined") return false;
-  return localStorage.getItem(welcomeSeenKey(userId)) === "1";
 }
 function markWelcomeSeen(userId: string): void {
   if (typeof window !== "undefined") localStorage.setItem(welcomeSeenKey(userId), "1");
@@ -500,7 +495,7 @@ export function OnboardingPage() {
           // Set the step BEFORE refreshUser resolves so the completion guard
           // above sees "welcome" and doesn't redirect out from under it.
           const uid = user?.id;
-          if (uid && !hasSeenWelcome(uid)) {
+          if (uid) {
             setStep("welcome");
             await refreshUser();
           } else {

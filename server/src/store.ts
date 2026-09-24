@@ -1102,6 +1102,11 @@ export const store = {
   },
   /** Nearest hood with coords — used when a plan has a venue but no explicit neighborhood. */
   nearestNeighborhoodId(lat: number, lng: number): string | undefined {
+    // ~1° of lat/lng ≈ 60-70 miles. Threshold of 1.0 covers the Philly metro
+    // area (NJ suburbs, Wilmington, Allentown) while excluding NYC, Long Island,
+    // and other cities. Without this cap every user gets a Philly neighborhood
+    // regardless of where on Earth they are.
+    const MAX_DIST_SQ = 1.0;
     let bestId: string | undefined;
     let bestD = Infinity;
     for (const n of snapshot.neighborhoods) {
@@ -1114,7 +1119,7 @@ export const store = {
         bestId = n.id;
       }
     }
-    return bestId;
+    return bestD <= MAX_DIST_SQ ? bestId : undefined;
   },
   // returns the user's neighborhood + adjacent neighborhood ids
   neighborhoodScope(neighborhoodId: string): string[] {

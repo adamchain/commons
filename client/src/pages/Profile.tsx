@@ -98,6 +98,10 @@ interface ProfilePayload {
   communities?: CommunityCardDTO[];
 }
 
+function profileTipKey(uid: string) {
+  return `commons_profile_tip_seen_${uid}`;
+}
+
 export function ProfilePage() {
   const { userId = "" } = useParams();
   const location = useLocation();
@@ -114,6 +118,7 @@ export function ProfilePage() {
   const [plansView, setPlansView] = useState<"list" | "calendar">("list");
   const [actionSheetOpen, setActionSheetOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [showProfileTip, setShowProfileTip] = useState(false);
   const isSelf = user?.id === userId;
 
   const reloadProfile = () =>
@@ -163,6 +168,17 @@ export function ProfilePage() {
       .then((r) => setNetwork(r.users))
       .catch(() => setNetwork([]));
   }, [isSelf, user?.networkUserIds?.length]);
+
+  useEffect(() => {
+    if (!isSelf || !user?.id) return;
+    try {
+      if (localStorage.getItem(profileTipKey(user.id)) !== "1") {
+        setShowProfileTip(true);
+      }
+    } catch {
+      /* storage unavailable */
+    }
+  }, [isSelf, user?.id]);
 
   function goBack() {
     if (navFrom?.from) {
@@ -236,6 +252,15 @@ export function ProfilePage() {
     if (!targetId) return;
     await api(`/api/users/${targetId}/block`, { method: "POST" });
     navigate("/", { replace: true });
+  }
+
+  function dismissProfileTip() {
+    try {
+      if (user?.id) localStorage.setItem(profileTipKey(user.id), "1");
+    } catch {
+      /* storage unavailable */
+    }
+    setShowProfileTip(false);
   }
 
   if (!isSelf) {
@@ -590,6 +615,22 @@ export function ProfilePage() {
           <span className="settings-feedback-sub">Tell us what's working and what's not</span>
         </span>
       </a>
+
+      {showProfileTip && (
+        <BottomSheet onClose={dismissProfileTip}>
+            <div className="sheet-title">Your profile</div>
+            <p className="sheet-copy">
+              Tell people a bit more about yourself. Stay in the loop with communities you&rsquo;ve joined and keep track of all of your plans!
+            </p>
+            <button
+              type="button"
+              className="btn-primary btn-block"
+              onClick={dismissProfileTip}
+            >
+              Got it
+            </button>
+        </BottomSheet>
+      )}
     </main>
   );
 }
