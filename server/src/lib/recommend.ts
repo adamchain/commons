@@ -2,6 +2,7 @@
 // Pure ranking; the route filters the candidate set first.
 
 import { store, type PlanRecord, type UserRecord } from "../store.js";
+import { NEARBY_MILES, distanceMiles } from "./geo.js";
 
 interface ScoredPlan {
   plan: PlanRecord;
@@ -32,6 +33,12 @@ function jaccard<T>(a: T[], b: T[]): number {
 }
 
 function proximityScore(user: UserRecord, plan: PlanRecord): number {
+  const miles = distanceMiles(user, plan);
+  if (miles != null) {
+    if (miles <= NEARBY_MILES) return 1;
+    if (miles >= 50) return 0;
+    return 1 - (miles - NEARBY_MILES) / (50 - NEARBY_MILES);
+  }
   const hoods =
     user.neighborhoodIds && user.neighborhoodIds.length > 0
       ? user.neighborhoodIds

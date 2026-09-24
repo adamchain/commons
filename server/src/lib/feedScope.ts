@@ -1,5 +1,6 @@
 import { store, type PlanRecord, type UserRecord } from "../store.js";
 import type { PlanVisibility } from "../types/shared.js";
+import { userOrigin } from "./geo.js";
 
 export function userHoods(me: UserRecord): string[] {
   const raw = me.neighborhoodIds?.length
@@ -60,7 +61,7 @@ export function planVisibleToViewer(plan: PlanRecord, me: UserRecord): boolean {
 
 /** Same candidate merge as GET /api/plans, then upcoming + not cancelled. */
 export function upcomingFeedForUser(me: UserRecord): PlanRecord[] {
-  const scope = combinedNeighborhoodScope(me);
+  const scope = userOrigin(me) ? null : combinedNeighborhoodScope(me);
   const inHood = scope ? store.listPlansByNeighborhoods(scope) : store.listPlans();
   const ownPlans = store.listPlansByCreator(me.id);
   const rsvpPlanIds = new Set(store.listParticipationsForUser(me.id).map((p) => p.planId));

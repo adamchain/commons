@@ -9,6 +9,7 @@ import {
   planVisibleToViewer,
   userHoods,
 } from "../lib/feedScope.js";
+import { distanceMiles, userOrigin } from "../lib/geo.js";
 import {
   ALL_INTERESTS,
   type InterestTag,
@@ -170,6 +171,7 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
       interested: interested.map((p) => pu(p.userId)),
     },
     myState: mine?.state ?? null,
+    distanceMiles: null,
   };
 }
 
@@ -230,7 +232,7 @@ plansRouter.get("/", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Finish setting up your profile to continue" });
     return;
   }
-  const scope = combinedNeighborhoodScope(me);
+  const scope = userOrigin(me) ? null : combinedNeighborhoodScope(me);
   const inHood = scope ? store.listPlansByNeighborhoods(scope) : store.listPlans();
   // Always include the user's own plans and ones they've RSVP'd to, even if
   // they sit outside their neighborhood scope — otherwise a plan posted to a
@@ -247,7 +249,13 @@ plansRouter.get("/", requireAuth, async (req, res) => {
   for (const p of [...inHood, ...ownPlans, ...rsvpPlans]) merged.set(p.id, p);
   const candidates = [...merged.values()].filter((p) => planVisibleToViewer(p, me));
   const ranked = rankPlansForUser(me, candidates);
-  const summaries = await Promise.all(ranked.map((plan) => planSummary(plan, userId)));
+  const summaries = await Promise.all(
+    ranked.map(async (plan) => {
+      const dto = await planSummary(plan, userId);
+      dto.distanceMiles = distanceMiles(me, plan);
+      return dto;
+    }),
+  );
   res.json(summaries);
 });
 

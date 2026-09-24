@@ -5023,6 +5023,37 @@ a.action-btn--stack {
   line-height: 1.6;
   margin: 0 0 14px;
 }
+.feed-location-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.feed-location-prompt p {
+  margin: 0;
+  font-size: var(--text-body);
+  line-height: 1.35;
+}
+.feed-distance-label {
+  margin: 8px 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.plan-grid-farther {
+  display: contents;
+}
+.plan-grid-farther .feed-distance-label {
+  grid-column: 1 / -1;
+}
+
 .feed-toolbar {
   display: flex;
   align-items: center;

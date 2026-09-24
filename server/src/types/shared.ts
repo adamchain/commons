@@ -235,6 +235,8 @@ export interface PlanDTO {
     interested: PublicUser[];
   };
   myState: ParticipationState | null;
+  /** Miles from the viewer's shared location. Null when either side has no point. */
+  distanceMiles?: number | null;
 }
 
 export interface ConversationDTO {
@@ -385,6 +387,10 @@ export interface MeDTO {
   leftConversationIds?: string[];
   /** Inbox pins, most recently pinned first. */
   pinnedConversationIds?: string[];
+  /** Device location the member chose to share. Null when sharing is off. */
+  location?: { lat: number; lng: number } | null;
+  /** Set once they share location or continue without it during onboarding. */
+  locationPromptAnsweredAt?: string | null;
 }
 
 export interface NotificationPrefs {

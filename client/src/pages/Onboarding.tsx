@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import type { CSSProperties, ReactNode } from "react";
 import { ArrowLeft, Check, Coffee, Flame, MapPin, Star, Wine, type LucideIcon } from "lucide-react";
@@ -31,7 +31,6 @@ import {
   type AvatarStyle,
   type InterestTag,
   type MeDTO,
-  type NeighborhoodDTO,
   type PlanDTO,
 } from "../types/shared";
 
@@ -123,7 +122,6 @@ export function OnboardingPage() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const lastAutoSubmittedCode = useRef<string | null>(null);
   const verifyInFlight = useRef(false);
   // Access code for the launch gate. Accepts the shared exclusive code OR a
@@ -257,7 +255,13 @@ export function OnboardingPage() {
     setStep(pickInitial(user, true));
   }
 
-  async function patchMe(patch: Partial<MeDTO> & { ageConfirmed?: boolean }) {
+  async function patchMe(
+    patch: Partial<MeDTO> & {
+      ageConfirmed?: boolean;
+      location?: { lat: number; lng: number } | null;
+      locationSharing?: false;
+    },
+  ) {
     const me = await api<MeDTO>("/api/auth/me", {
       method: "PATCH",
       body: JSON.stringify(patch),
@@ -420,14 +424,9 @@ export function OnboardingPage() {
   if (step === "location") {
     return (
       <LocationStep
-        onCoords={setCoords}
-        coords={coords}
-        onSave={async (neighborhoodIds) => {
-          const primary = neighborhoodIds[0] ?? null;
-          await patchMe({
-            neighborhoodIds,
-            neighborhoodId: primary,
-          });
+        onSave={async (shared) => {
+          if (shared) await patchMe({ location: shared });
+          else await patchMe({ location: null });
           setStep("interests");
         }}
         // Location is the first step after the access-code gate, so "back" has
@@ -542,17 +541,11 @@ function WelcomeStep({
   redirectTo: string;
   onContinue: () => void;
 }) {
-  const [neighborhoodName, setNeighborhoodName] = useState<string | null>(null);
   const [stat, setStat] = useState<string | null>(null);
   const goingToEvent = redirectTo.startsWith("/plans/");
+  const nearYou = Boolean(user.location);
 
   useEffect(() => {
-    const id = user.neighborhoodIds?.[0] ?? user.neighborhoodId ?? null;
-    if (id) {
-      void api<NeighborhoodDTO[]>("/api/neighborhoods")
-        .then((list) => setNeighborhoodName(list.find((n) => n.id === id)?.name ?? null))
-        .catch(() => undefined);
-    }
     void api<PlanDTO[]>("/api/plans")
       .then((plans) => {
         if (plans.length > 0) setStat(`${plans.length} plan${plans.length === 1 ? "" : "s"} near you`);
@@ -575,7 +568,7 @@ function WelcomeStep({
           <h2 className="welcome-headline">You&apos;re in.</h2>
           <p className="welcome-body">
             Welcome to COMMONS — a city full of women who actually do things
-            {neighborhoodName ? ` in ${neighborhoodName}` : ""}.
+            {nearYou ? " near you" : ""}.
           </p>
           {stat && <span className="welcome-stat-chip">{stat}</span>}
         </div>
@@ -609,9 +602,10 @@ function pickInitial(user: MeDTO | null, gatePassed: boolean): Step {
   // profile-setup steps. Admins are exempt so the operator can't lock themselves
   // out. Drop this check when the invite-only launch period ends.
   if (!gatePassed && !user.canAccessAdmin) return "gate";
+  const answeredLocation = Boolean(user.locationPromptAnsweredAt) || Boolean(user.location);
   const hoods =
     user.neighborhoodIds?.length ? user.neighborhoodIds : user.neighborhoodId ? [user.neighborhoodId] : [];
-  if (hoods.length === 0) return "location";
+  if (!answeredLocation && hoods.length === 0) return "location";
   if (user.interests.length < 1) return "interests";
   // Photo is required — don't let Path B (cleared local data / partial server
   // profile) jump past "Put a face to your name" just because firstName exists.
@@ -762,158 +756,65 @@ function OnboardingShell({
 }
 
 function LocationStep({
-  coords,
-  onCoords,
   onSave,
   onBack,
 }: {
-  coords: { lat: number; lng: number } | null;
-  onCoords: (c: { lat: number; lng: number } | null) => void;
-  onSave: (neighborhoodIds: string[]) => Promise<void>;
+  onSave: (shared: { lat: number; lng: number } | null) => Promise<void>;
   onBack?: () => void;
 }) {
-  const [neighborhoods, setNeighborhoods] = useState<NeighborhoodDTO[]>([]);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [filter, setFilter] = useState("");
-  const [busy, setBusy] = useState(false);
-  const scrollLockRef = useRef(0);
-  const [permissionState, setPermissionState] = useState<"idle" | "asking" | "granted" | "denied">(
-    coords ? "granted" : "idle"
-  );
-
-  useEffect(() => {
-    void api<NeighborhoodDTO[]>("/api/neighborhoods").then(setNeighborhoods).catch(() => undefined);
-  }, []);
+  const [phase, setPhase] = useState<"ask" | "asking" | "denied">("ask");
+  const [error, setError] = useState<string | null>(null);
 
   async function shareLocation() {
-    setPermissionState("asking");
-    const coords = await getCurrentCoords({ timeoutMs: 8000 });
-    if (coords) {
-      onCoords(coords);
-      setPermissionState("granted");
-    } else {
-      setPermissionState("denied");
+    setPhase("asking");
+    setError(null);
+    const shared = await getCurrentCoords({ timeoutMs: 8000 });
+    if (!shared) {
+      setPhase("denied");
+      return;
+    }
+    try {
+      await onSave(shared);
+    } catch (e) {
+      setError(formatError(e));
+      setPhase("ask");
     }
   }
 
-  // Sort by distance to user if we have coords; otherwise alphabetical.
-  const sorted = useMemo(() => {
-    const list = [...neighborhoods];
-    if (coords) {
-      list.sort((a, b) => distance(coords, a) - distance(coords, b));
-    } else {
-      list.sort((a, b) => a.name.localeCompare(b.name));
-    }
-    const q = filter.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter((n) => n.name.toLowerCase().includes(q) || n.metro.toLowerCase().includes(q));
-  }, [neighborhoods, coords, filter]);
-
-  // Keep the page from jumping to the top while filtering the neighborhood list.
-  useEffect(() => {
-    if (scrollLockRef.current > 0) {
-      window.scrollTo(0, scrollLockRef.current);
-    }
-  }, [filter, sorted]);
-
-  if (permissionState === "idle") {
-    return (
-      <div className="onboarding-location-hero">
-        <img
-          src={phillySkyline}
-          alt=""
-          className="onboarding-location-hero-img"
-        />
-        <div className="onboarding-location-hero-gradient" aria-hidden="true" />
-        {onBack && (
-          <button type="button" className="onboarding-back onboarding-back--on-photo" onClick={onBack} aria-label="Back">
-            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
-          </button>
-        )}
-        <p className="onboarding-location-city">
-          <MapPin size={12} strokeWidth={2.4} aria-hidden="true" />
-          Philadelphia
-        </p>
-        <div className="onboarding-location-sheet">
-          <img src={wordmark} alt="COMMONS" className="onboarding-brand-img" />
-          <h2 className="onboarding-title">Share your location</h2>
-          <p className="onboarding-subtitle">So we can show you what&apos;s happening nearby.</p>
-          <button className="btn-primary btn-block" onClick={shareLocation}>
-            Allow location access
-          </button>
-          <button className="btn-link" type="button" onClick={() => setPermissionState("denied")}>
-            Skip — I&apos;ll pick manually
-          </button>
-        </div>
-      </div>
-    );
-  }
-  if (permissionState === "asking") {
+  if (phase === "asking") {
     return <OnboardingShell title="Getting your location…" subtitle="" onBack={onBack} />;
   }
 
   return (
-    <OnboardingShell
-      title="Where do you spend time?"
-      subtitle={coords ? "Wherever you actually hang." : "Every corner that counts."}
-      onBack={onBack}
-    >
-      <input
-        className="onboarding-input"
-        placeholder="Search neighborhoods…"
-        value={filter}
-        onChange={(e) => {
-          scrollLockRef.current = window.scrollY;
-          setFilter(e.target.value);
-        }}
-      />
-      <ul className="neighborhood-list">
-        {sorted.map((n) => {
-          const on = selected.has(n.id);
-          return (
-            <li key={n.id}>
-              <button
-                type="button"
-                className={`neighborhood-row ${on ? "is-selected" : ""}`}
-                disabled={busy}
-                onClick={() => {
-                  setSelected((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(n.id)) next.delete(n.id);
-                    else next.add(n.id);
-                    return next;
-                  });
-                }}
-              >
-                <span className="neighborhood-name">
-                  {on && <span className="neighborhood-check" aria-hidden="true">✓</span>}
-                  {n.name}
-                </span>
-                <span className="neighborhood-metro">
-                  {coords && n.lat !== undefined && n.lng !== undefined
-                    ? `${formatMiles(distance(coords, n))} away`
-                    : n.metro}
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      <button
-        className="btn-primary btn-block"
-        disabled={busy || selected.size === 0}
-        onClick={async () => {
-          setBusy(true);
-          try {
-            await onSave([...selected]);
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        {selected.size > 0 ? `Continue · ${selected.size} picked` : "Continue"}
-      </button>
-    </OnboardingShell>
+    <div className="onboarding-location-hero">
+      <img src={phillySkyline} alt="" className="onboarding-location-hero-img" />
+      <div className="onboarding-location-hero-gradient" aria-hidden="true" />
+      {onBack && (
+        <button type="button" className="onboarding-back onboarding-back--on-photo" onClick={onBack} aria-label="Back">
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
+        </button>
+      )}
+      <p className="onboarding-location-city">
+        <MapPin size={12} strokeWidth={2.4} aria-hidden="true" />
+        Philadelphia
+      </p>
+      <div className="onboarding-location-sheet">
+        <img src={wordmark} alt="COMMONS" className="onboarding-brand-img" />
+        <h2 className="onboarding-title">Share your location</h2>
+        <p className="onboarding-subtitle">
+          {phase === "denied"
+            ? "We couldn't get your location. Plans within 15 miles show up first once you share it."
+            : "Plans within 15 miles of you show up first."}
+        </p>
+        {error && <p className="error-text">{error}</p>}
+        <button className="btn-primary btn-block" type="button" onClick={() => void shareLocation()}>
+          {phase === "denied" ? "Try again" : "Allow location access"}
+        </button>
+        <button className="btn-link" type="button" onClick={() => void onSave(null)}>
+          Continue without location
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -1414,19 +1315,3 @@ function CameraIcon() {
   );
 }
 
-function distance(a: { lat: number; lng: number }, b: { lat?: number; lng?: number }): number {
-  if (b.lat === undefined || b.lng === undefined) return Infinity;
-  // Equirectangular approximation in miles — fine for sorting at city scale.
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const x = (toRad(b.lng) - toRad(a.lng)) * Math.cos(toRad((a.lat + b.lat) / 2));
-  const y = toRad(b.lat) - toRad(a.lat);
-  const miles = Math.sqrt(x * x + y * y) * 3958.8;
-  return miles;
-}
-
-function formatMiles(miles: number): string {
-  if (!isFinite(miles)) return "";
-  if (miles < 0.1) return "<0.1 mi";
-  if (miles < 10) return `${miles.toFixed(1)} mi`;
-  return `${Math.round(miles)} mi`;
-}

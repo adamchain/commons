@@ -108,6 +108,11 @@ function meFromUser(user: UserRecord): MeDTO {
     mutedConversationIds: user.mutedConversationIds?.length ? user.mutedConversationIds : [],
     leftConversationIds: user.leftConversationIds?.length ? user.leftConversationIds : [],
     pinnedConversationIds: user.pinnedConversationIds?.length ? user.pinnedConversationIds : [],
+    location:
+      typeof user.locationLat === "number" && typeof user.locationLng === "number"
+        ? { lat: user.locationLat, lng: user.locationLng }
+        : null,
+    locationPromptAnsweredAt: user.locationPromptAnsweredAt ?? null,
   };
 }
 
@@ -297,6 +302,26 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
     }
     patch.neighborhoodId = resolved;
     patch.neighborhoodIds = [resolved];
+  }
+  if (req.body?.location && typeof req.body.location === "object") {
+    const lat = Number((req.body.location as { lat?: unknown }).lat);
+    const lng = Number((req.body.location as { lng?: unknown }).lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      res.status(400).json({ error: "That location doesn't look right." });
+      return;
+    }
+    patch.locationLat = lat;
+    patch.locationLng = lng;
+    patch.locationPromptAnsweredAt = new Date().toISOString();
+    const nearest = store.nearestNeighborhoodId(lat, lng);
+    if (nearest) {
+      patch.neighborhoodId = nearest;
+      patch.neighborhoodIds = [nearest];
+    }
+  } else if (req.body?.location === null || req.body?.locationSharing === false) {
+    patch.locationLat = null;
+    patch.locationLng = null;
+    patch.locationPromptAnsweredAt = new Date().toISOString();
   }
   if (Array.isArray(req.body?.interests)) patch.interests = req.body.interests;
   if (typeof req.body?.avatarSeed === "string") patch.avatarSeed = req.body.avatarSeed;

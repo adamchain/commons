@@ -75,6 +75,11 @@ export interface UserRecord {
   blockedUserIds?: string[];
   /** Whether this user's name surfaces in People search results. Missing/undefined defaults to true. */
   discoverableBySearch?: boolean;
+  /** Device location the user chose to share. Used to rank nearby plans. */
+  locationLat?: number | null;
+  locationLng?: number | null;
+  /** Set when they share location or explicitly continue without it. */
+  locationPromptAnsweredAt?: string | null;
   /** Conversation ids this user has muted — chat still works, notifications go quiet. */
   mutedConversationIds?: string[];
   /** Conversations the user explicitly left / removed from inbox. ensure* must

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
+import { getCurrentCoords } from "../lib/geolocate";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { LegalContent } from "../components/LegalContent";
 import { ScreenTitle } from "../components/ui";
@@ -13,6 +14,7 @@ import { useAuth } from "../context/AuthContext";
 import {
   INTEREST_LABELS,
   type InviteCodeDTO,
+  type MeDTO,
 } from "../types/shared";
 
 /**
@@ -25,6 +27,7 @@ export function SettingsPage() {
   const navigate = useNavigate();
   const [inviteCount, setInviteCount] = useState<number | null>(null);
   const [legalSheet, setLegalSheet] = useState<"terms" | "privacy" | null>(null);
+  const [locationOpen, setLocationOpen] = useState(false);
 
   useEffect(() => {
     void api<{ codes: InviteCodeDTO[] }>("/api/auth/invite-codes")
@@ -60,7 +63,13 @@ export function SettingsPage() {
           to={`/profile/${user.id}`}
           icon={<UserIcon />}
           title="Edit profile"
-          sub="Name, photo, neighborhood"
+          sub="Name, photo, bio"
+        />
+        <SettingsRow
+          icon={<PinIcon />}
+          title="Location"
+          sub={user.location ? "Sharing · plans within 15 miles come first" : "Off · share to see what's nearby"}
+          onClick={() => setLocationOpen(true)}
         />
         <SettingsRow
           to="/settings/forums"
@@ -156,6 +165,16 @@ export function SettingsPage() {
       <DeleteAccountRow onSignedOut={() => navigate("/onboarding", { replace: true })} />
 
       {legalSheet && <LegalSheet slug={legalSheet} onClose={() => setLegalSheet(null)} />}
+      {locationOpen && (
+        <LocationSheet
+          sharing={Boolean(user.location)}
+          onClose={() => setLocationOpen(false)}
+          onUpdated={(me) => {
+            setUser(me);
+            setLocationOpen(false);
+          }}
+        />
+      )}
     </main>
   );
 }
@@ -176,6 +195,81 @@ function LegalSheet({ slug, onClose }: { slug: "terms" | "privacy"; onClose: () 
           </button>
         </div>
         <LegalContent doc={doc} hideTitle />
+    </BottomSheet>
+  );
+}
+
+function LocationSheet({
+  sharing,
+  onClose,
+  onUpdated,
+}: {
+  sharing: boolean;
+  onClose: () => void;
+  onUpdated: (me: MeDTO) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function share() {
+    setBusy(true);
+    setError(null);
+    try {
+      const coords = await getCurrentCoords({ timeoutMs: 8000 });
+      if (!coords) {
+        setError("Location access was denied. Allow it in your browser or phone settings, then try again.");
+        return;
+      }
+      const me = await api<MeDTO>("/api/auth/me", {
+        method: "PATCH",
+        body: JSON.stringify({ location: coords }),
+      });
+      onUpdated(me);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't save your location");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function stopSharing() {
+    setBusy(true);
+    setError(null);
+    try {
+      const me = await api<MeDTO>("/api/auth/me", {
+        method: "PATCH",
+        body: JSON.stringify({ location: null }),
+      });
+      onUpdated(me);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't turn location off");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <BottomSheet onClose={onClose} labelledBy="location-sheet-title">
+      <div className="filter-sheet-header">
+        <h3 id="location-sheet-title" className="filter-sheet-title">Location</h3>
+        <button type="button" className="btn-link" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      <p className="sheet-copy">
+        Share your location and plans within 15 miles show up first on your feed.
+      </p>
+      {error && <p className="error-text">{error}</p>}
+      <div className="sheet-actions">
+        <Button variant="primary" block disabled={busy} onClick={() => void share()}>
+          {busy ? "Working…" : sharing ? "Update location" : "Share my location"}
+        </Button>
+        {sharing && (
+          <Button variant="secondary" block disabled={busy} onClick={() => void stopSharing()}>
+            Stop sharing
+          </Button>
+        )}
+      </div>
     </BottomSheet>
   );
 }
@@ -341,6 +435,14 @@ function MessageIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+    </svg>
+  );
+}
+function PinIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
     </svg>
   );
 }

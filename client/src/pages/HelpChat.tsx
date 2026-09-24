@@ -14,7 +14,7 @@ const SUGGESTIONS = [
   "How do I post a plan?",
   "How do I join a plan?",
   "How does the chat work?",
-  "How do I change my neighborhood?",
+  "How do I update my location?",
   "Why is my feed empty?",
   "How do invite codes work?",
 ];

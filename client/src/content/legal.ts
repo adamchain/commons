@@ -58,7 +58,7 @@ export const PRIVACY_POLICY: LegalDocument = {
         { type: "subhead", text: "We collect automatically:" },
         {
           type: "p",
-          text: "device information (device type, OS, app version); usage data (plans viewed, joined, posted); neighborhood-level location only — we do not collect or store precise GPS location; log data (errors, timestamps, technical data); and cookies or similar technologies for sessions and performance.",
+          text: "device information (device type, OS, app version); usage data (plans viewed, joined, posted); location, only if you choose to share it, so we can show plans near you; log data (errors, timestamps, technical data); and cookies or similar technologies for sessions and performance.",
         },
         { type: "subhead", text: "From third parties:" },
         {
@@ -77,7 +77,7 @@ export const PRIVACY_POLICY: LegalDocument = {
         { type: "subhead", text: "We do not collect:" },
         {
           type: "p",
-          text: "gender or sex, payment information (COMMONS is currently free), precise GPS location, data from third-party social accounts, or biometric information.",
+          text: "gender or sex, payment information (COMMONS is currently free), data from third-party social accounts, or biometric information.",
         },
       ],
     },

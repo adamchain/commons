@@ -1,50 +1,43 @@
-import type { AgeRange, InterestTag, NeighborhoodDTO } from "../types/shared";
+import type { AgeRange, InterestTag } from "../types/shared";
 import { ALL_AGE_RANGES, ALL_INTERESTS, AGE_RANGE_LABELS, INTEREST_LABELS } from "../types/shared";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Button } from "./ui/Button";
 
 /**
- * Bottom-sheet filter for the feed. Surfaces neighborhood + interest pickers
- * triggered by the top-right Filters button. Closes on backdrop tap or Apply.
+ * Bottom-sheet filter for the feed. Distance, age, and interest pickers
+ * triggered by the top-right Filters button.
  */
 export function FilterSheet({
-  neighborhoods,
-  userHoodIds,
+  hasLocation,
   userInterests,
   selectedTag,
-  selectedHoodId,
+  nearbyOnly,
   selectedAgeRange,
   hideCancelled,
   networkOnly,
   onTagChange,
-  onHoodChange,
+  onNearbyOnlyChange,
   onAgeRangeChange,
   onHideCancelledChange,
   onNetworkOnlyChange,
   onClose,
   onClear,
 }: {
-  neighborhoods: NeighborhoodDTO[];
-  userHoodIds: string[];
+  hasLocation: boolean;
   userInterests: InterestTag[];
   selectedTag: InterestTag | null;
-  selectedHoodId: string | null;
+  nearbyOnly: boolean;
   selectedAgeRange: AgeRange | null;
   hideCancelled: boolean;
   networkOnly: boolean;
   onTagChange: (t: InterestTag | null) => void;
-  onHoodChange: (id: string | null) => void;
+  onNearbyOnlyChange: (v: boolean) => void;
   onAgeRangeChange: (r: AgeRange | null) => void;
   onHideCancelledChange: (v: boolean) => void;
   onNetworkOnlyChange: (v: boolean) => void;
   onClose: () => void;
   onClear: () => void;
 }) {
-  const mineSet = new Set(userHoodIds);
-  const orderedHoods = [
-    ...neighborhoods.filter((n) => mineSet.has(n.id)),
-    ...neighborhoods.filter((n) => !mineSet.has(n.id)).sort((a, b) => a.name.localeCompare(b.name)),
-  ];
   const interestSet = new Set(userInterests);
   const orderedInterests = [
     ...userInterests,
@@ -110,28 +103,28 @@ export function FilterSheet({
           </div>
         </div>
 
-        <div className="filter-sheet-group">
-          <div className="filter-sheet-group-label">Neighborhood</div>
-          <div className="filter-sheet-chips">
-            <button
-              type="button"
-              className={`community-chip ${selectedHoodId === null ? "is-active" : ""}`}
-              onClick={() => onHoodChange(null)}
-            >
-              All areas
-            </button>
-            {orderedHoods.map((n) => (
+        {hasLocation && (
+          <div className="filter-sheet-group">
+            <div className="filter-sheet-group-label">Distance</div>
+            <div className="filter-sheet-chips">
               <button
-                key={n.id}
                 type="button"
-                className={`community-chip ${selectedHoodId === n.id ? "is-active" : ""}`}
-                onClick={() => onHoodChange(selectedHoodId === n.id ? null : n.id)}
+                className={`community-chip ${!nearbyOnly ? "is-active" : ""}`}
+                onClick={() => onNearbyOnlyChange(false)}
               >
-                {n.name}
+                All distances
               </button>
-            ))}
+              <button
+                type="button"
+                className={`community-chip ${nearbyOnly ? "is-active" : ""}`}
+                onClick={() => onNearbyOnlyChange(true)}
+                aria-pressed={nearbyOnly}
+              >
+                Within 15 miles
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="filter-sheet-group">
           <div className="filter-sheet-group-label">Interests</div>

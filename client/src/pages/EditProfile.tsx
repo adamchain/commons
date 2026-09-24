@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
@@ -8,7 +8,7 @@ import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
-import { type MeDTO, type NeighborhoodDTO } from "../types/shared";
+import { type MeDTO } from "../types/shared";
 
 export function EditProfilePage() {
   const { userId = "" } = useParams();
@@ -28,7 +28,7 @@ export function EditProfilePage() {
       </header>
       <h1 className="brand" style={{ marginBottom: 8 }}>Edit profile</h1>
       <p className="brand-tagline" style={{ marginBottom: 20 }}>
-        Name, photo, neighborhood, bio, and social links.
+        Name, photo, bio, and social links.
       </p>
       <EditProfileForm
         me={user}
@@ -60,41 +60,9 @@ function EditProfileForm({
   const [instagram, setInstagram] = useState(me.socialLinks?.instagram ?? "");
   const [tiktok, setTiktok] = useState(me.socialLinks?.tiktok ?? "");
   const [discoverable, setDiscoverable] = useState(me.discoverableBySearch);
-  const initialHoods = me.neighborhoodIds?.length
-    ? me.neighborhoodIds
-    : me.neighborhoodId
-      ? [me.neighborhoodId]
-      : [];
-  const [selectedHoods, setSelectedHoods] = useState<Set<string>>(() => new Set(initialHoods));
-  const [neighborhoods, setNeighborhoods] = useState<NeighborhoodDTO[]>([]);
-  const [hoodFilter, setHoodFilter] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    void api<NeighborhoodDTO[]>("/api/neighborhoods")
-      .then((list) => {
-        setNeighborhoods(list);
-        const valid = new Set(list.map((n) => n.id));
-        // Drop orphan/legacy ids that aren't in the curated list so the picker
-        // doesn't look blank-selected while still blocking save.
-        setSelectedHoods((prev) => {
-          const next = new Set([...prev].filter((id) => valid.has(id)));
-          return next.size === prev.size ? prev : next;
-        });
-      })
-      .catch(() => undefined);
-  }, []);
-
-  const sortedHoods = useMemo(() => {
-    const list = [...neighborhoods].sort((a, b) => a.name.localeCompare(b.name));
-    const q = hoodFilter.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter(
-      (n) => n.name.toLowerCase().includes(q) || n.metro.toLowerCase().includes(q),
-    );
-  }, [neighborhoods, hoodFilter]);
 
   function pickPhoto(dataUrl: string) {
     setPhoto(dataUrl);
@@ -102,22 +70,15 @@ function EditProfileForm({
   }
 
   async function save() {
-    if (selectedHoods.size === 0) {
-      setError("Pick at least one neighborhood so we can show you what's nearby.");
-      return;
-    }
     setBusy(true);
     setError(null);
     try {
-      const neighborhoodIds = [...selectedHoods];
       const next = await api<MeDTO>("/api/auth/me", {
         method: "PATCH",
         body: JSON.stringify({
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           bio: bio.trim(),
-          neighborhoodIds,
-          neighborhoodId: neighborhoodIds[0] ?? null,
           avatarPhotoDataUrl: photo ?? null,
           avatarParams: avatarParams ?? null,
           socialLinks: {
@@ -218,47 +179,7 @@ function EditProfileForm({
         maxLength={40}
       />
 
-      <label className="form-question" style={{ marginTop: 14 }}>
-        Neighborhoods
-      </label>
-      <p className="form-help">Where you actually hang.</p>
-      <input
-        className="onboarding-input"
-        placeholder="Search neighborhoods…"
-        value={hoodFilter}
-        onChange={(e) => setHoodFilter(e.target.value)}
-        style={{ marginBottom: 8 }}
-      />
-      <ul className="neighborhood-list profile-edit-hoods">
-        {sortedHoods.map((n) => {
-          const on = selectedHoods.has(n.id);
-          return (
-            <li key={n.id}>
-              <button
-                type="button"
-                className={`neighborhood-row ${on ? "is-selected" : ""}`}
-                disabled={busy}
-                onClick={() => {
-                  setSelectedHoods((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(n.id)) next.delete(n.id);
-                    else next.add(n.id);
-                    return next;
-                  });
-                }}
-              >
-                <span className="neighborhood-name">
-                  {on && <span className="neighborhood-check" aria-hidden="true">✓</span>}
-                  {n.name}
-                </span>
-                <span className="neighborhood-metro">{n.metro}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-
-      <label className="form-question" htmlFor="profile-edit-bio" style={{ marginTop: 10 }}>
+      <label className="form-question" htmlFor="profile-edit-bio" style={{ marginTop: 14 }}>
         Bio
       </label>
       <textarea
@@ -350,7 +271,7 @@ function EditProfileForm({
           type="button"
           className="btn-primary"
           style={{ flex: 2 }}
-          disabled={busy || !firstName.trim() || !lastName.trim() || selectedHoods.size === 0}
+          disabled={busy || !firstName.trim() || !lastName.trim()}
           onClick={() => void save()}
         >
           {busy ? "Saving…" : "Save changes"}

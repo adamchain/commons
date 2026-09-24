@@ -11,8 +11,8 @@ import { WeekStrip } from "../components/WeekStrip";
 import { EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { FLEXIBLE_DATE_PLACEHOLDER, isIdeaPlan, planHasEnded } from "../lib/planTime";
+import { getCurrentCoords } from "../lib/geolocate";
 import { consumeFeedScroll } from "../lib/navState";
-import { useNeighborhoods } from "../lib/useNeighborhoods";
 import { FORUM_INTERESTS, INTEREST_LABELS } from "../types/shared";
 import type { AgeRange, InterestTag, MeDTO, NetworkPromptDTO, PlanDTO } from "../types/shared";
 
@@ -25,9 +25,11 @@ const HOME_FORUM_SUGGESTION_KEY = "commons.homeForumSuggestion.v1.dismissed";
 // every time you left the feed was a papercut.
 const FEED_FILTERS_KEY = "commons.feedFilters.v1";
 
+const NEARBY_MILES = 15;
+
 type PersistedFilters = {
   selectedTag: InterestTag | null;
-  selectedHoodId: string | null;
+  nearbyOnly: boolean;
   selectedAgeRange: AgeRange | null;
   hideCancelled: boolean;
   networkOnly: boolean;
@@ -45,7 +47,7 @@ function rubberBandPull(dy: number): number {
 
 const EMPTY_FILTERS: PersistedFilters = {
   selectedTag: null,
-  selectedHoodId: null,
+  nearbyOnly: false,
   selectedAgeRange: null,
   hideCancelled: false,
   networkOnly: false,
@@ -64,11 +66,10 @@ function loadPersistedFilters(): PersistedFilters {
 export function FeedPage() {
   const [plans, setPlans] = useState<PlanDTO[]>([]);
   const [feedReady, setFeedReady] = useState(false);
-  const neighborhoodMap = useNeighborhoods();
-  const neighborhoods = useMemo(() => Object.values(neighborhoodMap), [neighborhoodMap]);
   const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState<InterestTag | null>(() => loadPersistedFilters().selectedTag);
-  const [selectedHoodId, setSelectedHoodId] = useState<string | null>(() => loadPersistedFilters().selectedHoodId);
+  const [nearbyOnly, setNearbyOnly] = useState(() => loadPersistedFilters().nearbyOnly);
+  const [sharingLocation, setSharingLocation] = useState(false);
   const [selectedAgeRange, setSelectedAgeRange] = useState<AgeRange | null>(() => loadPersistedFilters().selectedAgeRange);
   const [hideCancelled, setHideCancelled] = useState(() => loadPersistedFilters().hideCancelled);
   const [networkOnly, setNetworkOnly] = useState(() => loadPersistedFilters().networkOnly);
@@ -319,12 +320,12 @@ export function FeedPage() {
     try {
       localStorage.setItem(
         FEED_FILTERS_KEY,
-        JSON.stringify({ selectedTag, selectedHoodId, selectedAgeRange, hideCancelled, networkOnly }),
+        JSON.stringify({ selectedTag, nearbyOnly, selectedAgeRange, hideCancelled, networkOnly }),
       );
     } catch {
       /* storage unavailable — non-fatal */
     }
-  }, [selectedTag, selectedHoodId, selectedAgeRange, hideCancelled, networkOnly]);
+  }, [selectedTag, nearbyOnly, selectedAgeRange, hideCancelled, networkOnly]);
 
   useEffect(() => {
     if (!justPostedId) return;
@@ -336,7 +337,9 @@ export function FeedPage() {
   const activePlans = useMemo(() => {
     let list = plans ?? [];
     if (selectedTag) list = list.filter((p) => p.tags.includes(selectedTag));
-    if (selectedHoodId) list = list.filter((p) => p.neighborhoodId === selectedHoodId);
+    if (nearbyOnly && user?.location) {
+      list = list.filter((p) => p.distanceMiles != null && p.distanceMiles <= NEARBY_MILES);
+    }
     if (selectedAgeRange) list = list.filter((p) => p.creator.ageRange === selectedAgeRange);
     if (selectedDayIso) list = list.filter((p) => p.date.slice(0, 10) === selectedDayIso);
     if (hideCancelled) list = list.filter((p) => !p.cancelledAt);
@@ -356,7 +359,16 @@ export function FeedPage() {
       if (isIdeaPlan(p) && dateUnset) anytimeIdeas.push(p);
       else dated.push(p);
     }
-    dated.sort((a, b) => `${a.date}T${a.time || "23:59"}`.localeCompare(`${b.date}T${b.time || "23:59"}`));
+    const byWhen = (a: PlanDTO, b: PlanDTO) =>
+      `${a.date}T${a.time || "23:59"}`.localeCompare(`${b.date}T${b.time || "23:59"}`);
+    const nearbyFirst = (a: PlanDTO, b: PlanDTO) => {
+      if (!user?.location) return byWhen(a, b);
+      const aNear = a.distanceMiles != null && a.distanceMiles <= NEARBY_MILES ? 0 : 1;
+      const bNear = b.distanceMiles != null && b.distanceMiles <= NEARBY_MILES ? 0 : 1;
+      if (aNear !== bNear) return aNear - bNear;
+      return byWhen(a, b);
+    };
+    dated.sort(nearbyFirst);
     anytimeIdeas.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
     ideas.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
 
@@ -364,6 +376,11 @@ export function FeedPage() {
     // dated ideas sit in the timeline; anytime ideas stay up top so 2099
     // placeholders don't bury them.
     const active = view === "ideas" ? ideas : [...anytimeIdeas, ...dated];
+    if (user?.location) {
+      const near = active.filter((p) => p.distanceMiles != null && p.distanceMiles <= NEARBY_MILES);
+      const far = active.filter((p) => !(p.distanceMiles != null && p.distanceMiles <= NEARBY_MILES));
+      active.splice(0, active.length, ...near, ...far);
+    }
     // A just-posted plan is pinned to the very top regardless of its date, so
     // the user immediately sees what they created.
     if (justPostedId) {
@@ -374,13 +391,31 @@ export function FeedPage() {
       }
     }
     return active;
-  }, [plans, view, selectedTag, selectedHoodId, selectedAgeRange, selectedDayIso, hideCancelled, networkOnly, user?.networkUserIds, justPostedId]);
+  }, [plans, view, selectedTag, nearbyOnly, selectedAgeRange, selectedDayIso, hideCancelled, networkOnly, user?.location, user?.networkUserIds, justPostedId]);
 
   const filteredPlans = activePlans;
 
+  async function shareLocationFromFeed() {
+    setSharingLocation(true);
+    try {
+      const coords = await getCurrentCoords({ timeoutMs: 8000 });
+      if (!coords) return;
+      const me = await api<MeDTO>("/api/auth/me", {
+        method: "PATCH",
+        body: JSON.stringify({ location: coords }),
+      });
+      setUser(me);
+      await fetchPlans();
+    } catch {
+      /* permission denied or save failed — the prompt stays so they can retry */
+    } finally {
+      setSharingLocation(false);
+    }
+  }
+
   const activeFilterCount =
     (selectedTag ? 1 : 0) +
-    (selectedHoodId ? 1 : 0) +
+    (nearbyOnly ? 1 : 0) +
     (selectedAgeRange ? 1 : 0) +
     (hideCancelled ? 1 : 0) +
     (networkOnly ? 1 : 0);
@@ -417,6 +452,20 @@ export function FeedPage() {
         />
 
         <div className="feed-divider" />
+
+        {!user?.location && (
+          <div className="feed-location-prompt" role="status">
+            <p>Share your location and plans within 15 miles show up first.</p>
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={sharingLocation}
+              onClick={() => void shareLocationFromFeed()}
+            >
+              {sharingLocation ? "Getting location…" : "Share location"}
+            </button>
+          </div>
+        )}
 
         {!forumSuggestionDismissed && suggestedForumTag && (
           <div className="feed-forum-suggestion" role="status">
@@ -489,7 +538,7 @@ export function FeedPage() {
               hasFilters={activeFilterCount > 0 || selectedDayIso !== null}
               onClearFilters={() => {
                 setSelectedTag(null);
-                setSelectedHoodId(null);
+                setNearbyOnly(false);
                 setSelectedAgeRange(null);
                 setSelectedDayIso(null);
                 setHideCancelled(false);
@@ -497,13 +546,23 @@ export function FeedPage() {
             />
           ) : (
             <div className="plan-grid">
-              {filteredPlans.map((plan) => (
-                <PlanCard
-                  key={plan.id}
-                  plan={plan}
-                  onPlanRefresh={refreshPlans}
-                />
-              ))}
+              {filteredPlans.map((plan, index) => {
+                const farther =
+                  Boolean(user?.location) &&
+                  !(plan.distanceMiles != null && plan.distanceMiles <= NEARBY_MILES);
+                const prev = index > 0 ? filteredPlans[index - 1] : null;
+                const prevNear =
+                  prev != null &&
+                  prev.distanceMiles != null &&
+                  prev.distanceMiles <= NEARBY_MILES;
+                const showFartherLabel = farther && (index === 0 || prevNear);
+                return (
+                  <div key={plan.id} className={showFartherLabel ? "plan-grid-farther" : undefined}>
+                    {showFartherLabel && <h2 className="feed-distance-label">Farther away</h2>}
+                    <PlanCard plan={plan} onPlanRefresh={refreshPlans} />
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -523,23 +582,22 @@ export function FeedPage() {
 
       {filterOpen && (
         <FilterSheet
-          neighborhoods={neighborhoods}
-          userHoodIds={user?.neighborhoodIds ?? (user?.neighborhoodId ? [user.neighborhoodId] : [])}
+          hasLocation={Boolean(user?.location)}
           userInterests={user?.interests ?? []}
           selectedTag={selectedTag}
-          selectedHoodId={selectedHoodId}
+          nearbyOnly={nearbyOnly}
           selectedAgeRange={selectedAgeRange}
           hideCancelled={hideCancelled}
           networkOnly={networkOnly}
           onTagChange={setSelectedTag}
-          onHoodChange={setSelectedHoodId}
+          onNearbyOnlyChange={setNearbyOnly}
           onAgeRangeChange={setSelectedAgeRange}
           onHideCancelledChange={setHideCancelled}
           onNetworkOnlyChange={setNetworkOnly}
           onClose={() => setFilterOpen(false)}
           onClear={() => {
             setSelectedTag(null);
-            setSelectedHoodId(null);
+            setNearbyOnly(false);
             setSelectedAgeRange(null);
             setHideCancelled(false);
             setNetworkOnly(false);
