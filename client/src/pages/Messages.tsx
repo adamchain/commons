@@ -1,22 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { BarChart2, BellOff, MessageCircle, Pin, Trash2 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
-import { InterestCover, PlanCoverThumb } from "../components/CoverThumb";
+import { PlanCoverThumb } from "../components/CoverThumb";
 import { EmptyCard, ScreenTitle } from "../components/ui";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { Button } from "../components/ui/Button";
 import { sentenceCaseTitle } from "../lib/format";
-import {
-  FORUM_INTERESTS,
-  INTEREST_LABELS,
-  type ConversationSummaryDTO,
-  type ForumSummaryDTO,
-  type InterestTag,
-} from "../types/shared";
-
-const MESSAGES_INTERESTS_FROM = { from: "messages" as const, messagesTab: "interests" as const };
+import { type ConversationSummaryDTO } from "../types/shared";
 
 function previewLooksLikePoll(text: string | null | undefined): boolean {
   if (!text) return false;
@@ -222,15 +214,8 @@ function SwipeRemoveRow({
 }
 
 export function MessagesPage() {
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tab = searchParams.get("tab") === "interests" ? "interests" : "plans";
   const [items, setItems] = useState<ConversationSummaryDTO[]>([]);
   const [ready, setReady] = useState(false);
-  const [forums, setForums] = useState<ForumSummaryDTO[]>([]);
-  const [forumsReady, setForumsReady] = useState(false);
-  const [joiningTag, setJoiningTag] = useState<InterestTag | null>(null);
-  const [joinErr, setJoinErr] = useState<string | null>(null);
   const [dismissTarget, setDismissTarget] = useState<string | null>(null);
   const [dismissBusy, setDismissBusy] = useState(false);
   const [dismissErr, setDismissErr] = useState<string | null>(null);
@@ -297,147 +282,12 @@ export function MessagesPage() {
     }
   }
 
-  useEffect(() => {
-    if (tab !== "interests" || forumsReady) return;
-    void api<{ forums: ForumSummaryDTO[] }>("/api/forums")
-      .then((r) => setForums(r.forums))
-      .catch(() => setForums([]))
-      .finally(() => setForumsReady(true));
-  }, [tab, forumsReady]);
-
-  const joinedTags = new Set(forums.map((f) => f.interestTag));
-  const availableForums = FORUM_INTERESTS.filter((t) => !joinedTags.has(t));
-
-  async function joinForum(tag: InterestTag) {
-    if (joiningTag) return;
-    setJoiningTag(tag);
-    setJoinErr(null);
-    try {
-      await api(`/api/forums/${tag}/join`, { method: "POST" });
-      navigate(`/forums/${tag}`, { state: MESSAGES_INTERESTS_FROM });
-    } catch (e) {
-      setJoinErr(e instanceof Error ? e.message : "Couldn't join that forum.");
-      setJoiningTag(null);
-    }
-  }
-
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar app-shell--messages-lock">
       <ScreenTitle title="Messages" />
 
-      <div className="messages-tabs" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "plans"}
-          className={`messages-tab ${tab === "plans" ? "is-active" : ""}`}
-          onClick={() => setSearchParams({}, { replace: true })}
-        >
-          Plans
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "interests"}
-          className={`messages-tab ${tab === "interests" ? "is-active" : ""}`}
-          onClick={() => setSearchParams({ tab: "interests" }, { replace: true })}
-        >
-          Interests
-        </button>
-      </div>
-
       <div className="messages-scroll">
-      {tab === "interests" ? (
-        <>
-          {!forumsReady ? (
-            <div className="feed-skeleton" aria-hidden="true">
-              <div className="feed-skeleton-card" />
-              <div className="feed-skeleton-card" />
-            </div>
-          ) : (
-            <>
-              {forums.length === 0 ? (
-                <p className="form-help" style={{ marginTop: 4 }}>
-                  No forums yet. Coffee, workouts, the city chats.
-                </p>
-              ) : (
-                <div className="messages-card">
-                  <div className="messages-list">
-                    {forums.map((f) => (
-                        <Link
-                          key={f.interestTag}
-                          to={`/forums/${f.interestTag}`}
-                          state={MESSAGES_INTERESTS_FROM}
-                          className="messages-row messages-row--forum"
-                        >
-                          <InterestCover tag={f.interestTag} />
-                          <div className="messages-row-body">
-                            <div className="messages-row-top">
-                              <span className="messages-row-title">
-                                <span className="messages-row-title-text">{f.label}</span>
-                              </span>
-                              {f.latestPost?.createdAt ? (
-                                <span className={`messages-row-time${f.hasUnread ? " is-unread" : ""}`}>
-                                  {formatInboxTime(f.latestPost.createdAt)}
-                                </span>
-                              ) : null}
-                            </div>
-                            <div className="messages-row-bottom">
-                              <div className="messages-row-preview">
-                                {f.latestPost ? (
-                                  <span>
-                                    <span className="messages-row-author">{f.latestPost.authorName}</span>
-                                    {`: ${f.latestPost.preview}`}
-                                  </span>
-                                ) : (
-                                  <span className="messages-row-preview--empty">
-                                    It's quiet in here
-                                  </span>
-                                )}
-                              </div>
-                              {f.hasUnread && (
-                                <span className="messages-row-unread" aria-label="Unread">
-                                  1
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {availableForums.length > 0 && (
-                <div className="forum-join-more-block">
-                  <label className="form-eyebrow" htmlFor="join-more-forums">
-                    {forums.length === 0 ? "Pick an interest" : "Join more forums"}
-                  </label>
-                  <select
-                    id="join-more-forums"
-                    className="forum-join-select"
-                    value=""
-                    disabled={!!joiningTag}
-                    onChange={(e) => {
-                      const next = e.target.value as InterestTag;
-                      if (next) void joinForum(next);
-                    }}
-                  >
-                    <option value="" disabled>
-                      {joiningTag ? "Joining…" : "Choose a forum…"}
-                    </option>
-                    {availableForums.map((t) => (
-                      <option key={t} value={t}>
-                        {INTEREST_LABELS[t]}
-                      </option>
-                    ))}
-                  </select>
-                  {joinErr && <p className="error-text" style={{ marginTop: 12 }}>{joinErr}</p>}
-                </div>
-              )}
-            </>
-          )}
-        </>
-      ) : !ready ? (
+      {!ready ? (
         <div className="feed-skeleton" aria-hidden="true">
           <div className="feed-skeleton-card" />
           <div className="feed-skeleton-card" />
