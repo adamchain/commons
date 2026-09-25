@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Search, Plus, MessageCircle, User } from "lucide-react";
+import { Home, Search, Plus, MessageCircle } from "lucide-react";
 import { api } from "../api/http";
+import { Avatar } from "./Avatar";
 import { useAuth } from "../context/AuthContext";
 import { needsOnboarding } from "../lib/onboarding";
 import type { ConversationSummaryDTO } from "../types/shared";
@@ -118,7 +119,18 @@ export function BottomNav() {
         aria-label="Your profile"
       >
         <span className="bottom-nav-icon-wrap">
-          <User size={22} strokeWidth={1.6} />
+          {user ? (
+            <Avatar
+              seed={user.avatarSeed}
+              style={user.avatarStyle}
+              photoDataUrl={user.avatarPhotoDataUrl}
+              params={user.avatarParams}
+              name={user.firstName || undefined}
+              size="xs"
+            />
+          ) : (
+            <span className="bottom-nav-avatar-placeholder" aria-hidden="true" />
+          )}
         </span>
         <span className="bottom-nav-label">Profile</span>
       </NavLink>

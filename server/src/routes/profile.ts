@@ -25,9 +25,8 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
     res.status(404).json({ error: "User not found" });
     return;
   }
-  const neighborhood = target.neighborhoodId
-    ? store.findNeighborhoodById(target.neighborhoodId)
-    : null;
+  const resolvedHoodId = store.resolveNeighborhoodId(target.neighborhoodId);
+  const neighborhood = resolvedHoodId ? store.findNeighborhoodById(resolvedHoodId) : null;
   // Plans authored (all-time, for stats + past accordion).
   const allPlans = store.listPlansByCreator(targetId);
   // Compare YYYY-MM-DD strings — never `new Date("YYYY-MM-DD")` (UTC midnight

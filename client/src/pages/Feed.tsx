@@ -527,7 +527,6 @@ export function FeedPage() {
                 const showFartherLabel = farther && (index === 0 || prevNear);
                 return (
                   <div key={plan.id} className={showFartherLabel ? "plan-grid-farther" : undefined}>
-                    {showFartherLabel && <h2 className="feed-distance-label">Farther away</h2>}
                     <PlanCard plan={plan} onPlanRefresh={refreshPlans} />
                   </div>
                 );

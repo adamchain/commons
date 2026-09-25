@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
-import { Calendar, Star } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { ArrowLeft, Calendar, Star } from "lucide-react";
 import { api } from "../api/http";
 import { PlanCoverThumb, planPhotoUrl } from "../components/CoverThumb";
 import { InterestGlyph } from "../components/InterestGlyph";
@@ -8,7 +8,9 @@ import { LoadingScreen } from "../components/LoadingScreen";
 import { EmptyCard, Label, ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanWhenWhereLine, sentenceCaseTitle } from "../lib/format";
+import { hrefForBack } from "../lib/navState";
 import { isIdeaPlan, planHasEnded } from "../lib/planTime";
+import type { NavFromState } from "../lib/navState";
 import type { PlanDTO } from "../types/shared";
 
 /**
@@ -16,6 +18,9 @@ import type { PlanDTO } from "../types/shared";
  */
 export function MyPlansPage() {
   const { user } = useAuth();
+  const location = useLocation();
+  const navFrom = (location.state as NavFromState | null) ?? null;
+  const backHref = hrefForBack(navFrom);
   const [plans, setPlans] = useState<PlanDTO[] | null>(null);
 
   async function load() {
@@ -50,6 +55,13 @@ export function MyPlansPage() {
 
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar my-plans-page">
+      {navFrom?.from === "profile" && (
+        <header className="app-header app-header--minimal">
+          <Link to={backHref} className="back-circle" aria-label="Back">
+            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
+          </Link>
+        </header>
+      )}
       <ScreenTitle title="Plans" />
 
       {empty && (

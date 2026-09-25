@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { App as CapApp } from "@capacitor/app";
 import { useAuth } from "./context/AuthContext";
 import { BottomNav } from "./components/BottomNav";
 import { CoachMarks } from "./components/CoachMarks";
@@ -8,6 +9,9 @@ import { TopBar } from "./components/TopBar";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { listenForDeepLinks } from "./lib/deepLinks";
 import { needsOnboarding } from "./lib/onboarding";
+import { getCurrentCoords } from "./lib/geolocate";
+import { api } from "./api/http";
+import { isNative } from "./lib/platform";
 import { ChatPage } from "./pages/Chat";
 import { CreatePlanPage } from "./pages/CreatePlan";
 import { FeedPage } from "./pages/Feed";
@@ -15,7 +19,6 @@ import { NotificationsPage } from "./pages/Notifications";
 import { OnboardingPage } from "./pages/Onboarding";
 import { LandingPage } from "./pages/Landing";
 import { LegalPage } from "./pages/Legal";
-import { isNative } from "./lib/platform";
 import { PlanDetailPage } from "./pages/PlanDetail";
 import { PublicEventPage } from "./pages/PublicEvent";
 import { AdminPage } from "./pages/Admin";
@@ -152,9 +155,45 @@ function useDeepLinkNavigation() {
   }, [navigate]);
 }
 
+const LOCATION_REFRESH_INTERVAL_MS = 30 * 60 * 1000; // 30 min
+
+// Silently refreshes the user's stored location each time they bring the app
+// to the foreground, throttled to once per 30 minutes. Only runs if they
+// already have location sharing on (opted in during onboarding/settings).
+function useLocationRefresh() {
+  const { user, refreshUser } = useAuth();
+  const lastRefreshedAt = useRef<number>(0);
+
+  useEffect(() => {
+    if (!isNative() || !user?.location) return;
+
+    async function refresh() {
+      const now = Date.now();
+      if (now - lastRefreshedAt.current < LOCATION_REFRESH_INTERVAL_MS) return;
+      lastRefreshedAt.current = now;
+      const coords = await getCurrentCoords({ timeoutMs: 10000 });
+      if (!coords) return;
+      try {
+        await api("/api/auth/me", { method: "PATCH", body: JSON.stringify({ location: coords }) });
+        void refreshUser();
+      } catch {
+        // silent — stale location is better than an error
+      }
+    }
+
+    void refresh();
+
+    const handle = CapApp.addListener("appStateChange", (state) => {
+      if (state.isActive) void refresh();
+    });
+    return () => { void handle.then((h) => h.remove()); };
+  }, [user?.location, refreshUser]);
+}
+
 export default function App() {
   usePushOpenNavigation();
   useDeepLinkNavigation();
+  useLocationRefresh();
   return (
     <>
       <TopBar />

@@ -23,9 +23,9 @@ export async function getCurrentCoords(opts: Options = {}): Promise<Coords | nul
         if (req.location !== "granted") return null;
       }
       const pos = await Geolocation.getCurrentPosition({
-        enableHighAccuracy: false,
+        enableHighAccuracy: true,
         timeout,
-        maximumAge: 5 * 60 * 1000,
+        maximumAge: 60 * 1000,
       });
       return { lat: pos.coords.latitude, lng: pos.coords.longitude };
     } catch {
@@ -37,7 +37,7 @@ export async function getCurrentCoords(opts: Options = {}): Promise<Coords | nul
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       () => resolve(null),
-      { enableHighAccuracy: false, timeout, maximumAge: 5 * 60 * 1000 },
+      { enableHighAccuracy: true, timeout, maximumAge: 60 * 1000 },
     );
   });
 }

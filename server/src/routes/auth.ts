@@ -317,6 +317,24 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
     if (nearest) {
       patch.neighborhoodId = nearest;
       patch.neighborhoodIds = [nearest];
+    } else {
+      // Outside the Philly metro radius. If the user has no neighborhood yet,
+      // assign the globally nearest so their profile shows something after
+      // sharing location (handles developer testing from non-Philly devices).
+      const existing = store.findUserById(userId);
+      if (!existing?.neighborhoodId) {
+        const uncapped = store
+          .listNeighborhoods()
+          .filter((n) => typeof n.lat === "number" && typeof n.lng === "number")
+          .reduce<{ id: string; d: number } | null>((best, n) => {
+            const d = (n.lat! - lat) ** 2 + (n.lng! - lng) ** 2;
+            return !best || d < best.d ? { id: n.id, d } : best;
+          }, null);
+        if (uncapped) {
+          patch.neighborhoodId = uncapped.id;
+          patch.neighborhoodIds = [uncapped.id];
+        }
+      }
     }
   } else if (req.body?.location === null || req.body?.locationSharing === false) {
     patch.locationLat = null;

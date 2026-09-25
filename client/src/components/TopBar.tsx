@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Bell, Settings } from "lucide-react";
+import { Bell, HelpCircle, Settings } from "lucide-react";
 import wordmark from "../assets/wordmark.png";
 import { api } from "../api/http";
-import { Avatar } from "./Avatar";
 import { useAuth } from "../context/AuthContext";
 import type { NotificationDTO } from "../types/shared";
 
@@ -14,7 +13,7 @@ import type { NotificationDTO } from "../types/shared";
  */
 export function TopBar() {
   const { pathname } = useLocation();
-  const { user } = useAuth();
+  const { user } = useAuth(); // still needed for otherProfile check
   const [hasUnread, setHasUnread] = useState(false);
 
   // Other-user profiles own their chrome (back + •••). Hide even before `user`
@@ -97,22 +96,9 @@ export function TopBar() {
         <Link to="/settings" className="top-bar-icon-btn" aria-label="Settings">
           <Settings size={18} strokeWidth={1.6} />
         </Link>
-        {user && (
-          <Link
-            to={`/profile/${user.id}`}
-            className="top-bar-icon-btn top-bar-icon-btn--avatar"
-            aria-label="Your profile"
-          >
-            <Avatar
-              seed={user.avatarSeed}
-              style={user.avatarStyle}
-              photoDataUrl={user.avatarPhotoDataUrl}
-              params={user.avatarParams}
-              name={user.firstName || undefined}
-              size="sm"
-            />
-          </Link>
-        )}
+        <Link to="/helpchat" className="top-bar-icon-btn" aria-label="Help">
+          <HelpCircle size={18} strokeWidth={1.6} />
+        </Link>
       </div>
       <div className="top-bar-rule" aria-hidden="true" />
     </header>

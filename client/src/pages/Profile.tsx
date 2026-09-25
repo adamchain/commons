@@ -1279,7 +1279,7 @@ function YourPlansBlock({
     <section className="profile-block" id={id}>
       {isSelf && (
         <div className="profile-block-heading-row">
-          <Link to="/my-plans" className="profile-see-all-link">
+          <Link to="/my-plans" state={{ from: "profile", profileUserId }} className="profile-see-all-link">
             See all plans →
           </Link>
           <div className="profile-plans-toggle" role="tablist" aria-label="Plans view">

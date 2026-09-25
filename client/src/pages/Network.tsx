@@ -166,8 +166,9 @@ export function NetworkPage() {
       ) : (
         loaded &&
         !searching &&
-        !waitingForResults && (
-          <p className="network-empty">{trimmed ? "Nobody by that name." : "It's just you for now."}</p>
+        !waitingForResults &&
+        trimmed && (
+          <p className="network-empty">Nobody by that name.</p>
         )
       )}
 

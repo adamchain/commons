@@ -8737,14 +8737,23 @@ a.action-btn--stack {
 }
 
 .top-bar-icon-btn--avatar {
+  /* Visual: 28×28 circular avatar. Hit area: 44×44. */
+  /* padding expands tappable area; negative margin keeps layout size at 28px
+     so the TopBar height is not affected by the larger touch target. */
+  box-sizing: content-box;
   width: 28px;
   height: 28px;
-  padding: 0;
-  border-radius: 50%;
-  overflow: hidden;
+  padding: 8px;
+  margin: -8px;
+  border-radius: 0;
+  overflow: visible;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .top-bar-icon-btn--avatar .avatar {
   display: block;
+  flex-shrink: 0;
 }
 
 /* Small unread dot on the notifications bell — driven by real unread state. */
@@ -10198,6 +10207,19 @@ a.action-btn--stack {
 .bottom-nav-item .avatar {
   width: 26px;
   height: 26px;
+  border: 1.5px solid var(--border);
+  transition: outline 120ms ease;
+}
+.bottom-nav-item.is-active .avatar {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.bottom-nav-avatar-placeholder {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1.5px solid var(--border);
 }
 
 .bottom-nav-cta {
@@ -12212,7 +12234,7 @@ button.xpl-photo-tile {
 
 /* Profile — "Communities" section. */
 #profile-communities {
-  scroll-margin-top: calc(var(--topbar-height, 56px) + 12px);
+  scroll-margin-top: calc(var(--topbar-height, 56px) + env(safe-area-inset-top, 0px) + 12px);
 }
 .profile-communities-list {
   display: flex;
@@ -15711,61 +15733,67 @@ span.profile-other-cta {
   -webkit-overflow-scrolling: touch;
   padding: 0 0 8px;
 }
-/* Empty / suggestions state */
-.helpchat-empty {
+/* Help menu (accordion) */
+.helpchat-menu {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 48px 28px 24px;
-  text-align: center;
+  padding: 16px 0 24px;
 }
-.helpchat-empty-icon {
-  width: 60px;
-  height: 60px;
-  border-radius: 20px;
-  background: var(--tan-mid);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--red);
-  margin-bottom: 18px;
-  box-shadow: 0 2px 10px rgba(193,59,59,0.12);
-}
-.helpchat-empty-title {
-  font-size: var(--type-title);
-  font-weight: 700;
-  color: var(--text);
-  margin: 0 0 8px;
-}
-.helpchat-empty-sub {
-  font-size: var(--text-body);
-  color: var(--muted);
-  margin: 0 0 28px;
-  line-height: 1.55;
-  max-width: 280px;
-}
-.helpchat-suggestions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-  max-width: 340px;
-}
-.helpchat-suggestion {
-  padding: 9px 15px;
-  border-radius: 20px;
-  border: 1.5px solid var(--border);
-  background: var(--surface);
+.helpchat-menu-hint {
   font-size: var(--text-body-small);
-  font-weight: 500;
+  color: var(--muted);
+  margin: 0 20px 12px;
+}
+.helpchat-section {
+  border-bottom: 1px solid var(--border);
+}
+.helpchat-section:first-of-type {
+  border-top: 1px solid var(--border);
+}
+.helpchat-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 15px 20px;
+  background: none;
+  border: none;
+  font-size: var(--text-body);
+  font-weight: 600;
   color: var(--text);
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  text-align: left;
 }
-.helpchat-suggestion:active {
+.helpchat-section-chevron {
+  transition: transform 200ms ease;
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.helpchat-section-header.is-open .helpchat-section-chevron {
+  transform: rotate(180deg);
+}
+.helpchat-section-items {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+.helpchat-section-item {
+  padding: 13px 20px 13px 28px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-body-small);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+.helpchat-section-item:last-child {
+  border-bottom: none;
+}
+.helpchat-section-item:active {
   background: var(--tan-mid);
-  border-color: var(--red);
   color: var(--red);
 }
 /* Messages */
@@ -15885,38 +15913,46 @@ span.profile-other-cta {
 }
 /* Composer */
 .helpchat-composer {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  padding: 10px 16px;
-  padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
-  border-top: 1px solid var(--border);
+  padding: 10px 14px;
+  padding-bottom: max(14px, env(safe-area-inset-bottom, 14px));
   background: var(--bg);
   flex-shrink: 0;
+}
+.helpchat-composer-box {
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  border: 1.5px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 8px 8px 8px 14px;
+  transition: border-color 150ms ease;
+}
+.helpchat-composer-box:focus-within {
+  border-color: var(--red);
 }
 .helpchat-input {
   flex: 1;
   resize: none;
-  border: 1.5px solid var(--border);
-  border-radius: var(--r-control);
-  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  padding: 0;
   font-size: var(--text-body);
-  line-height: 1.4;
-  background: var(--surface);
+  line-height: 1.5;
   color: var(--text);
   outline: none;
   max-height: 120px;
   overflow-y: auto;
-  transition: border-color 120ms ease;
   min-width: 0;
+  align-self: center;
 }
-.helpchat-input:focus {
-  border-color: var(--red);
+.helpchat-input::placeholder {
+  color: var(--muted);
 }
 .helpchat-send {
   flex-shrink: 0;
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   background: var(--red);
   color: #fff;
@@ -15925,11 +15961,12 @@ span.profile-other-cta {
   justify-content: center;
   border: none;
   cursor: pointer;
-  transition: opacity 150ms ease;
-  box-shadow: 0 2px 8px rgba(193,59,59,0.25);
+  transition: background 150ms ease, opacity 150ms ease;
+  margin-left: 6px;
 }
 .helpchat-send:disabled {
-  opacity: 0.3;
+  background: var(--border);
+  color: var(--muted);
   cursor: default;
   box-shadow: none;
 }

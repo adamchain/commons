@@ -354,48 +354,63 @@ export function PlanDetailPage() {
                   : `${interestedCount} interested`}
             </span>
           </button>
-          <div className="plan-meta-card">
-            <div className="plan-meta-row">
-              <span className="plan-meta-icon" aria-hidden="true"><CalendarIcon /></span>
-              <div className="plan-meta-text">
-                <span className="plan-meta-label">Date &amp; time</span>
-                <span className="plan-meta-value">
-                  {formatPlanWhenLine(plan.date, plan.time, plan.isFlexibleTime, {
-                    isFlexibleDate: plan.isFlexibleDate,
-                    isThisWeek: plan.isThisWeek,
-                    isFlexibleLocation: plan.isFlexibleLocation,
-                  })}
-                </span>
-              </div>
-            </div>
-            {plan.isFlexibleLocation ? (
-              <div className="plan-meta-row">
-                <span className="plan-meta-icon" aria-hidden="true"><PinIcon /></span>
-                <div className="plan-meta-text">
-                  <span className="plan-meta-label">Location</span>
-                  <span className="plan-meta-value">Flexible</span>
-                </div>
-              </div>
+        </header>
+
+        {plan.description && (
+          <div className="plan-detail-card">
+            {plan.planKind === "looking_for" ? (
+              <p className="plan-description plan-description-quote" style={{ margin: 0 }}>
+                &ldquo;{linkifyText(plan.description)}&rdquo;
+              </p>
             ) : (
-              <a
-                className="plan-meta-row"
-                href={mapsHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setShowMapsConfirm(true);
-                }}
-              >
-                <span className="plan-meta-icon" aria-hidden="true"><PinIcon /></span>
-                <div className="plan-meta-text">
-                  <span className="plan-meta-label">Location</span>
-                  <span className="plan-meta-value">{plan.location.name}</span>
-                </div>
-              </a>
+              <p className="plan-description" style={{ margin: 0 }}>
+                {linkifyText(plan.description)}
+              </p>
             )}
           </div>
-        </header>
+        )}
+
+        <div className="plan-meta-card">
+          <div className="plan-meta-row">
+            <span className="plan-meta-icon" aria-hidden="true"><CalendarIcon /></span>
+            <div className="plan-meta-text">
+              <span className="plan-meta-label">Date &amp; time</span>
+              <span className="plan-meta-value">
+                {formatPlanWhenLine(plan.date, plan.time, plan.isFlexibleTime, {
+                  isFlexibleDate: plan.isFlexibleDate,
+                  isThisWeek: plan.isThisWeek,
+                  isFlexibleLocation: plan.isFlexibleLocation,
+                })}
+              </span>
+            </div>
+          </div>
+          {plan.isFlexibleLocation ? (
+            <div className="plan-meta-row">
+              <span className="plan-meta-icon" aria-hidden="true"><PinIcon /></span>
+              <div className="plan-meta-text">
+                <span className="plan-meta-label">Location</span>
+                <span className="plan-meta-value">Flexible</span>
+              </div>
+            </div>
+          ) : (
+            <a
+              className="plan-meta-row"
+              href={mapsHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                e.preventDefault();
+                setShowMapsConfirm(true);
+              }}
+            >
+              <span className="plan-meta-icon" aria-hidden="true"><PinIcon /></span>
+              <div className="plan-meta-text">
+                <span className="plan-meta-label">Location</span>
+                <span className="plan-meta-value">{plan.location.name}</span>
+              </div>
+            </a>
+          )}
+        </div>
 
         {attachedUrl && (
           <a
@@ -453,20 +468,6 @@ export function PlanDetailPage() {
           </span>
           <span className="host-row-chevron" aria-hidden="true">›</span>
         </button>
-
-        {plan.description && (
-          <div className="plan-detail-card">
-            {plan.planKind === "looking_for" ? (
-              <p className="plan-description plan-description-quote" style={{ margin: 0 }}>
-                &ldquo;{linkifyText(plan.description)}&rdquo;
-              </p>
-            ) : (
-              <p className="plan-description" style={{ margin: 0 }}>
-                {linkifyText(plan.description)}
-              </p>
-            )}
-          </div>
-        )}
 
         {canLock && (
           <div className="plan-detail-card idea-lock-card">
