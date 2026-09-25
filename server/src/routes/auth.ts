@@ -18,6 +18,39 @@ import { nextNetworkPrompt, otherGoingIds, userWasGoing } from "../lib/networkPr
 import { emit } from "../lib/notify.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
 
+const US_STATE_ABBR: Record<string, string> = {
+  Alabama:"AL",Alaska:"AK",Arizona:"AZ",Arkansas:"AR",California:"CA",
+  Colorado:"CO",Connecticut:"CT",Delaware:"DE","District of Columbia":"DC",
+  Florida:"FL",Georgia:"GA",Hawaii:"HI",Idaho:"ID",Illinois:"IL",Indiana:"IN",
+  Iowa:"IA",Kansas:"KS",Kentucky:"KY",Louisiana:"LA",Maine:"ME",Maryland:"MD",
+  Massachusetts:"MA",Michigan:"MI",Minnesota:"MN",Mississippi:"MS",Missouri:"MO",
+  Montana:"MT",Nebraska:"NE",Nevada:"NV","New Hampshire":"NH","New Jersey":"NJ",
+  "New Mexico":"NM","New York":"NY","North Carolina":"NC","North Dakota":"ND",
+  Ohio:"OH",Oklahoma:"OK",Oregon:"OR",Pennsylvania:"PA","Rhode Island":"RI",
+  "South Carolina":"SC","South Dakota":"SD",Tennessee:"TN",Texas:"TX",Utah:"UT",
+  Vermont:"VT",Virginia:"VA",Washington:"WA","West Virginia":"WV",Wisconsin:"WI",
+  Wyoming:"WY",
+};
+
+async function reverseGeocodeLabel(lat: number, lng: number): Promise<string | null> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=10`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": "COMMONS/1.0 (commons-app)" },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as { address?: Record<string, string> };
+    const addr = data.address ?? {};
+    const city = addr.city || addr.town || addr.village || addr.hamlet || addr.county || null;
+    const state = addr.state ? (US_STATE_ABBR[addr.state] ?? addr.state) : null;
+    if (!city) return state;
+    return state ? `${city}, ${state}` : city;
+  } catch {
+    return null;
+  }
+}
+
 export const authRouter = Router();
 
 const CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
@@ -313,6 +346,7 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
     patch.locationLat = lat;
     patch.locationLng = lng;
     patch.locationPromptAnsweredAt = new Date().toISOString();
+    patch.locationLabel = await reverseGeocodeLabel(lat, lng);
     const nearest = store.nearestNeighborhoodId(lat, lng);
     if (nearest) {
       patch.neighborhoodId = nearest;
@@ -339,6 +373,7 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
   } else if (req.body?.location === null || req.body?.locationSharing === false) {
     patch.locationLat = null;
     patch.locationLng = null;
+    patch.locationLabel = null;
     patch.locationPromptAnsweredAt = new Date().toISOString();
   }
   if (Array.isArray(req.body?.interests)) patch.interests = req.body.interests;

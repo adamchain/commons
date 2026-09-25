@@ -79,6 +79,7 @@ interface ProfilePayload {
   user: PublicUser;
   interests: InterestTag[];
   neighborhood: { id: string; name: string; metro: string } | null;
+  locationLabel: string | null;
   stats: { hosted: number; joined: number };
   upcoming: PlanDTO[];
   past: ProfilePastPlan[];
@@ -211,7 +212,7 @@ export function ProfilePage() {
   const visibleCommunities = communitiesExpanded ? shownCommunities : shownCommunities.slice(0, 3);
   const hiddenCommunityCount = Math.max(0, shownCommunities.length - visibleCommunities.length);
   const firstName = profile.user.firstName || "them";
-  const locationLabel = profile.neighborhood?.name ?? null;
+  const locationLabel = profile.locationLabel ?? profile.neighborhood?.name ?? null;
 
   async function shareProfile() {
     const url = `${window.location.origin}/profile/${userId}`;
@@ -485,10 +486,10 @@ export function ProfilePage() {
           </Link>
           <div className="profile-hero-text">
             <div className="profile-name">{displayName}</div>
-            {profile.neighborhood && (
+            {locationLabel && (
               <div className="profile-meta-line">
                 <MapPin size={11} strokeWidth={1.8} aria-hidden="true" />
-                {profile.neighborhood.name}
+                {locationLabel}
               </div>
             )}
             <div className="profile-hero-stats-row">

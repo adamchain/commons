@@ -98,6 +98,7 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
     user: userToPublic(target),
     interests: target.interests ?? [],
     neighborhood: neighborhood ? { id: neighborhood.id, name: neighborhood.name, metro: neighborhood.metro } : null,
+    locationLabel: target.locationLabel ?? null,
     stats: {
       hosted: allPlans.length,
       joined: joinedCount,

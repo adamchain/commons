@@ -80,6 +80,8 @@ export interface UserRecord {
   locationLng?: number | null;
   /** Set when they share location or explicitly continue without it. */
   locationPromptAnsweredAt?: string | null;
+  /** Human-readable city label from reverse geocoding, e.g. "Villanova, PA". */
+  locationLabel?: string | null;
   /** Conversation ids this user has muted — chat still works, notifications go quiet. */
   mutedConversationIds?: string[];
   /** Conversations the user explicitly left / removed from inbox. ensure* must
