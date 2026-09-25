@@ -41,8 +41,8 @@ export function CoverThumb({
 
 /** Gradient background for ideas with no image — color is stable per seed (plan/tag id). */
 export function IdeaCoverFallback({
-  seed = “”,
-  className = “”,
+  seed = "",
+  className = "",
 }: {
   seed?: string;
   className?: string;
@@ -51,7 +51,7 @@ export function IdeaCoverFallback({
     <div
       className={`idea-cover-fallback ${className}`.trim()}
       style={{ background: seedGradient(seed) }}
-      aria-hidden=”true”
+      aria-hidden="true"
     />
   );
 }
