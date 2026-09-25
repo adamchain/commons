@@ -54,6 +54,7 @@ const UserSchema = new mongoose.Schema<UserRecord>(
     locationLat: { type: Number, default: null },
     locationLng: { type: Number, default: null },
     locationPromptAnsweredAt: { type: String, default: null },
+    locationLabel: { type: String, default: null },
     mutedConversationIds: { type: [String], default: undefined },
     leftConversationIds: { type: [String], default: undefined },
     pinnedConversationIds: { type: [String], default: undefined },
