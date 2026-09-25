@@ -26,7 +26,7 @@ export function PhotoHero({
       {photo ? (
         <img src={photo} alt="" className="xpl-hero-img" />
       ) : (
-        <IdeaCoverFallback className="xpl-hero-img" iconSize={48} />
+        <IdeaCoverFallback className="xpl-hero-img" seed={title} />
       )}
       <div className="xpl-hero-gradient" aria-hidden="true" />
       {topLeft ? <div className="xpl-hero-top xpl-hero-top--left">{topLeft}</div> : null}

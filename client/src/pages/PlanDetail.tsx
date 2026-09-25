@@ -264,7 +264,7 @@ export function PlanDetailPage() {
       <div className={`plan-detail-hero${coverSrc || ideaCoverFallback ? "" : " plan-detail-hero--empty"}`}>
         <div className="plan-detail-hero-media">
           {coverSrc && <img src={coverSrc} alt="" loading="lazy" />}
-          {ideaCoverFallback && <IdeaCoverFallback iconSize={56} />}
+          {ideaCoverFallback && <IdeaCoverFallback seed={plan.id} />}
         </div>
         <div className="plan-detail-hero-bar">
           <button

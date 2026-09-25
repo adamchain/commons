@@ -93,7 +93,7 @@ export function PlanCard({
           </div>
         ) : isLooking ? (
           <div className="plan-card-flyer">
-            <IdeaCoverFallback iconSize={42} />
+            <IdeaCoverFallback seed={plan.id} />
           </div>
         ) : null}
         <div className="plan-card-body">

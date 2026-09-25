@@ -103,7 +103,7 @@ export function PublicEventPage() {
               onError={() => setCoverFailed(true)}
             />
           ) : (
-            <IdeaCoverFallback iconSize={52} />
+            <IdeaCoverFallback seed={plan.id} />
           )}
           <span className="public-event-hero-badge" aria-hidden="true">
             {plan.hostEmoji || "✨"}

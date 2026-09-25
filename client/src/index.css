@@ -9301,14 +9301,9 @@ a.action-btn--stack {
   display: block;
 }
 .idea-cover-fallback {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 100%;
   height: 100%;
   min-height: inherit;
-  background: linear-gradient(145deg, #f7ead4 0%, #f3dcc8 46%, #efd0d0 100%);
-  color: var(--red);
 }
 .plan-detail-hero > .idea-cover-fallback {
   position: absolute;
