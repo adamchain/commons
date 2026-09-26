@@ -83,6 +83,7 @@ export function PlanDetailPage() {
   };
 
   useEffect(() => {
+    window.scrollTo(0, 0);
     void load();
   }, [id]);
 

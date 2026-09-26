@@ -201,7 +201,7 @@ export function ParticipationButtons({
           <button
             type="button"
             className="btn-interested"
-            onClick={() => void switchToInterested()}
+            onClick={() => setShowGoingSheet(true)}
             disabled={pending}
           >
             Interested

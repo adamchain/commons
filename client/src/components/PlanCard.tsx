@@ -376,7 +376,7 @@ function QuickJoin({
             onClick={(e) => void onJoin(e)}
             disabled={busy}
           >
-            {busy ? "…" : goingActive ? "Joined" : "Join"}
+            {busy ? "…" : goingActive ? "I'm In ✓" : "I'm In"}
           </button>
         ) : (
           <button
@@ -397,7 +397,7 @@ function QuickJoin({
             onClose={() => setShowSheet(false)}
             labelledBy="plan-card-rsvp-title"
           >
-              <div id="plan-card-rsvp-title" className="sheet-title">{goingActive ? "Joined" : "Interested"}</div>
+              <div id="plan-card-rsvp-title" className="sheet-title">{goingActive ? "I'm In" : "Interested"}</div>
               <div className="sheet-actions">
                 {goingActive && (
                   <button type="button" className="sheet-link" onClick={() => void setState("interested")}>
@@ -406,7 +406,7 @@ function QuickJoin({
                 )}
                 {interestedActive && joinablePlan && (
                   <button type="button" className="sheet-link" onClick={() => void setState("going")}>
-                    Switch to Join
+                    Switch to I'm In
                   </button>
                 )}
                 <button
