@@ -26,6 +26,7 @@ import { emit } from "../lib/notify.js";
 import { planHasEnded, planRequiresHostApproval, plansOverlap, FLEXIBLE_DATE_PLACEHOLDER, thisWeekAnchorDate } from "../lib/planTime.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
 import { communityCreationBlockReason } from "../lib/communityAccess.js";
+import { unfurlLink } from "./linkPreview.js";
 import { coverUrlFor } from "./share.js";
 import type { PublicPlanDTO } from "../types/shared.js";
 
@@ -431,22 +432,13 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   // Optional flyer — uploaded data URL or library https cover.
   const flyerDataUrl = normalizeFlyerDataUrl(req.body?.flyerDataUrl);
 
-  // Optional shareable link. We trust the client-fetched OG preview rather than
-  // re-fetching at create time — the preview endpoint already validated and
-  // sanitized the URL; refetching here would just double the latency.
+  // Optional shareable link. Preview text and image are fetched here, not
+  // taken from the client, so a pasted link can't smuggle arbitrary content.
   let flyerLinkUrl: string | undefined;
   let flyerLinkPreview: PlanRecord["flyerLinkPreview"];
   flyerLinkUrl = parseHttpUrl(req.body?.flyerLinkUrl);
-  if (flyerLinkUrl && req.body?.flyerLinkPreview && typeof req.body.flyerLinkPreview === "object") {
-    const p = req.body.flyerLinkPreview as Record<string, unknown>;
-    const trim = (v: unknown, max: number): string | undefined =>
-      typeof v === "string" && v.trim() ? v.trim().slice(0, max) : undefined;
-    flyerLinkPreview = {
-      title: trim(p.title, 200),
-      description: trim(p.description, 400),
-      image: trim(p.image, 2048),
-      siteName: trim(p.siteName, 100),
-    };
+  if (flyerLinkUrl) {
+    flyerLinkPreview = (await unfurlLink(flyerLinkUrl)) ?? undefined;
   }
 
   const plan = store.createPlan({
@@ -684,23 +676,10 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
       patch.flyerLinkPreview = undefined;
     } else {
       const parsed = parseHttpUrl(raw);
-      if (parsed) patch.flyerLinkUrl = parsed;
-    }
-  }
-  if (req.body?.flyerLinkPreview !== undefined) {
-    const raw = req.body.flyerLinkPreview;
-    if (raw === null) {
-      patch.flyerLinkPreview = undefined;
-    } else if (typeof raw === "object") {
-      const p = raw as Record<string, unknown>;
-      const trim = (v: unknown, max: number): string | undefined =>
-        typeof v === "string" && v.trim() ? v.trim().slice(0, max) : undefined;
-      patch.flyerLinkPreview = {
-        title: trim(p.title, 200),
-        description: trim(p.description, 400),
-        image: trim(p.image, 2048),
-        siteName: trim(p.siteName, 100),
-      };
+      if (parsed) {
+        patch.flyerLinkUrl = parsed;
+        patch.flyerLinkPreview = (await unfurlLink(parsed)) ?? undefined;
+      }
     }
   }
 
@@ -1057,7 +1036,10 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
   };
   if (req.body?.flyerLinkUrl !== undefined) {
     const parsed = parseHttpUrl(req.body.flyerLinkUrl);
-    if (parsed) patch.flyerLinkUrl = parsed;
+    if (parsed) {
+      patch.flyerLinkUrl = parsed;
+      patch.flyerLinkPreview = (await unfurlLink(parsed)) ?? undefined;
+    }
     else if (req.body.flyerLinkUrl === null || req.body.flyerLinkUrl === "") {
       patch.flyerLinkUrl = undefined;
       patch.flyerLinkPreview = undefined;

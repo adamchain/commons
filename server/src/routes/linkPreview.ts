@@ -1,7 +1,15 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { Router } from "express";
+import { textBlockedReason } from "../lib/contentFilter.js";
 import { requireAuth } from "../middleware/requireAuth.js";
+
+export type LinkPreviewData = {
+  title?: string;
+  description?: string;
+  image?: string;
+  siteName?: string;
+};
 
 export const linkPreviewRouter = Router();
 
@@ -123,6 +131,77 @@ function resolveImage(image: string | undefined, base: URL): string | undefined 
   }
 }
 
+function cleanPreviewText(value: string | undefined, max: number): string | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim().slice(0, max);
+  if (!trimmed || textBlockedReason(trimmed)) return undefined;
+  return trimmed;
+}
+
+/** Fetch and parse a public page. Returns null when the URL is blocked or the fetch fails. */
+export async function unfurlLink(rawUrl: string): Promise<LinkPreviewData | null> {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return null;
+  }
+  if (!(await isPublicHttpUrl(parsed))) return null;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const r = await fetchPublic(parsed, controller.signal);
+    if (!r.ok) return null;
+    const ctype = (r.headers.get("content-type") ?? "").toLowerCase();
+    if (!ctype.includes("html") && !ctype.includes("text/")) return null;
+    const html = (await r.text()).slice(0, 1_000_000);
+    const headMatch = html.match(/<head[\s\S]*?<\/head>/i);
+    const head = headMatch ? headMatch[0] : html;
+
+    const title = cleanPreviewText(
+      pick(head, [
+        /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i,
+        /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i,
+        /<meta[^>]+name=["']twitter:title["'][^>]+content=["']([^"']+)["']/i,
+        /<title[^>]*>([^<]+)<\/title>/i,
+      ]),
+      200,
+    );
+    const description = cleanPreviewText(
+      pick(head, [
+        /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i,
+        /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:description["']/i,
+        /<meta[^>]+name=["']twitter:description["'][^>]+content=["']([^"']+)["']/i,
+        /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i,
+      ]),
+      400,
+    );
+    const imageRaw = pick(head, [
+      /<meta[^>]+property=["']og:image:secure_url["'][^>]+content=["']([^"']+)["']/i,
+      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+      /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
+    ]);
+    const siteName =
+      cleanPreviewText(
+        pick(head, [/<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)["']/i]),
+        100,
+      ) ?? parsed.hostname.replace(/^www\./, "");
+
+    return {
+      title,
+      description,
+      image: resolveImage(imageRaw, parsed),
+      siteName,
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 linkPreviewRouter.post("/", requireAuth, async (req, res) => {
   const rawUrl = String(req.body?.url ?? "").trim();
   if (!rawUrl) {
@@ -140,61 +219,10 @@ linkPreviewRouter.post("/", requireAuth, async (req, res) => {
     res.status(400).json({ error: "URL not allowed" });
     return;
   }
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 5000);
-  try {
-    const r = await fetchPublic(parsed, controller.signal);
-    if (!r.ok) {
-      res.status(502).json({ error: "Couldn't fetch URL" });
-      return;
-    }
-    const ctype = (r.headers.get("content-type") ?? "").toLowerCase();
-    if (!ctype.includes("html") && !ctype.includes("text/")) {
-      res.status(400).json({ error: "URL doesn't return HTML" });
-      return;
-    }
-    // 1MB cap protects against unfurling huge pages.
-    const html = (await r.text()).slice(0, 1_000_000);
-    const headMatch = html.match(/<head[\s\S]*?<\/head>/i);
-    const head = headMatch ? headMatch[0] : html;
-
-    const title = pick(head, [
-      /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i,
-      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i,
-      /<meta[^>]+name=["']twitter:title["'][^>]+content=["']([^"']+)["']/i,
-      /<title[^>]*>([^<]+)<\/title>/i,
-    ]);
-    const description = pick(head, [
-      /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i,
-      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:description["']/i,
-      /<meta[^>]+name=["']twitter:description["'][^>]+content=["']([^"']+)["']/i,
-      /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i,
-    ]);
-    const imageRaw = pick(head, [
-      /<meta[^>]+property=["']og:image:secure_url["'][^>]+content=["']([^"']+)["']/i,
-      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
-      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
-      /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
-    ]);
-    const siteName = pick(head, [
-      /<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)["']/i,
-    ]);
-
-    res.json({
-      url: parsed.toString(),
-      title: title?.slice(0, 200),
-      description: description?.slice(0, 400),
-      image: resolveImage(imageRaw, parsed),
-      siteName: siteName?.slice(0, 100) ?? parsed.hostname.replace(/^www\./, ""),
-    });
-  } catch (err) {
-    if (err instanceof Error && (err.message === "blocked" || err.message === "redirect")) {
-      res.status(400).json({ error: "URL not allowed" });
-      return;
-    }
+  const preview = await unfurlLink(rawUrl);
+  if (!preview) {
     res.status(502).json({ error: "Couldn't fetch URL" });
-  } finally {
-    clearTimeout(timer);
+    return;
   }
+  res.json({ url: parsed.toString(), ...preview });
 });
