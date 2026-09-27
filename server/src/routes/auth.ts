@@ -3,6 +3,7 @@ import { isAdminPhone } from "../lib/adminPhones.js";
 import { signSessionToken } from "../lib/jwt.js";
 import { normalizePhone } from "../lib/phone.js";
 import { checkPhoneVerification, isTwilioVerifyConfigured, startPhoneVerification } from "../lib/verify.js";
+import { rateLimit } from "../middleware/rateLimit.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { INVITE_CODES_PER_USER, normalizeInviteCode, store } from "../store.js";
 import type { UserRecord } from "../store.js";
@@ -153,7 +154,38 @@ async function userToMe(userId: string): Promise<MeDTO | null> {
   return meFromUser(user);
 }
 
-authRouter.post("/request-code", async (req, res) => {
+const TEN_MIN = 10 * 60 * 1000;
+const FIFTEEN_MIN = 15 * 60 * 1000;
+
+function phoneKey(prefix: string, req: { body?: { phoneNumber?: unknown } }): string | null {
+  const phone = normalizePhone(String(req.body?.phoneNumber ?? ""));
+  return phone ? `${prefix}:phone:${phone}` : null;
+}
+
+// Guessing a code, and asking for a new one, both get a server-side cap.
+// Twilio Verify has its own limit; this still applies when Verify is off.
+const limitRequestByPhone = rateLimit({
+  windowMs: FIFTEEN_MIN,
+  max: 5,
+  key: (req) => phoneKey("request", req),
+});
+const limitRequestByIp = rateLimit({
+  windowMs: FIFTEEN_MIN,
+  max: 20,
+  key: (req) => `request:ip:${req.ip}`,
+});
+const limitVerifyByPhone = rateLimit({
+  windowMs: TEN_MIN,
+  max: 8,
+  key: (req) => phoneKey("verify", req),
+});
+const limitVerifyByIp = rateLimit({
+  windowMs: TEN_MIN,
+  max: 30,
+  key: (req) => `verify:ip:${req.ip}`,
+});
+
+authRouter.post("/request-code", limitRequestByPhone, limitRequestByIp, async (req, res) => {
   const phone = normalizePhone(String(req.body?.phoneNumber ?? ""));
   if (!phone) {
     res.status(400).json({ error: "A valid phone number is required" });
@@ -194,7 +226,7 @@ authRouter.post("/request-code", async (req, res) => {
   res.json({ ok: true, phoneNumber: phone, smsConfigured: false, authMode: "dev" as const });
 });
 
-authRouter.post("/verify-code", async (req, res) => {
+authRouter.post("/verify-code", limitVerifyByPhone, limitVerifyByIp, async (req, res) => {
   const phone = normalizePhone(String(req.body?.phoneNumber ?? ""));
   const code = String(req.body?.code ?? "").trim();
   if (!phone || !code) {

@@ -33,6 +33,9 @@ import { startNudgeSchedulers } from "./lib/nudges.js";
 import { seedIfEmpty } from "./seed.js";
 
 const app = express();
+// Railway (and most hosts) terminate TLS and set X-Forwarded-For. One hop
+// so login rate limits see the client, not the proxy.
+app.set("trust proxy", 1);
 const port = Number(process.env.PORT ?? 4000);
 const clientUrl = process.env.APP_URL ?? "http://localhost:5173";
 const isProduction = process.env.NODE_ENV === "production";
