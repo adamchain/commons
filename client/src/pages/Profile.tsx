@@ -160,7 +160,15 @@ export function ProfilePage() {
 
   useEffect(() => {
     if (!isSelf || location.hash !== "#communities") return;
-    document.getElementById("profile-communities")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const el = document.getElementById("profile-communities");
+    if (!el) return;
+    // scrollIntoView also scrolls overflow ancestors and, with scroll-margin,
+    // lands past the Communities heading. Move the window only, just under the
+    // fixed top bar.
+    const bar = document.querySelector(".top-bar");
+    const offset = (bar?.getBoundingClientRect().height ?? 56) + 8;
+    const top = el.getBoundingClientRect().top + window.scrollY - offset;
+    window.scrollTo({ top: Math.max(0, top), behavior: "auto" });
   }, [isSelf, location.hash, communities.length, profile]);
 
   useEffect(() => {

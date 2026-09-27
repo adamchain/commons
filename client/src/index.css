@@ -12228,9 +12228,6 @@ button.xpl-photo-tile {
 }
 
 /* Profile — "Communities" section. */
-#profile-communities {
-  scroll-margin-top: calc(var(--topbar-height, 56px) + env(safe-area-inset-top, 0px) + 12px);
-}
 .profile-communities-list {
   display: flex;
   flex-direction: column;
