@@ -401,7 +401,7 @@ function DeleteAccountRow({ onSignedOut }: { onSignedOut: () => void }) {
               autoFocus
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
-              placeholder="delete"
+              placeholder="type delete"
               disabled={deleting}
             />
             {deleteError && <p className="error-text">{deleteError}</p>}
