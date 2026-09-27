@@ -156,13 +156,14 @@ export function PlanDetailPage() {
     });
   };
 
-  const isHosting = plan.creator.id === user.id;
+  const isCreator = plan.creator.id === user.id;
+  const isHosting = isCreator || (plan.coHosts?.some((h) => h.id === user.id) ?? false);
   const isLookingFor = plan.planKind === "looking_for";
   // Past events become a record: no RSVP / host coordination — just "Do it
   // again" (which carries the crew + chat forward) and the group chat.
   const isPast = planHasEnded(plan);
-  // Looking-For lifecycle: only the original poster can lock the plan in.
-  // Other interested folks coordinate via the group chat until the host
+  // Looking-For lifecycle: the creator or a co-host can lock the plan in.
+  // Other interested folks coordinate via the group chat until a host
   // commits to a venue + day.
   const canLock = !plan.lockedAt && isHosting && isLookingFor && !isPast && !plan.cancelledAt;
 
@@ -461,7 +462,7 @@ export function PlanDetailPage() {
           <span className="host-row-text">
             <span className="host-row-label">Started by</span>
             <strong>
-              {isHosting ? "you" : plan.creator.firstName}
+              {isCreator ? "you" : plan.creator.firstName}
               {plan.coHosts && plan.coHosts.length > 0 && (
                 <> &amp; {plan.coHosts.map((h) => (h.id === user.id ? "you" : h.firstName)).join(" & ")}</>
               )}

@@ -61,7 +61,8 @@ export function EditPlanPage() {
   // Bounce non-hosts out — server enforces too but no point letting them sit
   // on an edit form they can't submit.
   useEffect(() => {
-    if (plan && user && plan.creator.id !== user.id) {
+    const isCoHost = plan?.coHosts?.some((h) => h.id === user?.id) ?? false;
+    if (plan && user && plan.creator.id !== user.id && !isCoHost) {
       navigate(`/plans/${id}`, { replace: true });
     }
   }, [plan, user, id, navigate]);

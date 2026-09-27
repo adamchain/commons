@@ -32,6 +32,10 @@ import type { PublicPlanDTO } from "../types/shared.js";
 
 export const plansRouter = Router();
 
+function isPlanHost(plan: { creatorId: string; coHostIds?: string[] }, userId: string): boolean {
+  return plan.creatorId === userId || (plan.coHostIds ?? []).includes(userId);
+}
+
 /** Accept uploaded data-URLs or library http(s) covers; drop anything else. */
 function normalizeFlyerDataUrl(raw: unknown): string | undefined {
   if (typeof raw !== "string") return undefined;
@@ -569,7 +573,7 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Plan not found" });
     return;
   }
-  if (plan.creatorId !== userId) {
+  if (!isPlanHost(plan, userId)) {
     res.status(403).json({ error: "Only the host can edit this plan" });
     return;
   }
@@ -730,7 +734,7 @@ plansRouter.post("/:id/propose-time", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Plan not found" });
     return;
   }
-  if (plan.creatorId !== userId) {
+  if (!isPlanHost(plan, userId)) {
     res.status(403).json({ error: "Only the host can propose a time change" });
     return;
   }
@@ -772,7 +776,7 @@ plansRouter.post("/:id/apply-time", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Plan not found" });
     return;
   }
-  if (plan.creatorId !== userId) {
+  if (!isPlanHost(plan, userId)) {
     res.status(403).json({ error: "Only the host can apply the time change" });
     return;
   }
@@ -824,7 +828,7 @@ plansRouter.delete("/:id/propose-time", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Plan not found" });
     return;
   }
-  if (plan.creatorId !== userId) {
+  if (!isPlanHost(plan, userId)) {
     res.status(403).json({ error: "Only the host can cancel the proposal" });
     return;
   }
@@ -927,11 +931,10 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
     return;
   }
 
-  // Looking For lifecycle: only the original poster can lock the plan in.
-  // Other interested folks coordinate via the group chat; the creator stays
-  // the host through the whole lifecycle. Confirmed plans are edited via PATCH.
+  // Looking For lifecycle: the creator or a co-host can lock the plan in.
+  // Confirmed plans are edited via PATCH.
   const isLookingFor = (plan.planKind ?? "standard") === "looking_for";
-  if (plan.creatorId !== userId) {
+  if (!isPlanHost(plan, userId)) {
     res.status(403).json({
       error: isLookingFor
         ? "Only the original poster can lock this in"
@@ -1246,7 +1249,7 @@ plansRouter.post("/:id/approve", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Plan not found" });
     return;
   }
-  if (plan.creatorId !== userId) {
+  if (!isPlanHost(plan, userId)) {
     res.status(403).json({ error: "Only the host can approve" });
     return;
   }
@@ -1346,7 +1349,7 @@ plansRouter.post("/:id/transfer-host", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Plan not found" });
     return;
   }
-  if (plan.creatorId !== userId) {
+  if (!isPlanHost(plan, userId)) {
     res.status(403).json({ error: "Only the host can transfer" });
     return;
   }
@@ -1397,7 +1400,7 @@ plansRouter.post("/:id/up-for-grabs", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Plan not found" });
     return;
   }
-  if (plan.creatorId !== userId) {
+  if (!isPlanHost(plan, userId)) {
     res.status(403).json({ error: "Only the host can do this" });
     return;
   }
@@ -1478,7 +1481,7 @@ plansRouter.post("/:id/cancel", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Plan not found" });
     return;
   }
-  if (plan.creatorId !== userId) {
+  if (!isPlanHost(plan, userId)) {
     res.status(403).json({ error: "Only the host can cancel" });
     return;
   }
@@ -1534,7 +1537,7 @@ plansRouter.post("/:id/happened-outcome", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Plan not found" });
     return;
   }
-  if (plan.creatorId !== userId) {
+  if (!isPlanHost(plan, userId)) {
     res.status(403).json({ error: "Only the host can answer" });
     return;
   }
