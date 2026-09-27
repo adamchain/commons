@@ -189,24 +189,14 @@ export function ParticipationButtons({
         </p>
       )}
       {goingActive ? (
-        <>
-          <button
-            type="button"
-            className="btn-going is-active"
-            onClick={() => void tapGoing()}
-            disabled={pending}
-          >
-            I&apos;m In ✓
-          </button>
-          <button
-            type="button"
-            className="btn-interested"
-            onClick={() => setShowGoingSheet(true)}
-            disabled={pending}
-          >
-            Interested
-          </button>
-        </>
+        <button
+          type="button"
+          className="btn-going is-active"
+          onClick={() => setShowGoingSheet(true)}
+          disabled={pending}
+        >
+          Drop out
+        </button>
       ) : interestedOnly ? (
         <button
           type="button"
@@ -224,7 +214,7 @@ export function ParticipationButtons({
             onClick={() => void tapGoing()}
             disabled={pending}
           >
-            I&apos;m In
+            Join
           </button>
           <button
             type="button"
@@ -250,7 +240,7 @@ export function ParticipationButtons({
 
       {showGoingSheet && (
         <BottomSheet onClose={() => setShowGoingSheet(false)} labelledBy="rsvp-going-title">
-            <div id="rsvp-going-title" className="sheet-title">I&apos;m In</div>
+            <div id="rsvp-going-title" className="sheet-title">Joined</div>
             <div className="sheet-actions">
               <button type="button" className="sheet-link" onClick={() => void switchToInterested()}>
                 Switch to Interested
@@ -271,7 +261,7 @@ export function ParticipationButtons({
             <div className="sheet-actions">
               {!loose && !isApproveOnly && !isFull && (
                 <button type="button" className="sheet-link" onClick={() => void switchToGoing()}>
-                  Switch to I&apos;m In
+                  Switch to Join
                 </button>
               )}
               <button
