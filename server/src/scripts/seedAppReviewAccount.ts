@@ -2,7 +2,7 @@
 // data. This account is used for Apple App Review and should be kept populated
 // with sample content that demonstrates all app features.
 //
-// Test Account: +19999999999 / code 999999 (when ALLOW_TEST_LOGIN=1)
+// Test Account: +19999999999 / code 999999 (dev only — disabled in production)
 //
 // Creates:
 // - Fully onboarded user profile with photo, bio, interests
@@ -13,7 +13,7 @@
 // - Network connections with other users
 //
 // Usage:
-//   MONGODB_URI=... ALLOW_TEST_LOGIN=1 npx tsx src/scripts/seedAppReviewAccount.ts
+//   MONGODB_URI=... npx tsx src/scripts/seedAppReviewAccount.ts
 //
 // Idempotent: Safe to re-run to refresh demo data
 
@@ -186,10 +186,9 @@ async function main(): Promise<void> {
   console.log("");
   console.log("⚙️  Environment Configuration:");
   console.log("");
-  console.log("To enable test login in production for App Review:");
-  console.log("  ALLOW_TEST_LOGIN=1");
+  console.log("The fixed-code login is dev-only and will not work in production.");
   console.log("");
-  console.log("Alternative: Use a real phone number with Twilio");
+  console.log("For App Review, use a real phone number with Twilio");
   console.log("  - Provide reviewer with actual phone number");
   console.log("  - SMS code will be sent via Twilio Verify");
   console.log("  - More secure but requires reviewer to have phone");
@@ -199,8 +198,8 @@ async function main(): Promise<void> {
   console.log("✅ Test account ready for App Store Review!");
   console.log("");
   console.log("Next Steps:");
-  console.log("  1. Set ALLOW_TEST_LOGIN=1 in production env (if using test bypass)");
-  console.log("  2. Copy credentials to App Store Connect → App Review Information");
+  console.log("  1. Give App Review a real phone that can receive the Twilio code");
+  console.log("  2. Copy that number to App Store Connect → App Review Information");
   console.log("  3. Verify backend API is stable and accessible");
   console.log("  4. Test login with test account before submitting");
   console.log("");

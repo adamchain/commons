@@ -59,11 +59,9 @@ const CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 // fixed code — no Twilio SMS required — so you can test the app as a plain
 // non-member / non-admin account.
 //
-// Enabled outside production automatically, OR in any environment (including
-// production) when ALLOW_TEST_LOGIN=1 is set. The env flag lets QA test against
-// a prod-like deploy without exposing the bypass by default.
-const TEST_LOGIN_ENABLED =
-  process.env.NODE_ENV !== "production" || process.env.ALLOW_TEST_LOGIN === "1";
+// Never enabled in production. ALLOW_TEST_LOGIN is ignored there so a public
+// deploy cannot keep a fixed-code backdoor.
+const TEST_LOGIN_ENABLED = process.env.NODE_ENV !== "production";
 const TEST_LOGIN_ACCOUNTS: Record<string, string> = TEST_LOGIN_ENABLED
   ? { "+19999999999": "999999" }
   : {};
