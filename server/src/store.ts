@@ -91,6 +91,11 @@ export interface UserRecord {
   pinnedConversationIds?: string[];
   /** Set when COMMONS ejects the account for Terms / UGC violations. Blocks sign-in. */
   ejectedAt?: string | null;
+  /**
+   * Bumped on logout. Session JWTs carry the same number; a mismatch means
+   * the token was signed before the latest logout.
+   */
+  sessionVersion?: number;
 }
 
 export interface NeighborhoodRecord {

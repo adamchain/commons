@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
+import { clearAuthToken } from "../api/authToken";
 import { getCurrentCoords } from "../lib/geolocate";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { LegalContent } from "../components/LegalContent";
@@ -38,6 +39,7 @@ export function SettingsPage() {
   const signOut = async () => {
     sessionStorage.removeItem("commons_pending_admin_choice");
     await api("/api/auth/logout", { method: "POST" });
+    await clearAuthToken();
     setUser(null);
     navigate("/onboarding", { replace: true });
   };

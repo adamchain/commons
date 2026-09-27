@@ -59,6 +59,7 @@ const UserSchema = new mongoose.Schema<UserRecord>(
     leftConversationIds: { type: [String], default: undefined },
     pinnedConversationIds: { type: [String], default: undefined },
     ejectedAt: { type: String, default: null },
+    sessionVersion: { type: Number, default: 0 },
   },
   { collection: "users" },
 );

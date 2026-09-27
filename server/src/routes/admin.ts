@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type { Request, Response, NextFunction } from "express";
-import { verifySessionToken } from "../lib/jwt.js";
+import { sessionVersionMatches, verifySessionToken } from "../lib/jwt.js";
 import { isAdminPhone } from "../lib/adminPhones.js";
 import { isGcsConfigured, listDefaultCatalog, parseDataUrl, uploadCoverImage } from "../lib/gcs.js";
 import { store } from "../store.js";
@@ -39,6 +39,10 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction): Pr
     const payload = verifySessionToken(sessionCookie);
     const user = await findUserById(payload.sub);
     if (!user) {
+      res.status(401).json({ error: "Session invalid" });
+      return;
+    }
+    if (!sessionVersionMatches(user.sessionVersion, payload.sv)) {
       res.status(401).json({ error: "Session invalid" });
       return;
     }

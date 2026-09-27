@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { isAdminPhone } from "../lib/adminPhones.js";
-import { signSessionToken } from "../lib/jwt.js";
+import { sessionVersionMatches, signSessionToken, verifySessionToken } from "../lib/jwt.js";
 import { normalizePhone } from "../lib/phone.js";
 import { checkPhoneVerification, isTwilioVerifyConfigured, startPhoneVerification } from "../lib/verify.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -87,8 +87,12 @@ function parseTwilioError(err: unknown): TwilioLikeError {
   };
 }
 
-function setSessionCookie(res: import("express").Response, userId: string): string {
-  const token = signSessionToken(userId);
+function setSessionCookie(
+  res: import("express").Response,
+  userId: string,
+  sessionVersion = 0,
+): string {
+  const token = signSessionToken(userId, sessionVersion);
   res.cookie("session", token, {
     httpOnly: true,
     sameSite: "lax",
@@ -311,7 +315,7 @@ authRouter.post("/verify-code", limitVerifyByPhone, limitVerifyByIp, async (req,
       console.error("[auth] welcome notification failed", err);
     });
   }
-  const token = setSessionCookie(res, user.id);
+  const token = setSessionCookie(res, user.id, user.sessionVersion ?? 0);
   res.json({ ...meFromUser(user), token });
 });
 
@@ -478,7 +482,24 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
   res.json(me);
 });
 
-authRouter.post("/logout", (_req, res) => {
+authRouter.post("/logout", async (req, res) => {
+  const header = req.headers.authorization;
+  const bearer = header && /^Bearer\s+/i.test(header) ? header.replace(/^Bearer\s+/i, "").trim() : "";
+  const token = bearer || (req.cookies?.session as string | undefined) || "";
+  if (token) {
+    try {
+      const payload = verifySessionToken(token);
+      const user = await findUserById(payload.sub);
+      const current = user?.sessionVersion ?? 0;
+      // Only the live session can revoke itself. An already-dead token must
+      // not bump the counter and kick a newer login off.
+      if (user && sessionVersionMatches(current, payload.sv)) {
+        await updateUser(user.id, { sessionVersion: current + 1 });
+      }
+    } catch {
+      /* expired or forged — still clear the cookie */
+    }
+  }
   res.clearCookie("session");
   res.status(200).json({ ok: true });
 });

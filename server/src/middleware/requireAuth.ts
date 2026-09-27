@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { verifySessionToken } from "../lib/jwt.js";
+import { sessionVersionMatches, verifySessionToken } from "../lib/jwt.js";
 import { findUserById } from "../userRepo.js";
 
 declare module "express-serve-static-core" {
@@ -32,6 +32,10 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
     if (user.ejectedAt) {
       res.status(403).json({ error: "This account was removed for violating the COMMONS Terms of Service." });
+      return;
+    }
+    if (!sessionVersionMatches(user.sessionVersion, payload.sv)) {
+      res.status(401).json({ error: "Unauthorized" });
       return;
     }
     req.userId = user.id;
