@@ -6,12 +6,12 @@
 		"contentInset": "never"
 	},
 	"packageClassList": [
+		"SecureStorage",
 		"AppPlugin",
 		"CAPCameraPlugin",
 		"ClipboardPlugin",
 		"GeolocationPlugin",
 		"PreferencesPlugin",
-		"SecureStorage",
 		"PushNotificationsPlugin"
 	]
 }
