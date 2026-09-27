@@ -1,4 +1,7 @@
 PODS:
+  - AparajitaCapacitorSecureStorage (7.1.6):
+    - Capacitor
+    - KeychainSwift (~> 21.0)
   - Capacitor (7.6.6):
     - CapacitorCordova
   - CapacitorApp (7.1.2):
@@ -16,8 +19,10 @@ PODS:
   - CapacitorPushNotifications (7.0.6):
     - Capacitor
   - IONGeolocationLib (1.0.1)
+  - KeychainSwift (21.0.0)
 
 DEPENDENCIES:
+  - "AparajitaCapacitorSecureStorage (from `../../node_modules/@aparajita/capacitor-secure-storage`)"
   - "Capacitor (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorApp (from `../../node_modules/@capacitor/app`)"
   - "CapacitorCamera (from `../../node_modules/@capacitor/camera`)"
@@ -30,8 +35,11 @@ DEPENDENCIES:
 SPEC REPOS:
   trunk:
     - IONGeolocationLib
+    - KeychainSwift
 
 EXTERNAL SOURCES:
+  AparajitaCapacitorSecureStorage:
+    :path: "../../node_modules/@aparajita/capacitor-secure-storage"
   Capacitor:
     :path: "../../node_modules/@capacitor/ios"
   CapacitorApp:
@@ -50,6 +58,7 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/push-notifications"
 
 SPEC CHECKSUMS:
+  AparajitaCapacitorSecureStorage: 502bff73187cf9d0164459458ccf47ec65d5895a
   Capacitor: 961efd309ab0e390a8081b63c561186f61a6714d
   CapacitorApp: f01a913211780e0718dae9750442c3e23f96e106
   CapacitorCamera: 9e952270be355797f769aa835bb7643a96c871fe
@@ -59,7 +68,8 @@ SPEC CHECKSUMS:
   CapacitorPreferences: 69d9991307507aeab8ef8019c10b9babfda0e9ca
   CapacitorPushNotifications: b8e30637549ce91468b8c4dddbef2657be831f4c
   IONGeolocationLib: 20f9d0248a0b5264511fb57a37e25dd2badf797a
+  KeychainSwift: 4a71a45c802fd9e73906457c2dcbdbdc06c9419d
 
-PODFILE CHECKSUM: 2ee4fd93c6e7a14e87a8a301180b2382c3ef7431
+PODFILE CHECKSUM: a7a3ace6a919a36b0b763ecd7b24518b6d81c773
 
 COCOAPODS: 1.16.2

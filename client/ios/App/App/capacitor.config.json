@@ -11,6 +11,7 @@
 		"ClipboardPlugin",
 		"GeolocationPlugin",
 		"PreferencesPlugin",
+		"SecureStorage",
 		"PushNotificationsPlugin"
 	]
 }
