@@ -63,9 +63,6 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
       return plan && plan.creatorId !== targetId;
     }).length;
 
-  // Social links visibility: only show when the viewer has earned the connection.
-  // Earn = (a) self, (b) in target's network, (c) shared a completed plan
-  // with target (both went).
   const isSelf = viewerId === targetId;
   const viewer = await findUserById(viewerId);
   const viewerNetwork = new Set(viewer?.networkIds ?? []);
@@ -91,7 +88,9 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
   const inEitherNetwork = inMyNetwork || targetNetwork.has(viewerId);
   const sharedCompleted = hasSharedCompletedPlan(targetId, viewerId, todayIso);
   const showFullProfile = isSelf || inEitherNetwork || sharedCompleted;
-  const socialLinks = target.socialLinks ?? null;
+  // Same gate as plans: strangers don't get Instagram/TikTok until you're
+  // connected or you've already hung out.
+  const socialLinks = showFullProfile ? (target.socialLinks ?? null) : null;
   const sharedUpcoming = sharedPlanId ? upcoming.filter((p) => p.id === sharedPlanId) : [];
 
   res.json({
