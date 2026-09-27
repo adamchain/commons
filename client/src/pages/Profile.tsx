@@ -694,19 +694,9 @@ function OtherMessageButton({
       Message
     </>
   );
-  // Someone in your network gets the direct chat. Otherwise the shared plan chat.
-  const to = inNetwork
-    ? `/dm/${profileUserId}`
-    : sharedPlanId
-      ? `/plans/${sharedPlanId}/chat`
-      : null;
-  if (!to) {
-    return (
-      <button type="button" className="profile-other-cta profile-other-cta--message" disabled>
-        {inner}
-      </button>
-    );
-  }
+  // Connected people, and anyone you don't share a plan with, open a 1:1.
+  // A shared plan still opens that plan's chat.
+  const to = !inNetwork && sharedPlanId ? `/plans/${sharedPlanId}/chat` : `/dm/${profileUserId}`;
   return (
     <button
       type="button"

@@ -208,8 +208,8 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
     if (!otherId || store.isBlockedEitherWay(userId, otherId)) continue;
     const other = await findUserById(otherId);
     const msgs = store.listMessagesForConversation(conv.id);
-    const held = (conv.hiddenFromUserIds ?? []).some((id) => id !== userId);
-    if (held && !msgs.some((m) => m.kind !== "system")) continue;
+    // The other person stays hidden until they accept. The sender still sees
+    // the thread they just opened, even before the first message.
     const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
     const name = [other?.firstName, other?.lastName].filter(Boolean).join(" ") || "Message";
     summaries.push({
