@@ -227,19 +227,23 @@ export function CommunitiesPage() {
             tint="#C8DDC8"
             title={
               searching
-                ? "No communities match."
+                ? `No communities match “${query.trim()}”`
                 : catLabel
                   ? `Quiet on ${catLabel.toLowerCase()}.`
                   : "Nobody's started one yet."
             }
             body={
               searching
-                ? "Try a different name."
+                ? "Try a different word, or start one yourself."
                 : catLabel
                   ? "Try another category, or start this scene."
                   : "Run clubs, book clubs, the regulars — go first."
             }
-            cta={searching ? undefined : { to: "/communities/new", label: "Create a community" }}
+            cta={
+              searching
+                ? { to: "/communities/new", label: "Start one yourself" }
+                : { to: "/communities/new", label: "Create a community" }
+            }
           />
         )}
         {rest.length > 0 && (
