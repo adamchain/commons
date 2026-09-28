@@ -462,7 +462,7 @@ export function PlanDetailPage() {
           <span className="host-row-text">
             <span className="host-row-label">Started by</span>
             <strong>
-              {isCreator ? "you" : plan.creator.firstName}
+              {isCreator ? "You" : plan.creator.firstName}
               {plan.coHosts && plan.coHosts.length > 0 && (
                 <> &amp; {plan.coHosts.map((h) => (h.id === user.id ? "you" : h.firstName)).join(" & ")}</>
               )}

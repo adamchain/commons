@@ -1400,7 +1400,7 @@ export function CreatePlanPage() {
           <span className="host-row-text">
             <span className="host-row-label">Started by</span>
             <strong>
-              you
+              You
               {invitedPeople.length > 0
                 ? ` · ${invitedPeople.length} invited`
                 : ""}
