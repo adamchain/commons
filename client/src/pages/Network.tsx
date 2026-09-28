@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Users } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
-import { ScreenTitle } from "../components/ui";
+import { EmptyCard, ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import type { NetworkLinkStatus, PersonSearchResultDTO, PublicUser, SearchResultsDTO } from "../types/shared";
 
@@ -170,6 +170,15 @@ export function NetworkPage() {
         trimmed && (
           <p className="network-empty">Nobody by that name.</p>
         )
+      )}
+
+      {loaded && !trimmed && rows.length === 0 && (
+        <EmptyCard
+          icon={<Users size={22} strokeWidth={1.6} color="#3A6A3A" />}
+          tint="#C8DDC8"
+          title="Your people show up here once you connect."
+          body="Plans make that easy."
+        />
       )}
 
       <p className="network-invite">
