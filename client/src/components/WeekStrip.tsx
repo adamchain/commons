@@ -25,9 +25,9 @@ function prefersReducedMotion(): boolean {
 }
 
 /**
- * Compact day strip. Tap a day to filter the feed; tap again to clear.
- * All dates / Today returns to the unfiltered feed and jumps the scroller
- * back to today.
+ * Compact day strip. Tap a day to filter the feed; tap that day again to
+ * clear. Today, when the current day has scrolled out of view, jumps the
+ * scroller back without changing the filter.
  */
 export function WeekStrip({
   plans,
@@ -97,8 +97,7 @@ export function WeekStrip({
     });
   };
 
-  const showReset = selectedDayIso !== null || !todayInView;
-  const resetLabel = selectedDayIso ? "All dates" : "Today";
+  const showReset = selectedDayIso === null && !todayInView;
 
   return (
     <div className="week-strip-wrap">
@@ -134,13 +133,10 @@ export function WeekStrip({
         <button
           type="button"
           className="week-strip-reset"
-          onClick={() => {
-            if (selectedDayIso) onSelectDay(null);
-            jumpToToday();
-          }}
-          aria-label={selectedDayIso ? "Show all dates" : "Jump to today"}
+          onClick={jumpToToday}
+          aria-label="Jump to today"
         >
-          {resetLabel}
+          Today
         </button>
       )}
     </div>
