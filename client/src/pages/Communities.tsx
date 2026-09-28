@@ -142,7 +142,7 @@ export function CommunitiesPage() {
           </Link>
         )}
         <div className="cmy-list-masthead-copy">
-          <h1 className="cmy-list-title">{directory ? "All communities" : "Communities"}</h1>
+          <h1 className="cmy-list-title">Communities</h1>
         </div>
         <button
           type="button"
