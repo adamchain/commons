@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useLayoutEffect, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -158,18 +158,19 @@ export function ProfilePage() {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [isSelf]);
 
-  useEffect(() => {
-    if (!isSelf || location.hash !== "#communities") return;
+  // "Your communities" links here with #communities. Scroll once, by the
+  // distance the heading is still below the top bar. Re-running when the
+  // community list arrives was adding that offset again and landing past it.
+  useLayoutEffect(() => {
+    if (!isSelf || location.hash !== "#communities" || !profile) return;
     const el = document.getElementById("profile-communities");
     if (!el) return;
-    // scrollIntoView also scrolls overflow ancestors and, with scroll-margin,
-    // lands past the Communities heading. Move the window only, just under the
-    // fixed top bar.
     const bar = document.querySelector(".top-bar");
     const offset = (bar?.getBoundingClientRect().height ?? 56) + 8;
-    const top = el.getBoundingClientRect().top + window.scrollY - offset;
-    window.scrollTo({ top: Math.max(0, top), behavior: "auto" });
-  }, [isSelf, location.hash, communities.length, profile]);
+    const delta = el.getBoundingClientRect().top - offset;
+    if (Math.abs(delta) < 2) return;
+    window.scrollBy(0, delta);
+  }, [isSelf, location.hash, profile]);
 
   useEffect(() => {
     if (!isSelf) return;
