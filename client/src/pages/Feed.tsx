@@ -594,14 +594,14 @@ function FeedEmptyState({
     headline = "Nothing in that slice.";
     body = "Loosen it up — more of the city is out there.";
   } else if (view === "ideas") {
-    headline = "Nobody's floated one yet.";
-    body = "Coffee, a walk, whatever's rattling around.";
+    headline = "Just an idea.";
+    body = "A casual thought — see who’s down before committing to anything.";
   } else if (hasAnyPlans) {
     headline = "Quiet around here.";
-    body = "The floor's yours.";
+    body = "Toss one out. We’ll let you know when someone’s in.";
   } else {
     headline = "Quiet around here.";
-    body = "Coffee run, gallery night, pickup soccer. Anything.";
+    body = "A casual thought is enough — coffee, a walk, whoever’s around.";
   }
 
   return (

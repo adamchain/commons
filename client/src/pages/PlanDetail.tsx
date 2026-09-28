@@ -356,6 +356,15 @@ export function PlanDetailPage() {
                   : `${interestedCount} interested`}
             </span>
           </button>
+          {!isPast && !plan.cancelledAt && goingCount <= 1 && (
+            <button
+              type="button"
+              className="plan-detail-share-nudge"
+              onClick={() => setShowShare(true)}
+            >
+              Share it to get more eyes on this.
+            </button>
+          )}
         </header>
 
         {plan.description && (

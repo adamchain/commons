@@ -1605,6 +1605,19 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   border: none;
   box-sizing: border-box;
 }
+.plan-detail-share-nudge {
+  display: block;
+  margin: 8px 0 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--red);
+  font: inherit;
+  font-size: var(--text-body-small);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
 .plan-detail-people-count {
   font-size: var(--text-body);
   font-weight: 600;
