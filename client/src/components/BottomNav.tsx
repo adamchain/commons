@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Search, Plus, MessageCircle } from "lucide-react";
+import { Home, Users, Plus, MessageCircle } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "./Avatar";
 import { useAuth } from "../context/AuthContext";
@@ -8,7 +8,7 @@ import { needsOnboarding } from "../lib/onboarding";
 import type { ConversationSummaryDTO } from "../types/shared";
 
 /**
- * Bottom nav — Home · Search · Plus (create) · MessageCircle · User.
+ * Bottom nav — Home · Communities · Plus (create) · MessageCircle · User.
  * Height 58px, bg card, borderTop border. Active = red; inactive = faint.
  * Plus: 44×44 circle, red, icon 20 white.
  */
@@ -87,12 +87,12 @@ export function BottomNav() {
         to="/communities"
         end
         className={({ isActive }) => `bottom-nav-item ${isActive ? "is-active" : ""}`}
-        aria-label="Search"
+        aria-label="Communities"
       >
         <span className="bottom-nav-icon-wrap">
-          <Search size={22} strokeWidth={1.6} />
+          <Users size={22} strokeWidth={1.6} />
         </span>
-        <span className="bottom-nav-label">Search</span>
+        <span className="bottom-nav-label">Communities</span>
       </NavLink>
 
       <NavLink to="/plans/new" className="bottom-nav-cta" aria-label="Make a plan">
