@@ -901,7 +901,9 @@ function LegalConsentStep({
       </ul>
 
       <p className="legal-consent-intro">
-        You must read both documents before you can agree.
+        {bothRead
+          ? "Both read — you’re good to go."
+          : "You must read both documents before you can agree."}
       </p>
       <div className="legal-consent-openers">
         {(["terms", "privacy"] as const).map((slug) => (
