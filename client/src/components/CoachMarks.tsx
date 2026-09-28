@@ -14,6 +14,12 @@ type Step = {
 
 const STEPS: Step[] = [
   {
+    id: "rsvp",
+    title: "Join or Interested",
+    body: "Join = you’re going. Interested = keep me posted, no commitment yet.",
+    slot: 0,
+  },
+  {
     id: "post",
     title: "Post a plan or float an idea",
     body: "The plus is yours — a plan, or just an idea.",
@@ -34,8 +40,13 @@ const STEPS: Step[] = [
 ];
 
 /**
- * F.13 — first-run coach marks on Home only. Max 3, dismissible, never repeated.
+ * First-run coach marks on Home and plan detail. Dismissible, never repeated.
  */
+function showCoach(pathname: string): boolean {
+  if (pathname === "/") return true;
+  return /^\/plans\/[^/]+$/.test(pathname) && pathname !== "/plans/new";
+}
+
 export function CoachMarks() {
   const { pathname } = useLocation();
   const { user } = useAuth();
@@ -43,7 +54,7 @@ export function CoachMarks() {
 
   useEffect(() => {
     if (!user?.onboardingComplete) return;
-    if (pathname !== "/") return;
+    if (!showCoach(pathname)) return;
     try {
       if (localStorage.getItem(COACH_KEY) === "1") return;
     } catch {
@@ -54,7 +65,7 @@ export function CoachMarks() {
     return () => window.clearTimeout(t);
   }, [user?.id, user?.onboardingComplete, pathname]);
 
-  if (stepIdx === null || pathname !== "/") return null;
+  if (stepIdx === null || !showCoach(pathname)) return null;
   const step = STEPS[stepIdx];
   if (!step) return null;
 
