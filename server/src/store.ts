@@ -2397,6 +2397,9 @@ export const store = {
   },
 
   // ---- Community bulletin posts ----
+  listAllCommunityPosts(): CommunityPostRecord[] {
+    return snapshot.communityPosts.filter((p) => !p.deletedAt);
+  },
   listCommunityPosts(communityId: string): CommunityPostRecord[] {
     return snapshot.communityPosts
       .filter(
@@ -2642,6 +2645,12 @@ export const store = {
             : null,
         };
       });
+  },
+  listAllForumPosts(): ForumPostRecord[] {
+    return [...snapshot.forumPosts];
+  },
+  listAllForumReplies(): ForumReplyRecord[] {
+    return [...snapshot.forumReplies];
   },
   /** Public feed for a forum — approved posts only, sponsored included once approved. */
   listPosts(tag: InterestTag, sort: ForumSort = "recent"): ForumPostRecord[] {

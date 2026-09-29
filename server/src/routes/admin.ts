@@ -7,6 +7,7 @@ import { store } from "../store.js";
 import { listAllUsers, findUserById } from "../userRepo.js";
 import { runBehaviorAgent, analyzeUserBehavior } from "../lib/behaviorAgent.js";
 import { communityCategoriesOf, normalizeCommunityCategory } from "../types/shared.js";
+import { buildAdminDashboard, buildCommunityDetail } from "../lib/adminDashboard.js";
 import { buildCoverCatalog, invalidateCoverCatalogCache } from "../lib/coverCatalog.js";
 
 const adminRouter = Router();
@@ -89,6 +90,20 @@ function seriesLastNDays(n: number): Map<string, number> {
   }
   return map;
 }
+
+adminRouter.get("/dashboard", async (req, res) => {
+  const data = await buildAdminDashboard(req.userId);
+  res.json(data);
+});
+
+adminRouter.get("/dashboard/communities/:id", (req, res) => {
+  const detail = buildCommunityDetail(String(req.params.id));
+  if (!detail) {
+    res.status(404).json({ error: "Community not found" });
+    return;
+  }
+  res.json(detail);
+});
 
 adminRouter.get("/summary", async (_req, res) => {
   const users = await listAllUsers();

@@ -21,7 +21,7 @@ import { LandingPage } from "./pages/Landing";
 import { LegalPage } from "./pages/Legal";
 import { PlanDetailPage } from "./pages/PlanDetail";
 import { PublicEventPage } from "./pages/PublicEvent";
-import { AdminPage } from "./pages/Admin";
+import { AdminPage } from "./pages/admin/FounderDashboard";
 import { ProfilePage } from "./pages/Profile";
 import { EditProfilePage } from "./pages/EditProfile";
 import { DmChatPage } from "./pages/DmChat";
