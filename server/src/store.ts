@@ -416,6 +416,8 @@ export interface CommunityRecord {
   memberCount: number;
   creationStatus: CommunityCreationStatus;
   isFounding: boolean;
+  /** Set when an admin hides a founding community. Off the app, data kept so it can be shown again. */
+  hiddenAt?: string | null;
   bulletinPermission: CommunityPostingPermission;
   planPostingPermission: CommunityPostingPermission;
   chatEnabled: boolean;
@@ -2078,7 +2080,7 @@ export const store = {
     return [...snapshot.communities];
   },
   listApprovedCommunities(): CommunityRecord[] {
-    return snapshot.communities.filter((c) => c.creationStatus === "approved");
+    return snapshot.communities.filter((c) => c.creationStatus === "approved" && !c.hiddenAt);
   },
   listPendingCommunities(): CommunityRecord[] {
     return snapshot.communities
@@ -2149,6 +2151,7 @@ export const store = {
       memberCount: 1,
       creationStatus,
       isFounding: input.isFounding ?? false,
+      hiddenAt: null,
       bulletinPermission: input.bulletinPermission ?? "members",
       planPostingPermission: input.planPostingPermission ?? "members",
       chatEnabled: true,

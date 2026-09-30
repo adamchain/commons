@@ -3,7 +3,8 @@ import type { Request, Response, NextFunction } from "express";
 import { sessionVersionMatches, verifySessionToken } from "../lib/jwt.js";
 import { isAdminPhone } from "../lib/adminPhones.js";
 import { isGcsConfigured, listDefaultCatalog, parseDataUrl, uploadCoverImage } from "../lib/gcs.js";
-import { store } from "../store.js";
+import { store, type CommunityRecord } from "../store.js";
+import { emit } from "../lib/notify.js";
 import { listAllUsers, findUserById } from "../userRepo.js";
 import { runBehaviorAgent, analyzeUserBehavior } from "../lib/behaviorAgent.js";
 import { communityCategoriesOf, normalizeCommunityCategory } from "../types/shared.js";
@@ -513,8 +514,21 @@ adminRouter.get("/communities", async (req, res) => {
   const status = String(req.query.status ?? "pending");
   const all = store.listCommunities();
   const filtered =
-    status === "all" ? all : all.filter((c) => c.creationStatus === status);
-  filtered.sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
+    status === "all"
+      ? all
+      : status === "founding"
+        ? all.filter((c) => c.isFounding)
+        : all.filter((c) => c.creationStatus === status);
+  if (status === "founding") {
+    filtered.sort((a, b) => {
+      const hiddenRank = (c: CommunityRecord) => (c.hiddenAt ? 1 : 0);
+      const byHidden = hiddenRank(a) - hiddenRank(b);
+      if (byHidden !== 0) return byHidden;
+      return a.name.localeCompare(b.name);
+    });
+  } else {
+    filtered.sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
+  }
   const rows = await Promise.all(
     filtered.map(async (c) => {
       const organizer = await findUserById(c.organizerId);
@@ -529,6 +543,7 @@ adminRouter.get("/communities", async (req, res) => {
           : { id: c.organizerId, firstName: "Unknown", lastName: "" },
         memberCount: c.memberCount,
         isFounding: c.isFounding,
+        hiddenAt: c.hiddenAt ?? null,
         submittedAt: c.submittedAt,
         creationStatus: c.creationStatus,
       };
@@ -573,6 +588,81 @@ adminRouter.post("/communities/:id/reject", (req, res) => {
   });
   store.log("community_rejected", { communityId: community.id });
   res.json({ ok: true, community: updated });
+});
+
+function requireFoundingCommunity(id: string, res: Response): CommunityRecord | undefined {
+  const community = store.findCommunityById(id);
+  if (!community) {
+    res.status(404).json({ error: "Community not found" });
+    return;
+  }
+  if (!community.isFounding) {
+    res.status(400).json({ error: "Only founding communities can be hidden or deleted here" });
+    return;
+  }
+  return community;
+}
+
+// POST /api/admin/communities/:id/hide — take a founding community off the app. Data stays.
+adminRouter.post("/communities/:id/hide", (req, res) => {
+  const community = requireFoundingCommunity(String(req.params.id), res);
+  if (!community) return;
+  const hiddenAt = new Date().toISOString();
+  store.updateCommunity(community.id, { hiddenAt });
+  store.log("community_hidden", { communityId: community.id, by: req.userId ?? "admin" });
+  res.json({ ok: true, hiddenAt });
+});
+
+// POST /api/admin/communities/:id/show — put a hidden founding community back.
+adminRouter.post("/communities/:id/show", (req, res) => {
+  const community = requireFoundingCommunity(String(req.params.id), res);
+  if (!community) return;
+  store.updateCommunity(community.id, { hiddenAt: null });
+  store.log("community_shown", { communityId: community.id, by: req.userId ?? "admin" });
+  res.json({ ok: true, hiddenAt: null });
+});
+
+// DELETE /api/admin/communities/:id — permanently remove a founding community.
+adminRouter.delete("/communities/:id", async (req, res) => {
+  const community = requireFoundingCommunity(String(req.params.id), res);
+  if (!community) return;
+  const name = community.name;
+  const communityId = community.id;
+  const actorId = req.userId ?? "admin";
+  const result = store.deleteCommunity(communityId);
+  if (!result) {
+    res.status(404).json({ error: "Community not found" });
+    return;
+  }
+  for (const planId of result.cancelledPlanIds) {
+    const plan = store.findPlanById(planId);
+    if (!plan) continue;
+    const participants = store.listParticipationsForPlan(planId);
+    const recipientIds = Array.from(
+      new Set(
+        participants
+          .filter((p) => p.state === "going" || p.state === "interested")
+          .map((p) => p.userId)
+          .filter((id) => id !== actorId),
+      ),
+    );
+    for (const uid of recipientIds) {
+      await emit({
+        userId: uid,
+        kind: "planCancellation",
+        body: `"${plan.title}" was cancelled — ${name} was deleted`,
+        planId: plan.id,
+        dedupKey: `planCancellation:${plan.id}:${uid}`,
+      });
+    }
+  }
+  store.log("community_deleted", {
+    communityId,
+    by: actorId,
+    cancelledPlans: result.cancelledPlanIds.length,
+    founding: true,
+  });
+  res.json({ ok: true });
 });
 
 // POST /api/admin/communities/founding — create-and-approve a Founding Community,

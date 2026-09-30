@@ -193,7 +193,7 @@ export async function communityCardsForUser(userId: string): Promise<CommunityCa
   for (const membership of store.listCommunityMembershipsForUser(userId)) {
     if (membership.status !== "active" || seen.has(membership.communityId)) continue;
     const community = store.findCommunityById(membership.communityId);
-    if (!community || community.creationStatus !== "approved") continue;
+    if (!community || community.hiddenAt || community.creationStatus !== "approved") continue;
     if (isQaOrTestCommunityName(community.name)) continue;
     seen.add(community.id);
     list.push(community);
@@ -322,6 +322,23 @@ function parsePermission(
   return raw === "organizer_only" || raw === "members" ? raw : fallback;
 }
 
+// Hidden founding communities stay in storage but are gone from the app until an admin shows them again.
+// Deleting the community itself is still allowed, so memberships can be removed on purpose.
+communitiesRouter.param("id", (req, res, next, id) => {
+  const community = store.findCommunityById(String(id));
+  if (!community?.hiddenAt) {
+    next();
+    return;
+  }
+  const parts = req.path.split("/").filter(Boolean);
+  const deletingCommunity = req.method === "DELETE" && parts[parts.length - 1] === String(id);
+  if (deletingCommunity) {
+    next();
+    return;
+  }
+  res.status(404).json({ error: "Community not found" });
+});
+
 // GET /api/communities — approved communities as cards (Explore rail + browse).
 communitiesRouter.get("/", requireAuth, async (req, res) => {
   const viewerId = String(req.userId);
@@ -347,6 +364,7 @@ communitiesRouter.get("/mine", requireAuth, async (req, res) => {
     if (!community) continue;
     // Show approved communities; also surface the viewer's own pending submissions
     // so a creator sees their in-review community from their profile.
+    if (community.hiddenAt) continue;
     if (community.creationStatus === "rejected") continue;
     if (community.creationStatus === "pending" && community.organizerId !== viewerId) continue;
     list.push(community);

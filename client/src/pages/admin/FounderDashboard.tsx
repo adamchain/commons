@@ -12,6 +12,7 @@ import {
   AdminUserDetailModal,
   CardImagesManager,
   CommunitiesReview,
+  FoundingCommunityControls,
   ReportsReview,
   ReviewInbox,
 } from "../Admin";
@@ -103,6 +104,7 @@ type Dashboard = {
       name: string;
       initials: string;
       isFounding: boolean;
+      hidden: boolean;
       members: number;
       plans: number;
       bulletinPosts: number;
@@ -134,6 +136,7 @@ type CommunityDetail = {
   name: string;
   initials: string;
   isFounding: boolean;
+  hidden: boolean;
   members: number;
   description: string;
   weeks: { weekStart: string; label: string; newMembers: number; plans: number; bulletinPosts: number; activeMembers: number }[];
@@ -260,6 +263,14 @@ export function AdminPage() {
     }
   }, []);
 
+  const refresh = useCallback(async () => {
+    try {
+      setData(await api<Dashboard>("/api/admin/dashboard"));
+    } catch {
+      // Keep the current dashboard if a follow-up refresh fails.
+    }
+  }, []);
+
   useEffect(() => {
     void load();
   }, [load]);
@@ -334,10 +345,11 @@ export function AdminPage() {
                 communityId={communityId}
                 onOpen={(id) => go("communities", id)}
                 onBack={() => go("communities")}
+                onChanged={() => void refresh()}
               />
             )}
             {page === "operations" && (
-              <Operations data={data} onSelectUser={setSelectedUserId} />
+              <Operations data={data} onSelectUser={setSelectedUserId} onChanged={() => void refresh()} />
             )}
           </>
         ) : null}
@@ -765,17 +777,24 @@ function Communities({
   communityId,
   onOpen,
   onBack,
+  onChanged,
 }: {
   data: Dashboard;
   communityId: string | null;
   onOpen: (id: string) => void;
   onBack: () => void;
+  onChanged: () => void;
 }) {
-  if (communityId) return <CommunityDetail id={communityId} onBack={onBack} />;
+  if (communityId) return <CommunityDetail id={communityId} onBack={onBack} onChanged={onChanged} />;
   return (
     <>
       <PageHead title="Communities" sub="Approved communities · plans are all-time, active members are this week" updated={data.updatedLabel} />
       <article className="fdash-card">
+        {data.communities.rows.some((c) => c.isFounding) ? (
+          <p className="fdash-muted" style={{ marginTop: 0 }}>
+            Hide a founding community to take it off the app and show it again later. Delete removes it and cancels its plans.
+          </p>
+        ) : null}
         {data.communities.rows.length === 0 ? (
           <p className="fdash-muted">No approved communities yet.</p>
         ) : (
@@ -799,8 +818,21 @@ function Communities({
                       <button type="button" className="fdash-linkish" onClick={() => onOpen(c.id)}>
                         {c.name}
                         {c.isFounding ? <span className="fdash-type"> · Founding</span> : null}
+                        {c.hidden ? <span className="fdash-type"> · Hidden</span> : null}
                       </button>
                     </div>
+                    {c.isFounding ? (
+                      <div style={{ marginTop: 8 }}>
+                        <FoundingCommunityControls
+                          id={c.id}
+                          name={c.name}
+                          hidden={c.hidden}
+                          hideClassName="fdash-btn fdash-btn--ghost"
+                          deleteClassName="fdash-btn"
+                          onDone={onChanged}
+                        />
+                      </div>
+                    ) : null}
                   </td>
                   <td className="is-num">{c.members}</td>
                   <td className="is-num">{c.plans}</td>
@@ -817,7 +849,7 @@ function Communities({
   );
 }
 
-function CommunityDetail({ id, onBack }: { id: string; onBack: () => void }) {
+function CommunityDetail({ id, onBack, onChanged }: { id: string; onBack: () => void; onChanged: () => void }) {
   const [detail, setDetail] = useState<CommunityDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -837,8 +869,24 @@ function CommunityDetail({ id, onBack }: { id: string; onBack: () => void }) {
         <>
           <PageHead
             title={detail.name}
-            sub={`${detail.members} members${detail.isFounding ? " · Founding" : ""} · ${detail.description || "No description"}`}
+            sub={`${detail.members} members${detail.isFounding ? " · Founding" : ""}${detail.hidden ? " · Hidden" : ""} · ${detail.description || "No description"}`}
           />
+          {detail.isFounding ? (
+            <div style={{ margin: "0 0 14px" }}>
+              <FoundingCommunityControls
+                id={detail.id}
+                name={detail.name}
+                hidden={detail.hidden}
+                hideClassName="fdash-btn fdash-btn--ghost"
+                deleteClassName="fdash-btn"
+                onDone={(action) => {
+                  onChanged();
+                  if (action === "delete") onBack();
+                  else setDetail((current) => (current ? { ...current, hidden: action === "hide" } : current));
+                }}
+              />
+            </div>
+          ) : null}
           <article className="fdash-card">
             <h2>Plans posted by week</h2>
             <div className="fdash-weekbars">
@@ -886,7 +934,15 @@ function CommunityDetail({ id, onBack }: { id: string; onBack: () => void }) {
   );
 }
 
-function Operations({ data, onSelectUser }: { data: Dashboard; onSelectUser: (id: string) => void }) {
+function Operations({
+  data,
+  onSelectUser,
+  onChanged,
+}: {
+  data: Dashboard;
+  onSelectUser: (id: string) => void;
+  onChanged: () => void;
+}) {
   const [query, setQuery] = useState("");
   const sys = data.operations.system;
   const matches = useMemo(() => {
@@ -996,7 +1052,7 @@ function Operations({ data, onSelectUser }: { data: Dashboard; onSelectUser: (id
         </article>
 
         <ReviewInbox />
-        <CommunitiesReview />
+        <CommunitiesReview onChanged={onChanged} />
         <ReportsReview />
         <details className="fdash-card">
           <summary style={{ cursor: "pointer", fontWeight: 680 }}>Event card library</summary>

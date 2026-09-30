@@ -105,6 +105,7 @@ export interface AdminDashboard {
       name: string;
       initials: string;
       isFounding: boolean;
+      hidden: boolean;
       members: number;
       plans: number;
       bulletinPosts: number;
@@ -434,7 +435,7 @@ export async function buildAdminDashboard(viewerId?: string): Promise<AdminDashb
 
   const communityActivity = communityActivityIndex(communities.map((c) => c.id), posts, livePlans, conversations, messages);
   const alerts = communities
-    .filter((c) => c.isFounding && c.creationStatus === "approved")
+    .filter((c) => c.isFounding && c.creationStatus === "approved" && !c.hiddenAt)
     .map((c) => {
       const last = communityActivity.lastAt.get(c.id) ?? c.createdAt;
       const daysInactive = Math.floor((now.getTime() - Date.parse(last)) / 86400000);
@@ -445,7 +446,7 @@ export async function buildAdminDashboard(viewerId?: string): Promise<AdminDashb
     .map(({ communityId, name, daysInactive }) => ({ communityId, name, daysInactive }));
 
   const activeCommunities = communities
-    .filter((c) => c.creationStatus === "approved")
+    .filter((c) => c.creationStatus === "approved" && !c.hiddenAt)
     .map((c) => ({
       id: c.id,
       name: c.name,
@@ -668,7 +669,7 @@ function buildHealth(input: {
     .sort((a, b) => b.weekStart.localeCompare(a.weekStart))
     .slice(0, 6);
 
-  const approved = input.communities.filter((c) => c.creationStatus === "approved");
+  const approved = input.communities.filter((c) => c.creationStatus === "approved" && !c.hiddenAt);
   const communityRows = approved
     .map((c) => {
       const last = input.communityActivity.lastAt.get(c.id) ?? null;
@@ -872,6 +873,7 @@ function buildCommunityRows(
         name: c.name,
         initials: initials(c.name),
         isFounding: c.isFounding,
+        hidden: Boolean(c.hiddenAt),
         members: c.memberCount,
         plans: plans.filter((p) => p.communityId === c.id).length,
         bulletinPosts: posts.filter((p) => p.communityId === c.id && !p.parentId).length,
@@ -879,7 +881,10 @@ function buildCommunityRows(
         lastActivityAt: communityActivity.lastAt.get(c.id) ?? null,
       };
     })
-    .sort((a, b) => b.activeMembers - a.activeMembers || b.plans - a.plans || a.name.localeCompare(b.name));
+    .sort((a, b) => {
+      if (a.hidden !== b.hidden) return a.hidden ? 1 : -1;
+      return b.activeMembers - a.activeMembers || b.plans - a.plans || a.name.localeCompare(b.name);
+    });
 }
 
 export function buildCommunityDetail(communityId: string) {
@@ -919,6 +924,7 @@ export function buildCommunityDetail(communityId: string) {
     name: community.name,
     initials: initials(community.name),
     isFounding: community.isFounding,
+    hidden: Boolean(community.hiddenAt),
     members: community.memberCount,
     description: community.description,
     weeks,

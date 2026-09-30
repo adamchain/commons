@@ -174,7 +174,7 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
   for (const membership of store.listCommunityMembershipsForUser(userId)) {
     if (membership.status !== "active") continue;
     const community = store.findCommunityById(membership.communityId);
-    if (!community || !community.chatEnabled || community.creationStatus !== "approved") continue;
+    if (!community || community.hiddenAt || !community.chatEnabled || community.creationStatus !== "approved") continue;
     const conv = store.findCommunityConversation(community.id);
     if (conv && store.hasLeftConversation(userId, conv.id)) continue;
     if (conv && !conv.participantIds.includes(userId)) continue;
@@ -258,6 +258,10 @@ function canAccessPlanGroupChat(planId: string, userId: string): boolean {
 }
 
 function canReadConversation(conv: ConversationRecord, userId: string): boolean {
+  if (conv.communityId) {
+    const community = store.findCommunityById(conv.communityId);
+    if (!community || community.hiddenAt) return false;
+  }
   if (conv.participantIds.includes(userId)) return true;
   if (conv.planId) return canAccessPlanGroupChat(conv.planId, userId);
   return false;

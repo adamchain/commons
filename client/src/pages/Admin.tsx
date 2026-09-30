@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api/http";
+import { api, parseApiError } from "../api/http";
 import { invalidateCardImages } from "../lib/cardImages";
 import {
   ALL_COMMUNITY_CATEGORIES,
@@ -772,13 +772,75 @@ interface AdminCommunityRow {
   organizer: { id: string; firstName: string; lastName: string };
   memberCount: number;
   isFounding: boolean;
+  hiddenAt: string | null;
   submittedAt: string;
   creationStatus: "pending" | "approved" | "rejected";
 }
 
+export function FoundingCommunityControls({
+  id,
+  name,
+  hidden,
+  hideClassName = "btn",
+  deleteClassName = "btn",
+  onDone,
+}: {
+  id: string;
+  name: string;
+  hidden: boolean;
+  hideClassName?: string;
+  deleteClassName?: string;
+  onDone: (action: "hide" | "show" | "delete") => void | Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function run(path: string, method: string, action: "hide" | "show" | "delete") {
+    setBusy(true);
+    setError(null);
+    try {
+      await api(path, { method });
+      await onDone(action);
+    } catch (e) {
+      setError(parseApiError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center" }}>
+      <button
+        type="button"
+        className={hideClassName}
+        disabled={busy}
+        onClick={() => void run(`/api/admin/communities/${id}/${hidden ? "show" : "hide"}`, "POST", hidden ? "show" : "hide")}
+      >
+        {busy ? "Saving…" : hidden ? "Show" : "Hide"}
+      </button>
+      <button
+        type="button"
+        className={deleteClassName}
+        disabled={busy}
+        onClick={() => {
+          const ok = window.confirm(
+            `Delete "${name}"? This removes the community, its members, chat, and bulletin, and cancels its plans. Hide it if you might want it back.`,
+          );
+          if (!ok) return;
+          void run(`/api/admin/communities/${id}`, "DELETE", "delete");
+        }}
+      >
+        Delete
+      </button>
+      {error ? <span className="error-text" style={{ fontSize: 12 }}>{error}</span> : null}
+    </div>
+  );
+}
+
 // Pending-communities review queue + Founding Community creation.
-export function CommunitiesReview() {
+export function CommunitiesReview({ onChanged }: { onChanged?: () => void | Promise<void> }) {
   const [rows, setRows] = useState<AdminCommunityRow[] | null>(null);
+  const [foundingRows, setFoundingRows] = useState<AdminCommunityRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [founding, setFounding] = useState({ name: "", description: "", category: "events", organizer: "" });
@@ -787,8 +849,12 @@ export function CommunitiesReview() {
 
   const load = useCallback(async () => {
     try {
-      const r = await api<{ communities: AdminCommunityRow[] }>("/api/admin/communities?status=pending");
-      setRows(r.communities);
+      const [pending, foundingList] = await Promise.all([
+        api<{ communities: AdminCommunityRow[] }>("/api/admin/communities?status=pending"),
+        api<{ communities: AdminCommunityRow[] }>("/api/admin/communities?status=founding"),
+      ]);
+      setRows(pending.communities);
+      setFoundingRows(foundingList.communities);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Failed to load");
@@ -830,6 +896,7 @@ export function CommunitiesReview() {
       setFounding({ name: "", description: "", category: "events", organizer: "" });
       setFoundingMsg("Founding community created and approved.");
       await load();
+      await onChanged?.();
     } catch (e) {
       setFoundingMsg(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Could not create");
     } finally {
@@ -887,6 +954,56 @@ export function CommunitiesReview() {
                     Reject
                   </button>
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <h3 className="admin-section-title" style={{ marginTop: "1.25rem", marginBottom: "0.5rem" }}>
+          Founding communities
+        </h3>
+        <p style={{ fontSize: 13, opacity: 0.7, margin: "0 0 0.75rem" }}>
+          Hide takes a community off Explore, search, and messages. Show brings it back with members intact. Delete removes it and cancels its plans.
+        </p>
+        {!foundingRows ? (
+          <p>Loading…</p>
+        ) : foundingRows.length === 0 ? (
+          <p style={{ opacity: 0.7, margin: 0 }}>No founding communities yet.</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            {foundingRows.map((c) => (
+              <div
+                key={c.id}
+                style={{
+                  border: "1px solid rgba(0,0,0,0.1)",
+                  borderRadius: 12,
+                  padding: "0.75rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.35rem",
+                  opacity: c.hiddenAt ? 0.72 : 1,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem" }}>
+                  <strong>
+                    {c.name}
+                    {c.hiddenAt ? <span style={{ fontWeight: 500, opacity: 0.7 }}> · Hidden</span> : null}
+                  </strong>
+                  <span style={{ fontSize: 12, opacity: 0.6 }}>{c.memberCount} members</span>
+                </div>
+                <div style={{ fontSize: 13, opacity: 0.85 }}>{c.description}</div>
+                <div style={{ fontSize: 12, opacity: 0.6 }}>
+                  by {c.organizer.firstName} {c.organizer.lastName}
+                </div>
+                <FoundingCommunityControls
+                  id={c.id}
+                  name={c.name}
+                  hidden={Boolean(c.hiddenAt)}
+                  onDone={async () => {
+                    await load();
+                    await onChanged?.();
+                  }}
+                />
               </div>
             ))}
           </div>

@@ -320,6 +320,7 @@ const CommunitySchema = new Schema<CommunityRecord>(
     memberCount: { type: Number, default: 1 },
     creationStatus: { type: String, enum: ["pending", "approved", "rejected"], default: "approved" },
     isFounding: { type: Boolean, default: false },
+    hiddenAt: { type: String, default: null },
     bulletinPermission: { type: String, enum: ["organizer_only", "members"], default: "members" },
     planPostingPermission: { type: String, enum: ["organizer_only", "members"], default: "members" },
     chatEnabled: { type: Boolean, default: true },

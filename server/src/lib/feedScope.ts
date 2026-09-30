@@ -38,6 +38,8 @@ export function planVisibleToViewer(plan: PlanRecord, me: UserRecord): boolean {
     return false;
   }
   if (plan.communityId && plan.communityVisibility === "community_only") {
+    const community = store.findCommunityById(plan.communityId);
+    if (community?.hiddenAt) return false;
     if (plan.creatorId === me.id) return true;
     const membership = store.findCommunityMembership(plan.communityId, me.id);
     if (membership?.status !== "active") return false;

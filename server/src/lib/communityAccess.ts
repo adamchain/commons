@@ -73,10 +73,11 @@ export function communityMembershipBlockReason(
  * Returns an error string, or null if creation status allows the write.
  */
 export function communityCreationBlockReason(
-  community: Pick<CommunityRecord, "organizerId" | "creationStatus"> | null | undefined,
+  community: Pick<CommunityRecord, "organizerId" | "creationStatus" | "hiddenAt"> | null | undefined,
   userId: string,
 ): string | null {
   if (!community) return "Community not found";
+  if (community.hiddenAt) return "Community not found";
   if (community.creationStatus === "pending") {
     if (!isCommunityOrganizer(community, userId)) {
       return "This community is pending review";
