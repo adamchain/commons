@@ -10902,6 +10902,16 @@ a.action-btn--stack {
 .plan-guests-modal-list .who-row-name-list {
   margin-top: 8px;
 }
+.plan-guests-modal-list .who-row-name-text {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.35em;
+}
+.plan-guests-modal-list .who-row-name-sub {
+  font-size: inherit;
+  font-weight: 600;
+  color: var(--ink);
+}
 
 /* ---- Polls ---- */
 .chat-composer-poll {
