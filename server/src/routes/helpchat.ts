@@ -1,6 +1,12 @@
 import { Router } from "express";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireAuth } from "../middleware/requireAuth.js";
+import {
+  HELP_TICKET_SECTION_LABELS,
+  isHelpTicketSection,
+  store,
+  type HelpTicketRecord,
+} from "../store.js";
 
 export const helpchatRouter = Router();
 
@@ -420,4 +426,44 @@ helpchatRouter.post("/", requireAuth, async (req, res) => {
     res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
     res.end();
   }
+});
+
+function helpTicketDTO(ticket: HelpTicketRecord) {
+  return {
+    id: ticket.id,
+    section: ticket.section,
+    sectionLabel: HELP_TICKET_SECTION_LABELS[ticket.section],
+    body: ticket.body,
+    status: ticket.status,
+    reply: ticket.reply,
+    createdAt: ticket.createdAt,
+    repliedAt: ticket.repliedAt,
+    resolvedAt: ticket.resolvedAt,
+  };
+}
+
+// GET /api/helpchat/tickets — open notes, plus resolved ones for 24 hours.
+helpchatRouter.get("/tickets", requireAuth, (req, res) => {
+  const tickets = store.listVisibleHelpTicketsForUser(String(req.userId)).map(helpTicketDTO);
+  res.json({ tickets });
+});
+
+// POST /api/helpchat/tickets { section, message }
+helpchatRouter.post("/tickets", requireAuth, (req, res) => {
+  const sectionRaw = String(req.body?.section ?? "").trim();
+  const message = typeof req.body?.message === "string" ? req.body.message.trim().slice(0, 2000) : "";
+  if (!isHelpTicketSection(sectionRaw)) {
+    res.status(400).json({ error: "Pick a section of the app" });
+    return;
+  }
+  if (message.length < 2) {
+    res.status(400).json({ error: "Tell us a bit more so we can help" });
+    return;
+  }
+  const ticket = store.createHelpTicket({
+    userId: String(req.userId),
+    section: sectionRaw,
+    body: message,
+  });
+  res.status(201).json({ ticket: helpTicketDTO(ticket) });
 });

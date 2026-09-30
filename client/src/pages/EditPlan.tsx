@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Ban, Check, Hand } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { AvatarCropModal } from "../components/AvatarCropModal";
 import { NumberPicker } from "../components/NumberPicker";
 import { ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
@@ -98,6 +99,7 @@ function EditForm({
 }) {
   const navigate = useNavigate();
   const flyerRef = useRef<HTMLInputElement>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
 
   // Mirror current plan into editable form state.
   const initialVibes = useMemo<VibeIcon[]>(
@@ -171,16 +173,16 @@ function EditForm({
   }
 
   function onFlyerPick(file: File): void {
-    fileToResizedDataUrl(file)
-      .then((dataUrl) => setForm((f) => ({ ...f, flyerDataUrl: dataUrl })))
+    fileToResizedDataUrl(file, 1600, 0.9)
+      .then(setCropSrc)
       .catch(() => setSubmitErr("Couldn't read that image. Try another."));
   }
 
   async function openFlyerPicker(): Promise<void> {
     if (isNative()) {
       try {
-        const dataUrl = await pickPhotoNative({ maxPx: 1024, quality: 0.85 });
-        if (dataUrl) setForm((f) => ({ ...f, flyerDataUrl: dataUrl }));
+        const dataUrl = await pickPhotoNative({ maxPx: 1600, quality: 0.9 });
+        if (dataUrl) setCropSrc(dataUrl);
       } catch {
         /* user canceled */
       }
@@ -718,6 +720,20 @@ function EditForm({
           onTransferred={() => navigate(`/plans/${plan.id}`)}
         />
       </section>
+      {cropSrc && (
+        <AvatarCropModal
+          src={cropSrc}
+          shape="rect"
+          aspect={3 / 2}
+          outputPx={1200}
+          title="Position your cover"
+          onCancel={() => setCropSrc(null)}
+          onConfirm={(dataUrl) => {
+            setForm((f) => ({ ...f, flyerDataUrl: dataUrl }));
+            setCropSrc(null);
+          }}
+        />
+      )}
     </main>
   );
 }

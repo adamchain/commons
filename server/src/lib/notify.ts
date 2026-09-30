@@ -53,6 +53,7 @@ const PREF_KEY: Record<NotificationKind, keyof NotificationPrefs> = {
   welcome: "someoneJoinedYourPlan",
   // Ops alert for COMMONS admins. Not gated by a member preference.
   communityReview: "someoneJoinedYourPlan",
+  helpReply: "someoneJoinedYourPlan",
 };
 
 export async function emit(input: {

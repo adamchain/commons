@@ -199,13 +199,14 @@ function hrefFor(n: NotificationDTO): string | null {
   if (n.kind === "newGroupChatMessage" && n.profileUserId && !n.planId) return `/dm/${n.profileUserId}`;
   if (n.kind === "newGroupChatMessage" && n.planId) return `/plans/${n.planId}/chat`;
   if (n.kind === "welcome") return "/settings/interests";
+  if (n.kind === "helpReply") return "/helpchat";
   // Network request/accept link to the other person's profile, where the
   // Accept / connected state lives.
   if ((n.kind === "networkRequest" || n.kind === "networkAccepted") && n.profileUserId) {
     return `/profile/${n.profileUserId}`;
   }
   // A new community waiting on COMMONS admin review opens the review queue.
-  if (n.kind === "communityReview") return "/admin#communities-review";
+  if (n.kind === "communityReview") return "/admin?page=communities#communities-review";
   // Join requests and posts waiting on the organizer open the dashboard queue.
   if (n.kind === "communityJoinRequest" && n.communityId) {
     return `/communities/${n.communityId}/dashboard?section=requests`;
@@ -271,5 +272,7 @@ function iconFor(kind: NotificationKind): ReactNode {
       return <Users {...props} />;
     case "communityReview":
       return <Shield {...props} />;
+    case "helpReply":
+      return <MessageCircle {...props} />;
   }
 }

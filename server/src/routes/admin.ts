@@ -3,7 +3,7 @@ import type { Request, Response, NextFunction } from "express";
 import { sessionVersionMatches, verifySessionToken } from "../lib/jwt.js";
 import { isAdminPhone } from "../lib/adminPhones.js";
 import { isGcsConfigured, listDefaultCatalog, parseDataUrl, uploadCoverImage } from "../lib/gcs.js";
-import { store, type CommunityRecord } from "../store.js";
+import { HELP_TICKET_SECTION_LABELS, store, type CommunityRecord, type HelpTicketRecord } from "../store.js";
 import { emit } from "../lib/notify.js";
 import { listAllUsers, findUserById } from "../userRepo.js";
 import { runBehaviorAgent, analyzeUserBehavior } from "../lib/behaviorAgent.js";
@@ -821,6 +821,59 @@ adminRouter.post("/reports/:id/eject", (req, res) => {
     targetUserId: report.targetUserId,
   });
   res.json({ ok: true, report: updated, ejected: true });
+});
+
+function helpTicketAdminDTO(ticket: HelpTicketRecord, user: { id: string; firstName: string; lastName?: string | null } | undefined) {
+  return {
+    id: ticket.id,
+    section: ticket.section,
+    sectionLabel: HELP_TICKET_SECTION_LABELS[ticket.section],
+    body: ticket.body,
+    status: ticket.status,
+    reply: ticket.reply,
+    createdAt: ticket.createdAt,
+    repliedAt: ticket.repliedAt,
+    user: user
+      ? { id: user.id, firstName: user.firstName, lastName: user.lastName ?? "" }
+      : { id: ticket.userId, firstName: "Member", lastName: "" },
+  };
+}
+
+adminRouter.get("/help-tickets", async (_req, res) => {
+  const rows = store.listHelpTickets().filter((t) => t.status !== "resolved");
+  const tickets = await Promise.all(
+    rows.map(async (ticket) => helpTicketAdminDTO(ticket, await findUserById(ticket.userId))),
+  );
+  res.json({ tickets });
+});
+
+adminRouter.post("/help-tickets/:id/reply", async (req, res) => {
+  const reply = typeof req.body?.reply === "string" ? req.body.reply.trim().slice(0, 2000) : "";
+  if (!reply) {
+    res.status(400).json({ error: "Write a reply" });
+    return;
+  }
+  const ticket = store.replyToHelpTicket(String(req.params.id), reply);
+  if (!ticket) {
+    res.status(404).json({ error: "That request is already resolved or missing" });
+    return;
+  }
+  await emit({
+    userId: ticket.userId,
+    kind: "helpReply",
+    body: "Commons replied to your help request.",
+    dedupKey: `helpReply:${ticket.id}:${ticket.repliedAt ?? ticket.id}`,
+  });
+  res.json({ ok: true, ticket: helpTicketAdminDTO(ticket, await findUserById(ticket.userId)) });
+});
+
+adminRouter.post("/help-tickets/:id/resolve", async (req, res) => {
+  const ticket = store.resolveHelpTicket(String(req.params.id));
+  if (!ticket) {
+    res.status(404).json({ error: "That request is already resolved or missing" });
+    return;
+  }
+  res.json({ ok: true, ticket: helpTicketAdminDTO(ticket, await findUserById(ticket.userId)) });
 });
 
 export { adminRouter };

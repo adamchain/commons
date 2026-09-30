@@ -17,6 +17,7 @@ import { api, parseApiError } from "../api/http";
 import { FLEXIBLE_DATE_PLACEHOLDER, thisWeekAnchorDate } from "../lib/planTime";
 import { formatPlaceAddress, formatPlanDate, formatPlanTime, normalizeHttpUrl } from "../lib/format";
 import { Avatar } from "../components/Avatar";
+import { AvatarCropModal } from "../components/AvatarCropModal";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
 import { LocationAutocomplete } from "../components/LocationAutocomplete";
 import { useAuth } from "../context/AuthContext";
@@ -318,6 +319,7 @@ export function CreatePlanPage() {
   });
   const [lockCrew, setLockCrew] = useState<PublicUser[]>([]);
   const flyerRef = useRef<HTMLInputElement>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [showCoverLib, setShowCoverLib] = useState(false);
   const [coverPickerOpen, setCoverPickerOpen] = useState(false);
   const [showInvitePicker, setShowInvitePicker] = useState(false);
@@ -831,16 +833,16 @@ export function CreatePlanPage() {
   };
 
   const onFlyerPick = (file: File) => {
-    fileToResizedDataUrl(file)
-      .then((dataUrl) => setForm((f) => ({ ...f, flyerDataUrl: dataUrl })))
+    fileToResizedDataUrl(file, 1600, 0.9)
+      .then(setCropSrc)
       .catch(() => setError("Couldn't read that image. Try another."));
   };
 
   const openFlyerPicker = async () => {
     if (isNative()) {
       try {
-        const dataUrl = await pickPhotoNative({ maxPx: 1024, quality: 0.85 });
-        if (dataUrl) setForm((f) => ({ ...f, flyerDataUrl: dataUrl }));
+        const dataUrl = await pickPhotoNative({ maxPx: 1600, quality: 0.9 });
+        if (dataUrl) setCropSrc(dataUrl);
       } catch {
         /* user canceled */
       }
@@ -848,6 +850,21 @@ export function CreatePlanPage() {
     }
     flyerRef.current?.click();
   };
+
+  const coverCrop = cropSrc ? (
+    <AvatarCropModal
+      src={cropSrc}
+      shape="rect"
+      aspect={3 / 2}
+      outputPx={1200}
+      title="Position your cover"
+      onCancel={() => setCropSrc(null)}
+      onConfirm={(dataUrl) => {
+        setForm((f) => ({ ...f, flyerDataUrl: dataUrl }));
+        setCropSrc(null);
+      }}
+    />
+  ) : null;
 
   const [linkBusy, setLinkBusy] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
@@ -1052,9 +1069,10 @@ export function CreatePlanPage() {
               setForm((f) => ({ ...f, flyerDataUrl: url }));
               setShowCoverLib(false);
             }}
-            onClose={() => setShowCoverLib(false)}
-          />
+          onClose={() => setShowCoverLib(false)}
+        />
         )}
+        {coverCrop}
       </>
     );
   }
@@ -1726,6 +1744,7 @@ export function CreatePlanPage() {
           onClose={() => setShowCoverLib(false)}
         />
       )}
+      {coverCrop}
     </main>
   );
 }

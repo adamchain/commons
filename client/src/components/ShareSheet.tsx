@@ -177,22 +177,46 @@ export function ShareSheet({ plan, isOwn = false, onClose }: { plan: PlanDTO; is
   );
 }
 
-// Community header share. The system share call can hang or reject inside the
-// iOS webview and on desktop without ever showing a sheet, so the header tap
-// opens this panel first. Copy always has its own click.
+// Community header share. Same live card as a plan share: the thumbnail is the
+// PNG crawlers see, so iMessage / Instagram / X match this sheet.
 export function CommunityShareSheet({
   name,
   communityId,
+  memberCount,
   onClose,
 }: {
   name: string;
   communityId: string;
+  memberCount: number;
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
-  const url = `${getPublicWebOrigin()}/communities/${communityId}`;
+  const [igCopied, setIgCopied] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void getActiveInviteCode().then((code) => {
+      if (active) setInviteCode(code);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const url = useMemo(() => {
+    const base = `${getPublicWebOrigin()}/communities/${communityId}`;
+    return inviteCode ? `${base}?invite=${encodeURIComponent(inviteCode)}` : base;
+  }, [communityId, inviteCode]);
+  const previewSrc = useMemo(
+    () => `${API_BASE}/communities/${communityId}/og-image.png?m=${memberCount}`,
+    [communityId, memberCount],
+  );
   const shareText = `Join ${name} on COMMONS`;
+  const smsBody = encodeURIComponent(`${shareText} ${url}`);
   const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+  const memberLabel = memberCount === 1 ? "1 member" : `${memberCount} members`;
 
   async function copyLink() {
     try {
@@ -218,7 +242,7 @@ export function CommunityShareSheet({
 
   async function nativeShare() {
     try {
-      await navigator.share({ title: name, text: shareText, url });
+      await navigator.share({ title: shareText, text: shareText, url });
       onClose();
     } catch (err) {
       if (isShareCancel(err)) return;
@@ -226,23 +250,99 @@ export function CommunityShareSheet({
     }
   }
 
+  function openExternal(href: string) {
+    window.open(href, "_blank", "noopener,noreferrer");
+  }
+
+  async function shareToInstagram() {
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      /* clipboard unavailable — the deep link still opens the app */
+    }
+    setIgCopied(true);
+    setTimeout(() => setIgCopied(false), 2200);
+    window.location.href = "instagram://app";
+  }
+
+  const channels: { key: string; label: string; icon: ReactNode; onClick: () => void }[] = [
+    {
+      key: "sms",
+      label: "Messages",
+      icon: <MessagesIcon />,
+      onClick: () => openExternal(`sms:?&body=${smsBody}`),
+    },
+    {
+      key: "instagram",
+      label: igCopied ? "Link copied!" : "Instagram",
+      icon: <InstagramIcon />,
+      onClick: () => void shareToInstagram(),
+    },
+    {
+      key: "whatsapp",
+      label: "WhatsApp",
+      icon: <WhatsAppIcon />,
+      onClick: () => openExternal(`https://wa.me/?text=${encodeURIComponent(`${shareText} ${url}`)}`),
+    },
+    {
+      key: "facebook",
+      label: "Facebook",
+      icon: <FacebookIcon />,
+      onClick: () => openExternal(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`),
+    },
+    {
+      key: "x",
+      label: "X",
+      icon: <XIcon />,
+      onClick: () =>
+        openExternal(
+          `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`,
+        ),
+    },
+  ];
+
   return (
     <BottomSheet onClose={onClose} labelledBy="community-share-title">
       <div id="community-share-title" className="sheet-title">Share this community</div>
       <div className="share-preview">
-        <div className="share-preview-fallback">
-          <div className="share-preview-fallback-title">{name}</div>
+        {imgFailed ? (
+          <div className="share-preview-fallback">
+            <div className="share-preview-fallback-title">{name}</div>
+          </div>
+        ) : (
+          <img
+            className="share-preview-img"
+            src={previewSrc}
+            alt={`${name} share card`}
+            loading="eager"
+            onError={() => setImgFailed(true)}
+          />
+        )}
+        <div className="share-preview-caption">
+          {memberLabel} — updates as people join
         </div>
-        <div className="share-preview-caption">Send a link so people can open this community.</div>
       </div>
-      <button type="button" className="share-primary-btn" onClick={() => void copyLink()}>
-        {copied ? "Link copied" : "Copy link"}
-      </button>
       {canNativeShare && (
-        <button type="button" className="btn-secondary btn-block" onClick={() => void nativeShare()}>
-          Share…
+        <button type="button" className="share-primary-btn" onClick={() => void nativeShare()}>
+          <ShareGlyph /> Share…
         </button>
       )}
+      <div className="share-channels">
+        {channels.map((c) => (
+          <button key={c.key} type="button" className="share-channel" onClick={c.onClick}>
+            <span className={`share-channel-icon share-channel-icon--${c.key}`} aria-hidden="true">
+              {c.icon}
+            </span>
+            <span className="share-channel-label">{c.label}</span>
+          </button>
+        ))}
+        <button type="button" className="share-channel" onClick={() => void copyLink()}>
+          <span className="share-channel-icon share-channel-icon--copy" aria-hidden="true">
+            <LinkIcon />
+          </span>
+          <span className="share-channel-label">{copied ? "Copied!" : "Copy link"}</span>
+        </button>
+      </div>
       <button type="button" className="btn-link sheet-cancel" onClick={onClose}>
         Cancel
       </button>

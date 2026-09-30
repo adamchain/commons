@@ -12,6 +12,7 @@ function pathForPushData(data: unknown): string | null {
   if (!data || typeof data !== "object") return null;
   const d = data as Record<string, string>;
   if (d.kind === "communityReview") return "/admin#communities-review";
+  if (d.kind === "helpReply") return "/helpchat";
   if (d.kind === "communityJoinRequest" && d.communityId) {
     return `/communities/${d.communityId}/dashboard?section=requests`;
   }

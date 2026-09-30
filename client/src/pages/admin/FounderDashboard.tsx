@@ -13,6 +13,7 @@ import {
   CardImagesManager,
   CommunitiesReview,
   FoundingCommunityControls,
+  HelpTicketsReview,
   ReportsReview,
   ReviewInbox,
 } from "../Admin";
@@ -788,7 +789,8 @@ function Communities({
   if (communityId) return <CommunityDetail id={communityId} onBack={onBack} onChanged={onChanged} />;
   return (
     <>
-      <PageHead title="Communities" sub="Approved communities · plans are all-time, active members are this week" updated={data.updatedLabel} />
+      <PageHead title="Communities" sub="Pending review, then approved communities · plans are all-time, active members are this week" updated={data.updatedLabel} />
+      <CommunitiesReview pendingOnly onChanged={onChanged} />
       <article className="fdash-card">
         {data.communities.rows.some((c) => c.isFounding) ? (
           <p className="fdash-muted" style={{ marginTop: 0 }}>
@@ -1053,6 +1055,7 @@ function Operations({
 
         <ReviewInbox />
         <CommunitiesReview onChanged={onChanged} />
+        <HelpTicketsReview />
         <ReportsReview />
         <details className="fdash-card">
           <summary style={{ cursor: "pointer", fontWeight: 680 }}>Event card library</summary>

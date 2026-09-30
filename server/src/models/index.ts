@@ -28,6 +28,7 @@ import type {
   ParticipationRecord,
   PlanRecord,
   PlanSuggestionRecord,
+  HelpTicketRecord,
   ReportRecord,
 } from "../store.js";
 
@@ -274,6 +275,29 @@ const ReportSchema = new Schema<ReportRecord>(
 ReportSchema.index({ id: 1 }, { unique: true });
 ReportSchema.index({ status: 1, createdAt: -1 });
 export const ReportModel = compile<ReportRecord>("Report", ReportSchema);
+
+const HelpTicketSchema = new Schema<HelpTicketRecord>(
+  {
+    id: { type: String, required: true },
+    userId: { type: String, required: true },
+    section: {
+      type: String,
+      enum: ["general", "plans", "communities", "messages", "profile", "feed"],
+      required: true,
+    },
+    body: { type: String, required: true },
+    status: { type: String, enum: ["open", "replied", "resolved"], default: "open" },
+    reply: { type: String, default: null },
+    repliedAt: { type: String, default: null },
+    resolvedAt: { type: String, default: null },
+    createdAt: { type: String, required: true },
+  },
+  { collection: "helpTickets" },
+);
+HelpTicketSchema.index({ id: 1 }, { unique: true });
+HelpTicketSchema.index({ userId: 1, createdAt: -1 });
+HelpTicketSchema.index({ status: 1, createdAt: -1 });
+export const HelpTicketModel = compile<HelpTicketRecord>("HelpTicket", HelpTicketSchema);
 
 // Card images — admin-curated cover art for event cards. Tiny collection, but
 // durable so the library survives restarts and isn't tied to a code deploy.

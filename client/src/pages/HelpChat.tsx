@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowUp, Bot, ChevronDown } from "lucide-react";
-import { API_BASE } from "../api/http";
+import { API_BASE, api, parseApiError } from "../api/http";
 import { getAuthToken } from "../api/authToken";
 import { isNative } from "../lib/platform";
 
@@ -118,6 +118,33 @@ const HELP_SECTIONS = [
     ],
   },
 ];
+
+const CONTACT_SECTIONS = [
+  { id: "general", label: "General" },
+  { id: "plans", label: "Plans" },
+  { id: "communities", label: "Communities" },
+  { id: "messages", label: "Messages" },
+  { id: "profile", label: "Profile" },
+  { id: "feed", label: "Feed" },
+] as const;
+
+type HelpTicket = {
+  id: string;
+  section: string;
+  sectionLabel: string;
+  body: string;
+  status: "open" | "replied" | "resolved";
+  reply: string | null;
+  createdAt: string;
+  repliedAt: string | null;
+  resolvedAt: string | null;
+};
+
+function ticketStatusLabel(status: HelpTicket["status"]): string {
+  if (status === "replied") return "Reply from Commons";
+  if (status === "resolved") return "Resolved";
+  return "Waiting for a reply";
+}
 
 async function buildHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -366,7 +393,48 @@ export function HelpChatPage() {
   };
 
   const [openSection, setOpenSection] = useState<string | null>(null);
+  const [tickets, setTickets] = useState<HelpTicket[]>([]);
+  const [contactOpen, setContactOpen] = useState(false);
+  const [contactSection, setContactSection] = useState<(typeof CONTACT_SECTIONS)[number]["id"]>("general");
+  const [contactMessage, setContactMessage] = useState("");
+  const [contactBusy, setContactBusy] = useState(false);
+  const [contactError, setContactError] = useState<string | null>(null);
   const isEmpty = messages.length === 0;
+
+  const loadTickets = useCallback(async () => {
+    try {
+      const res = await api<{ tickets: HelpTicket[] }>("/api/helpchat/tickets");
+      setTickets(res.tickets);
+    } catch {
+      /* the chat still works if the ticket list can't load */
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTickets();
+    const timer = window.setInterval(() => void loadTickets(), 20000);
+    return () => window.clearInterval(timer);
+  }, [loadTickets]);
+
+  async function submitContact(e: React.FormEvent) {
+    e.preventDefault();
+    if (contactBusy) return;
+    setContactBusy(true);
+    setContactError(null);
+    try {
+      const res = await api<{ ticket: HelpTicket }>("/api/helpchat/tickets", {
+        method: "POST",
+        body: JSON.stringify({ section: contactSection, message: contactMessage }),
+      });
+      setTickets((prev) => [res.ticket, ...prev.filter((t) => t.id !== res.ticket.id)]);
+      setContactMessage("");
+      setContactOpen(false);
+    } catch (err) {
+      setContactError(parseApiError(err));
+    } finally {
+      setContactBusy(false);
+    }
+  }
 
   return (
     <main className="helpchat-shell">
@@ -446,6 +514,24 @@ export function HelpChatPage() {
         )}
       </div>
 
+      {tickets.length > 0 && (
+        <div className="helpchat-tickets" aria-label="Your requests">
+          {tickets.map((ticket) => (
+            <article
+              key={ticket.id}
+              className={`helpchat-ticket${ticket.status === "resolved" ? " is-resolved" : ""}`}
+            >
+              <div className="helpchat-ticket-meta">
+                <span>{ticket.sectionLabel}</span>
+                <span>{ticketStatusLabel(ticket.status)}</span>
+              </div>
+              <p className="helpchat-ticket-body">{ticket.body}</p>
+              {ticket.reply && <p className="helpchat-ticket-reply">{ticket.reply}</p>}
+            </article>
+          ))}
+        </div>
+      )}
+
       <div className="helpchat-composer">
         <div className="helpchat-composer-box">
           <textarea
@@ -468,6 +554,51 @@ export function HelpChatPage() {
             <ArrowUp size={15} strokeWidth={2.5} aria-hidden="true" />
           </button>
         </div>
+        <button
+          type="button"
+          className="helpchat-contact"
+          onClick={() => {
+            setContactOpen((open) => !open);
+            setContactError(null);
+          }}
+        >
+          {contactOpen ? "Close" : "Can’t find an answer? Contact us"}
+        </button>
+        {contactOpen && (
+          <form className="helpchat-contact-form" onSubmit={(e) => void submitContact(e)}>
+            <label className="helpchat-contact-label" htmlFor="help-contact-section">
+              Where in the app
+            </label>
+            <select
+              id="help-contact-section"
+              className="helpchat-contact-select"
+              value={contactSection}
+              onChange={(e) => setContactSection(e.target.value as (typeof CONTACT_SECTIONS)[number]["id"])}
+            >
+              {CONTACT_SECTIONS.map((section) => (
+                <option key={section.id} value={section.id}>
+                  {section.label}
+                </option>
+              ))}
+            </select>
+            <label className="helpchat-contact-label" htmlFor="help-contact-message">
+              What’s going on
+            </label>
+            <textarea
+              id="help-contact-message"
+              className="helpchat-contact-text"
+              rows={4}
+              maxLength={2000}
+              placeholder="Tell us what you need help with"
+              value={contactMessage}
+              onChange={(e) => setContactMessage(e.target.value)}
+            />
+            {contactError && <p className="helpchat-error">{contactError}</p>}
+            <button type="submit" className="helpchat-contact-send" disabled={contactBusy || contactMessage.trim().length < 2}>
+              {contactBusy ? "Sending…" : "Send to Commons"}
+            </button>
+          </form>
+        )}
       </div>
     </main>
   );

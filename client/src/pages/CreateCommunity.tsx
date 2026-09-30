@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Camera, ImagePlus, MapPin } from "lucide-react";
 import { api } from "../api/http";
+import { AvatarCropModal } from "../components/AvatarCropModal";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
 import { LocationAutocomplete } from "../components/LocationAutocomplete";
 import { LegalContent } from "../components/LegalContent";
@@ -41,6 +42,7 @@ export function CreateCommunityPage() {
   const [screeningOn, setScreeningOn] = useState(false);
   const [screening, setScreening] = useState("");
   const [coverImage, setCoverImage] = useState<string | null>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [coverBusy, setCoverBusy] = useState(false);
   const [showCoverLib, setShowCoverLib] = useState(false);
   const [legalSheet, setLegalSheet] = useState<"terms" | "privacy" | null>(null);
@@ -56,7 +58,7 @@ export function CreateCommunityPage() {
     setCoverBusy(true);
     setErr(null);
     try {
-      setCoverImage(await fileToResizedDataUrl(file, 1024, 0.85));
+      setCropSrc(await fileToResizedDataUrl(file, 1600, 0.9));
     } catch {
       setErr("Couldn't read that image. Try another.");
     } finally {
@@ -66,15 +68,12 @@ export function CreateCommunityPage() {
 
   async function openCoverUpload() {
     if (isNative()) {
-      setCoverBusy(true);
       setErr(null);
       try {
-        const dataUrl = await pickPhotoNative({ maxPx: 1024, quality: 0.85 });
-        if (dataUrl) setCoverImage(dataUrl);
+        const dataUrl = await pickPhotoNative({ maxPx: 1600, quality: 0.9 });
+        if (dataUrl) setCropSrc(dataUrl);
       } catch {
         /* user canceled */
-      } finally {
-        setCoverBusy(false);
       }
       return;
     }
@@ -434,6 +433,20 @@ export function CreateCommunityPage() {
         />
       )}
       {legalSheet && <LegalSheet slug={legalSheet} onClose={() => setLegalSheet(null)} />}
+      {cropSrc && (
+        <AvatarCropModal
+          src={cropSrc}
+          shape="rect"
+          aspect={16 / 9}
+          outputPx={1200}
+          title="Position your cover"
+          onCancel={() => setCropSrc(null)}
+          onConfirm={(dataUrl) => {
+            setCoverImage(dataUrl);
+            setCropSrc(null);
+          }}
+        />
+      )}
     </main>
   );
 }

@@ -7376,6 +7376,10 @@ a.action-btn--stack {
 .avatar-crop-stage:active {
   cursor: grabbing;
 }
+.avatar-crop-stage--rect {
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
 .avatar-crop-img {
   position: absolute;
   top: 0;
@@ -7395,7 +7399,7 @@ a.action-btn--stack {
 }
 .avatar-crop-zoom {
   width: 100%;
-  max-width: 260px;
+  max-width: 320px;
   accent-color: var(--accent);
 }
 .avatar-crop-actions {
@@ -7404,7 +7408,7 @@ a.action-btn--stack {
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  max-width: 260px;
+  max-width: 320px;
 }
 
 .segmented {
@@ -15951,4 +15955,111 @@ span.profile-other-cta {
   color: var(--muted);
   cursor: default;
   box-shadow: none;
+}
+.helpchat-tickets {
+  flex-shrink: 0;
+  max-height: 34dvh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 14px 0;
+}
+.helpchat-ticket {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 12px 14px;
+}
+.helpchat-ticket.is-resolved {
+  opacity: 0.72;
+}
+.helpchat-ticket-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--text-caption, 12px);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.helpchat-ticket.is-resolved .helpchat-ticket-meta span:last-child {
+  color: var(--text);
+}
+.helpchat-ticket-body,
+.helpchat-ticket-reply {
+  margin: 0;
+  font-size: var(--text-body-small);
+  line-height: 1.45;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+.helpchat-ticket-reply {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.helpchat-contact {
+  display: block;
+  width: 100%;
+  margin: 10px 0 0;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: var(--text-body-small);
+  text-align: center;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.helpchat-contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+.helpchat-contact-label {
+  font-size: var(--text-caption, 12px);
+  font-weight: 650;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.helpchat-contact-select,
+.helpchat-contact-text {
+  width: 100%;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-body);
+  padding: 10px 12px;
+}
+.helpchat-contact-text {
+  resize: vertical;
+  min-height: 96px;
+  line-height: 1.45;
+}
+.helpchat-contact-select:focus,
+.helpchat-contact-text:focus {
+  outline: none;
+  border-color: var(--red);
+}
+.helpchat-contact-send {
+  margin-top: 4px;
+  border: none;
+  border-radius: 12px;
+  background: var(--red);
+  color: #fff;
+  font-weight: 700;
+  font-size: var(--text-body);
+  padding: 12px 14px;
+  cursor: pointer;
+}
+.helpchat-contact-send:disabled {
+  background: var(--border);
+  color: var(--muted);
+  cursor: default;
 }

@@ -22,6 +22,14 @@ export default defineConfig({
           return req.url;
         },
       },
+      "/communities": {
+        target: "http://localhost:4000",
+        changeOrigin: true,
+        bypass(req) {
+          if (req.url && req.url.includes("/og-image.png")) return undefined;
+          return req.url;
+        },
+      },
     },
   },
 })

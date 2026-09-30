@@ -25,7 +25,13 @@ import { linkPreviewRouter } from "./routes/linkPreview.js";
 import { searchRouter } from "./routes/search.js";
 import { usersRouter } from "./routes/users.js";
 import { reportsRouter } from "./routes/reports.js";
-import { shareRouter, injectPlanMeta, planIdFromDetailPath } from "./routes/share.js";
+import {
+  shareRouter,
+  injectPlanMeta,
+  planIdFromDetailPath,
+  injectCommunityMeta,
+  communityIdFromDetailPath,
+} from "./routes/share.js";
 import { helpchatRouter } from "./routes/helpchat.js";
 import { store } from "./store.js";
 import { readFileSync } from "node:fs";
@@ -135,6 +141,15 @@ if (isProduction) {
       if (plan) {
         res.setHeader("Cache-Control", "public, max-age=120");
         res.type("html").send(injectPlanMeta(indexHtml, plan, publicOrigin(req)));
+        return;
+      }
+    }
+    const communityId = communityIdFromDetailPath(req.path);
+    if (communityId) {
+      const community = store.findCommunityById(communityId);
+      if (community) {
+        res.setHeader("Cache-Control", "public, max-age=120");
+        res.type("html").send(injectCommunityMeta(indexHtml, community, publicOrigin(req)));
         return;
       }
     }

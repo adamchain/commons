@@ -5,6 +5,7 @@ import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
 import { LinkedText } from "../components/LinkedText";
+import { AvatarCropModal } from "../components/AvatarCropModal";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
 import { JoinConfirmPopup } from "../components/JoinConfirmPopup";
 import { PlanCard } from "../components/PlanCard";
@@ -414,6 +415,7 @@ export function CommunityDetailPage() {
         <CommunityShareSheet
           name={community.name}
           communityId={community.id}
+          memberCount={community.memberCount}
           onClose={() => setShowShare(false)}
         />
       )}
@@ -1410,6 +1412,7 @@ function SettingsTab({
   const [categories, setCategories] = useState<CommunityCategory[]>(() => communityCategoriesOf(community));
   const [screening, setScreening] = useState(community.screeningQuestion ?? "");
   const [coverImage, setCoverImage] = useState<string | null>(community.coverImage ?? null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [coverBusy, setCoverBusy] = useState(false);
   const [showCoverLib, setShowCoverLib] = useState(false);
   const [bulletinPermission, setBulletinPermission] = useState<CommunityPostingPermission>(community.bulletinPermission);
@@ -1452,7 +1455,7 @@ function SettingsTab({
     setCoverBusy(true);
     setErr(null);
     try {
-      setCoverImage(await fileToResizedDataUrl(file, 1024, 0.85));
+      setCropSrc(await fileToResizedDataUrl(file, 1600, 0.9));
     } catch {
       setErr("Couldn't read that image. Try another.");
     } finally {
@@ -1462,15 +1465,12 @@ function SettingsTab({
 
   async function openCoverUpload() {
     if (isNative()) {
-      setCoverBusy(true);
       setErr(null);
       try {
-        const dataUrl = await pickPhotoNative({ maxPx: 1024, quality: 0.85 });
-        if (dataUrl) setCoverImage(dataUrl);
+        const dataUrl = await pickPhotoNative({ maxPx: 1600, quality: 0.9 });
+        if (dataUrl) setCropSrc(dataUrl);
       } catch {
         /* user canceled */
-      } finally {
-        setCoverBusy(false);
       }
       return;
     }
@@ -1614,6 +1614,20 @@ function SettingsTab({
             setShowCoverLib(false);
           }}
           onClose={() => setShowCoverLib(false)}
+        />
+      )}
+      {cropSrc && (
+        <AvatarCropModal
+          src={cropSrc}
+          shape="rect"
+          aspect={16 / 9}
+          outputPx={1200}
+          title="Position your cover"
+          onCancel={() => setCropSrc(null)}
+          onConfirm={(dataUrl) => {
+            setCoverImage(dataUrl);
+            setCropSrc(null);
+          }}
         />
       )}
 

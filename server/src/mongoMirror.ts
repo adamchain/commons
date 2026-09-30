@@ -26,6 +26,7 @@ import {
   ForumPostModel,
   ForumReplyModel,
   InterestForumModel,
+  HelpTicketModel,
   LogModel,
   MessageModel,
   NeighborhoodModel,
@@ -54,6 +55,7 @@ import type {
   ForumPostRecord,
   ForumReplyRecord,
   InterestForumRecord,
+  HelpTicketRecord,
   InviteCodeRecord,
   LogRecord,
   MessageRecord,
@@ -283,6 +285,9 @@ export const mongoMirror = {
 
   upsertReport(r: ReportRecord): void {
     upsert(ReportModel as never, r, `upsertReport ${r.id}`);
+  },
+  upsertHelpTicket(t: HelpTicketRecord): void {
+    upsert(HelpTicketModel as never, t, `upsertHelpTicket ${t.id}`);
   },
 
   // Notifications

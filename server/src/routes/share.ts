@@ -1,9 +1,9 @@
-// Dynamic social-share cards for plans.
+// Dynamic social-share cards for plans and communities.
 //
 // Social crawlers (Facebook, iMessage, X, LinkedIn, WhatsApp, Slack, …) don't
 // run JS, so the client SPA's static <meta> tags are all they'd otherwise see —
-// every shared plan link would preview as the generic Commons card. This module
-// gives each plan its own live preview:
+// every shared plan or community link would preview as the generic Commons card.
+// This module gives each plan and live community its own preview:
 //
 //   • GET /plans/:id/og-image.png  — a 1200×630 card rendered from the real
 //     event (cover photo, title, date, place, host) with a LIVE
@@ -23,7 +23,8 @@ import { Router } from "express";
 import satori from "satori";
 import { Resvg } from "@resvg/resvg-js";
 import { coverPoolSync } from "../lib/coverCatalog.js";
-import { store, type PlanRecord } from "../store.js";
+import { store, type CommunityRecord, type PlanRecord } from "../store.js";
+import { communityCategoryLine } from "../types/shared.js";
 
 export const shareRouter = Router();
 
@@ -85,9 +86,8 @@ export function coverUrlFor(plan: PlanRecord): string {
   return hashPick(pool, plan.id);
 }
 
-/** Fetch a remote/curated cover and inline it as a data URI. Returns null on failure. */
-async function coverDataUri(plan: PlanRecord): Promise<string | null> {
-  const src = coverUrlFor(plan);
+/** Fetch a remote cover and inline it as a data URI. Returns null on failure. */
+async function fetchImageDataUri(src: string): Promise<string | null> {
   if (!src) return null;
   if (src.startsWith("data:")) return src;
   try {
@@ -104,6 +104,11 @@ async function coverDataUri(plan: PlanRecord): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/** Fetch a remote/curated cover and inline it as a data URI. Returns null on failure. */
+async function coverDataUri(plan: PlanRecord): Promise<string | null> {
+  return fetchImageDataUri(coverUrlFor(plan));
 }
 
 // ---- Text helpers ----------------------------------------------------------
@@ -228,7 +233,7 @@ function logoChip(): El {
   );
 }
 
-function goingPill(going: number, interested: number): El {
+function statPill(label: string): El {
   return h(
     "div",
     {
@@ -250,7 +255,7 @@ function goingPill(going: number, interested: number): El {
         background: RED,
         marginRight: 10,
       }),
-      text(countBadge(going, interested), {
+      text(label, {
         color: INK,
         fontFamily: "Inter",
         fontWeight: 600,
@@ -258,6 +263,10 @@ function goingPill(going: number, interested: number): El {
       }),
     ],
   );
+}
+
+function goingPill(going: number, interested: number): El {
+  return statPill(countBadge(going, interested));
 }
 
 function buildTree(
@@ -414,6 +423,173 @@ shareRouter.get("/plans/:id/og-image.png", async (req, res) => {
   }
 });
 
+// ---- Community cards -------------------------------------------------------
+// Same 1200×630 layout as a plan card: cover, wordmark, live member count,
+// name, category, and place. Only approved, visible communities get a card.
+
+const CATEGORY_COVERS: Record<string, string> = {
+  coffee: "https://images.unsplash.com/photo-1453614512568-c4024d13c247?auto=format&fit=crop&w=1200&q=70",
+  food: "https://images.unsplash.com/photo-1574966739987-65e38db0f7ce?auto=format&fit=crop&w=1200&q=70",
+  drinks: "https://images.unsplash.com/photo-1568644396922-5c3bfae12521?auto=format&fit=crop&w=1200&q=70",
+  workouts: "https://images.unsplash.com/photo-1603455778956-d71832eafa4e?auto=format&fit=crop&w=1200&q=70",
+  wellness: "https://images.unsplash.com/photo-1603455778956-d71832eafa4e?auto=format&fit=crop&w=1200&q=70",
+  walks: "https://images.unsplash.com/photo-1615373111465-965023eb989c?auto=format&fit=crop&w=1200&q=70",
+  creative: "https://images.unsplash.com/photo-1518998053901-5348d3961a04?auto=format&fit=crop&w=1200&q=70",
+  events: "https://images.unsplash.com/photo-1518998053901-5348d3961a04?auto=format&fit=crop&w=1200&q=70",
+  music: "https://images.unsplash.com/photo-1518998053901-5348d3961a04?auto=format&fit=crop&w=1200&q=70",
+  books: "https://images.unsplash.com/photo-1518998053901-5348d3961a04?auto=format&fit=crop&w=1200&q=70",
+  night_out: "https://images.unsplash.com/photo-1568644396922-5c3bfae12521?auto=format&fit=crop&w=1200&q=70",
+  games: "https://images.unsplash.com/photo-1518998053901-5348d3961a04?auto=format&fit=crop&w=1200&q=70",
+  cowork: "https://images.unsplash.com/photo-1453614512568-c4024d13c247?auto=format&fit=crop&w=1200&q=70",
+  moms: "https://images.unsplash.com/photo-1615373111465-965023eb989c?auto=format&fit=crop&w=1200&q=70",
+  new_to_philly: "https://images.unsplash.com/photo-1615373111465-965023eb989c?auto=format&fit=crop&w=1200&q=70",
+  sober: "https://images.unsplash.com/photo-1453614512568-c4024d13c247?auto=format&fit=crop&w=1200&q=70",
+};
+
+function isShareableCommunity(community: CommunityRecord): boolean {
+  return community.creationStatus === "approved" && !community.hiddenAt;
+}
+
+function communityCoverSource(community: CommunityRecord): string {
+  if (community.coverImage) return community.coverImage;
+  return CATEGORY_COVERS[community.category] ?? CATEGORY_COVERS.events;
+}
+
+function memberBadge(memberCount: number): string {
+  const n = Math.max(0, memberCount);
+  if (n <= 1) return "1 member";
+  return `${n} members`;
+}
+
+function buildCommunityTree(community: CommunityRecord, cover: string | null): El {
+  const organizer = store.findUserById(community.organizerId);
+  const organizerName = organizer?.firstName ?? "an organizer";
+  const place = community.city?.trim() || "Philadelphia";
+  const meta = [communityCategoryLine(community), place].filter(Boolean).join("  ·  ");
+
+  const layers: unknown[] = [];
+  if (cover) {
+    layers.push({
+      type: "img",
+      props: {
+        src: cover,
+        width: OG_WIDTH,
+        height: OG_HEIGHT,
+        style: { position: "absolute", top: 0, left: 0, width: OG_WIDTH, height: OG_HEIGHT, objectFit: "cover" },
+      },
+    });
+  } else {
+    layers.push(
+      h("div", {
+        position: "absolute", top: 0, left: 0, width: OG_WIDTH, height: OG_HEIGHT,
+        background: "linear-gradient(135deg, #1A1A2E 0%, #C13B3B 100%)",
+      }),
+    );
+  }
+
+  layers.push(
+    h("div", {
+      position: "absolute", top: 0, left: 0, width: OG_WIDTH, height: OG_HEIGHT,
+      background: "linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.05) 40%, rgba(0,0,0,0.78) 100%)",
+    }),
+  );
+
+  layers.push(
+    h(
+      "div",
+      {
+        position: "absolute", top: 40, left: 48, right: 48, display: "flex",
+        alignItems: "center",
+      },
+      [logoChip()],
+    ),
+  );
+
+  layers.push(
+    h(
+      "div",
+      {
+        position: "absolute", left: 56, right: 56, bottom: 52,
+        display: "flex", flexDirection: "column",
+      },
+      [
+        statPill(memberBadge(community.memberCount)),
+        text(titleCase(community.name), {
+          color: "#fff", fontFamily: "Montserrat", fontWeight: 800, fontSize: 64,
+          lineHeight: 1.08, letterSpacing: -1.2, maxHeight: 210, overflow: "hidden",
+          textShadow: "0 3px 18px rgba(0,0,0,0.45)",
+        }),
+        text(meta, {
+          color: "rgba(255,255,255,0.9)", fontFamily: "Inter", fontWeight: 600, fontSize: 28,
+          marginTop: 16, textShadow: "0 2px 10px rgba(0,0,0,0.5)",
+        }),
+        text(`Organized by ${organizerName}`, {
+          color: "rgba(255,255,255,0.72)", fontFamily: "Inter", fontWeight: 400, fontSize: 24, marginTop: 8,
+        }),
+      ],
+    ),
+  );
+
+  return h(
+    "div",
+    { width: OG_WIDTH, height: OG_HEIGHT, display: "flex", position: "relative", background: "#111" },
+    layers,
+  );
+}
+
+function communityCacheKey(community: CommunityRecord): string {
+  const fp = [
+    community.name,
+    community.category,
+    (community.categories ?? []).join(","),
+    community.city ?? "",
+    community.coverImage ? `c${community.coverImage.length}` : "",
+    community.organizerId,
+    community.creationStatus,
+    community.hiddenAt ?? "",
+  ].join("|");
+  return `ogc1:${community.id}:${community.memberCount}:${fp}`;
+}
+
+async function renderCommunityCard(community: CommunityRecord): Promise<Buffer> {
+  const key = communityCacheKey(community);
+  const hit = imageCache.get(key);
+  if (hit) return hit;
+
+  const cover = await fetchImageDataUri(communityCoverSource(community));
+  const svg = await satori(buildCommunityTree(community, cover) as never, {
+    width: OG_WIDTH,
+    height: OG_HEIGHT,
+    fonts: loadFonts(),
+    loadAdditionalAsset: async (code, segment) => {
+      if (code !== "emoji") return "";
+      return (await emojiDataUri(segment)) ?? TRANSPARENT_PNG;
+    },
+  });
+  const png = new Resvg(svg, { fitTo: { mode: "width", value: OG_WIDTH } }).render().asPng();
+
+  if (imageCache.size > 200) imageCache.clear();
+  imageCache.set(key, png);
+  return png;
+}
+
+shareRouter.get("/communities/:id/og-image.png", async (req, res) => {
+  const community = store.findCommunityById(req.params.id);
+  if (!community || !isShareableCommunity(community)) {
+    res.status(404).send("Not found");
+    return;
+  }
+  try {
+    const png = await renderCommunityCard(community);
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "public, max-age=300, s-maxage=300");
+    res.send(png);
+  } catch (err) {
+    console.error("[og-image community]", err);
+    res.status(500).send("Failed to render");
+  }
+});
+
 // ---- HTML meta injection ---------------------------------------------------
 function esc(s: string): string {
   return s
@@ -473,6 +649,58 @@ export function injectPlanMeta(html: string, plan: PlanRecord, origin: string): 
 /** True for `/plans/:id` exactly (not /edit, /chat, /new). */
 export function planIdFromDetailPath(pathname: string): string | null {
   const m = /^\/plans\/([^/]+)\/?$/.exec(pathname);
+  if (!m) return null;
+  const id = decodeURIComponent(m[1]);
+  if (id === "new") return null;
+  return id;
+}
+
+/**
+ * Rewrite the SPA index.html's social tags for a live community. Pending,
+ * rejected, and hidden communities keep the generic Commons card.
+ */
+export function injectCommunityMeta(html: string, community: CommunityRecord, origin: string): string {
+  if (!isShareableCommunity(community)) return html;
+  const title = titleCase(community.name);
+  const place = community.city?.trim() || "Philadelphia";
+  const badge = memberBadge(community.memberCount);
+  const category = communityCategoryLine(community);
+  const description = `${[category, place, badge].filter(Boolean).join(" · ")} — join on Commons.`;
+  const pageUrl = `${origin}/communities/${community.id}`;
+  const imageUrl = `${origin}/communities/${community.id}/og-image.png?m=${community.memberCount}`;
+
+  const tags = `
+    <title>${esc(title)} · Commons</title>
+    <meta name="description" content="${esc(description)}" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Commons" />
+    <meta property="og:title" content="${esc(title)}" />
+    <meta property="og:description" content="${esc(description)}" />
+    <meta property="og:url" content="${esc(pageUrl)}" />
+    <meta property="og:image" content="${esc(imageUrl)}" />
+    <meta property="og:image:secure_url" content="${esc(imageUrl)}" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="${OG_WIDTH}" />
+    <meta property="og:image:height" content="${OG_HEIGHT}" />
+    <meta property="og:image:alt" content="${esc(title)} on Commons" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${esc(title)}" />
+    <meta name="twitter:description" content="${esc(description)}" />
+    <meta name="twitter:image" content="${esc(imageUrl)}" />
+    <meta name="twitter:image:alt" content="${esc(title)} on Commons" />
+  `;
+
+  const stripped = html
+    .replace(/<title>[\s\S]*?<\/title>/i, "")
+    .replace(/<meta[^>]+(?:name|property)=["'](?:og:[^"']*|twitter:[^"']*|description)["'][^>]*>\s*/gi, "")
+    .replace(/<link[^>]+rel=["']canonical["'][^>]*>\s*/i, `<link rel="canonical" href="${esc(pageUrl)}" />`);
+
+  return stripped.replace(/<\/head>/i, `${tags}\n  </head>`);
+}
+
+/** True for `/communities/:id` exactly (not /new, /dashboard, /chat). */
+export function communityIdFromDetailPath(pathname: string): string | null {
+  const m = /^\/communities\/([^/]+)\/?$/.exec(pathname);
   if (!m) return null;
   const id = decodeURIComponent(m[1]);
   if (id === "new") return null;

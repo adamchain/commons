@@ -764,6 +764,147 @@ export function ReportsReview() {
   );
 }
 
+type HelpTicketRow = {
+  id: string;
+  sectionLabel: string;
+  body: string;
+  status: "open" | "replied" | "resolved";
+  reply: string | null;
+  createdAt: string;
+  user: { id: string; firstName: string; lastName: string };
+};
+
+export function HelpTicketsReview() {
+  const [rows, setRows] = useState<HelpTicketRow[] | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await api<{ tickets: HelpTicketRow[] }>("/api/admin/help-tickets");
+      setRows(r.tickets);
+      setDrafts((prev) => {
+        const next = { ...prev };
+        for (const ticket of r.tickets) {
+          if (next[ticket.id] === undefined) next[ticket.id] = ticket.reply ?? "";
+        }
+        return next;
+      });
+      setError(null);
+    } catch (e) {
+      setError(parseApiError(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function sendReply(id: string) {
+    const reply = (drafts[id] ?? "").trim();
+    if (!reply) return;
+    setBusyId(id);
+    setError(null);
+    try {
+      await api(`/api/admin/help-tickets/${id}/reply`, {
+        method: "POST",
+        body: JSON.stringify({ reply }),
+      });
+      await load();
+    } catch (e) {
+      setError(parseApiError(e));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function resolve(id: string) {
+    setBusyId(id);
+    setError(null);
+    try {
+      await api(`/api/admin/help-tickets/${id}/resolve`, { method: "POST" });
+      await load();
+    } catch (e) {
+      setError(parseApiError(e));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const openCount = rows?.filter((r) => r.status === "open").length ?? 0;
+
+  return (
+    <section className="admin-section" id="help-tickets">
+      <h2 className="admin-section-title">
+        Help requests{rows ? ` · ${openCount} waiting` : ""}
+      </h2>
+      <p style={{ fontSize: 13, opacity: 0.75, margin: "0 0 12px" }}>
+        Reply here and it shows on that member’s Help page until you mark it resolved. Resolved requests stay visible to them for 24 hours.
+      </p>
+      <div className="admin-card">
+        {error && <p className="error-text">{error}</p>}
+        {!rows ? (
+          <p>Loading…</p>
+        ) : rows.length === 0 ? (
+          <p style={{ opacity: 0.7, margin: 0 }}>No open help requests.</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            {rows.map((ticket) => (
+              <div
+                key={ticket.id}
+                style={{
+                  border: "1px solid rgba(0,0,0,0.1)",
+                  borderRadius: 12,
+                  padding: "0.75rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.45rem",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem" }}>
+                  <strong>
+                    {ticket.sectionLabel} · {ticket.user.firstName} {ticket.user.lastName}
+                  </strong>
+                  <span style={{ fontSize: 12, opacity: 0.6 }}>
+                    {ticket.status === "open" ? "Waiting" : "Replied"} · {new Date(ticket.createdAt).toLocaleString()}
+                  </span>
+                </div>
+                <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{ticket.body}</p>
+                <textarea
+                  rows={3}
+                  value={drafts[ticket.id] ?? ""}
+                  onChange={(e) => setDrafts((prev) => ({ ...prev, [ticket.id]: e.target.value }))}
+                  placeholder="Reply to this member"
+                  style={{ width: "100%", font: "inherit", padding: "0.5rem", borderRadius: 8 }}
+                />
+                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="admin-btn"
+                    disabled={busyId === ticket.id || !(drafts[ticket.id] ?? "").trim()}
+                    onClick={() => void sendReply(ticket.id)}
+                  >
+                    {busyId === ticket.id ? "Saving…" : "Send reply"}
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-btn"
+                    disabled={busyId === ticket.id}
+                    onClick={() => void resolve(ticket.id)}
+                  >
+                    Mark resolved
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 interface AdminCommunityRow {
   id: string;
   name: string;
@@ -838,7 +979,14 @@ export function FoundingCommunityControls({
 }
 
 // Pending-communities review queue + Founding Community creation.
-export function CommunitiesReview({ onChanged }: { onChanged?: () => void | Promise<void> }) {
+export function CommunitiesReview({
+  onChanged,
+  pendingOnly = false,
+}: {
+  onChanged?: () => void | Promise<void>;
+  /** Communities page shows the review queue; Operations keeps founding tools too. */
+  pendingOnly?: boolean;
+}) {
   const [rows, setRows] = useState<AdminCommunityRow[] | null>(null);
   const [foundingRows, setFoundingRows] = useState<AdminCommunityRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -849,17 +997,17 @@ export function CommunitiesReview({ onChanged }: { onChanged?: () => void | Prom
 
   const load = useCallback(async () => {
     try {
-      const [pending, foundingList] = await Promise.all([
-        api<{ communities: AdminCommunityRow[] }>("/api/admin/communities?status=pending"),
-        api<{ communities: AdminCommunityRow[] }>("/api/admin/communities?status=founding"),
-      ]);
+      const pending = await api<{ communities: AdminCommunityRow[] }>("/api/admin/communities?status=pending");
       setRows(pending.communities);
-      setFoundingRows(foundingList.communities);
+      if (!pendingOnly) {
+        const foundingList = await api<{ communities: AdminCommunityRow[] }>("/api/admin/communities?status=founding");
+        setFoundingRows(foundingList.communities);
+      }
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Failed to load");
     }
-  }, []);
+  }, [pendingOnly]);
 
   useEffect(() => {
     void load();
@@ -874,6 +1022,7 @@ export function CommunitiesReview({ onChanged }: { onChanged?: () => void | Prom
           : undefined;
       await api(`/api/admin/communities/${id}/${action}`, { method: "POST", body });
       await load();
+      await onChanged?.();
     } catch (e) {
       setError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Action failed");
     } finally {
@@ -959,6 +1108,8 @@ export function CommunitiesReview({ onChanged }: { onChanged?: () => void | Prom
           </div>
         )}
 
+        {pendingOnly ? null : (
+        <>
         <h3 className="admin-section-title" style={{ marginTop: "1.25rem", marginBottom: "0.5rem" }}>
           Founding communities
         </h3>
@@ -1044,6 +1195,8 @@ export function CommunitiesReview({ onChanged }: { onChanged?: () => void | Prom
           </button>
           {foundingMsg && <p style={{ fontSize: 13, margin: 0 }}>{foundingMsg}</p>}
         </div>
+        </>
+        )}
       </div>
     </section>
   );
@@ -1062,7 +1215,7 @@ export function ReviewInbox() {
 
   const load = useCallback(async () => {
     try {
-      const [communities, reports, posts] = await Promise.all([
+      const [communities, reports, posts, help] = await Promise.all([
         api<{
           communities: Array<{
             id: string;
@@ -1081,6 +1234,7 @@ export function ReviewInbox() {
             createdAt: string;
           }>;
         }>("/api/admin/forums/pending-posts"),
+        api<{ tickets: HelpTicketRow[] }>("/api/admin/help-tickets"),
       ]);
       const rows: ReviewItem[] = [
         ...communities.communities.map((c) => ({
@@ -1089,6 +1243,13 @@ export function ReviewInbox() {
           title: `${c.name} is waiting for review`,
           meta: `Community · ${c.organizer.firstName} ${c.organizer.lastName}`.trim(),
           at: c.submittedAt,
+        })),
+        ...help.tickets.map((t) => ({
+          id: `help-${t.id}`,
+          href: "#help-tickets",
+          title: t.body.trim().slice(0, 120) || "Help request",
+          meta: `Help · ${t.sectionLabel} · ${t.user.firstName}${t.status === "replied" ? " · replied" : ""}`,
+          at: t.createdAt,
         })),
         ...reports.reports
           .filter((r) => r.status === "open")

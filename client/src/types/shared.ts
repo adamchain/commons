@@ -566,7 +566,8 @@ export type NotificationKind =
   | "didThisHappen"
   | "planSpotReopen"
   | "welcome"
-  | "communityReview";
+  | "communityReview"
+  | "helpReply";
 
 export interface NotificationDTO {
   id: string;

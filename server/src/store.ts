@@ -336,6 +336,47 @@ export interface ReportRecord {
   reviewedAt?: string | null;
 }
 
+export const HELP_TICKET_SECTIONS = ["general", "plans", "communities", "messages", "profile", "feed"] as const;
+export type HelpTicketSection = (typeof HELP_TICKET_SECTIONS)[number];
+export type HelpTicketStatus = "open" | "replied" | "resolved";
+
+export const HELP_TICKET_SECTION_LABELS: Record<HelpTicketSection, string> = {
+  general: "General",
+  plans: "Plans",
+  communities: "Communities",
+  messages: "Messages",
+  profile: "Profile",
+  feed: "Feed",
+};
+
+/** How long a resolved help ticket stays on the member's help page. */
+export const HELP_TICKET_RESOLVED_VISIBLE_MS = 24 * 60 * 60 * 1000;
+
+export function isHelpTicketSection(value: string): value is HelpTicketSection {
+  return (HELP_TICKET_SECTIONS as readonly string[]).includes(value);
+}
+
+export function helpTicketVisibleToUser(ticket: HelpTicketRecord, now = Date.now()): boolean {
+  if (ticket.status !== "resolved") return true;
+  if (!ticket.resolvedAt) return false;
+  const resolved = Date.parse(ticket.resolvedAt);
+  if (Number.isNaN(resolved)) return false;
+  return now - resolved < HELP_TICKET_RESOLVED_VISIBLE_MS;
+}
+
+/** A member's "contact us" note from Help, plus the admin reply. */
+export interface HelpTicketRecord {
+  id: string;
+  userId: string;
+  section: HelpTicketSection;
+  body: string;
+  status: HelpTicketStatus;
+  reply: string | null;
+  repliedAt: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
 /**
  * Foundation for both Your Network (V1) and Communities (V2). Each row is a
  * directed relationship from `userId` to `targetId`. `kind` distinguishes
@@ -508,7 +549,8 @@ export interface NotificationRecord {
     | "didThisHappen"
     | "planSpotReopen"
     | "welcome"
-    | "communityReview";
+    | "communityReview"
+    | "helpReply";
   body: string;
   planId?: string;
   conversationId?: string;
@@ -621,6 +663,7 @@ interface Snapshot {
   smsCodes: SmsCodeRecord[];
   logs: LogRecord[];
   reports: ReportRecord[];
+  helpTickets: HelpTicketRecord[];
   planSuggestions: PlanSuggestionRecord[];
   notifications: NotificationRecord[];
   relationships: RelationshipRecord[];
@@ -653,6 +696,7 @@ function emptySnapshot(): Snapshot {
     smsCodes: [],
     logs: [],
     reports: [],
+    helpTickets: [],
     planSuggestions: [],
     notifications: [],
     relationships: [],
@@ -730,6 +774,7 @@ function load(): Snapshot {
       forumPostLikes: parsed.forumPostLikes ?? [],
       devices: parsed.devices ?? [],
       reports: parsed.reports ?? [],
+      helpTickets: parsed.helpTickets ?? [],
     };
   } catch {
     return emptySnapshot();
@@ -1354,6 +1399,51 @@ export const store = {
     row.reviewedAt = status === "reviewed" ? new Date().toISOString() : null;
     persist();
     mongoMirror.upsertReport(row);
+    return row;
+  },
+  createHelpTicket(input: { userId: string; section: HelpTicketSection; body: string }): HelpTicketRecord {
+    const row: HelpTicketRecord = {
+      id: randomUUID(),
+      userId: input.userId,
+      section: input.section,
+      body: input.body,
+      status: "open",
+      reply: null,
+      repliedAt: null,
+      resolvedAt: null,
+      createdAt: new Date().toISOString(),
+    };
+    snapshot.helpTickets.push(row);
+    persist();
+    mongoMirror.upsertHelpTicket(row);
+    return row;
+  },
+  listHelpTickets(): HelpTicketRecord[] {
+    return [...snapshot.helpTickets].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+  listVisibleHelpTicketsForUser(userId: string): HelpTicketRecord[] {
+    return this.listHelpTickets().filter((t) => t.userId === userId && helpTicketVisibleToUser(t));
+  },
+  findHelpTicketById(id: string): HelpTicketRecord | undefined {
+    return snapshot.helpTickets.find((t) => t.id === id);
+  },
+  replyToHelpTicket(id: string, reply: string): HelpTicketRecord | undefined {
+    const row = this.findHelpTicketById(id);
+    if (!row || row.status === "resolved") return undefined;
+    row.reply = reply;
+    row.repliedAt = new Date().toISOString();
+    row.status = "replied";
+    persist();
+    mongoMirror.upsertHelpTicket(row);
+    return row;
+  },
+  resolveHelpTicket(id: string): HelpTicketRecord | undefined {
+    const row = this.findHelpTicketById(id);
+    if (!row || row.status === "resolved") return undefined;
+    row.status = "resolved";
+    row.resolvedAt = new Date().toISOString();
+    persist();
+    mongoMirror.upsertHelpTicket(row);
     return row;
   },
   listParticipationsForPlan(planId: string): ParticipationRecord[] {

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { AvatarCropModal } from "../components/AvatarCropModal";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
@@ -63,6 +64,7 @@ function EditProfileForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
 
   function pickPhoto(dataUrl: string) {
     setPhoto(dataUrl);
@@ -116,8 +118,8 @@ function EditProfileForm({
             onClick={async () => {
               if (isNative()) {
                 try {
-                  const dataUrl = await pickPhotoNative({ maxPx: 512, quality: 0.82 });
-                  if (dataUrl) pickPhoto(dataUrl);
+                  const dataUrl = await pickPhotoNative({ maxPx: 1600, quality: 0.9 });
+                  if (dataUrl) setCropSrc(dataUrl);
                 } catch {
                   /* user canceled */
                 }
@@ -148,14 +150,25 @@ function EditProfileForm({
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (!f) return;
-              fileToResizedDataUrl(f)
-                .then(pickPhoto)
+              fileToResizedDataUrl(f, 1600, 0.9)
+                .then(setCropSrc)
                 .catch(() => setError("Couldn't read that image. Try another."));
               if (fileRef.current) fileRef.current.value = "";
             }}
           />
         </div>
       </div>
+      {cropSrc && (
+        <AvatarCropModal
+          src={cropSrc}
+          outputPx={512}
+          onCancel={() => setCropSrc(null)}
+          onConfirm={(dataUrl) => {
+            pickPhoto(dataUrl);
+            setCropSrc(null);
+          }}
+        />
+      )}
 
       <label className="form-question" htmlFor="profile-edit-name" style={{ marginTop: 14 }}>
         First name
