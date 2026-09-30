@@ -12,7 +12,7 @@ export type UserPatch = Partial<Omit<UserRecord, "id" | "createdAt" | "avatarPho
   avatarParams?: string | null;
 };
 
-export type CreateUserOptions = { accountSource?: "verify" | "seed" };
+export type CreateUserOptions = { accountSource?: "verify" | "seed" | "sub" };
 
 // All user reads/writes go through the in-memory `store` snapshot. The store
 // mirrors writes to Mongo via `mongoMirror`, and `hydrateSnapshotFromMongo`
@@ -46,8 +46,9 @@ export async function createUser(
   opts?: CreateUserOptions,
 ): Promise<UserRecord> {
   const user = store.createUser(phoneNumber, opts);
-  // Every new user gets a fixed set of invite codes — launch mechanic.
-  store.createInviteCodesForUser(user.id, INVITE_CODES_PER_USER);
+  if (opts?.accountSource !== "sub") {
+    store.createInviteCodesForUser(user.id, INVITE_CODES_PER_USER);
+  }
   return user;
 }
 

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, MessageCircle, MoreVertical, Plus } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { HoldToDelete } from "../components/HoldToDelete";
 import { PollCard } from "../components/PollCard";
 import { PollSheet } from "../components/PollSheet";
 import { BottomSheet } from "../components/ui/BottomSheet";
@@ -42,6 +43,7 @@ export function DmChatPage() {
   const [pollModalOpen, setPollModalOpen] = useState(false);
   const [creatingPoll, setCreatingPoll] = useState(false);
   const [busyPollId, setBusyPollId] = useState<string | null>(null);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [leaveBusy, setLeaveBusy] = useState(false);
@@ -55,6 +57,7 @@ export function DmChatPage() {
   const composerMenuRef = useRef<HTMLDivElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const deletedIdsRef = useRef(new Set<string>());
   const lastId = messages[messages.length - 1]?.id ?? "";
   const { scrollRef, endRef, shellRef, stickOnSend } = useStickToBottom(ready, `${lastId}:${messages.length}`);
 
@@ -75,7 +78,7 @@ export function DmChatPage() {
         setConv(c);
         const msgs = await api<MessageDTO[]>(`/api/conversations/${c.id}/messages`);
         if (!live) return;
-        setMessages(msgs.sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+        setMessages(visibleMessages(msgs, deletedIdsRef.current));
       } catch (e) {
         if (!live) return;
         const message = parseApiError(e) || "Couldn't open this chat.";
@@ -96,7 +99,7 @@ export function DmChatPage() {
     if (!conv) return;
     const interval = setInterval(() => {
       void api<MessageDTO[]>(`/api/conversations/${conv.id}/messages`)
-        .then((msgs) => setMessages(msgs.sort((a, b) => a.createdAt.localeCompare(b.createdAt))))
+        .then((msgs) => setMessages(visibleMessages(msgs, deletedIdsRef.current)))
         .catch(() => undefined);
     }, POLL_MS);
     return () => clearInterval(interval);
@@ -279,6 +282,21 @@ export function DmChatPage() {
       /* they can tap again */
     } finally {
       setBusyPollId(null);
+    }
+  }
+
+  async function deleteOwnMessage(messageId: string) {
+    if (!conv || deletingMessageId) return;
+    if (!window.confirm("Delete this message? It's removed for everyone in this chat.")) return;
+    setDeletingMessageId(messageId);
+    try {
+      await api(`/api/conversations/${conv.id}/messages/${messageId}`, { method: "DELETE" });
+      deletedIdsRef.current.add(messageId);
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    } catch (e) {
+      window.alert(parseApiError(e) || "Couldn't delete that message.");
+    } finally {
+      setDeletingMessageId(null);
     }
   }
 
@@ -475,10 +493,11 @@ export function DmChatPage() {
                     poll={m.poll}
                     author={m.sender}
                     participants={conv.participants}
-                    busy={busyPollId === m.id}
                     onVote={(optionId) => void votePoll(m.id, optionId)}
                     onClose={m.poll.canClose ? () => void closePoll(m.id) : undefined}
                     onReopen={m.poll.canClose ? () => void reopenPoll(m.id) : undefined}
+                    onDelete={m.sender.id === user?.id ? () => void deleteOwnMessage(m.id) : undefined}
+                    busy={busyPollId === m.id || deletingMessageId === m.id}
                   />
                 </div>
               );
@@ -498,7 +517,11 @@ export function DmChatPage() {
                   </span>
                 )}
                 <div className="chat-bubble-stack">
-                  <div className={`chat-bubble${m.imageUrl ? " has-image" : ""}`}>
+                  <HoldToDelete
+                    className={`chat-bubble${m.imageUrl ? " has-image" : ""}`}
+                    enabled={Boolean(mine && user && deletingMessageId !== m.id)}
+                    onDelete={() => void deleteOwnMessage(m.id)}
+                  >
                     {m.imageUrl && (
                       <a href={m.imageUrl} target="_blank" rel="noopener noreferrer" className="chat-bubble-image-link">
                         <img src={m.imageUrl} alt="" className="chat-bubble-image" />
@@ -508,23 +531,27 @@ export function DmChatPage() {
                     <div className="chat-bubble-time">
                       {new Date(m.createdAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
                     </div>
-                  </div>
-                  {user && (() => {
-                    const hearts = m.reactions?.["❤️"] ?? [];
-                    const iReacted = hearts.includes(user.id);
-                    return (
-                      <button
-                        type="button"
-                        className={`chat-react-btn ${iReacted ? "is-reacted" : ""} ${hearts.length > 0 ? "has-count" : ""}`}
-                        onClick={() => void toggleHeart(m.id)}
-                        aria-label={iReacted ? "Remove heart" : "React with heart"}
-                        aria-pressed={iReacted}
-                      >
-                        <span aria-hidden="true">❤️</span>
-                        {hearts.length > 0 && <span className="chat-react-count">{hearts.length}</span>}
-                      </button>
-                    );
-                  })()}
+                  </HoldToDelete>
+                  {user && (
+                    <div className="chat-bubble-actions">
+                      {(() => {
+                        const hearts = m.reactions?.["❤️"] ?? [];
+                        const iReacted = hearts.includes(user.id);
+                        return (
+                          <button
+                            type="button"
+                            className={`chat-react-btn ${iReacted ? "is-reacted" : ""} ${hearts.length > 0 ? "has-count" : ""}`}
+                            onClick={() => void toggleHeart(m.id)}
+                            aria-label={iReacted ? "Remove heart" : "React with heart"}
+                            aria-pressed={iReacted}
+                          >
+                            <span aria-hidden="true">❤️</span>
+                            {hearts.length > 0 && <span className="chat-react-count">{hearts.length}</span>}
+                          </button>
+                        );
+                      })()}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -667,6 +694,11 @@ export function DmChatPage() {
       )}
     </main>
   );
+}
+
+function visibleMessages(msgs: MessageDTO[], deleted: Set<string>): MessageDTO[] {
+  const visible = deleted.size === 0 ? msgs : msgs.filter((m) => !deleted.has(m.id));
+  return visible.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
 type DmGateKind = "network" | "pending" | "incoming" | "blocked" | "missing" | "other";

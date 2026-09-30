@@ -7,9 +7,11 @@ const UserSchema = new mongoose.Schema<UserRecord>(
     phoneNumber: { type: String, required: true },
     accountSource: {
       type: String,
-      enum: ["verify", "seed"],
+      enum: ["verify", "seed", "sub"],
       default: "verify",
     },
+    ownerUserId: { type: String, default: undefined },
+    managedCommunityId: { type: String, default: undefined },
     firstName: { type: String, default: "" },
     lastName: { type: String, default: "" },
     email: { type: String, default: null },

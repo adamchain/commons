@@ -391,6 +391,22 @@ export interface MeDTO {
   location?: { lat: number; lng: number } | null;
   /** Set once they share location or continue without it during onboarding. */
   locationPromptAnsweredAt?: string | null;
+  /** personal = the phone login. community = a sub account for a community they run. */
+  accountKind?: "personal" | "community";
+  /** Set when this profile is a community sub account. */
+  managedCommunityId?: string | null;
+}
+
+export interface LinkedAccountDTO {
+  id: string;
+  firstName: string;
+  avatarPhotoDataUrl?: string;
+  avatarSeed: string;
+  avatarStyle: AvatarStyle;
+  kind: "personal" | "community";
+  communityId?: string;
+  communityName?: string;
+  active: boolean;
 }
 
 export interface NotificationPrefs {
@@ -660,6 +676,8 @@ export interface CommunityDashboardDTO {
   requests: (CommunityMemberDTO & { mutualCount: number })[];
   pendingPosts: { id: string; content: string; createdAt: string; author: PublicUser }[];
   memberList: CommunityMemberDTO[];
+  /** Community persona the organizer can switch into. Null until they make one. */
+  subAccount: { id: string; firstName: string; avatarPhotoDataUrl?: string } | null;
 }
 
 export interface CommunityPostDTO {

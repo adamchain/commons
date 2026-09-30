@@ -60,10 +60,12 @@ export function TopBar() {
       if (!document.hidden) load();
     };
     document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("commons:notifications-changed", load);
     return () => {
       cancelled = true;
       clearInterval(t);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("commons:notifications-changed", load);
     };
   }, [user?.id, pathname, hide]);
 

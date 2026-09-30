@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, BarChart2, MessageCircle } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { HoldToDelete } from "../components/HoldToDelete";
 import { CommunityCoverThumb } from "../components/CoverThumb";
 import { BlockConfirmModal, ReportModal } from "../components/PlanSafetyMenu";
 import { PollCard } from "../components/PollCard";
@@ -59,6 +60,7 @@ export function CommunityChatPage() {
   const [pollModalOpen, setPollModalOpen] = useState(false);
   const [creatingPoll, setCreatingPoll] = useState(false);
   const [busyPollId, setBusyPollId] = useState<string | null>(null);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
   const [pinnedPollsOpen, setPinnedPollsOpen] = useState(false);
   const [composerMenuOpen, setComposerMenuOpen] = useState(false);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
@@ -70,6 +72,7 @@ export function CommunityChatPage() {
   const composerMenuRef = useRef<HTMLDivElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const deletedIdsRef = useRef(new Set<string>());
   const lastMessageId = messages[messages.length - 1]?.id ?? "";
   const { scrollRef, endRef, shellRef, stickOnSend } = useStickToBottom(
     chatReady && !needsJoin,
@@ -90,7 +93,7 @@ export function CommunityChatPage() {
         setConv(c);
         const msgs = await api<MessageDTO[]>(`/api/conversations/${c.id}/messages`);
         if (!alive) return;
-        setMessages(msgs.sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+        setMessages(visibleMessages(msgs, deletedIdsRef.current));
       } catch (e) {
         if (!alive) return;
         const msg = parseApiError(e);
@@ -114,7 +117,7 @@ export function CommunityChatPage() {
     const interval = setInterval(async () => {
       try {
         const msgs = await api<MessageDTO[]>(`/api/conversations/${conv.id}/messages`);
-        setMessages(msgs.sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+        setMessages(visibleMessages(msgs, deletedIdsRef.current));
       } catch {
         /* swallow */
       }
@@ -266,7 +269,7 @@ export function CommunityChatPage() {
     try {
       await api(`/api/conversations/${conv.id}/clear`, { method: "POST" });
       const msgs = await api<MessageDTO[]>(`/api/conversations/${conv.id}/messages`);
-      setMessages(msgs.sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+      setMessages(visibleMessages(msgs, deletedIdsRef.current));
     } catch {
       window.alert("Couldn't delete that chat.");
     }
@@ -294,6 +297,21 @@ export function CommunityChatPage() {
       setConv((prev) => (prev ? { ...prev, muted: r.muted } : prev));
     } catch {
       /* swallow — they can tap again */
+    }
+  }
+
+  async function deleteOwnMessage(messageId: string) {
+    if (!conv || deletingMessageId) return;
+    if (!window.confirm("Delete this message? It's removed for everyone in this chat.")) return;
+    setDeletingMessageId(messageId);
+    try {
+      await api(`/api/conversations/${conv.id}/messages/${messageId}`, { method: "DELETE" });
+      deletedIdsRef.current.add(messageId);
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    } catch (e) {
+      window.alert(parseApiError(e) || "Couldn't delete that message.");
+    } finally {
+      setDeletingMessageId(null);
     }
   }
 
@@ -527,7 +545,8 @@ export function CommunityChatPage() {
                     showQuestion={openPolls.length > 1}
                     onVote={(optId) => void votePoll(m.id, optId)}
                     onClose={m.poll!.canClose ? () => void closePoll(m.id) : undefined}
-                    busy={busyPollId === m.id}
+                    onDelete={m.sender?.id === user.id ? () => void deleteOwnMessage(m.id) : undefined}
+                    busy={busyPollId === m.id || deletingMessageId === m.id}
                   />
                 ))}
               </div>
@@ -570,7 +589,8 @@ export function CommunityChatPage() {
                       onVote={(optId) => void votePoll(msg.id, optId)}
                       onClose={msg.poll.canClose ? () => void closePoll(msg.id) : undefined}
                       onReopen={msg.poll.canClose ? () => void reopenPoll(msg.id) : undefined}
-                      busy={busyPollId === msg.id}
+                      onDelete={msg.sender.id === user.id ? () => void deleteOwnMessage(msg.id) : undefined}
+                      busy={busyPollId === msg.id || deletingMessageId === msg.id}
                     />
                   </div>
                 );
@@ -599,7 +619,11 @@ export function CommunityChatPage() {
                     </span>
                   )}
                   <div className="chat-bubble-stack">
-                  <div className={`chat-bubble${entry.imageUrl ? " has-image" : ""}`}>
+                  <HoldToDelete
+                    className={`chat-bubble${entry.imageUrl ? " has-image" : ""}`}
+                    enabled={mine && deletingMessageId !== entry.id}
+                    onDelete={() => void deleteOwnMessage(entry.id)}
+                  >
                     {!mine && entry.showAvatar && (
                       <div className="chat-bubble-author">{entry.sender.firstName}</div>
                     )}
@@ -617,7 +641,8 @@ export function CommunityChatPage() {
                       <div className="chat-bubble-body">{entry.body}</div>
                     )}
                     <div className="chat-bubble-time">{formatTimeOnly(entry.createdAt)}</div>
-                  </div>
+                  </HoldToDelete>
+                  <div className="chat-bubble-actions">
                     {(() => {
                       const hearts = entry.reactions["❤️"] ?? [];
                       const iReacted = hearts.includes(user.id);
@@ -634,6 +659,7 @@ export function CommunityChatPage() {
                         </button>
                       );
                     })()}
+                  </div>
                   </div>
                 </div>
               );
@@ -774,6 +800,11 @@ export function CommunityChatPage() {
       )}
     </main>
   );
+}
+
+function visibleMessages(msgs: MessageDTO[], deleted: Set<string>): MessageDTO[] {
+  const visible = deleted.size === 0 ? msgs : msgs.filter((m) => !deleted.has(m.id));
+  return visible.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
 /** Status code from `api()` errors shaped as `"<status>: <body>"`. */

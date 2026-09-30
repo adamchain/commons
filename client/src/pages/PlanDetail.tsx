@@ -326,11 +326,7 @@ export function PlanDetailPage() {
             type="button"
             className="plan-detail-people"
             onClick={() => setShowGuestsModal(true)}
-            aria-label={
-              planPeople.length === 0
-                ? "No one yet. View who's going"
-                : `${goingCount} going${interestedCount > 0 ? `, ${interestedCount} interested` : ""}. View who's going`
-            }
+            aria-label={`${goingCount} going, ${interestedCount} interested. View who's going`}
           >
             {planPeoplePreview.length > 0 && (
               <span className="avatar-stack">
@@ -349,11 +345,9 @@ export function PlanDetailPage() {
               </span>
             )}
             <span className="plan-detail-people-count">
-              {planPeople.length === 0
-                ? "No one yet"
-                : goingCount > 0
-                  ? `${goingCount} going`
-                  : `${interestedCount} interested`}
+              {goingCount} going
+              <span className="plan-detail-people-sep" aria-hidden="true">·</span>
+              {interestedCount} interested
             </span>
           </button>
           {!isPast && !plan.cancelledAt && goingCount <= 1 && (

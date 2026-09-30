@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Coffee, MessageCircle, SlidersHorizontal } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Coffee, SlidersHorizontal } from "lucide-react";
 import { api } from "../api/http";
 import { FilterSheet } from "../components/FilterSheet";
 import { InviteSheet } from "../components/InviteSheet";
@@ -12,13 +12,7 @@ import { EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { FLEXIBLE_DATE_PLACEHOLDER, isIdeaPlan, planHasEnded } from "../lib/planTime";
 import { consumeFeedScroll } from "../lib/navState";
-import { FORUM_INTERESTS, INTEREST_LABELS } from "../types/shared";
 import type { AgeRange, InterestTag, MeDTO, NetworkPromptDTO, PlanDTO } from "../types/shared";
-
-// F.2 — shown once on the first Home load, pointing new users at a forum
-// matching one of their picked interests. Dismissible; never reappears once
-// dismissed (or once it's been shown and clicked through).
-const HOME_FORUM_SUGGESTION_KEY = "commons.homeForumSuggestion.v1.dismissed";
 
 // Feed filters persist across navigation + reload — losing "hide cancelled"
 // every time you left the feed was a papercut.
@@ -92,25 +86,6 @@ export function FeedPage() {
   const [postSuccessId, setPostSuccessId] = useState<string | null>(
     navState?.showPostSuccess ? navState?.justPostedId ?? null : null,
   );
-  const [forumSuggestionDismissed, setForumSuggestionDismissed] = useState(() => {
-    try {
-      return localStorage.getItem(HOME_FORUM_SUGGESTION_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
-  const suggestedForumTag = useMemo<InterestTag | null>(() => {
-    if (!user?.interests?.length) return null;
-    return user.interests.find((t) => FORUM_INTERESTS.includes(t)) ?? null;
-  }, [user?.interests]);
-  const dismissForumSuggestion = useCallback(() => {
-    setForumSuggestionDismissed(true);
-    try {
-      localStorage.setItem(HOME_FORUM_SUGGESTION_KEY, "1");
-    } catch {
-      /* storage unavailable — the card will just show again next load */
-    }
-  }, []);
 
   const [refreshing, setRefreshing] = useState(false);
   const refreshingRef = useRef(false);
@@ -380,6 +355,13 @@ export function FeedPage() {
       const far = active.filter((p) => !(p.distanceMiles != null && p.distanceMiles <= NEARBY_MILES));
       active.splice(0, active.length, ...near, ...far);
     }
+    // Plans you created or joined stay above everything else. Order inside
+    // each group is unchanged (nearby, then soonest).
+    if (user) {
+      const mine = active.filter((p) => p.creator.id === user.id || p.myState === "going");
+      const rest = active.filter((p) => p.creator.id !== user.id && p.myState !== "going");
+      active.splice(0, active.length, ...mine, ...rest);
+    }
     // A just-posted plan is pinned to the very top regardless of its date, so
     // the user immediately sees what they created.
     if (justPostedId) {
@@ -390,7 +372,7 @@ export function FeedPage() {
       }
     }
     return active;
-  }, [plans, view, selectedTag, nearbyOnly, selectedAgeRange, selectedDayIso, hideCancelled, networkOnly, user?.location, user?.networkUserIds, justPostedId]);
+  }, [plans, view, selectedTag, nearbyOnly, selectedAgeRange, selectedDayIso, hideCancelled, networkOnly, user?.id, user?.location, user?.networkUserIds, justPostedId]);
 
   const filteredPlans = activePlans;
 
@@ -434,31 +416,6 @@ export function FeedPage() {
         />
 
         <div className="feed-divider" />
-
-
-        {!forumSuggestionDismissed && suggestedForumTag && (
-          <div className="feed-forum-suggestion" role="status">
-            <span className="feed-forum-suggestion-glyph" aria-hidden="true">
-              <MessageCircle size={18} strokeWidth={1.8} />
-            </span>
-            <Link
-              to={`/forums/${suggestedForumTag}`}
-              state={{ from: "feed" }}
-              className="feed-forum-suggestion-text"
-              onClick={dismissForumSuggestion}
-            >
-              New here? Come say hi in the {INTEREST_LABELS[suggestedForumTag]} forum — it's a friendly first stop →
-            </Link>
-            <button
-              type="button"
-              className="feed-forum-suggestion-dismiss"
-              onClick={dismissForumSuggestion}
-              aria-label="Dismiss suggestion"
-            >
-              ×
-            </button>
-          </div>
-        )}
 
         <div className="feed-toolbar">
           <div className="segmented segmented-feed-view" role="group" aria-label="Feed">

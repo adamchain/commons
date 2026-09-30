@@ -26,7 +26,6 @@ import { ReportModal } from "../components/PlanSafetyMenu";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanWhenLine } from "../lib/format";
-import { interestVisual } from "../lib/interestIcons";
 import { isIdeaPlan } from "../lib/planTime";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import {
@@ -793,16 +792,17 @@ function formatOtherPlanWhen(plan: PlanDTO): string {
 
 function OtherPlanRow({ plan, profileUserId }: { plan: PlanDTO; profileUserId: string }) {
   const going = plan.participants.going.length;
-  const { Icon, iconColor, tint } = interestVisual(plan.tags?.[0]);
   return (
     <Link
       to={`/plans/${plan.id}`}
       state={{ from: "profile", profileUserId }}
       className="profile-other-plan-card"
     >
-      <span className="profile-other-plan-icon" style={{ background: tint, color: iconColor }} aria-hidden="true">
-        <Icon size={18} strokeWidth={1.8} />
-      </span>
+      <PlanCoverThumb
+        planId={plan.id}
+        flyerDataUrl={planPhotoUrl(plan)}
+        isIdea={isIdeaPlan(plan)}
+      />
       <span className="profile-other-plan-body">
         <span className="profile-other-plan-title">{plan.title}</span>
         <span className="profile-other-plan-date">{formatOtherPlanWhen(plan)}</span>

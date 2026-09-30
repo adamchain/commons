@@ -358,6 +358,9 @@ export const mongoMirror = {
       .catch((err) => fail(`deleteMessagesByConversation ${conversationId}`, err));
     track(p);
   },
+  deleteMessage(id: string): void {
+    removeById(MessageModel as never, id, `deleteMessage ${id}`);
+  },
 
   // Interest Forums
   upsertInterestForum(f: InterestForumRecord): void {

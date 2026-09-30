@@ -25,8 +25,15 @@ import { ALL_INTERESTS, normalizeCommunityCategory, parseCommunityCategories } f
 export interface UserRecord {
   id: string;
   phoneNumber: string;
-  /** `verify` = signed up via Twilio Verify; `seed` = demo data script only. */
-  accountSource?: "verify" | "seed";
+  /** `verify` = signed up via Twilio Verify; `seed` = demo data; `sub` = community persona. */
+  accountSource?: "verify" | "seed" | "sub";
+  /**
+   * Set on a community sub account. The personal account that can switch into
+   * this profile. Login stays on that phone — this row has no SMS number.
+   */
+  ownerUserId?: string;
+  /** The community this profile represents. One sub account per community. */
+  managedCommunityId?: string;
   firstName: string;
   lastName?: string;
   /** Optional digest email. Phone is still the login. */
@@ -772,9 +779,17 @@ export const store = {
   findUserByPhone(phoneNumber: string): UserRecord | undefined {
     return snapshot.users.find((u) => u.phoneNumber === phoneNumber);
   },
+  findUserByManagedCommunity(communityId: string): UserRecord | undefined {
+    return snapshot.users.find((u) => u.managedCommunityId === communityId);
+  },
+  listSubAccountsForOwner(ownerUserId: string): UserRecord[] {
+    return snapshot.users
+      .filter((u) => u.ownerUserId === ownerUserId && u.managedCommunityId)
+      .sort((a, b) => a.firstName.localeCompare(b.firstName));
+  },
   createUser(
     phoneNumber: string,
-    opts?: { accountSource?: "verify" | "seed" },
+    opts?: { accountSource?: "verify" | "seed" | "sub" },
   ): UserRecord {
     const user: UserRecord = {
       id: randomUUID(),
@@ -1607,6 +1622,28 @@ export const store = {
   },
   findMessageById(messageId: string): MessageRecord | undefined {
     return snapshot.messages.find((m) => m.id === messageId);
+  },
+  /** Remove one message for every participant. Rewinds the inbox preview when it was the latest. */
+  deleteMessage(messageId: string): boolean {
+    const idx = snapshot.messages.findIndex((m) => m.id === messageId);
+    if (idx < 0) return false;
+    const [removed] = snapshot.messages.splice(idx, 1);
+    const conv = snapshot.conversations.find((c) => c.id === removed.conversationId);
+    if (conv) {
+      let latest = "";
+      for (const m of snapshot.messages) {
+        if (m.conversationId !== conv.id) continue;
+        if (m.createdAt > latest) latest = m.createdAt;
+      }
+      const nextAt = latest || conv.createdAt;
+      if (conv.lastMessageAt !== nextAt) {
+        conv.lastMessageAt = nextAt;
+        mongoMirror.upsertConversation(conv);
+      }
+    }
+    persist();
+    mongoMirror.deleteMessage(removed.id);
+    return true;
   },
   createMessage(
     conversationId: string,

@@ -737,6 +737,37 @@ chatRouter.post("/conversations/:id/mute", requireAuth, (req, res) => {
   res.json({ ok: true, muted: next });
 });
 
+// DELETE /api/conversations/:id/messages/:msgId — sender removes their own message for everyone.
+chatRouter.delete("/conversations/:id/messages/:msgId", requireAuth, (req, res) => {
+  const convId = String(req.params.id);
+  const msgId = String(req.params.msgId);
+  const userId = String(req.userId);
+  const conv = store.findConversationById(convId);
+  if (!conv) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
+  if (!canReadConversation(conv, userId)) {
+    res.status(403).json({ error: "Not a participant" });
+    return;
+  }
+  if ((conv.hiddenFromUserIds ?? []).includes(userId)) {
+    res.status(403).json({ error: "This chat isn't available yet." });
+    return;
+  }
+  const existing = store.findMessageById(msgId);
+  if (!existing || existing.conversationId !== convId) {
+    res.status(404).json({ error: "Message not found" });
+    return;
+  }
+  if (existing.kind === "system" || existing.senderId !== userId) {
+    res.status(403).json({ error: "You can only delete your own messages" });
+    return;
+  }
+  store.deleteMessage(msgId);
+  res.json({ ok: true });
+});
+
 // POST /api/conversations/:id/messages/:msgId/react { emoji }
 // Toggle the caller's reaction on a message. Only ❤️ is offered today, but the
 // store handles any emoji so the UI can grow.

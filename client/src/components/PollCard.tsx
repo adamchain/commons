@@ -15,6 +15,8 @@ interface PollCardProps {
   onClose?: () => void;
   /** Present only when the viewer may re-open a closed poll (author or host). */
   onReopen?: () => void;
+  /** Present when the viewer authored this poll and can remove it for everyone. */
+  onDelete?: () => void;
   /** "card" for the inline message stream, "pinned" for the compact top bar. */
   variant?: "card" | "pinned";
   /** Hide the question header — used when a pinned dropdown already shows it. */
@@ -32,6 +34,7 @@ export function PollCard({
   onVote,
   onClose,
   onReopen,
+  onDelete,
   variant = "card",
   showQuestion = true,
   collapsible = false,
@@ -148,15 +151,24 @@ export function PollCard({
           {author.firstName} · {total} {total === 1 ? "vote" : "votes"}
           {poll.closed && " · Final results"}
         </span>
-        {!poll.closed && onClose && (
-          <button type="button" className="poll-card-close" onClick={onClose} disabled={busy}>
-            Close poll
-          </button>
-        )}
-        {poll.closed && onReopen && (
-          <button type="button" className="poll-card-close" onClick={onReopen} disabled={busy}>
-            Reopen poll
-          </button>
+        {(onDelete || (!poll.closed && onClose) || (poll.closed && onReopen)) && (
+          <span className="poll-card-actions">
+            {onDelete && (
+              <button type="button" className="poll-card-close" onClick={onDelete} disabled={busy}>
+                Delete
+              </button>
+            )}
+            {!poll.closed && onClose && (
+              <button type="button" className="poll-card-close" onClick={onClose} disabled={busy}>
+                Close poll
+              </button>
+            )}
+            {poll.closed && onReopen && (
+              <button type="button" className="poll-card-close" onClick={onReopen} disabled={busy}>
+                Reopen poll
+              </button>
+            )}
+          </span>
         )}
       </div>
       </>

@@ -2,10 +2,16 @@ import { store, type CommunityRecord } from "../store.js";
 
 /** True only for the community's actual organizer — not COMMONS admins. */
 export function isCommunityOrganizer(
-  community: Pick<CommunityRecord, "organizerId">,
+  community: Pick<CommunityRecord, "id" | "organizerId">,
   userId: string,
 ): boolean {
-  return community.organizerId === userId;
+  if (community.organizerId === userId) return true;
+  const user = store.findUserById(userId);
+  return (
+    !!user &&
+    user.managedCommunityId === community.id &&
+    user.ownerUserId === community.organizerId
+  );
 }
 
 export function isActiveCommunityMember(communityId: string, userId: string): boolean {
@@ -73,7 +79,7 @@ export function communityMembershipBlockReason(
  * Returns an error string, or null if creation status allows the write.
  */
 export function communityCreationBlockReason(
-  community: Pick<CommunityRecord, "organizerId" | "creationStatus" | "hiddenAt"> | null | undefined,
+  community: Pick<CommunityRecord, "id" | "organizerId" | "creationStatus" | "hiddenAt"> | null | undefined,
   userId: string,
 ): string | null {
   if (!community) return "Community not found";

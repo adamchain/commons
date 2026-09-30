@@ -1627,6 +1627,11 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.plan-detail-people-sep {
+  margin: 0 6px;
+  color: var(--muted);
+  font-weight: 500;
+}
 
 .plan-detail-body {
   padding: 16px 14px 32px;
@@ -5975,6 +5980,23 @@ a.action-btn--stack {
 .chat-react-btn.is-reacted { border-color: var(--red); }
 .chat-react-count { font-weight: 600; font-size: var(--text-body-small); color: var(--ink); }
 
+.chat-bubble-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chat-bubble--holdable {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: pan-y;
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+.chat-bubble--holdable.is-holding {
+  transform: scale(0.98);
+  opacity: 0.72;
+}
+
 .chat-header-bar {
   display: flex;
   align-items: center;
@@ -6051,50 +6073,6 @@ a.action-btn--stack {
 }
 .friend-remove-btn:hover {
   color: var(--accent);
-}
-
-/* F.2 — dismissible, first-Home-load forum suggestion above the feed. */
-.feed-forum-suggestion {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: var(--tan);
-  border-radius: var(--radius-lg, 14px);
-  padding: 12px 12px 12px 12px;
-  margin-bottom: 16px;
-}
-.feed-forum-suggestion-glyph {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #fff;
-  color: var(--red);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-}
-.feed-forum-suggestion-text {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--type-body);
-  font-weight: 600;
-  color: var(--text);
-  line-height: 1.4;
-}
-.feed-forum-suggestion-dismiss {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  font-size: var(--text-screen-title);
-  line-height: 1;
 }
 
 /* Pull-to-refresh — iPhone-native feel: finger-tracked transform + fixed spinner. */
@@ -6293,11 +6271,11 @@ a.action-btn--stack {
   border-top: 1px solid var(--border);
   border-radius: 0;
   flex-shrink: 0;
-  /* Pin the input to the bottom of the viewport so it's always visible without
-     a little page scroll. Clears the iOS home indicator via the safe-area inset
-     and sits above any messages that scroll behind it. */
-  position: sticky;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 0px);
+  /* Stay in the flex column under the transcript. A sticky bottom inset
+     (safe area) pulled this bar up over the last heart on iOS. The shell
+     already pads for the home indicator, and the message list scrolls
+     inside its own box. */
+  position: relative;
   z-index: 5;
   margin-left: -15px;
   margin-right: -15px;
@@ -11185,6 +11163,12 @@ a.action-btn--stack {
   font-size: var(--text-body-small);
   color: var(--faint);
 }
+.poll-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
 .poll-card-close {
   font-size: var(--text-body-small);
   font-weight: 600;
@@ -13607,7 +13591,8 @@ button.xpl-photo-tile {
   cursor: default;
 }
 .chat-messages {
-  padding-bottom: 24px;
+  /* Room for the heart under the last bubble, above the composer. */
+  padding-bottom: 20px;
 }
 .chat-messages-end {
   width: 100%;
@@ -15547,19 +15532,11 @@ span.profile-other-cta {
   text-decoration: none;
   color: inherit;
 }
-.profile-other-plan-icon {
+.profile-other-plan-card .cover-thumb,
+.profile-other-plan-card .cover-thumb-frame {
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  background: #f3ebe3;
-  line-height: 1;
-}
-.profile-other-plan-icon svg {
-  display: block;
 }
 .profile-other-plan-body {
   flex: 1;

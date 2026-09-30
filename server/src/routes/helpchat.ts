@@ -27,7 +27,7 @@ The **top bar** shows your avatar (tap to open profile), notification bell, and 
 
 ## Feed (Home screen)
 
-The feed shows plans happening in the **next 7 days** in your neighborhood, ranked by an algorithm that weighs:
+The feed shows plans happening in the **next 7 days** in your neighborhood. Plans you created or joined always sit at the top. The rest are ranked by an algorithm that weighs:
 - Interest match (how well the plan tags match your 3 interests)
 - Recency (newer posts rank higher)
 - Social proof (plans with more people joining rank higher)
@@ -79,6 +79,7 @@ Shows full info about a plan:
 **Participation buttons:**
 - **Join** — marks you as Going. After you tap it, the button reads **Joined**
 - **Interested** — softer opt-in. After you tap it, the button reads **Interested ✓**
+- The host gets a notification either way: "Alex joined your plan…" or "Alex is interested in your plan…". The plan chat also gets a short line.
 - Ideas and plans with a capacity only start with **Interested**
 
 **Participants section:**
@@ -108,6 +109,7 @@ Every plan has its own group thread. Access it from the Chat row on the plan det
 
 **What you can do:**
 - Send text messages
+- Delete your own messages (press and hold a message you sent — it's removed for everyone in the chat)
 - Send photos (tap the + icon in the composer → camera/library)
 - **Create polls** (tap + → Poll): add a question and options; anyone in the chat can vote; pinned polls appear at the top
 - Leave the chat (⋯ menu in the top-right → Leave chat)
@@ -200,6 +202,7 @@ Communities are **interest-based groups** tied to a neighborhood. Found in the E
 - Joined communities appear in your Messages tab
 - Community plans can be set to "Community only" visibility — only members see them
 - To leave a community: open it → ⋯ menu → Leave
+- Organizers can make a **sub account** for a community they run (community dashboard). Switching to it in Settings posts and shows up as the community, separate from their personal profile. Switch back the same way.
 
 ---
 

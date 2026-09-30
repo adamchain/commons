@@ -11,7 +11,12 @@ export function isTwilioSmsConfigured(): boolean {
   );
 }
 
+function isDeliverablePhone(phoneNumber: string): boolean {
+  return phoneNumber.startsWith("+");
+}
+
 export async function sendSmsInvite(phoneNumber: string, inviterFirstName: string, planTitle: string, link: string): Promise<void> {
+  if (!isDeliverablePhone(phoneNumber)) return;
   const body = `${inviterFirstName} invited you to "${planTitle}" on Commons. ${link}`;
   if (isTwilioSmsConfigured()) {
     const client = twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!);
@@ -27,6 +32,7 @@ export async function sendSmsInvite(phoneNumber: string, inviterFirstName: strin
 
 /** Short transactional texts (nudges, lock-in, reminders). Logs when SMS isn’t configured. */
 export async function sendTransactionalSms(phoneNumber: string, body: string): Promise<void> {
+  if (!isDeliverablePhone(phoneNumber)) return;
   if (isTwilioSmsConfigured()) {
     const client = twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!);
     await client.messages.create({

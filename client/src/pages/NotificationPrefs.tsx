@@ -105,8 +105,8 @@ export function NotificationPrefsPage() {
           onToggle={() => void toggle("newGroupChatMessage")}
         />
         <ToggleRow
-          title="Someone joined your plan"
-          sub="When someone says they're in"
+          title="Join and Interested"
+          sub="When someone taps Join or Interested on your plan"
           on={current.someoneJoinedYourPlan}
           busy={busy === "someoneJoinedYourPlan"}
           onToggle={() => void toggle("someoneJoinedYourPlan")}

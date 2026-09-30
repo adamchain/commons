@@ -1184,56 +1184,58 @@ plansRouter.put("/:id/participation", requireAuth, async (req, res) => {
       return;
     }
   }
+  // Snapshot first. upsertParticipation mutates the same row, so reading
+  // existing.state afterwards looks like they were already in the new state
+  // and the host notification never sends.
+  const previousState = existing?.state ?? null;
   store.upsertParticipation(planId, userId, state);
   if (state === "going" || state === "interested") {
-    const existing = store.findGroupConversationByPlan(planId);
-    if (existing) store.setConversationLeft(userId, existing.id, false);
+    const group = store.findGroupConversationByPlan(planId);
+    if (group) store.setConversationLeft(userId, group.id, false);
     store.ensureGroupConversation(planId, [plan.creatorId, userId], { rejoinIds: [userId] });
   }
   store.log("participation_changed", {
     planId,
     userId,
-    from: existing?.state ?? null,
+    from: previousState,
     to: state,
   });
-  // Notify host on first Interested apply when they need to review the request.
+  // Host (and co-hosts) hear about a new Join or Interested. Copy names the
+  // action so the two aren't easy to mix up. Deduped once per person per action.
   if (
-    state === "interested" &&
-    existing?.state !== "interested" &&
-    plan.creatorId !== userId &&
-    planRequiresHostApproval(plan)
+    (state === "going" || state === "interested") &&
+    previousState !== state &&
+    plan.creatorId !== userId
   ) {
     const joiner = await findUserById(userId);
     const joinerName = joiner?.firstName || "Someone";
-    await emit({
-      userId: plan.creatorId,
-      kind: "someoneJoinedYourPlan",
-      body: `${joinerName} wants a spot on "${plan.title}"`,
-      planId: plan.id,
-      dedupKey: `planApplication:${plan.id}:${userId}`,
-    });
-  }
-  // Notify host on first promotion to "going" — fires once per (plan, joiner)
-  // via dedupKey. The very first joiner on a plan gets warmer, specific copy
-  // ("you're going together") since it's the moment the plan stops being
-  // solo; later joiners get a lighter-weight, generic line.
-  if (state === "going" && existing?.state !== "going" && plan.creatorId !== userId) {
-    const goingBeforeThisJoin = store
-      .listParticipationsForPlan(planId)
-      .filter((p) => p.state === "going" && p.userId !== userId).length;
-    const joiner = await findUserById(userId);
-    const joinerName = joiner?.firstName || "Someone";
-    const body =
-      goingBeforeThisJoin === 0
-        ? `${joinerName} claimed a spot on "${plan.title}" — you're going together ✨`
-        : `${joinerName} is in for "${plan.title}"`;
-    await emit({
-      userId: plan.creatorId,
-      kind: "someoneJoinedYourPlan",
-      body,
-      planId: plan.id,
-      dedupKey: `someoneJoinedYourPlan:${plan.id}:${userId}`,
-    });
+    const joined = state === "going";
+    const body = joined
+      ? `${joinerName} joined your plan "${plan.title}"`
+      : `${joinerName} is interested in your plan "${plan.title}"`;
+    const dedupKey = joined
+      ? `someoneJoinedYourPlan:${plan.id}:${userId}`
+      : `planInterested:${plan.id}:${userId}`;
+    const hostIds = [plan.creatorId, ...(plan.coHostIds ?? [])].filter(
+      (id, index, all) => id !== userId && all.indexOf(id) === index,
+    );
+    for (const hostId of hostIds) {
+      await emit({
+        userId: hostId,
+        kind: "someoneJoinedYourPlan",
+        body,
+        planId: plan.id,
+        profileUserId: userId,
+        dedupKey: hostId === plan.creatorId ? dedupKey : `${dedupKey}:${hostId}`,
+      });
+    }
+    const conv = store.findGroupConversationByPlan(planId);
+    if (conv) {
+      store.createSystemMessage(
+        conv.id,
+        joined ? `${joinerName} joined` : `${joinerName} is interested`,
+      );
+    }
   }
   res.json({ ok: true });
 });

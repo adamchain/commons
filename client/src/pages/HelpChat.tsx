@@ -109,7 +109,7 @@ const HELP_SECTIONS = [
       },
       {
         q: "How does the feed ranking work?",
-        a: "Plans are ranked by date first. If you've shared your location, plans within 15 miles of you are boosted higher so the most reachable things surface first.",
+        a: "Plans you created or joined stay at the top. Everything else is ordered by date, and if you've shared your location, plans within 15 miles come before ones farther away.",
       },
       {
         q: "How do I filter the feed?",
