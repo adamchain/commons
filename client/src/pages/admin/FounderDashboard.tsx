@@ -3,8 +3,10 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   Activity,
   LayoutGrid,
+  Map as MapIcon,
   Settings2,
   UserPlus,
+  UserRound,
   Users,
 } from "lucide-react";
 import { api } from "../../api/http";
@@ -19,7 +21,7 @@ import {
 } from "../Admin";
 import "./FounderDashboard.css";
 
-type PageId = "overview" | "health" | "acquisition" | "communities" | "operations";
+type PageId = "overview" | "health" | "acquisition" | "communities" | "users" | "map" | "operations";
 
 type Delta = { value: number | null; previous: number | null; delta: number | null; spark: number[] };
 
@@ -119,7 +121,16 @@ type Dashboard = {
       trackedInApp: false;
       hostNotes: { id: string; thumb: "up" | "down"; note: string; createdAt: string; planTitle: string }[];
     };
-    users: { id: string; firstName: string; lastName: string; phoneTail: string; neighborhoodName: string | null; seed: boolean }[];
+    users: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      phoneTail: string;
+      neighborhoodName: string | null;
+      seed: boolean;
+      onboardingComplete: boolean;
+      createdAt: string;
+    }[];
     system: {
       dashboardMs: number;
       apiLatencyTracked: false;
@@ -148,6 +159,8 @@ const PAGES: { id: PageId; label: string; icon: typeof LayoutGrid }[] = [
   { id: "health", label: "Health", icon: Activity },
   { id: "acquisition", label: "Acquisition", icon: UserPlus },
   { id: "communities", label: "Communities", icon: Users },
+  { id: "users", label: "Users", icon: UserRound },
+  { id: "map", label: "God view", icon: MapIcon },
   { id: "operations", label: "Operations", icon: Settings2 },
 ];
 
@@ -349,6 +362,8 @@ export function AdminPage() {
                 onChanged={() => void refresh()}
               />
             )}
+            {page === "users" && <UsersPage data={data} onSelectUser={setSelectedUserId} />}
+            {page === "map" && <GodView onSelectUser={setSelectedUserId} />}
             {page === "operations" && (
               <Operations data={data} onSelectUser={setSelectedUserId} onChanged={() => void refresh()} />
             )}
@@ -792,11 +807,9 @@ function Communities({
       <PageHead title="Communities" sub="Pending review, then approved communities · plans are all-time, active members are this week" updated={data.updatedLabel} />
       <CommunitiesReview pendingOnly onChanged={onChanged} />
       <article className="fdash-card">
-        {data.communities.rows.some((c) => c.isFounding) ? (
-          <p className="fdash-muted" style={{ marginTop: 0 }}>
-            Hide a founding community to take it off the app and show it again later. Delete removes it and cancels its plans.
-          </p>
-        ) : null}
+        <p className="fdash-muted" style={{ marginTop: 0 }}>
+          Hide takes a community off the app and keeps its members. Show brings it back. Delete removes it and cancels its plans.
+        </p>
         {data.communities.rows.length === 0 ? (
           <p className="fdash-muted">No approved communities yet.</p>
         ) : (
@@ -809,6 +822,7 @@ function Communities({
                 <th className="is-num">Bulletin</th>
                 <th className="is-num">Active this week</th>
                 <th className="is-num">Last activity</th>
+                <th> </th>
               </tr>
             </thead>
             <tbody>
@@ -823,24 +837,22 @@ function Communities({
                         {c.hidden ? <span className="fdash-type"> · Hidden</span> : null}
                       </button>
                     </div>
-                    {c.isFounding ? (
-                      <div style={{ marginTop: 8 }}>
-                        <FoundingCommunityControls
-                          id={c.id}
-                          name={c.name}
-                          hidden={c.hidden}
-                          hideClassName="fdash-btn fdash-btn--ghost"
-                          deleteClassName="fdash-btn"
-                          onDone={onChanged}
-                        />
-                      </div>
-                    ) : null}
                   </td>
                   <td className="is-num">{c.members}</td>
                   <td className="is-num">{c.plans}</td>
                   <td className="is-num">{c.bulletinPosts}</td>
                   <td className="is-num">{c.activeMembers}</td>
                   <td className="is-num">{c.lastActivityAt ? pretty(c.lastActivityAt.slice(0, 10)) : "—"}</td>
+                  <td>
+                    <FoundingCommunityControls
+                      id={c.id}
+                      name={c.name}
+                      hidden={c.hidden}
+                      hideClassName="fdash-btn fdash-btn--ghost"
+                      deleteClassName="fdash-btn"
+                      onDone={onChanged}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -873,22 +885,20 @@ function CommunityDetail({ id, onBack, onChanged }: { id: string; onBack: () => 
             title={detail.name}
             sub={`${detail.members} members${detail.isFounding ? " · Founding" : ""}${detail.hidden ? " · Hidden" : ""} · ${detail.description || "No description"}`}
           />
-          {detail.isFounding ? (
-            <div style={{ margin: "0 0 14px" }}>
-              <FoundingCommunityControls
-                id={detail.id}
-                name={detail.name}
-                hidden={detail.hidden}
-                hideClassName="fdash-btn fdash-btn--ghost"
-                deleteClassName="fdash-btn"
-                onDone={(action) => {
-                  onChanged();
-                  if (action === "delete") onBack();
-                  else setDetail((current) => (current ? { ...current, hidden: action === "hide" } : current));
-                }}
-              />
-            </div>
-          ) : null}
+          <div style={{ margin: "0 0 14px" }}>
+            <FoundingCommunityControls
+              id={detail.id}
+              name={detail.name}
+              hidden={detail.hidden}
+              hideClassName="fdash-btn fdash-btn--ghost"
+              deleteClassName="fdash-btn"
+              onDone={(action) => {
+                onChanged();
+                if (action === "delete") onBack();
+                else setDetail((current) => (current ? { ...current, hidden: action === "hide" } : current));
+              }}
+            />
+          </div>
           <article className="fdash-card">
             <h2>Plans posted by week</h2>
             <div className="fdash-weekbars">
@@ -934,6 +944,240 @@ function CommunityDetail({ id, onBack, onChanged }: { id: string; onBack: () => 
       )}
     </>
   );
+}
+
+function UsersPage({
+  data,
+  onSelectUser,
+}: {
+  data: Dashboard;
+  onSelectUser: (id: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [includeSeed, setIncludeSeed] = useState(false);
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return data.operations.users
+      .filter((u) => includeSeed || !u.seed)
+      .filter((u) => {
+        if (!q) return true;
+        return `${u.firstName} ${u.lastName} ${u.phoneTail} ${u.neighborhoodName ?? ""}`.toLowerCase().includes(q);
+      })
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [data.operations.users, includeSeed, query]);
+
+  return (
+    <>
+      <PageHead
+        title="Users"
+        sub={`${rows.length} ${includeSeed ? "accounts" : "members"} · last 4 of the phone only`}
+        updated={data.updatedLabel}
+      />
+      <article className="fdash-card">
+        <div className="fdash-userbar">
+          <input
+            className="fdash-search"
+            placeholder="Name, neighborhood, or last 4"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <label className="fdash-check">
+            <input type="checkbox" checked={includeSeed} onChange={(e) => setIncludeSeed(e.target.checked)} />
+            Include demo accounts
+          </label>
+        </div>
+        {rows.length === 0 ? (
+          <p className="fdash-muted">No matching accounts.</p>
+        ) : (
+          <table className="fdash-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Neighborhood</th>
+                <th>Phone</th>
+                <th>Onboarded</th>
+                <th className="is-num">Joined</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((u) => (
+                <tr key={u.id}>
+                  <td>
+                    <button type="button" className="fdash-linkish" onClick={() => onSelectUser(u.id)}>
+                      {u.firstName} {u.lastName}
+                    </button>
+                    {u.seed ? <span className="fdash-type"> · Demo</span> : null}
+                  </td>
+                  <td>{u.neighborhoodName ?? "—"}</td>
+                  <td>{u.phoneTail ? `•••${u.phoneTail}` : "—"}</td>
+                  <td>{u.onboardingComplete ? "Yes" : "No"}</td>
+                  <td className="is-num">{u.createdAt ? pretty(u.createdAt.slice(0, 10)) : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </article>
+    </>
+  );
+}
+
+type GodViewData = {
+  people: {
+    id: string;
+    name: string;
+    lat: number;
+    lng: number;
+    placed: "precise" | "neighborhood";
+    neighborhoodName: string | null;
+    seed: boolean;
+  }[];
+  plans: { id: string; title: string; lat: number; lng: number; date: string; upcoming: boolean }[];
+  neighborhoods: { name: string; lat: number; lng: number }[];
+  bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number };
+  outside: { people: number; plans: number };
+  heatmap: { matrix: number[][]; max: number; label: string };
+};
+
+const HEAT_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function GodView({ onSelectUser }: { onSelectUser: (id: string) => void }) {
+  const [data, setData] = useState<GodViewData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showSeed, setShowSeed] = useState(false);
+  const [showPlans, setShowPlans] = useState(true);
+  const [picked, setPicked] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    api<GodViewData>("/api/admin/map")
+      .then((d) => live && setData(d))
+      .catch((e) => live && setError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Failed to load"));
+    return () => { live = false; };
+  }, []);
+
+  const people = data?.people.filter((p) => showSeed || !p.seed) ?? [];
+  const width = 800;
+  const height = 520;
+  const project = (lat: number, lng: number) => {
+    const b = data?.bounds;
+    if (!b) return { x: 0, y: 0 };
+    const x = ((lng - b.minLng) / Math.max(0.0001, b.maxLng - b.minLng)) * width;
+    const y = ((b.maxLat - lat) / Math.max(0.0001, b.maxLat - b.minLat)) * height;
+    return { x, y };
+  };
+
+  return (
+    <>
+      <PageHead title="God view" sub="People and plans on the map, and when the app is actually used" />
+      {error ? <p className="fdash-muted">{error}</p> : null}
+      {!data && !error ? <p className="fdash-muted">Loading the map…</p> : null}
+      {data ? (
+        <>
+          <article className="fdash-card">
+            <div className="fdash-userbar">
+              <label className="fdash-check">
+                <input type="checkbox" checked={showPlans} onChange={(e) => setShowPlans(e.target.checked)} />
+                Plans
+              </label>
+              <label className="fdash-check">
+                <input type="checkbox" checked={showSeed} onChange={(e) => setShowSeed(e.target.checked)} />
+                Demo accounts
+              </label>
+              <span className="fdash-muted">
+                {people.length} on the map · {data.plans.filter((p) => p.upcoming).length} upcoming plans
+                {data.outside.people > 0 ? ` · ${data.outside.people} outside Philadelphia` : ""}
+              </span>
+            </div>
+            <svg className="fdash-map" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Map of members and plans">
+              <rect width={width} height={height} className="fdash-map-bg" />
+              {data.neighborhoods.map((hood) => {
+                const p = project(hood.lat, hood.lng);
+                return (
+                  <text key={hood.name} x={p.x} y={p.y} className="fdash-map-hood">
+                    {hood.name}
+                  </text>
+                );
+              })}
+              {showPlans
+                ? data.plans.map((plan) => {
+                    const p = project(plan.lat, plan.lng);
+                    return (
+                      <circle
+                        key={plan.id}
+                        cx={p.x}
+                        cy={p.y}
+                        r={plan.upcoming ? 5 : 3}
+                        className={plan.upcoming ? "fdash-map-plan" : "fdash-map-plan is-past"}
+                      >
+                        <title>{`${plan.title} · ${plan.date}`}</title>
+                      </circle>
+                    );
+                  })
+                : null}
+              {people.map((person) => {
+                const p = project(person.lat, person.lng);
+                const active = picked === person.id;
+                return (
+                  <circle
+                    key={person.id}
+                    cx={p.x}
+                    cy={p.y}
+                    r={active ? 7 : 4.5}
+                    className={person.placed === "precise" ? "fdash-map-person is-precise" : "fdash-map-person"}
+                    onClick={() => {
+                      setPicked(person.id);
+                      onSelectUser(person.id);
+                    }}
+                  >
+                    <title>
+                      {person.name}
+                      {person.neighborhoodName ? ` · ${person.neighborhoodName}` : ""}
+                      {person.placed === "neighborhood" ? " · neighborhood, not exact" : ""}
+                    </title>
+                  </circle>
+                );
+              })}
+            </svg>
+            <p className="fdash-muted fdash-map-legend">
+              <i className="fdash-dot fdash-dot--person" /> Exact location
+              <i className="fdash-dot fdash-dot--hood" /> Placed on their neighborhood
+              <i className="fdash-dot fdash-dot--plan" /> Plan
+            </p>
+          </article>
+          <article className="fdash-card" style={{ marginTop: 14 }}>
+            <h2>When people use Commons</h2>
+            <p className="fdash-muted">{data.heatmap.label}</p>
+            <div className="fdash-heat" style={{ gridTemplateColumns: `44px repeat(24, minmax(10px, 1fr))` }}>
+              <span />
+              {Array.from({ length: 24 }, (_, hour) => (
+                <span key={hour} className="fdash-heat-h">{hour % 3 === 0 ? hour : ""}</span>
+              ))}
+              {data.heatmap.matrix.map((row, day) => (
+                <span key={HEAT_DAYS[day]} style={{ display: "contents" }}>
+                  <span className="fdash-heat-d">{HEAT_DAYS[day]}</span>
+                  {row.map((count, hour) => (
+                    <span
+                      key={hour}
+                      className="fdash-heat-cell"
+                      title={`${HEAT_DAYS[day]} ${hour}:00 UTC · ${count}`}
+                      style={{ background: heatColor(count, data.heatmap.max) }}
+                    />
+                  ))}
+                </span>
+              ))}
+            </div>
+          </article>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+function heatColor(count: number, max: number): string {
+  if (count <= 0) return "rgba(0,0,0,0.05)";
+  const t = Math.max(0.18, count / Math.max(1, max));
+  return `rgba(176, 74, 63, ${t})`;
 }
 
 function Operations({

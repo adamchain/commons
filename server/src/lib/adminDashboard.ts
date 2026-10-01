@@ -5,6 +5,7 @@
 
 import twilio from "twilio";
 import { isMongoConnected } from "./db.js";
+import { planPoint } from "./geo.js";
 import { planStartTimestamp } from "./planTime.js";
 import { LogModel } from "../models/index.js";
 import { store, type PlanRecord, type UserRecord } from "../store.js";
@@ -119,7 +120,16 @@ export interface AdminDashboard {
       trackedInApp: false;
       hostNotes: { id: string; thumb: "up" | "down"; note: string; createdAt: string; planTitle: string }[];
     };
-    users: { id: string; firstName: string; lastName: string; phoneTail: string; neighborhoodName: string | null; seed: boolean }[];
+    users: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      phoneTail: string;
+      neighborhoodName: string | null;
+      seed: boolean;
+      onboardingComplete: boolean;
+      createdAt: string;
+    }[];
     system: {
       dashboardMs: number;
       apiLatencyTracked: false;
@@ -551,6 +561,8 @@ export async function buildAdminDashboard(viewerId?: string): Promise<AdminDashb
           phoneTail: u.phoneNumber.replace(/\D/g, "").slice(-4),
           neighborhoodName: (u.neighborhoodId && hoodName.get(u.neighborhoodId)) || null,
           seed: isSeed(u),
+          onboardingComplete: u.onboardingComplete,
+          createdAt: u.createdAt,
         }))
         .sort((a, b) => a.firstName.localeCompare(b.firstName)),
       system: {
@@ -928,5 +940,129 @@ export function buildCommunityDetail(communityId: string) {
     members: community.memberCount,
     description: community.description,
     weeks,
+  };
+}
+
+/** Spread people who only have a neighborhood so they don't stack on one pixel. */
+function neighborhoodJitter(id: string): { dLat: number; dLng: number } {
+  let h = 0;
+  for (const ch of id) h = (h * 33 + ch.charCodeAt(0)) >>> 0;
+  const angle = ((h % 360) * Math.PI) / 180;
+  const miles = 0.12 + ((h >>> 8) % 100) / 100 * 0.28;
+  return {
+    dLat: (miles / 69) * Math.cos(angle),
+    dLng: (miles / (69 * Math.cos((40 * Math.PI) / 180))) * Math.sin(angle),
+  };
+}
+
+const PHILLY_BOUNDS = { minLat: 39.88, maxLat: 40.1, minLng: -75.28, maxLng: -74.95 };
+
+export function buildGodView() {
+  const hoods = store.listNeighborhoods();
+  const hoodById = new Map(hoods.map((h) => [h.id, h]));
+  const people: {
+    id: string;
+    name: string;
+    lat: number;
+    lng: number;
+    placed: "precise" | "neighborhood";
+    neighborhoodName: string | null;
+    seed: boolean;
+  }[] = [];
+
+  for (const user of store.listUsers()) {
+    if (user.ownerUserId) continue;
+    const hoodId = user.neighborhoodIds?.[0] ?? user.neighborhoodId;
+    const hood = hoodId ? hoodById.get(hoodId) : undefined;
+    const precise = typeof user.locationLat === "number" && typeof user.locationLng === "number";
+    let lat: number | null = precise ? user.locationLat! : null;
+    let lng: number | null = precise ? user.locationLng! : null;
+    let placed: "precise" | "neighborhood" = "precise";
+    if (!precise) {
+      if (!hood || typeof hood.lat !== "number" || typeof hood.lng !== "number") continue;
+      const jitter = neighborhoodJitter(user.id);
+      lat = hood.lat + jitter.dLat;
+      lng = hood.lng + jitter.dLng;
+      placed = "neighborhood";
+    }
+    if (lat === null || lng === null) continue;
+    const name = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
+    people.push({
+      id: user.id,
+      name: name || "Unnamed",
+      lat,
+      lng,
+      placed,
+      neighborhoodName: hood?.name ?? null,
+      seed: user.accountSource === "seed",
+    });
+  }
+
+  const today = dayKey(new Date());
+  const plans = store
+    .listPlans()
+    .filter((plan) => !plan.cancelledAt)
+    .map((plan) => {
+      const point = planPoint(plan);
+      if (!point) return null;
+      return {
+        id: plan.id,
+        title: plan.title,
+        lat: point.lat,
+        lng: point.lng,
+        date: plan.date.slice(0, 10),
+        upcoming: plan.date.slice(0, 10) >= today,
+      };
+    })
+    .filter((plan): plan is NonNullable<typeof plan> => plan !== null);
+
+  const matrix = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0));
+  const bump = (iso: string | null | undefined) => {
+    if (!iso) return;
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return;
+    matrix[d.getUTCDay()]![d.getUTCHours()]! += 1;
+  };
+  for (const user of store.listUsers()) {
+    if (user.accountSource === "seed" || user.ownerUserId) continue;
+    bump(user.createdAt);
+  }
+  for (const plan of store.listPlans()) bump(plan.createdAt);
+  for (const message of store.listAllMessages()) {
+    if (message.kind === "user") bump(message.createdAt);
+  }
+  for (const part of store.listAllParticipations()) bump(part.updatedAt);
+
+  const hoodLats = hoods.map((h) => h.lat).filter((n): n is number => typeof n === "number");
+  const hoodLngs = hoods.map((h) => h.lng).filter((n): n is number => typeof n === "number");
+  const bounds = hoodLats.length > 0 && hoodLngs.length > 0
+    ? {
+        minLat: Math.min(...hoodLats) - 0.02,
+        maxLat: Math.max(...hoodLats) + 0.02,
+        minLng: Math.min(...hoodLngs) - 0.025,
+        maxLng: Math.max(...hoodLngs) + 0.025,
+      }
+    : PHILLY_BOUNDS;
+  const inside = (lat: number, lng: number) =>
+    lat >= bounds.minLat && lat <= bounds.maxLat && lng >= bounds.minLng && lng <= bounds.maxLng;
+  const visiblePeople = people.filter((person) => inside(person.lat, person.lng));
+  const visiblePlans = plans.filter((plan) => inside(plan.lat, plan.lng));
+
+  return {
+    people: visiblePeople,
+    plans: visiblePlans,
+    outside: {
+      people: people.length - visiblePeople.length,
+      plans: plans.length - visiblePlans.length,
+    },
+    neighborhoods: hoods
+      .filter((h) => typeof h.lat === "number" && typeof h.lng === "number")
+      .map((h) => ({ name: h.name, lat: h.lat as number, lng: h.lng as number })),
+    bounds,
+    heatmap: {
+      matrix,
+      max: Math.max(1, ...matrix.flat()),
+      label: "UTC — signups, plans, messages, RSVPs. Demo accounts are left out of signups.",
+    },
   };
 }

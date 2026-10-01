@@ -8,7 +8,7 @@ import { emit } from "../lib/notify.js";
 import { listAllUsers, findUserById } from "../userRepo.js";
 import { runBehaviorAgent, analyzeUserBehavior } from "../lib/behaviorAgent.js";
 import { communityCategoriesOf, normalizeCommunityCategory } from "../types/shared.js";
-import { buildAdminDashboard, buildCommunityDetail } from "../lib/adminDashboard.js";
+import { buildAdminDashboard, buildCommunityDetail, buildGodView } from "../lib/adminDashboard.js";
 import { buildCoverCatalog, invalidateCoverCatalogCache } from "../lib/coverCatalog.js";
 
 const adminRouter = Router();
@@ -95,6 +95,10 @@ function seriesLastNDays(n: number): Map<string, number> {
 adminRouter.get("/dashboard", async (req, res) => {
   const data = await buildAdminDashboard(req.userId);
   res.json(data);
+});
+
+adminRouter.get("/map", (_req, res) => {
+  res.json(buildGodView());
 });
 
 adminRouter.get("/dashboard/communities/:id", (req, res) => {
@@ -590,22 +594,18 @@ adminRouter.post("/communities/:id/reject", (req, res) => {
   res.json({ ok: true, community: updated });
 });
 
-function requireFoundingCommunity(id: string, res: Response): CommunityRecord | undefined {
+function requireCommunity(id: string, res: Response): CommunityRecord | undefined {
   const community = store.findCommunityById(id);
   if (!community) {
     res.status(404).json({ error: "Community not found" });
     return;
   }
-  if (!community.isFounding) {
-    res.status(400).json({ error: "Only founding communities can be hidden or deleted here" });
-    return;
-  }
   return community;
 }
 
-// POST /api/admin/communities/:id/hide — take a founding community off the app. Data stays.
+// POST /api/admin/communities/:id/hide — take a community off the app. Data stays.
 adminRouter.post("/communities/:id/hide", (req, res) => {
-  const community = requireFoundingCommunity(String(req.params.id), res);
+  const community = requireCommunity(String(req.params.id), res);
   if (!community) return;
   const hiddenAt = new Date().toISOString();
   store.updateCommunity(community.id, { hiddenAt });
@@ -613,18 +613,18 @@ adminRouter.post("/communities/:id/hide", (req, res) => {
   res.json({ ok: true, hiddenAt });
 });
 
-// POST /api/admin/communities/:id/show — put a hidden founding community back.
+// POST /api/admin/communities/:id/show — put a hidden community back.
 adminRouter.post("/communities/:id/show", (req, res) => {
-  const community = requireFoundingCommunity(String(req.params.id), res);
+  const community = requireCommunity(String(req.params.id), res);
   if (!community) return;
   store.updateCommunity(community.id, { hiddenAt: null });
   store.log("community_shown", { communityId: community.id, by: req.userId ?? "admin" });
   res.json({ ok: true, hiddenAt: null });
 });
 
-// DELETE /api/admin/communities/:id — permanently remove a founding community.
+// DELETE /api/admin/communities/:id — permanently remove a community.
 adminRouter.delete("/communities/:id", async (req, res) => {
-  const community = requireFoundingCommunity(String(req.params.id), res);
+  const community = requireCommunity(String(req.params.id), res);
   if (!community) return;
   const name = community.name;
   const communityId = community.id;
@@ -660,7 +660,7 @@ adminRouter.delete("/communities/:id", async (req, res) => {
     communityId,
     by: actorId,
     cancelledPlans: result.cancelledPlanIds.length,
-    founding: true,
+    founding: community.isFounding,
   });
   res.json({ ok: true });
 });
