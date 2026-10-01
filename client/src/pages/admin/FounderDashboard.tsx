@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Activity,
@@ -1035,6 +1035,7 @@ type GodViewData = {
   plans: { id: string; title: string; lat: number; lng: number; date: string; upcoming: boolean }[];
   neighborhoods: { name: string; lat: number; lng: number }[];
   bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number };
+  basemap: { center: { lat: number; lng: number }; zoom: number; width: number; height: number };
   outside: { people: number; plans: number };
   heatmap: { matrix: number[][]; max: number; label: string };
 };
@@ -1046,7 +1047,8 @@ function GodView({ onSelectUser }: { onSelectUser: (id: string) => void }) {
   const [error, setError] = useState<string | null>(null);
   const [showSeed, setShowSeed] = useState(false);
   const [showPlans, setShowPlans] = useState(true);
-  const [picked, setPicked] = useState<string | null>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const mapRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -1057,15 +1059,80 @@ function GodView({ onSelectUser }: { onSelectUser: (id: string) => void }) {
   }, []);
 
   const people = data?.people.filter((p) => showSeed || !p.seed) ?? [];
-  const width = 800;
-  const height = 520;
-  const project = (lat: number, lng: number) => {
-    const b = data?.bounds;
-    if (!b) return { x: 0, y: 0 };
-    const x = ((lng - b.minLng) / Math.max(0.0001, b.maxLng - b.minLng)) * width;
-    const y = ((b.maxLat - lat) / Math.max(0.0001, b.maxLat - b.minLat)) * height;
-    return { x, y };
-  };
+
+  useEffect(() => {
+    if (!data) return;
+    let cancelled = false;
+    const markers: GoogleMarker[] = [];
+    void (async () => {
+      try {
+        const { key } = await api<{ key: string }>("/api/admin/map/key");
+        if (cancelled || !mapRef.current) return;
+        window.gm_authFailure = () => {
+          if (!cancelled) {
+            setMapError("Turn on the Maps JavaScript API for this Google Cloud key, then reload.");
+          }
+        };
+        await loadGoogleMaps(key);
+        const maps = window.google?.maps;
+        if (cancelled || !mapRef.current || !maps) return;
+        const map = new maps.Map(mapRef.current, {
+          center: data.basemap.center,
+          zoom: data.basemap.zoom,
+          disableDefaultUI: true,
+          clickableIcons: false,
+          gestureHandling: "greedy",
+        });
+        const add = (
+          lat: number,
+          lng: number,
+          fill: string,
+          scale: number,
+          title: string,
+          onClick?: () => void,
+        ) => {
+          const marker = new maps.Marker({
+            position: { lat, lng },
+            map,
+            title,
+            icon: {
+              path: maps.SymbolPath.CIRCLE,
+              scale,
+              fillColor: fill,
+              fillOpacity: 1,
+              strokeColor: "#ffffff",
+              strokeWeight: 1.5,
+            },
+          });
+          if (onClick) marker.addListener("click", onClick);
+          markers.push(marker);
+        };
+        for (const person of data.people) {
+          if (!showSeed && person.seed) continue;
+          add(
+            person.lat,
+            person.lng,
+            person.placed === "precise" ? "#b04a3f" : "#2a2a32",
+            person.placed === "precise" ? 7 : 5,
+            person.neighborhoodName ? `${person.name} · ${person.neighborhoodName}` : person.name,
+            () => onSelectUser(person.id),
+          );
+        }
+        if (showPlans) {
+          for (const plan of data.plans) {
+            add(plan.lat, plan.lng, plan.upcoming ? "#6f8f72" : "#8a8478", plan.upcoming ? 6 : 4, `${plan.title} · ${plan.date}`);
+          }
+        }
+        if (!cancelled) setMapError(null);
+      } catch (e) {
+        if (!cancelled) setMapError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Google Maps failed to load");
+      }
+    })();
+    return () => {
+      cancelled = true;
+      for (const marker of markers) marker.setMap(null);
+    };
+  }, [data, showSeed, showPlans, onSelectUser]);
 
   return (
     <>
@@ -1089,56 +1156,11 @@ function GodView({ onSelectUser }: { onSelectUser: (id: string) => void }) {
                 {data.outside.people > 0 ? ` · ${data.outside.people} outside Philadelphia` : ""}
               </span>
             </div>
-            <svg className="fdash-map" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Map of members and plans">
-              <rect width={width} height={height} className="fdash-map-bg" />
-              {data.neighborhoods.map((hood) => {
-                const p = project(hood.lat, hood.lng);
-                return (
-                  <text key={hood.name} x={p.x} y={p.y} className="fdash-map-hood">
-                    {hood.name}
-                  </text>
-                );
-              })}
-              {showPlans
-                ? data.plans.map((plan) => {
-                    const p = project(plan.lat, plan.lng);
-                    return (
-                      <circle
-                        key={plan.id}
-                        cx={p.x}
-                        cy={p.y}
-                        r={plan.upcoming ? 5 : 3}
-                        className={plan.upcoming ? "fdash-map-plan" : "fdash-map-plan is-past"}
-                      >
-                        <title>{`${plan.title} · ${plan.date}`}</title>
-                      </circle>
-                    );
-                  })
-                : null}
-              {people.map((person) => {
-                const p = project(person.lat, person.lng);
-                const active = picked === person.id;
-                return (
-                  <circle
-                    key={person.id}
-                    cx={p.x}
-                    cy={p.y}
-                    r={active ? 7 : 4.5}
-                    className={person.placed === "precise" ? "fdash-map-person is-precise" : "fdash-map-person"}
-                    onClick={() => {
-                      setPicked(person.id);
-                      onSelectUser(person.id);
-                    }}
-                  >
-                    <title>
-                      {person.name}
-                      {person.neighborhoodName ? ` · ${person.neighborhoodName}` : ""}
-                      {person.placed === "neighborhood" ? " · neighborhood, not exact" : ""}
-                    </title>
-                  </circle>
-                );
-              })}
-            </svg>
+            {mapError ? <p className="fdash-muted">{mapError}</p> : null}
+            <div ref={mapRef} className="fdash-gmap" hidden={Boolean(mapError)} role="img" aria-label="Map of members and plans" />
+            {mapError ? (
+              <GodViewPlot data={data} people={people} showPlans={showPlans} onSelectUser={onSelectUser} />
+            ) : null}
             <p className="fdash-muted fdash-map-legend">
               <i className="fdash-dot fdash-dot--person" /> Exact location
               <i className="fdash-dot fdash-dot--hood" /> Placed on their neighborhood
@@ -1172,6 +1194,114 @@ function GodView({ onSelectUser }: { onSelectUser: (id: string) => void }) {
       ) : null}
     </>
   );
+}
+
+function GodViewPlot({
+  data,
+  people,
+  showPlans,
+  onSelectUser,
+}: {
+  data: GodViewData;
+  people: GodViewData["people"];
+  showPlans: boolean;
+  onSelectUser: (id: string) => void;
+}) {
+  const width = 800;
+  const height = 520;
+  const frame = data.basemap;
+  const project = (lat: number, lng: number) => {
+    const origin = mercatorPixel(frame.center.lat, frame.center.lng, frame.zoom);
+    const point = mercatorPixel(lat, lng, frame.zoom);
+    return {
+      x: (frame.width / 2 + (point.x - origin.x)) * (width / frame.width),
+      y: (frame.height / 2 + (point.y - origin.y)) * (height / frame.height),
+    };
+  };
+  return (
+    <svg className="fdash-map" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Map of members and plans">
+      <rect width={width} height={height} className="fdash-map-bg" />
+      {data.neighborhoods.map((hood) => {
+        const p = project(hood.lat, hood.lng);
+        return (
+          <text key={hood.name} x={p.x} y={p.y} className="fdash-map-hood">{hood.name}</text>
+        );
+      })}
+      {showPlans
+        ? data.plans.map((plan) => {
+            const p = project(plan.lat, plan.lng);
+            return (
+              <circle key={plan.id} cx={p.x} cy={p.y} r={plan.upcoming ? 5 : 3} className={plan.upcoming ? "fdash-map-plan" : "fdash-map-plan is-past"}>
+                <title>{`${plan.title} · ${plan.date}`}</title>
+              </circle>
+            );
+          })
+        : null}
+      {people.map((person) => {
+        const p = project(person.lat, person.lng);
+        return (
+          <circle
+            key={person.id}
+            cx={p.x}
+            cy={p.y}
+            r={4.5}
+            className={person.placed === "precise" ? "fdash-map-person is-precise" : "fdash-map-person"}
+            onClick={() => onSelectUser(person.id)}
+          >
+            <title>{person.name}</title>
+          </circle>
+        );
+      })}
+    </svg>
+  );
+}
+
+function mercatorPixel(lat: number, lng: number, zoom: number): { x: number; y: number } {
+  const siny = Math.min(Math.max(Math.sin((lat * Math.PI) / 180), -0.9999), 0.9999);
+  const scale = 256 * 2 ** zoom;
+  return {
+    x: scale * (0.5 + lng / 360),
+    y: scale * (0.5 - Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)),
+  };
+}
+
+type GoogleMarker = {
+  setMap: (map: null) => void;
+  addListener: (event: string, fn: () => void) => void;
+};
+
+interface GoogleMapsNamespace {
+  maps: {
+    Map: new (el: HTMLElement, opts: Record<string, unknown>) => unknown;
+    Marker: new (opts: Record<string, unknown>) => GoogleMarker;
+    SymbolPath: { CIRCLE: number };
+  };
+}
+
+declare global {
+  interface Window {
+    google?: GoogleMapsNamespace;
+    gm_authFailure?: () => void;
+  }
+}
+
+function loadGoogleMaps(key: string): Promise<void> {
+  if (window.google?.maps) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>("script[data-commons-gmap]");
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Google Maps failed to load")), { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}`;
+    script.async = true;
+    script.dataset.commonsGmap = "1";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Google Maps failed to load"));
+    document.head.appendChild(script);
+  });
 }
 
 function heatColor(count: number, max: number): string {

@@ -956,6 +956,51 @@ function neighborhoodJitter(id: string): { dLat: number; dLng: number } {
 }
 
 const PHILLY_BOUNDS = { minLat: 39.88, maxLat: 40.1, minLng: -75.28, maxLng: -74.95 };
+const BASEMAP_WIDTH = 640;
+const BASEMAP_HEIGHT = 416;
+
+/** Google Static Maps uses Web Mercator. Overlay dots must use the same math. */
+function mercatorPixel(lat: number, lng: number, zoom: number): { x: number; y: number } {
+  const siny = Math.min(Math.max(Math.sin((lat * Math.PI) / 180), -0.9999), 0.9999);
+  const scale = 256 * 2 ** zoom;
+  return {
+    x: scale * (0.5 + lng / 360),
+    y: scale * (0.5 - Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)),
+  };
+}
+
+function basemapFrame(bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }): {
+  center: { lat: number; lng: number };
+  zoom: number;
+  width: number;
+  height: number;
+} {
+  const center = {
+    lat: (bounds.minLat + bounds.maxLat) / 2,
+    lng: (bounds.minLng + bounds.maxLng) / 2,
+  };
+  const corners: [number, number][] = [
+    [bounds.minLat, bounds.minLng],
+    [bounds.minLat, bounds.maxLng],
+    [bounds.maxLat, bounds.minLng],
+    [bounds.maxLat, bounds.maxLng],
+  ];
+  let zoom = 11;
+  for (let z = 16; z >= 1; z--) {
+    const origin = mercatorPixel(center.lat, center.lng, z);
+    const fits = corners.every(([lat, lng]) => {
+      const p = mercatorPixel(lat, lng, z);
+      const x = BASEMAP_WIDTH / 2 + (p.x - origin.x);
+      const y = BASEMAP_HEIGHT / 2 + (p.y - origin.y);
+      return x >= 16 && x <= BASEMAP_WIDTH - 16 && y >= 16 && y <= BASEMAP_HEIGHT - 16;
+    });
+    if (fits) {
+      zoom = z;
+      break;
+    }
+  }
+  return { center, zoom, width: BASEMAP_WIDTH, height: BASEMAP_HEIGHT };
+}
 
 export function buildGodView() {
   const hoods = store.listNeighborhoods();
@@ -1059,6 +1104,7 @@ export function buildGodView() {
       .filter((h) => typeof h.lat === "number" && typeof h.lng === "number")
       .map((h) => ({ name: h.name, lat: h.lat as number, lng: h.lng as number })),
     bounds,
+    basemap: basemapFrame(bounds),
     heatmap: {
       matrix,
       max: Math.max(1, ...matrix.flat()),

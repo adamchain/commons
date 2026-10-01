@@ -101,6 +101,15 @@ adminRouter.get("/map", (_req, res) => {
   res.json(buildGodView());
 });
 
+adminRouter.get("/map/key", (_req, res) => {
+  const key = process.env.GOOGLE_MAPS_API_KEY?.trim() || process.env.GOOGLE_PLACES_API_KEY?.trim();
+  if (!key) {
+    res.status(404).json({ error: "Google Maps is not configured." });
+    return;
+  }
+  res.json({ key });
+});
+
 adminRouter.get("/dashboard/communities/:id", (req, res) => {
   const detail = buildCommunityDetail(String(req.params.id));
   if (!detail) {
