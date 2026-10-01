@@ -12,11 +12,15 @@ export type NavFromState = {
     | "explore"
     | "profile"
     | "community"
+    | "community-chat"
+    | "dm"
     | "network"
     | "settings-forums";
   planId?: string;
   /** Profile back targets — do not overload planId for this. */
   profileUserId?: string;
+  /** Direct-message partner — used when `from` is `"dm"`. */
+  dmUserId?: string;
   forumTag?: string;
   communityId?: string;
   /** Messages Plans vs Interests — used when `from` is `"messages"`. */
@@ -49,6 +53,10 @@ export function hrefForBack(state: NavFromState | null | undefined): string {
       return state.planId ? `/plans/${state.planId}` : "/";
     case "chat":
       return state.planId ? `/plans/${state.planId}/chat` : "/messages";
+    case "community-chat":
+      return state.communityId ? `/communities/${state.communityId}/chat` : "/messages";
+    case "dm":
+      return state.dmUserId ? `/dm/${state.dmUserId}` : "/messages";
     case "forum":
       return state.forumTag ? `/forums/${state.forumTag}` : "/messages?tab=interests";
     case "settings-forums":

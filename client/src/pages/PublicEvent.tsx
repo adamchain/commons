@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, parseApiError } from "../api/http";
-import { formatPhoneInput, formatPlanWhenLine } from "../lib/format";
+import { formatPhoneInput, formatPlanWhenLine, isValidPhoneInput } from "../lib/format";
 import { INTEREST_EMOJI, INTEREST_LABELS, type PublicPlanDTO } from "../types/shared";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { IdeaCoverFallback } from "../components/CoverThumb";
@@ -158,7 +158,7 @@ export function PublicEventPage() {
                 onKeyDown={(e) => e.key === "Enter" && join()}
               />
               {error && <div className="onboarding-error">{error}</div>}
-              <button className="btn-primary btn-block" disabled={busy || !phoneNumber} onClick={join}>
+              <button className="btn-primary btn-block" disabled={busy || !isValidPhoneInput(phoneNumber)} onClick={join}>
                 {busy ? "Sending…" : "Join & RSVP"}
               </button>
               <p className="onboarding-fineprint">

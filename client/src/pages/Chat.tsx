@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { ChatPersonLink } from "../components/ChatPersonLink";
 import { HoldToDelete } from "../components/HoldToDelete";
 import { BlockConfirmModal, ReportModal } from "../components/PlanSafetyMenu";
 import { PollCard } from "../components/PollCard";
@@ -49,6 +50,7 @@ export function ChatPage() {
         : navFrom?.from === "profile"
           ? "Profile"
           : "Plan";
+  const personProfileFrom: NavFromState = { from: "chat", planId };
   const planLinkState: NavFromState =
     navFrom?.from === "messages"
       ? { from: "messages" }
@@ -523,6 +525,7 @@ export function ChatPage() {
                     key={m.id}
                     poll={m.poll!}
                     author={m.sender!}
+                    profileFrom={personProfileFrom}
                     participants={conv.participants}
                     variant="pinned"
                     showQuestion={openPolls.length > 1}
@@ -567,6 +570,7 @@ export function ChatPage() {
                     <PollCard
                       poll={msg.poll}
                       author={msg.sender}
+                      profileFrom={personProfileFrom}
                       participants={conv.participants}
                       collapsible
                       onVote={(optId) => void votePoll(msg.id, optId)}
@@ -591,13 +595,19 @@ export function ChatPage() {
                   {!mine && (
                     <span className="chat-bubble-avatar-slot">
                       {entry.showAvatar ? (
-                        <Avatar
-                          seed={entry.sender.avatarSeed}
-                          style={entry.sender.avatarStyle}
-                          photoDataUrl={entry.sender.avatarPhotoDataUrl}
-                          params={entry.sender.avatarParams}
-                          size="sm"
-                        />
+                        <ChatPersonLink
+                          userId={entry.sender.id}
+                          name={entry.sender.firstName}
+                          state={personProfileFrom}
+                        >
+                          <Avatar
+                            seed={entry.sender.avatarSeed}
+                            style={entry.sender.avatarStyle}
+                            photoDataUrl={entry.sender.avatarPhotoDataUrl}
+                            params={entry.sender.avatarParams}
+                            size="sm"
+                          />
+                        </ChatPersonLink>
                       ) : null}
                     </span>
                   )}
@@ -608,7 +618,14 @@ export function ChatPage() {
                     onDelete={() => void deleteOwnMessage(entry.id)}
                   >
                     {!mine && entry.showAvatar && (
-                      <div className="chat-bubble-author">{entry.sender.firstName}</div>
+                      <ChatPersonLink
+                        userId={entry.sender.id}
+                        name={entry.sender.firstName}
+                        state={personProfileFrom}
+                        className="chat-bubble-author"
+                      >
+                        {entry.sender.firstName}
+                      </ChatPersonLink>
                     )}
                     {entry.imageUrl && (
                       <a

@@ -170,7 +170,8 @@ export function isValidPhoneInput(raw: string): boolean {
   const compact = raw.replace(/\s/g, "").trim();
   if (compact.startsWith("+")) {
     const rest = compact.slice(1).replace(/\D/g, "");
-    if (rest.startsWith("1") && rest.length === 11) return isNanp10(rest.slice(1));
+    // Country code 1 is NANP only — a short "+1…" must not count as a finished number.
+    if (rest.startsWith("1")) return rest.length === 11 && isNanp10(rest.slice(1));
     return /^\d{6,14}$/.test(rest);
   }
   return false;

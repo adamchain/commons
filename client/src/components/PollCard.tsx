@@ -1,12 +1,16 @@
 import { useMemo, useState } from "react";
 import { BarChart2, Check, ChevronDown } from "lucide-react";
+import type { NavFromState } from "../lib/navState";
 import { Avatar } from "./Avatar";
+import { ChatPersonLink } from "./ChatPersonLink";
 import type { PollDTO, PublicUser } from "../types/shared";
 
 interface PollCardProps {
   poll: PollDTO;
   /** Who posted the poll. */
   author: PublicUser;
+  /** When set, the author's name opens their profile and back returns here. */
+  profileFrom?: NavFromState;
   /** Everyone in the conversation — used to resolve voter avatars/names. */
   participants: PublicUser[];
   /** Called with the tapped option id. Re-tapping your option clears the vote. */
@@ -30,6 +34,7 @@ interface PollCardProps {
 export function PollCard({
   poll,
   author,
+  profileFrom,
   participants,
   onVote,
   onClose,
@@ -148,7 +153,20 @@ export function PollCard({
 
       <div className="poll-card-foot">
         <span className="poll-card-meta">
-          {author.firstName} · {total} {total === 1 ? "vote" : "votes"}
+          {profileFrom ? (
+            <ChatPersonLink
+              userId={author.id}
+              name={author.firstName}
+              state={profileFrom}
+              className="poll-card-author"
+            >
+              {author.firstName}
+            </ChatPersonLink>
+          ) : (
+            author.firstName
+          )}
+          {" · "}
+          {total} {total === 1 ? "vote" : "votes"}
           {poll.closed && " · Final results"}
         </span>
         {(onDelete || (!poll.closed && onClose) || (poll.closed && onReopen)) && (

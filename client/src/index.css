@@ -5906,6 +5906,23 @@ a.action-btn--stack {
   border-color: var(--ink);
   border-radius: 16px 16px 4px 16px;
 }
+.chat-person-link {
+  cursor: pointer;
+}
+.chat-bubble-avatar-slot .chat-person-link {
+  display: flex;
+  border-radius: 50%;
+}
+.chat-person-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.chat-bubble-author.chat-person-link:hover,
+.chat-bubble-author.chat-person-link:focus-visible,
+.poll-card-author.chat-person-link:hover,
+.poll-card-author.chat-person-link:focus-visible {
+  text-decoration: underline;
+}
 .chat-bubble-author {
   font-size: var(--text-body-small);
   font-weight: 700;

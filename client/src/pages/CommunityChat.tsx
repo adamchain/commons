@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, BarChart2, MessageCircle } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { ChatPersonLink } from "../components/ChatPersonLink";
 import { HoldToDelete } from "../components/HoldToDelete";
 import { CommunityCoverThumb } from "../components/CoverThumb";
 import { BlockConfirmModal, ReportModal } from "../components/PlanSafetyMenu";
@@ -14,6 +15,7 @@ import { sentenceCaseTitle } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
+import type { NavFromState } from "../lib/navState";
 import { useStickToBottom } from "../lib/useStickToBottom";
 import type { CommunityCategory, MessageDTO, PublicUser } from "../types/shared";
 
@@ -50,6 +52,7 @@ export function CommunityChatPage() {
     ? "/messages"
     : `/communities/${communityIdFromState || id}`;
   const backLabel = fromMessages ? "Messages" : "Community";
+  const personProfileFrom: NavFromState = { from: "community-chat", communityId: id };
   const { user } = useAuth();
   const [conv, setConv] = useState<CommunityConversation | null>(null);
   const [messages, setMessages] = useState<MessageDTO[]>([]);
@@ -540,6 +543,7 @@ export function CommunityChatPage() {
                     key={m.id}
                     poll={m.poll!}
                     author={m.sender!}
+                    profileFrom={personProfileFrom}
                     participants={conv.participants}
                     variant="pinned"
                     showQuestion={openPolls.length > 1}
@@ -584,6 +588,7 @@ export function CommunityChatPage() {
                     <PollCard
                       poll={msg.poll}
                       author={msg.sender}
+                      profileFrom={personProfileFrom}
                       participants={conv.participants}
                       collapsible
                       onVote={(optId) => void votePoll(msg.id, optId)}
@@ -608,13 +613,19 @@ export function CommunityChatPage() {
                   {!mine && (
                     <span className="chat-bubble-avatar-slot">
                       {entry.showAvatar ? (
-                        <Avatar
-                          seed={entry.sender.avatarSeed}
-                          style={entry.sender.avatarStyle}
-                          photoDataUrl={entry.sender.avatarPhotoDataUrl}
-                          params={entry.sender.avatarParams}
-                          size="sm"
-                        />
+                        <ChatPersonLink
+                          userId={entry.sender.id}
+                          name={entry.sender.firstName}
+                          state={personProfileFrom}
+                        >
+                          <Avatar
+                            seed={entry.sender.avatarSeed}
+                            style={entry.sender.avatarStyle}
+                            photoDataUrl={entry.sender.avatarPhotoDataUrl}
+                            params={entry.sender.avatarParams}
+                            size="sm"
+                          />
+                        </ChatPersonLink>
                       ) : null}
                     </span>
                   )}
@@ -625,7 +636,14 @@ export function CommunityChatPage() {
                     onDelete={() => void deleteOwnMessage(entry.id)}
                   >
                     {!mine && entry.showAvatar && (
-                      <div className="chat-bubble-author">{entry.sender.firstName}</div>
+                      <ChatPersonLink
+                        userId={entry.sender.id}
+                        name={entry.sender.firstName}
+                        state={personProfileFrom}
+                        className="chat-bubble-author"
+                      >
+                        {entry.sender.firstName}
+                      </ChatPersonLink>
                     )}
                     {entry.imageUrl && (
                       <a

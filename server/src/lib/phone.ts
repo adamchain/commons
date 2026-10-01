@@ -15,10 +15,12 @@ export function normalizePhone(raw: string): string | null {
   const compact = raw.replace(/\s/g, "").trim();
   if (compact.startsWith("+")) {
     const rest = compact.slice(1).replace(/\D/g, "");
-    if (/^\d{6,14}$/.test(rest)) {
-      if (rest.startsWith("1") && rest.length === 11 && !isNanp10(rest.slice(1))) return null;
+    // Country code 1 is NANP only. Anything else in that prefix is not a sendable number.
+    if (rest.startsWith("1")) {
+      if (rest.length !== 11 || !isNanp10(rest.slice(1))) return null;
       return `+${rest}`;
     }
+    if (/^\d{6,14}$/.test(rest)) return `+${rest}`;
   }
   return null;
 }

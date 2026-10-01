@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import type { CSSProperties, ReactNode } from "react";
 import { ArrowLeft, Check, Coffee, Flame, MapPin, Star, Wine, type LucideIcon } from "lucide-react";
-import { api } from "../api/http";
+import { api, parseApiError } from "../api/http";
 import { formatPhoneInput, isValidPhoneInput } from "../lib/format";
 import { APP_STORE_URL } from "../lib/appStore";
 import { setAuthToken } from "../api/authToken";
@@ -262,7 +262,9 @@ export function OnboardingPage() {
   if (step === "phone") {
     const phoneValid = isValidPhoneInput(phoneNumber);
     const digitsOnly = phoneNumber.replace(/\D/g, "");
-    const phoneTouched = digitsOnly.length >= 3;
+    // Only flag a finished number. Showing this after the first few digits
+    // reads as a failure while the person is still typing.
+    const showInvalidPhone = digitsOnly.length >= 10 && !phoneValid;
     return (
       <OnboardingShell
         landing
@@ -286,12 +288,8 @@ export function OnboardingPage() {
             setError(null);
           }}
         />
-        {phoneTouched && !phoneValid && (
-          <div className="onboarding-error">
-            {digitsOnly.length < 10
-              ? "Enter a 10-digit US phone number."
-              : "Enter a valid phone number."}
-          </div>
+        {showInvalidPhone && (
+          <div className="onboarding-error">Enter a valid phone number.</div>
         )}
         {error && <div className="onboarding-error">{error}</div>}
         <button
@@ -608,14 +606,11 @@ function pickInitial(user: MeDTO | null, gatePassed: boolean): Step {
 }
 
 function formatError(e: unknown): string {
-  if (e instanceof Error) {
-    try {
-      const parsed = JSON.parse(e.message);
-      if (typeof parsed?.error === "string") return parsed.error;
-    } catch { /* fall through */ }
-    return e.message;
+  const msg = parseApiError(e);
+  if (msg === "Failed to fetch" || msg === "Load failed" || msg === "Network request failed") {
+    return "Couldn't reach Commons. Check your connection and try again.";
   }
-  return "Something went wrong";
+  return msg || "Something went wrong";
 }
 
 /** Formats US numbers as users type, while still allowing +country input. */

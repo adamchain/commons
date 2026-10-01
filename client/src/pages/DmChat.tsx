@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, MessageCircle, MoreVertical, Plus } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { ChatPersonLink } from "../components/ChatPersonLink";
 import { HoldToDelete } from "../components/HoldToDelete";
 import { PollCard } from "../components/PollCard";
 import { PollSheet } from "../components/PollSheet";
@@ -127,6 +128,7 @@ export function DmChatPage() {
     return () => document.removeEventListener("mousedown", close);
   }, [composerMenuOpen]);
 
+  const personProfileFrom: NavFromState = { from: "dm", dmUserId: userId };
   const other = conv?.participants.find((p) => p.id !== user?.id) ?? conv?.participants[0];
   const gateName = personName(gate?.person ?? null);
   const title = other
@@ -381,7 +383,18 @@ export function DmChatPage() {
           <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </button>
         <div className="chat-thread-heading">
-          <div className="chat-thread-title">{title}</div>
+          {userId ? (
+            <ChatPersonLink
+              userId={userId}
+              name={other?.firstName || gateName || "them"}
+              state={personProfileFrom}
+              className="chat-thread-title"
+            >
+              {title}
+            </ChatPersonLink>
+          ) : (
+            <div className="chat-thread-title">{title}</div>
+          )}
           {conv && (
             <div className="chat-thread-sub">
               {conv.muted
@@ -435,7 +448,7 @@ export function DmChatPage() {
             gate={gate}
             busy={gateBusy}
             note={connectErr}
-            onProfile={() => navigate(`/profile/${userId}`, { state: { from: "network" } })}
+            onProfile={() => navigate(`/profile/${userId}`, { state: personProfileFrom })}
             onConnect={() => void connectThenOpen()}
           />
         )}
@@ -456,8 +469,8 @@ export function DmChatPage() {
             {connectErr && <p className="error-text">{connectErr}</p>}
           </div>
         )}
-        {!blocked && other && !conv?.awaitingAccept && (
-          <Link to={`/profile/${other.id}`} state={{ from: "network" }} className="chat-header-card chat-header-card--compact">
+        {!blocked && other && (
+          <Link to={`/profile/${other.id}`} state={personProfileFrom} className="chat-header-card chat-header-card--compact">
             <Avatar
               seed={other.avatarSeed}
               style={other.avatarStyle}
@@ -492,6 +505,7 @@ export function DmChatPage() {
                   <PollCard
                     poll={m.poll}
                     author={m.sender}
+                    profileFrom={personProfileFrom}
                     participants={conv.participants}
                     onVote={(optionId) => void votePoll(m.id, optionId)}
                     onClose={m.poll.canClose ? () => void closePoll(m.id) : undefined}
@@ -507,13 +521,15 @@ export function DmChatPage() {
               <div key={m.id} className={`chat-bubble-row${mine ? " is-mine" : ""}`}>
                 {!mine && m.sender && (
                   <span className="chat-bubble-avatar-slot">
-                    <Avatar
-                      seed={m.sender.avatarSeed}
-                      style={m.sender.avatarStyle}
-                      photoDataUrl={m.sender.avatarPhotoDataUrl}
-                      params={m.sender.avatarParams}
-                      size="sm"
-                    />
+                    <ChatPersonLink userId={m.sender.id} name={m.sender.firstName} state={personProfileFrom}>
+                      <Avatar
+                        seed={m.sender.avatarSeed}
+                        style={m.sender.avatarStyle}
+                        photoDataUrl={m.sender.avatarPhotoDataUrl}
+                        params={m.sender.avatarParams}
+                        size="sm"
+                      />
+                    </ChatPersonLink>
                   </span>
                 )}
                 <div className="chat-bubble-stack">

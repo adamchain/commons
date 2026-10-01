@@ -58,6 +58,10 @@ function profileBackLabel(state: NavFromState | null): string {
       return "Plans";
     case "profile":
       return "Profile";
+    case "chat":
+    case "community-chat":
+    case "dm":
+      return "Chat";
     default:
       return "Back";
   }
