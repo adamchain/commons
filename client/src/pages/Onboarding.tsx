@@ -50,11 +50,10 @@ function markWelcomeSeen(userId: string): void {
 }
 
 // TEMP launch gate: after verifying their phone, every (non-admin) member must
-// enter this exclusive code to finalize account setup. Stored client-side once
-// passed so it isn't re-prompted on refresh. Remove this gate (the EXCLUSIVE_CODE
-// constant, the "gate" Step, its render block, and the gate branch in
-// pickInitial) when the invite-only launch period ends.
-const EXCLUSIVE_CODE = "commonsphl";
+// enter an access code. The valid codes live in Mongo (see server accessCodes)
+// and are checked by POST /api/auth/redeem-code. This device remembers a pass
+// so the prompt is not shown again. Remove the "gate" Step, its render block,
+// and the gate branch in pickInitial when the invite-only launch period ends.
 const GATE_STORAGE_KEY = "commons_gate_ok";
 
 function isGatePassed(): boolean {
@@ -218,17 +217,12 @@ export function OnboardingPage() {
     }
   }
 
-  // TEMP launch gate: accept the shared exclusive code, or redeem a personal
-  // invite code from an existing member. Either one clears the gate for this
-  // device and lets account setup continue.
+  // TEMP launch gate: shared access codes and personal invite codes are both
+  // checked on the server. Either one clears the gate for this device.
   async function submitGate() {
     const entered = accessCode.trim();
     if (!entered) return;
     setError(null);
-    if (entered.toLowerCase() === EXCLUSIVE_CODE) {
-      passGate();
-      return;
-    }
     setBusy(true);
     try {
       await api("/api/auth/redeem-code", {

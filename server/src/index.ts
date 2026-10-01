@@ -37,6 +37,7 @@ import { store } from "./store.js";
 import { readFileSync } from "node:fs";
 import { startNudgeSchedulers } from "./lib/nudges.js";
 import { seedIfEmpty } from "./seed.js";
+import { ensureLaunchAccessCodes } from "./lib/accessCodes.js";
 
 const app = express();
 // Railway (and most hosts) terminate TLS and set X-Forwarded-For. One hop
@@ -167,6 +168,7 @@ async function bootstrap(): Promise<void> {
   // Idempotent — fills any missing InterestTag forum rows after hydrate (or
   // when Mongo is offline and the snapshot came from data.json).
   store.ensureForumsForInterests();
+  await ensureLaunchAccessCodes();
   await seedIfEmpty();
   startNudgeSchedulers();
   warmCoverCatalog();

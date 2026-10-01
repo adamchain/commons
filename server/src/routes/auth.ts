@@ -20,6 +20,7 @@ import { nextNetworkPrompt, otherGoingIds, userWasGoing } from "../lib/networkPr
 import { emit } from "../lib/notify.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
 import { accountRootId, isCommunitySubAccount } from "../lib/subAccounts.js";
+import { isLaunchAccessCode } from "../lib/accessCodes.js";
 
 const US_STATE_ABBR: Record<string, string> = {
   Alabama:"AL",Alaska:"AK",Arizona:"AZ",Arkansas:"AR",California:"CA",
@@ -615,6 +616,12 @@ authRouter.post("/redeem-code", requireAuth, async (req, res) => {
     return;
   }
   const code = normalizeInviteCode(raw);
+  // Shared launch codes live in Mongo and can be used by anyone. The App Store
+  // build already posts unknown codes here, so a new code works without an update.
+  if (await isLaunchAccessCode(code)) {
+    res.json({ ok: true });
+    return;
+  }
   const row = store.findInviteCodeByCode(code);
   if (!row) {
     res.status(404).json({ error: "Code not found" });
