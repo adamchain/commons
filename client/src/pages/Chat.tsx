@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { ComposerField, MentionText } from "../components/ComposerField";
 import { ChatPersonLink } from "../components/ChatPersonLink";
 import { HoldToDelete } from "../components/HoldToDelete";
 import { BlockConfirmModal, ReportModal } from "../components/PlanSafetyMenu";
@@ -638,7 +639,9 @@ export function ChatPage() {
                       </a>
                     )}
                     {entry.body && !(entry.imageUrl && entry.body === "📷 Photo") && (
-                      <div className="chat-bubble-body">{entry.body}</div>
+                      <div className="chat-bubble-body">
+                        <MentionText text={entry.body} people={conv.participants} />
+                      </div>
                     )}
                     <div className="chat-bubble-time">{formatTimeOnly(entry.createdAt)}</div>
                   </HoldToDelete>
@@ -743,21 +746,16 @@ export function ChatPage() {
                 if (imageInputRef.current) imageInputRef.current.value = "";
               }}
             />
-            <input
-              type="text"
+            <ComposerField
               className="chat-composer-input"
               placeholder={pendingImage ? "Add a caption…" : "Message the group…"}
               value={body}
-              onChange={(e) => setBody(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                e.preventDefault();
+              onChange={setBody}
+              people={conv.participants}
+              disabled={sending}
+              onSubmit={() => {
                 if (sending || (!body.trim() && !pendingImage)) return;
                 void send();
-              }}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                e.currentTarget.focus({ preventScroll: true });
               }}
             />
             <button

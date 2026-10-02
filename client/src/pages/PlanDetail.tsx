@@ -124,7 +124,7 @@ export function PlanDetailPage() {
       try {
         const conv = await api<ConversationDTO>(`/api/plans/${plan.id}/conversation?join=0`);
         setChatConvId(conv.id);
-        const msgs = await api<MessageDTO[]>(`/api/conversations/${conv.id}/messages`);
+        const msgs = await api<MessageDTO[]>(`/api/conversations/${conv.id}/messages?peek=1`);
         setChatPreview(msgs.filter((m) => !m.kind || m.kind === "user").slice(-2));
       } catch {
         setChatPreview([]);
@@ -245,10 +245,11 @@ export function PlanDetailPage() {
   const mapsQuery = encodeURIComponent(
     [plan.location.name, plan.location.address].filter(Boolean).join(" "),
   );
+  const mapsName = encodeURIComponent(plan.location.name);
   const mapsHref =
     plan.location.lat !== undefined && plan.location.lng !== undefined
-      ? `https://www.google.com/maps/search/?api=1&query=${plan.location.lat},${plan.location.lng}`
-      : `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
+      ? `https://maps.apple.com/?ll=${plan.location.lat},${plan.location.lng}&q=${mapsName}`
+      : `https://maps.apple.com/?q=${mapsQuery}`;
   const interestTags = plan.tags.filter((t) => INTEREST_LABELS[t]);
   const goingCount = plan.participants.going.length;
   const interestedCount = plan.participants.interested.length;
@@ -856,7 +857,7 @@ export function PlanDetailPage() {
               className="sheet-link"
               onClick={() => setShowMapsConfirm(false)}
             >
-              Open in Maps
+              Open in Apple Maps
             </a>
             <button type="button" className="btn-link sheet-cancel" onClick={() => setShowMapsConfirm(false)}>
               Cancel

@@ -419,21 +419,26 @@ h1, h2, h3, h4, h5, h6 {
 
 .plan-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  /* minmax(0, 1fr) — a wide cover image's intrinsic width must not stretch
+     the column past the screen. 1fr alone uses that min-content size. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 15px;
   margin-top: 4px;
+}
+.plan-grid > * {
+  min-width: 0;
 }
 
 @media (min-width: 720px) {
   .plan-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 15px;
   }
 }
 
 @media (min-width: 1200px) {
   .plan-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 15px;
   }
 }
@@ -1124,7 +1129,11 @@ a.btn-primary[aria-disabled="true"] {
 
 .plan-detail-hero {
   position: relative;
-  height: 264px;
+  width: 100%;
+  max-width: 720px;
+  margin-inline: auto;
+  aspect-ratio: 3 / 2;
+  height: auto;
   flex-shrink: 0;
   overflow: hidden;
   background: var(--surface-2);
@@ -4912,6 +4921,12 @@ a.action-btn--stack {
   text-align: center;
   text-decoration: none;
 }
+.profile-network-card-links {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
 .profile-network-card-seeall {
   display: inline-block;
   margin-top: 2px;
@@ -5200,12 +5215,12 @@ a.action-btn--stack {
 }
 @media (min-width: 720px) {
   .plan-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (min-width: 1200px) {
   .plan-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -6148,6 +6163,8 @@ a.action-btn--stack {
 }
 .feed-pull-content {
   will-change: transform;
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* My Plans page — SCREEN 9 */
@@ -6333,7 +6350,7 @@ a.action-btn--stack {
 }
 .chat-composer-row {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
 }
 .chat-composer-attach {
@@ -6388,9 +6405,54 @@ a.action-btn--stack {
   padding: 10px 15px;
   color: var(--ink);
   font-size: var(--text-body);
-  width: auto;
+  font-family: inherit;
+  width: 100%;
   line-height: 1.35;
   box-shadow: var(--shadow-sm);
+  resize: none;
+  max-height: 140px;
+  overflow-y: auto;
+}
+.composer-field {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.composer-mentions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  z-index: 6;
+  max-height: 180px;
+  overflow: auto;
+}
+.composer-mention {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 650;
+  cursor: pointer;
+}
+.composer-mention:hover {
+  background: var(--surface-2);
+}
+.mention-link {
+  font-weight: 700;
+  color: inherit;
+  text-decoration: underline;
 }
 .chat-composer-input:focus {
   outline: none;
@@ -6909,6 +6971,8 @@ a.action-btn--stack {
   justify-content: space-between;
   gap: 12px;
   margin-top: 8px;
+  min-width: 0;
+  max-width: 100%;
 }
 .plan-card-attendees {
   display: flex;
@@ -7857,6 +7921,8 @@ a.action-btn--stack {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   overflow: hidden;
+  min-width: 0;
+  max-width: 100%;
   /* Only as tall as its content — without this, grid's default stretch makes a
      card match a taller row-sibling and the inner link's height:100% leaves an
      empty white gap below the details. */
@@ -9061,6 +9127,10 @@ a.action-btn--stack {
   scrollbar-width: none;
   padding: 4px 0 2px;
   gap: 0;
+  /* Don't let the 35-day row set the feed's width. */
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
 }
 .week-strip--scroll::-webkit-scrollbar {
   display: none;
@@ -9264,6 +9334,8 @@ a.action-btn--stack {
   letter-spacing: -0.01em;
   line-height: 1.15;
   margin: 0 0 4px;
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .plan-card--compact .plan-card-posted-by {
@@ -9294,6 +9366,10 @@ a.action-btn--stack {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .plan-card-flyer {
@@ -9304,6 +9380,8 @@ a.action-btn--stack {
   overflow: hidden;
   border-radius: 20px 20px 0 0;
   background: var(--surface-2);
+  min-width: 0;
+  max-width: 100%;
 }
 .plan-card-body {
   padding: 10px 12px 10px;
@@ -9311,6 +9389,8 @@ a.action-btn--stack {
 .plan-card--compact.plan-card-link {
   padding: 0;
   display: block;
+  min-width: 0;
+  max-width: 100%;
 }
 .plan-card--compact .plan-card-footer-row {
   margin-top: 8px;
@@ -9336,6 +9416,8 @@ a.action-btn--stack {
 
 .plan-card-flyer img {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   height: 100%;
   object-fit: cover;
   display: block;
@@ -9702,6 +9784,9 @@ a.action-btn--stack {
   color: var(--red);
   font-size: var(--text-caption);
   font-weight: 700;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
   letter-spacing: 0.02em;
   line-height: 1.2;
 }
@@ -10165,17 +10250,19 @@ a.action-btn--stack {
 .bottom-nav-badge {
   position: absolute;
   top: -6px;
-  right: -8px;
+  right: -10px;
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
   border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-on);
-  font-size: var(--text-caption);
+  background: var(--red, var(--accent));
+  color: #fff;
+  font-size: 10px;
   font-weight: 700;
   line-height: 16px;
   text-align: center;
+  box-shadow: 0 0 0 2px var(--card);
+  pointer-events: none;
 }
 
 .bottom-nav-item {
@@ -15449,6 +15536,7 @@ button.xpl-photo-tile {
 }
 .profile-other-ctas {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 0;
 }

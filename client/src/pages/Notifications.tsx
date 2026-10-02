@@ -159,6 +159,10 @@ export function NotificationsPage() {
 function NotifRow({ item, onDismiss }: { item: NotificationDTO; onDismiss: () => void }) {
   const href = hrefFor(item);
   const isGrabs = item.kind === "planUpForGrabs";
+  const isNetworkAdd =
+    item.kind === "networkRequest" &&
+    Boolean(item.profileUserId) &&
+    /added you|wants to add you|accept to connect/i.test(item.body);
   const inner = (
     <>
       <span className="notif-row-icon" aria-hidden="true">
@@ -167,6 +171,7 @@ function NotifRow({ item, onDismiss }: { item: NotificationDTO; onDismiss: () =>
       <div className="notif-row-body">
         <div className="notif-row-title">{item.body}</div>
         {isGrabs && <span className="notif-row-cta">Take over hosting</span>}
+        {isNetworkAdd && item.profileUserId && <NetworkAccept userId={item.profileUserId} />}
         <div className="notif-row-sub">{formatRelative(item.createdAt)}</div>
       </div>
       {item.readAt === null && <span className="notif-row-unread" aria-label="Unread" />}
@@ -218,6 +223,29 @@ function hrefFor(n: NotificationDTO): string | null {
   if (n.communityId) return `/communities/${n.communityId}`;
   if (n.planId) return `/plans/${n.planId}`;
   return null;
+}
+
+function NetworkAccept({ userId }: { userId: string }) {
+  const [state, setState] = useState<"idle" | "ok" | "err">("idle");
+  async function accept(e: { preventDefault(): void; stopPropagation(): void }) {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await api("/api/auth/network-accept", {
+        method: "POST",
+        body: JSON.stringify({ userId }),
+      });
+      setState("ok");
+    } catch {
+      setState("err");
+    }
+  }
+  if (state === "ok") return <span className="notif-row-cta">You're connected</span>;
+  return (
+    <button type="button" className="notif-row-cta notif-row-accept" onClick={(e) => void accept(e)}>
+      {state === "err" ? "Couldn't accept — try their profile" : "Accept"}
+    </button>
+  );
 }
 
 function iconFor(kind: NotificationKind): ReactNode {

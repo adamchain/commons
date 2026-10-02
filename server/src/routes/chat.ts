@@ -19,6 +19,14 @@ import type { ConversationDTO, ConversationSummaryDTO, MessageDTO, PollDTO } fro
 
 const MAX_CHAT_IMAGE_CHARS = 1_600_000;
 
+/** Real messages from other people. System lines don't light the inbox badge. */
+function humanUnread(
+  msgs: { kind?: string; senderId: string; readBy: string[] }[],
+  userId: string,
+): number {
+  return msgs.filter((m) => m.kind !== "system" && m.senderId !== userId && !m.readBy.includes(userId)).length;
+}
+
 function messagePreview(msg: { kind?: string; body: string; imageUrl?: string | null }): string {
   if (msg.kind === "poll") return `📊 ${truncate(msg.body, 78)}`;
   if (msg.imageUrl) {
@@ -135,9 +143,6 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
     if (plan.creatorId !== userId && store.isBlockedEitherWay(userId, plan.creatorId)) continue;
     const conv = store.findGroupConversationByPlan(planId);
     if (conv && store.hasLeftConversation(userId, conv.id)) continue;
-    // If a conversation exists but the user explicitly left it, keep it out of
-    // their inbox even though they're still on the plan.
-    if (conv && !conv.participantIds.includes(userId)) continue;
     const msgs = conv ? store.listMessagesForConversation(conv.id) : [];
     const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
     const hasRealChatter = msgs.some((m) => m.kind !== "system");
@@ -159,7 +164,7 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
       lastMessageAt: conv && msgs.length ? conv.lastMessageAt : null,
       lastMessagePreview: lastMsg ? messagePreview(lastMsg) : null,
       lastMessageSender: lastSenderName(lastMsg),
-      unreadCount: conv ? msgs.filter((m) => !m.readBy.includes(userId)).length : 0,
+      unreadCount: conv ? humanUnread(msgs, userId) : 0,
       participantCount,
       myRole,
       coverImage: plan.flyerDataUrl ?? plan.flyerLinkPreview?.image ?? null,
@@ -178,7 +183,6 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
     if (!community || community.hiddenAt || !community.chatEnabled || community.creationStatus !== "approved") continue;
     const conv = store.findCommunityConversation(community.id);
     if (conv && store.hasLeftConversation(userId, conv.id)) continue;
-    if (conv && !conv.participantIds.includes(userId)) continue;
     const msgs = conv ? store.listMessagesForConversation(conv.id) : [];
     const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
     summaries.push({
@@ -190,7 +194,7 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
       lastMessageAt: conv && msgs.length ? conv.lastMessageAt : null,
       lastMessagePreview: lastMsg ? messagePreview(lastMsg) : null,
       lastMessageSender: lastSenderName(lastMsg),
-      unreadCount: conv ? msgs.filter((m) => !m.readBy.includes(userId)).length : 0,
+      unreadCount: conv ? humanUnread(msgs, userId) : 0,
       participantCount: community.memberCount,
       myRole: community.organizerId === userId ? "hosting" : "going",
       communityId: community.id,
@@ -222,7 +226,7 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
       lastMessageAt: msgs.length ? conv.lastMessageAt : null,
       lastMessagePreview: lastMsg ? messagePreview(lastMsg) : null,
       lastMessageSender: lastSenderName(lastMsg),
-      unreadCount: msgs.filter((m) => !m.readBy.includes(userId)).length,
+      unreadCount: humanUnread(msgs, userId),
       participantCount: 2,
       myRole: "going",
       dmUserId: otherId,
@@ -342,8 +346,11 @@ chatRouter.get("/conversations/:id/messages", requireAuth, async (req, res) => {
     res.status(403).json({ error: "This chat isn't available yet." });
     return;
   }
-  store.markConversationRead(convId, userId);
-  store.markMessageNotificationsRead(userId, convId);
+  const peek = String(req.query.peek ?? "") === "1";
+  if (!peek) {
+    store.markConversationRead(convId, userId);
+    store.markMessageNotificationsRead(userId, convId);
+  }
   const hostId = conversationHostId(conv);
   const raw = store.listMessagesForConversation(convId).filter((m) => {
     if (m.kind === "system") return true;
@@ -686,6 +693,35 @@ chatRouter.post("/conversations/:id/clear", requireAuth, (req, res) => {
   }
   store.clearConversationMessages(convId);
   store.createSystemMessage(convId, "The host cleared this chat for everyone.");
+  res.json({ ok: true });
+});
+
+// POST /api/inbox/hide — drop a thread that has no conversation yet
+// (an upcoming plan or community that never opened chat) from this inbox.
+chatRouter.post("/inbox/hide", requireAuth, (req, res) => {
+  const userId = String(req.userId);
+  const planId = String(req.body?.planId ?? "");
+  const communityId = String(req.body?.communityId ?? "");
+  let convId = "";
+  if (communityId) {
+    const community = store.findCommunityById(communityId);
+    if (!community) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    convId = store.ensureCommunityConversation(communityId, []).id;
+  } else if (planId) {
+    const plan = store.findPlanById(planId);
+    if (!plan) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    convId = store.ensureGroupConversation(planId, [plan.creatorId]).id;
+  } else {
+    res.status(400).json({ error: "Nothing to remove" });
+    return;
+  }
+  store.setConversationLeft(userId, convId, true);
   res.json({ ok: true });
 });
 

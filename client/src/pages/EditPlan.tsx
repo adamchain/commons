@@ -746,8 +746,10 @@ function EditForm({
           src={cropSrc}
           shape="rect"
           aspect={3 / 2}
+          stageMax={420}
           outputPx={1200}
           title="Position your cover"
+          subtitle="This is the shape of the plan cover."
           onCancel={() => setCropSrc(null)}
           onConfirm={(dataUrl) => {
             setForm((f) => ({ ...f, flyerDataUrl: dataUrl }));

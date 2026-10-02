@@ -34,12 +34,6 @@ export function GetThereSheet({ plan, onClose }: { plan: PlanDTO; onClose: () =>
         ? `https://maps.apple.com/?daddr=${lat},${lng}&q=${named}`
         : `https://maps.apple.com/?q=${dest}`,
     },
-    {
-      label: "🌎 Google Maps",
-      href: hasCoords
-        ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
-        : `https://www.google.com/maps/dir/?api=1&destination=${dest}`,
-    },
   ];
 
   return (

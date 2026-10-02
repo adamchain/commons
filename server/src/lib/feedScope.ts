@@ -47,10 +47,12 @@ export function planVisibleToViewer(plan: PlanRecord, me: UserRecord): boolean {
   const v: PlanVisibility = plan.visibility ?? "everyone";
   if (v === "network") {
     if (plan.creatorId === me.id) return true;
-    const creator = store.findUserById(plan.creatorId);
-    if (creator?.networkIds?.includes(me.id)) return true;
     const myPart = store.findParticipation(plan.id, me.id);
     if (myPart?.state === "going" || myPart?.state === "interested") return true;
+    const audience = plan.audienceUserIds;
+    if (audience && audience.length > 0) return audience.includes(me.id);
+    const creator = store.findUserById(plan.creatorId);
+    if (creator?.networkIds?.includes(me.id)) return true;
     return false;
   }
   if (v === "community") {

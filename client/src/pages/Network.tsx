@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Users } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
@@ -27,6 +27,9 @@ type Row = {
  */
 export function NetworkPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const adding = searchParams.get("add") === "1";
+  const searchRef = useRef<HTMLInputElement>(null);
   const [network, setNetwork] = useState<NetworkMember[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [query, setQuery] = useState("");
@@ -122,12 +125,14 @@ export function NetworkPage() {
           <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </Link>
       </header>
-      <ScreenTitle title="My network" />
+      <ScreenTitle title={adding ? "Add people" : "My network"} subtitle={adding ? "Search by name, then connect." : undefined} />
 
       <div className="network-search-wrap">
         <SearchIcon />
         <input
+          ref={searchRef}
           className="network-search-input"
+          autoFocus={adding}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search people"

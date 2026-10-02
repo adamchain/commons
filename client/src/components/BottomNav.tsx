@@ -32,7 +32,8 @@ export function BottomNav() {
         .catch(() => undefined);
     };
     load();
-    const t = setInterval(load, 60000);
+    const t = setInterval(load, 15000);
+    window.addEventListener("focus", load);
     const onVisible = () => {
       if (!document.hidden) load();
     };
@@ -40,6 +41,7 @@ export function BottomNav() {
     return () => {
       cancelled = true;
       clearInterval(t);
+      window.removeEventListener("focus", load);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [user?.id, pathname]);

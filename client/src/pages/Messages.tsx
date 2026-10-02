@@ -216,7 +216,7 @@ function SwipeRemoveRow({
 export function MessagesPage() {
   const [items, setItems] = useState<ConversationSummaryDTO[]>([]);
   const [ready, setReady] = useState(false);
-  const [dismissTarget, setDismissTarget] = useState<string | null>(null);
+  const [dismissTarget, setDismissTarget] = useState<ConversationSummaryDTO | null>(null);
   const [dismissBusy, setDismissBusy] = useState(false);
   const [dismissErr, setDismissErr] = useState<string | null>(null);
   const [pinErr, setPinErr] = useState<string | null>(null);
@@ -268,12 +268,27 @@ export function MessagesPage() {
     }
   }
 
-  async function dismissPastChat(conversationId: string) {
+  function rowKey(c: ConversationSummaryDTO) {
+    return c.dmUserId ? `dm-${c.dmUserId}` : c.communityId ? `comm-${c.communityId}` : c.planId;
+  }
+
+  async function dismissPastChat(target: ConversationSummaryDTO) {
     setDismissBusy(true);
     setDismissErr(null);
     try {
-      await api(`/api/conversations/${conversationId}/leave`, { method: "POST" });
-      setItems((prev) => prev.filter((c) => c.conversationId !== conversationId));
+      if (target.conversationId) {
+        await api(`/api/conversations/${target.conversationId}/leave`, { method: "POST" });
+      } else {
+        await api("/api/inbox/hide", {
+          method: "POST",
+          body: JSON.stringify({
+            planId: target.communityId ? undefined : target.planId || undefined,
+            communityId: target.communityId,
+          }),
+        });
+      }
+      const key = rowKey(target);
+      setItems((prev) => prev.filter((c) => rowKey(c) !== key));
       setDismissTarget(null);
     } catch (e) {
       setDismissErr(parseApiError(e));
@@ -309,7 +324,7 @@ export function MessagesPage() {
               {items.map((c) => {
                 const preview = cleanPreview(c.lastMessagePreview);
                 const isPoll = previewLooksLikePoll(c.lastMessagePreview);
-                const canDismiss = Boolean(c.conversationId);
+                const canDismiss = true;
                 const title = c.communityName ?? sentenceCaseTitle(c.planTitle);
                 const time = formatInboxTime(c.lastMessageAt ?? c.planDate);
                 const unread = c.unreadCount > 0;
@@ -362,7 +377,7 @@ export function MessagesPage() {
                     }}
                     onRemove={() => {
                       setDismissErr(null);
-                      setDismissTarget(c.conversationId!);
+                      setDismissTarget(c);
                     }}
                   >
                     <Link

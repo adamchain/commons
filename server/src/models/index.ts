@@ -90,6 +90,7 @@ const PlanSchema = new Schema<PlanRecord>(
     upForGrabsAt: { type: String, default: null },
     chatEnabled: { type: Boolean, default: true },
     chatKeptAt: { type: String, default: null },
+    audienceUserIds: { type: [String], default: undefined },
     flyerDataUrl: { type: String },
     flyerLinkUrl: { type: String },
     flyerLinkPreview: {

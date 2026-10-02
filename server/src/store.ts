@@ -213,6 +213,12 @@ export interface PlanRecord {
   chatEnabled?: boolean;
   /** Host chose to keep the group chat after the event ended. */
   chatKeptAt?: string | null;
+  /**
+   * When visibility is network and this list is non-empty, only these people
+   * (plus the host and anyone who already RSVP'd) can see the plan.
+   * Empty or absent means the whole network.
+   */
+  audienceUserIds?: string[];
   createdAt: string;
 }
 

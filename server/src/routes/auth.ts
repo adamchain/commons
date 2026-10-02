@@ -764,7 +764,7 @@ export async function ensureConnectRequest(
     await emit({
       userId: targetId,
       kind: "networkRequest",
-      body: `${viewer.firstName || "Someone"} wants to add you to their network`,
+      body: `${viewer.firstName || "Someone"} added you to their network. Accept to connect.`,
       dedupKey: `networkRequest:${userId}:${targetId}`,
       profileUserId: userId,
     });

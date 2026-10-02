@@ -453,6 +453,18 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     .filter((id) => !store.isBlockedEitherWay(userId, id))
     .slice(0, 5);
 
+  const rawAudience = Array.isArray(req.body?.audienceUserIds) ? (req.body.audienceUserIds as unknown[]) : [];
+  const audienceUserIds =
+    visibility === "network"
+      ? Array.from(
+          new Set(
+            rawAudience
+              .map(String)
+              .filter((id) => id && id !== userId && Boolean(store.findUserById(id))),
+          ),
+        ).slice(0, 80)
+      : [];
+
   // Optional flyer — uploaded data URL or library https cover.
   const flyerDataUrl = normalizeFlyerDataUrl(req.body?.flyerDataUrl);
 
@@ -493,6 +505,7 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     flyerLinkUrl,
     flyerLinkPreview,
     chatEnabled: req.body?.chatEnabled !== false,
+    audienceUserIds: audienceUserIds.length ? audienceUserIds : undefined,
   });
 
   store.upsertParticipation(plan.id, userId, "going");
@@ -1080,6 +1093,17 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
   if (description !== undefined) patch.description = description;
   if (tags) patch.tags = tags;
   if (visibility) patch.visibility = visibility;
+  if (Array.isArray(req.body?.audienceUserIds)) {
+    const ids = Array.from(
+      new Set(
+        (req.body.audienceUserIds as unknown[])
+          .map(String)
+          .filter((id) => id && id !== String(req.userId) && Boolean(store.findUserById(id))),
+      ),
+    ).slice(0, 80);
+    const vis = visibility ?? plan.visibility;
+    patch.audienceUserIds = vis === "network" && ids.length ? ids : [];
+  }
   if (capacity !== undefined) patch.capacity = capacity;
   const lockedCapacity = capacity !== undefined ? capacity : plan.capacity;
   patch.joinType = lockedCapacity ? "approve" : "open";

@@ -197,6 +197,7 @@ export function CreatePlanPage() {
       siteName?: string;
     },
     chatEnabled: true,
+    networkEveryone: false,
   });
   const [submitting, setSubmitting] = useState(false);
   const [showMore, setShowMore] = useState(false);
@@ -628,6 +629,16 @@ export function CreatePlanPage() {
   // it (we never clear `form`), and postPlan can be re-invoked from the
   // error banner's Retry button without re-entering anything.
   const postPlan = async () => {
+    if (
+      form.visibility === "network" &&
+      !form.networkEveryone &&
+      invitedIds.size === 0 &&
+      (network?.length ?? 0) > 0
+    ) {
+      setAttemptedSubmit(true);
+      setError("Pick who in your network should see this, or share with everyone.");
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {
@@ -676,6 +687,8 @@ export function CreatePlanPage() {
           communityId: effectiveCommunityId ?? undefined,
           communityVisibility: effectiveCommunityId ? communityVisibility : undefined,
           chatEnabled: form.chatEnabled,
+          audienceUserIds:
+            form.visibility === "network" && !form.networkEveryone ? [...invitedIds] : undefined,
         }),
       });
       // The co-host (seeded inviteUser) is already added server-side — don't
@@ -780,6 +793,16 @@ export function CreatePlanPage() {
 
   const lockPlan = async () => {
     if (!lockFromId) return;
+    if (
+      form.visibility === "network" &&
+      !form.networkEveryone &&
+      invitedIds.size === 0 &&
+      (network?.length ?? 0) > 0
+    ) {
+      setAttemptedSubmit(true);
+      setError("Pick who in your network should see this, or share with everyone.");
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {
@@ -807,6 +830,8 @@ export function CreatePlanPage() {
           flyerLinkUrl: normalizeHttpUrl(form.flyerLinkUrl) ?? null,
           hostEmoji: VIBE_OPTIONS.find((o) => o.id === form.vibes[0])?.emoji ?? "✨",
           inviteUserIds: [...invitedIds],
+          audienceUserIds:
+            form.visibility === "network" && !form.networkEveryone ? [...invitedIds] : undefined,
           chatEnabled: form.chatEnabled,
         }),
       });
@@ -863,8 +888,10 @@ export function CreatePlanPage() {
       src={cropSrc}
       shape="rect"
       aspect={3 / 2}
+      stageMax={420}
       outputPx={1200}
       title="Position your cover"
+      subtitle="This is the shape of the plan cover."
       onCancel={() => setCropSrc(null)}
       onConfirm={(dataUrl) => {
         setForm((f) => ({ ...f, flyerDataUrl: dataUrl }));
@@ -1181,7 +1208,9 @@ export function CreatePlanPage() {
           })()}{" "}
           once you post ·{" "}
           {form.visibility === "network"
-            ? "Visible to your network"
+            ? form.networkEveryone
+              ? "Visible to your network"
+              : "Visible only to the people you pick"
             : "Visible to everyone on COMMONS"}
             </>
           )}
@@ -1497,7 +1526,7 @@ export function CreatePlanPage() {
               <button
                 type="button"
                 className={`vis-pill ${form.visibility === "network" ? "is-active" : ""}`}
-                onClick={() => setForm((f) => ({ ...f, visibility: "network" }))}
+                onClick={() => setForm((f) => ({ ...f, visibility: "network", networkEveryone: false }))}
                 aria-pressed={form.visibility === "network"}
               >
                 <Users size={12} strokeWidth={1.8} aria-hidden="true" />
@@ -1519,13 +1548,14 @@ export function CreatePlanPage() {
             />
           </div>
 
-          {/* Granular hand-pick inside Your Network. Empty list = full network. */}
           {form.visibility === "network" && (
             <div className="settings-handpick">
               <NetworkHandPick
                 network={inviteNetwork}
                 invitedIds={invitedIds}
                 onToggle={toggleInvited}
+                everyone={form.networkEveryone}
+                onEveryone={() => setForm((f) => ({ ...f, networkEveryone: !f.networkEveryone }))}
               />
             </div>
           )}
@@ -1800,6 +1830,8 @@ type FormShape = {
     siteName?: string;
   };
   chatEnabled: boolean;
+  /** Network posts start as a hand-picked list. True shares with the whole network. */
+  networkEveryone: boolean;
 };
 
 /**
@@ -2099,7 +2131,7 @@ function IdeaForm({
               <button
                 type="button"
                 className={`vis-pill ${form.visibility === "network" ? "is-active" : ""}`}
-                onClick={() => setForm((f) => ({ ...f, visibility: "network" }))}
+                onClick={() => setForm((f) => ({ ...f, visibility: "network", networkEveryone: false }))}
                 aria-pressed={form.visibility === "network"}
               >
                 <Users size={12} strokeWidth={1.8} aria-hidden="true" />
@@ -2127,6 +2159,8 @@ function IdeaForm({
                 network={network}
                 invitedIds={invitedIds}
                 onToggle={onToggleInvited}
+                everyone={form.networkEveryone}
+                onEveryone={() => setForm((f) => ({ ...f, networkEveryone: !f.networkEveryone }))}
               />
             </div>
           )}
@@ -2341,19 +2375,21 @@ function IdeaForm({
 }
 
 /**
- * Hand-pick a subset of the user's network. Empty selection means the plan
- * still lands on the user's full network (we don't want a footgun where the
- * host posts to no one). Once any chip is picked, the audience is narrowed
- * to that explicit list via the existing invitedIds flow.
+ * Who in the network sees this plan. Picked people are the audience.
+ * "Everyone" is an explicit choice, not the default.
  */
 function NetworkHandPick({
   network,
   invitedIds,
   onToggle,
+  everyone = false,
+  onEveryone,
 }: {
   network: PublicUser[] | null;
   invitedIds: Set<string>;
   onToggle: (id: string) => void;
+  everyone?: boolean;
+  onEveryone?: () => void;
 }) {
   if (network === null) {
     return <p className="form-help" style={{ marginTop: 8 }}>Loading your network…</p>;
@@ -2377,6 +2413,19 @@ function NetworkHandPick({
   }
   return (
     <div style={{ marginTop: 10 }}>
+      {onEveryone && (
+        <>
+          <p className="form-help" style={{ marginTop: 0 }}>
+            {everyone
+              ? "Everyone in your network can see this."
+              : "Pick who should see this. Only they will."}
+          </p>
+          <button type="button" className="btn-link" onClick={onEveryone} style={{ marginBottom: 8 }}>
+            {everyone ? "Choose specific people" : "Share with everyone in your network"}
+          </button>
+        </>
+      )}
+      {!everyone && (
       <div className="invite-people-list">
         {network.map((u) => {
           const picked = invitedIds.has(u.id);
@@ -2402,6 +2451,7 @@ function NetworkHandPick({
           );
         })}
       </div>
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, BarChart2, MessageCircle } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { ComposerField, MentionText } from "../components/ComposerField";
 import { ChatPersonLink } from "../components/ChatPersonLink";
 import { HoldToDelete } from "../components/HoldToDelete";
 import { CommunityCoverThumb } from "../components/CoverThumb";
@@ -656,7 +657,9 @@ export function CommunityChatPage() {
                       </a>
                     )}
                     {entry.body && !(entry.imageUrl && entry.body === "📷 Photo") && (
-                      <div className="chat-bubble-body">{entry.body}</div>
+                      <div className="chat-bubble-body">
+                        <MentionText text={entry.body} people={conv.participants} />
+                      </div>
                     )}
                     <div className="chat-bubble-time">{formatTimeOnly(entry.createdAt)}</div>
                   </HoldToDelete>
@@ -761,15 +764,14 @@ export function CommunityChatPage() {
                 if (imageInputRef.current) imageInputRef.current.value = "";
               }}
             />
-            <input
-              type="text"
+            <ComposerField
               className="chat-composer-input"
               placeholder={pendingImage ? "Add a caption…" : "Message the group…"}
               value={body}
-              onChange={(e) => setBody(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                e.preventDefault();
+              onChange={setBody}
+              people={conv.participants}
+              disabled={sending}
+              onSubmit={() => {
                 if (sending || (!body.trim() && !pendingImage)) return;
                 void send();
               }}

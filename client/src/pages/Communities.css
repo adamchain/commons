@@ -1193,7 +1193,7 @@ button.cmy-joined-pill {
 
 .cmy-composer {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: var(--s-2);
   padding: 10px 12px;
   background: var(--surface, #fff);
@@ -1203,13 +1203,18 @@ button.cmy-joined-pill {
 .cmy-composer-input {
   flex: 1;
   min-width: 0;
+  width: 100%;
   font-family: var(--font-ui);
   font-size: var(--type-body);
+  line-height: 1.35;
   padding: 6px 4px;
   border-radius: 0;
   border: none;
   background: transparent;
   color: var(--ink-900);
+  resize: none;
+  max-height: 140px;
+  overflow-y: auto;
 }
 .cmy-composer-input:focus {
   outline: none;
@@ -1284,7 +1289,8 @@ button.cmy-joined-pill {
 }
 .cmy-reply-composer {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
+  flex-wrap: wrap;
   gap: var(--s-2);
   margin-top: 4px;
 }

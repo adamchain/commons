@@ -355,6 +355,13 @@ export function ProfilePage() {
               profileUserId={userId}
               inNetwork={profile.network.inMyNetwork}
             />
+            <Link
+              to={`/plans/new?inviteUser=${encodeURIComponent(userId)}&inviteName=${encodeURIComponent(profile.user.firstName)}`}
+              className="profile-other-cta profile-other-cta--message"
+            >
+              <CalendarPlus size={16} strokeWidth={2} aria-hidden="true" />
+              Make a Plan
+            </Link>
           </div>
 
           {profile.network.mutualCount > 0 && mutualLabel && (
@@ -1473,16 +1480,24 @@ function NetworkCard({ network }: { network: PublicUser[] | null }) {
       {isEmpty ? (
         <>
           <p className="profile-network-card-empty">
-            Your people aren't here yet — invite them.
+            Your people aren't here yet — find them or invite them.
           </p>
-          <Link to="/invite" className="btn-primary btn-block profile-network-card-invite">
+          <Link to="/network?add=1" className="btn-primary btn-block profile-network-card-invite">
+            Add people
+          </Link>
+          <Link to="/invite" className="btn-link profile-network-card-seeall">
             Invite friends →
           </Link>
         </>
       ) : (
-        <Link to="/network" className="btn-link profile-network-card-seeall">
-          See all →
-        </Link>
+        <div className="profile-network-card-links">
+          <Link to="/network?add=1" className="btn-link profile-network-card-seeall">
+            Add people
+          </Link>
+          <Link to="/network" className="btn-link profile-network-card-seeall">
+            See all →
+          </Link>
+        </div>
       )}
     </div>
   );

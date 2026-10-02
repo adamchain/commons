@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, MessageCircle, MoreVertical, Plus } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { ComposerField, MentionText } from "../components/ComposerField";
 import { ChatPersonLink } from "../components/ChatPersonLink";
 import { HoldToDelete } from "../components/HoldToDelete";
 import { PollCard } from "../components/PollCard";
@@ -543,7 +544,11 @@ export function DmChatPage() {
                         <img src={m.imageUrl} alt="" className="chat-bubble-image" />
                       </a>
                     )}
-                    {m.body && !(m.imageUrl && m.body === "📷 Photo") && <div className="chat-bubble-body">{m.body}</div>}
+                    {m.body && !(m.imageUrl && m.body === "📷 Photo") && (
+                      <div className="chat-bubble-body">
+                        <MentionText text={m.body} people={other ? [other] : []} />
+                      </div>
+                    )}
                     <div className="chat-bubble-time">
                       {new Date(m.createdAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
                     </div>
@@ -655,15 +660,14 @@ export function DmChatPage() {
                   if (imageInputRef.current) imageInputRef.current.value = "";
                 }}
               />
-              <input
-                type="text"
+              <ComposerField
                 className="chat-composer-input"
                 placeholder={pendingImage ? "Add a caption…" : "Message…"}
                 value={body}
-                onChange={(e) => setBody(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  e.preventDefault();
+                onChange={setBody}
+                people={other ? [other] : []}
+                disabled={sending}
+                onSubmit={() => {
                   if (sending || (!body.trim() && !pendingImage)) return;
                   void send();
                 }}

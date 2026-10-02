@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from "reac
 import { ArrowLeft, Calendar, Heart, LayoutDashboard, MessageCircle, Send, Users } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { ComposerField, MentionText, type MentionPerson } from "../components/ComposerField";
 import { CommunityCover } from "../components/CommunityCover";
 import { LinkedText } from "../components/LinkedText";
 import { AvatarCropModal } from "../components/AvatarCropModal";
@@ -353,7 +354,7 @@ export function CommunityDetailPage() {
         )}
       </nav>
 
-      {tab === "bulletin" && community.bulletinEnabled && (canSeeInside ? <BulletinTab community={community} canPost={canPostBulletin} canReply={isActiveMember || community.isOrganizer} onPendingChange={load} /> : (
+      {tab === "bulletin" && community.bulletinEnabled && (canSeeInside ? <BulletinTab community={community} canPost={canPostBulletin} canReply={isActiveMember || community.isOrganizer} onPendingChange={load} people={members.filter((m) => m.status === "active").map((m) => ({ id: m.user.id, firstName: m.user.firstName }))} /> : (
         <LockedPanel
           community={community}
           onChange={setCommunity}
@@ -728,11 +729,13 @@ function BulletinTab({
   canPost,
   canReply,
   onPendingChange,
+  people,
 }: {
   community: CommunityDTO;
   canPost: boolean;
   canReply: boolean;
   onPendingChange?: () => void;
+  people: MentionPerson[];
 }) {
   const { user } = useAuth();
   const [posts, setPosts] = useState<CommunityPostDTO[]>([]);
@@ -870,14 +873,15 @@ function BulletinTab({
     <div className="cmy-composer-wrap">
       {postErr && <p className="cmy-err">{postErr}</p>}
       <div className="cmy-composer">
-        <input
-          type="text"
+        <ComposerField
           className="cmy-composer-input"
           placeholder={composerHint}
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") submit();
+          onChange={setDraft}
+          people={people}
+          disabled={busy}
+          onSubmit={() => {
+            if (!busy && draft.trim()) submit();
           }}
         />
         <button type="button" className="cmy-btn cmy-btn--primary cmy-btn--sm" disabled={busy || !draft.trim()} onClick={submit}>
@@ -901,7 +905,7 @@ function BulletinTab({
                   <span className="cmy-post-name">{p.author.firstName}</span>
                   <span className="cmy-post-time">{formatRelative(p.createdAt)}</span>
                 </div>
-                {p.content && <p className="cmy-post-body">{p.content}</p>}
+                {p.content && <p className="cmy-post-body"><MentionText text={p.content} people={people} /></p>}
                 {p.image && <img className="cmy-post-image" src={p.image} alt="" loading="lazy" />}
                 <div className="cmy-join-row">
                   <button type="button" className="cmy-btn cmy-btn--primary cmy-btn--sm" onClick={() => approve(p.id)}>
@@ -930,7 +934,7 @@ function BulletinTab({
                   <span className="cmy-post-time">{formatRelative(p.createdAt)}</span>
                   <div className="cmy-post-actions">{postMenu(p)}</div>
                 </div>
-                {p.content && <p className="cmy-post-body">{p.content}</p>}
+                {p.content && <p className="cmy-post-body"><MentionText text={p.content} people={people} /></p>}
                 {p.image && <img className="cmy-post-image" src={p.image} alt="" loading="lazy" />}
               </li>
             ))}
@@ -963,7 +967,7 @@ function BulletinTab({
                 {postMenu(p)}
               </div>
             </div>
-            {p.content && <p className="cmy-post-body">{p.content}</p>}
+            {p.content && <p className="cmy-post-body"><MentionText text={p.content} people={people} /></p>}
             {p.image && <img className="cmy-post-image" src={p.image} alt="" loading="lazy" />}
             {(p.replies?.length ?? 0) > 0 && (
               <ul className="cmy-reply-list">
@@ -976,7 +980,7 @@ function BulletinTab({
                         <span className="cmy-post-time">{formatRelative(r.createdAt)}</span>
                         {postMenu(r)}
                       </div>
-                      {r.content && <p className="cmy-post-body">{r.content}</p>}
+                      {r.content && <p className="cmy-post-body"><MentionText text={r.content} people={people} /></p>}
                     </div>
                   </li>
                 ))}
@@ -999,19 +1003,20 @@ function BulletinTab({
             {canReply && (
               replyTo === p.id ? (
                 <div className="cmy-reply-composer">
-                  <input
-                    type="text"
+                  <ComposerField
                     className="cmy-composer-input"
                     placeholder={`Reply to ${p.author.firstName}…`}
                     value={replyDraft}
                     autoFocus
-                    onChange={(e) => setReplyDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") void submitReply(p.id);
-                      if (e.key === "Escape") {
-                        setReplyTo(null);
-                        setReplyDraft("");
-                      }
+                    people={people}
+                    disabled={replyBusy}
+                    onChange={setReplyDraft}
+                    onSubmit={() => {
+                      if (!replyBusy && replyDraft.trim()) void submitReply(p.id);
+                    }}
+                    onEscape={() => {
+                      setReplyTo(null);
+                      setReplyDraft("");
                     }}
                   />
                   <button
