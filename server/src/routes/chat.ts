@@ -131,6 +131,7 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
   for (const [planId, myRole] of roleByPlan) {
     const plan = store.findPlanById(planId);
     if (!plan) continue;
+    if (plan.chatEnabled === false) continue;
     if (plan.creatorId !== userId && store.isBlockedEitherWay(userId, plan.creatorId)) continue;
     const conv = store.findGroupConversationByPlan(planId);
     if (conv && store.hasLeftConversation(userId, conv.id)) continue;
@@ -249,9 +250,14 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
   res.json(summaries);
 });
 
+function planGroupChatOpen(planId: string): boolean {
+  const plan = store.findPlanById(planId);
+  return !!plan && plan.chatEnabled !== false;
+}
+
 function canAccessPlanGroupChat(planId: string, userId: string): boolean {
   const plan = store.findPlanById(planId);
-  if (!plan) return false;
+  if (!plan || plan.chatEnabled === false) return false;
   const me = store.findUserById(userId);
   if (!me) return false;
   return planVisibleToViewer(plan, me);
@@ -262,6 +268,7 @@ function canReadConversation(conv: ConversationRecord, userId: string): boolean 
     const community = store.findCommunityById(conv.communityId);
     if (!community || community.hiddenAt) return false;
   }
+  if (conv.type === "group" && conv.planId && !planGroupChatOpen(conv.planId)) return false;
   if (conv.participantIds.includes(userId)) return true;
   if (conv.planId) return canAccessPlanGroupChat(conv.planId, userId);
   return false;
@@ -274,6 +281,10 @@ chatRouter.get("/plans/:planId/conversation", requireAuth, async (req, res) => {
   const plan = store.findPlanById(planId);
   if (!plan) {
     res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  if (plan.chatEnabled === false) {
+    res.status(404).json({ error: "Chat is off for this plan" });
     return;
   }
   if (!canAccessPlanGroupChat(planId, userId)) {
@@ -369,6 +380,10 @@ chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => 
   const conv = store.findConversationById(convId);
   if (!conv) {
     res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
+  if (conv.type === "group" && conv.planId && !planGroupChatOpen(conv.planId)) {
+    res.status(403).json({ error: "Chat is off for this plan" });
     return;
   }
   if (!conv.participantIds.includes(userId)) {

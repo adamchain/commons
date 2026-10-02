@@ -36,6 +36,24 @@ function isPlanHost(plan: { creatorId: string; coHostIds?: string[] }, userId: s
   return plan.creatorId === userId || (plan.coHostIds ?? []).includes(userId);
 }
 
+function planChatOn(plan: { chatEnabled?: boolean } | null | undefined): boolean {
+  return !!plan && plan.chatEnabled !== false;
+}
+
+/** Organizer + community persona, so RSVPs on a community plan reach whoever is running it. */
+function communityPlanNotify(plan: { communityId?: string | null }): {
+  name: string | null;
+  extraIds: string[];
+} {
+  if (!plan.communityId) return { name: null, extraIds: [] };
+  const community = store.findCommunityById(plan.communityId);
+  if (!community) return { name: null, extraIds: [] };
+  const extraIds = [community.organizerId];
+  const persona = store.findUserByManagedCommunity(community.id);
+  if (persona) extraIds.push(persona.id);
+  return { name: community.name, extraIds };
+}
+
 /** Accept uploaded data-URLs or library http(s) covers; drop anything else. */
 function normalizeFlyerDataUrl(raw: unknown): string | undefined {
   if (typeof raw !== "string") return undefined;
@@ -166,6 +184,8 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     cancelledAt: plan.cancelledAt ?? null,
     upForGrabsAt: plan.upForGrabsAt ?? null,
     happenedOutcome: plan.happenedOutcome ?? null,
+    chatEnabled: plan.chatEnabled !== false,
+    chatKeptAt: plan.chatKeptAt ?? null,
     flyerDataUrl: plan.flyerDataUrl,
     flyerLinkUrl: plan.flyerLinkUrl,
     flyerLinkPreview: plan.flyerLinkPreview,
@@ -472,6 +492,7 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     flyerDataUrl,
     flyerLinkUrl,
     flyerLinkPreview,
+    chatEnabled: req.body?.chatEnabled !== false,
   });
 
   store.upsertParticipation(plan.id, userId, "going");
@@ -487,7 +508,9 @@ plansRouter.post("/", requireAuth, async (req, res) => {
       dedupKey: `coHost:${plan.id}:${coId}`,
     });
   }
-  const newConv = store.ensureGroupConversation(plan.id, [userId, ...coHostIds]);
+  const newConv = planChatOn(plan)
+    ? store.ensureGroupConversation(plan.id, [userId, ...coHostIds])
+    : null;
 
   // "Do it again": pull the previous event's attendees + group chat forward so
   // the crew and their conversation carry into the NEW plan only. Never run
@@ -508,12 +531,12 @@ plansRouter.post("/", requireAuth, async (req, res) => {
         .map((p) => p.userId);
 
       // Carry the prior crew into the new conversation so the group persists.
-      if (prevAttendees.length > 0) {
+      if (newConv && prevAttendees.length > 0) {
         store.ensureGroupConversation(plan.id, [userId, ...coHostIds, ...prevAttendees]);
       }
       // Persist the previous group chat history into the new thread only.
-      const prevConv = store.findGroupConversationByPlan(fromPlanId);
-      if (prevConv && prevConv.id !== newConv.id) {
+      const prevConv = newConv ? store.findGroupConversationByPlan(fromPlanId) : undefined;
+      if (newConv && prevConv && prevConv.id !== newConv.id) {
         store.cloneConversationMessages(prevConv.id, newConv.id);
       }
 
@@ -522,17 +545,19 @@ plansRouter.post("/", requireAuth, async (req, res) => {
         isFlexibleTime || isFlexibleDate || !time
           ? resolvedDate
           : `${resolvedDate} at ${time}`;
-      store.createSystemMessage(
-        newConv.id,
-        `🔁 ${me.firstName || "The host"} planned "${title}" again — ${whenLabel}. Same crew, new date.`,
-      );
+      if (newConv) {
+        store.createSystemMessage(
+          newConv.id,
+          `🔁 ${me.firstName || "The host"} planned "${title}" again — ${whenLabel}. Same crew, new date.`,
+        );
+      }
       for (const attId of prevAttendees) {
         await emit({
           userId: attId,
           kind: "planInvite",
           body: `${me.firstName || "Someone"} is doing "${title}" again — you're in the group`,
           planId: plan.id,
-          conversationId: newConv.id,
+          conversationId: newConv?.id,
           dedupKey: `replan:${plan.id}:${attId}`,
         });
       }
@@ -603,6 +628,9 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
   if (req.body?.hostEmoji !== undefined) {
     const e = String(req.body.hostEmoji).trim();
     if (e) patch.hostEmoji = e;
+  }
+  if ("chatEnabled" in (req.body ?? {})) {
+    patch.chatEnabled = req.body.chatEnabled !== false;
   }
   if (Array.isArray(req.body?.tags)) {
     const tags = Array.from(
@@ -917,7 +945,7 @@ plansRouter.post("/:id/suggestions", requireAuth, async (req, res) => {
     return;
   }
   store.createPlanSuggestion(planId, userId, body);
-  store.ensureGroupConversation(planId, [plan.creatorId, userId]);
+  if (planChatOn(plan)) store.ensureGroupConversation(planId, [plan.creatorId, userId]);
   const updated = store.findPlanById(planId)!;
   res.status(201).json(await planSummary(updated, userId));
 });
@@ -1063,10 +1091,15 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
     const hostEmoji = String(req.body.hostEmoji ?? "").trim();
     if (hostEmoji) patch.hostEmoji = hostEmoji;
   }
+  if ("chatEnabled" in (req.body ?? {})) {
+    patch.chatEnabled = req.body.chatEnabled !== false;
+  }
   store.updatePlan(planId, patch);
 
   const updated = store.findPlanById(planId)!;
-  const conv = store.ensureGroupConversation(planId, [updated.creatorId]);
+  const conv = planChatOn(updated)
+    ? store.ensureGroupConversation(planId, [updated.creatorId])
+    : null;
   const host = await findUserById(updated.creatorId);
   const hostName = host?.firstName ?? "Host";
   const dayLabel = new Date(dateInput).toLocaleDateString(undefined, {
@@ -1075,10 +1108,12 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
     day: "numeric",
   });
   const timeLabel = isFlexibleTime || !time ? "flexible time" : time;
-  store.createSystemMessage(
-    conv.id,
-    `${hostName} locked in the plan — ${locationName}, ${dayLabel} · ${timeLabel}`,
-  );
+  if (conv) {
+    store.createSystemMessage(
+      conv.id,
+      `${hostName} locked in the plan — ${locationName}, ${dayLabel} · ${timeLabel}`,
+    );
+  }
 
   await notifyInterestedPlanLocked(updated, hostName);
 
@@ -1190,9 +1225,11 @@ plansRouter.put("/:id/participation", requireAuth, async (req, res) => {
   const previousState = existing?.state ?? null;
   store.upsertParticipation(planId, userId, state);
   if (state === "going" || state === "interested") {
-    const group = store.findGroupConversationByPlan(planId);
-    if (group) store.setConversationLeft(userId, group.id, false);
-    store.ensureGroupConversation(planId, [plan.creatorId, userId], { rejoinIds: [userId] });
+    if (planChatOn(plan)) {
+      const group = store.findGroupConversationByPlan(planId);
+      if (group) store.setConversationLeft(userId, group.id, false);
+      store.ensureGroupConversation(planId, [plan.creatorId, userId], { rejoinIds: [userId] });
+    }
   }
   store.log("participation_changed", {
     planId,
@@ -1210,13 +1247,18 @@ plansRouter.put("/:id/participation", requireAuth, async (req, res) => {
     const joiner = await findUserById(userId);
     const joinerName = joiner?.firstName || "Someone";
     const joined = state === "going";
+    const communityNote = communityPlanNotify(plan);
     const body = joined
-      ? `${joinerName} joined your plan "${plan.title}"`
-      : `${joinerName} is interested in your plan "${plan.title}"`;
+      ? communityNote.name
+        ? `${joinerName} joined "${plan.title}" in ${communityNote.name}`
+        : `${joinerName} joined your plan "${plan.title}"`
+      : communityNote.name
+        ? `${joinerName} is interested in "${plan.title}" in ${communityNote.name}`
+        : `${joinerName} is interested in your plan "${plan.title}"`;
     const dedupKey = joined
       ? `someoneJoinedYourPlan:${plan.id}:${userId}`
       : `planInterested:${plan.id}:${userId}`;
-    const hostIds = [plan.creatorId, ...(plan.coHostIds ?? [])].filter(
+    const hostIds = [plan.creatorId, ...(plan.coHostIds ?? []), ...communityNote.extraIds].filter(
       (id, index, all) => id !== userId && all.indexOf(id) === index,
     );
     for (const hostId of hostIds) {
@@ -1270,7 +1312,7 @@ plansRouter.post("/:id/approve", requireAuth, async (req, res) => {
     }
   }
   store.upsertParticipation(planId, targetId, "going");
-  store.ensureGroupConversation(planId, [plan.creatorId, targetId]);
+  if (planChatOn(plan)) store.ensureGroupConversation(planId, [plan.creatorId, targetId]);
   store.log("plan_approved", { planId, userId: targetId, by: userId });
   res.json(await planSummary(plan, userId));
 });
@@ -1374,7 +1416,7 @@ plansRouter.post("/:id/transfer-host", requireAuth, async (req, res) => {
     return;
   }
   store.updatePlan(planId, { creatorId: newHostId });
-  store.ensureGroupConversation(planId, [newHostId]);
+  if (planChatOn(plan)) store.ensureGroupConversation(planId, [newHostId]);
   // The outgoing host drops their own participation — they explicitly handed
   // it off, so they're no longer committed. Hosts are implicitly "going"
   // before the transfer, so we log a "going" drop-out for analytics.
@@ -1412,11 +1454,13 @@ plansRouter.post("/:id/up-for-grabs", requireAuth, async (req, res) => {
   }
   store.updatePlan(planId, { upForGrabsAt: new Date().toISOString() });
   const host = await findUserById(userId);
-  const conv = store.ensureGroupConversation(planId, [plan.creatorId]);
-  store.createSystemMessage(
-    conv.id,
-    `${host?.firstName ?? "The host"} can't make it — this plan is up for grabs. Tap "Take over hosting" to keep it alive.`,
-  );
+  if (planChatOn(plan)) {
+    const conv = store.ensureGroupConversation(planId, [plan.creatorId]);
+    store.createSystemMessage(
+      conv.id,
+      `${host?.firstName ?? "The host"} can't make it — this plan is up for grabs. Tap "Take over hosting" to keep it alive.`,
+    );
+  }
   for (const p of store.listParticipationsForPlan(planId)) {
     if (p.userId === userId) continue;
     if (p.state !== "going" && p.state !== "interested") continue;
@@ -1458,10 +1502,11 @@ plansRouter.post("/:id/claim-host", requireAuth, async (req, res) => {
   const oldHostId = plan.creatorId;
   store.updatePlan(planId, { creatorId: userId, upForGrabsAt: null });
   store.upsertParticipation(planId, userId, "going");
-  store.ensureGroupConversation(planId, [userId]);
   const newHost = await findUserById(userId);
-  const conv = store.ensureGroupConversation(planId, [userId]);
-  store.createSystemMessage(conv.id, `${newHost?.firstName ?? "Someone"} took over hosting. 🙌`);
+  if (planChatOn(store.findPlanById(planId))) {
+    const conv = store.ensureGroupConversation(planId, [userId]);
+    store.createSystemMessage(conv.id, `${newHost?.firstName ?? "Someone"} took over hosting. 🙌`);
+  }
   await emit({
     userId: oldHostId,
     kind: "someoneJoinedYourPlan",
@@ -1546,4 +1591,36 @@ plansRouter.post("/:id/happened-outcome", requireAuth, async (req, res) => {
   store.updatePlan(planId, { happenedOutcome: outcome });
   store.log("plan_happened_outcome", { planId, by: userId, outcome });
   res.json({ ok: true, happenedOutcome: outcome });
+});
+
+/** Host keeps or deletes the group chat after the event ends. */
+plansRouter.post("/:id/chat-cleanup", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const planId = String(req.params.id);
+  const action = String(req.body?.action ?? "");
+  if (action !== "keep" && action !== "delete") {
+    res.status(400).json({ error: "action must be keep or delete" });
+    return;
+  }
+  const plan = store.findPlanById(planId);
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  if (!isPlanHost(plan, userId)) {
+    res.status(403).json({ error: "Only the host can update the chat" });
+    return;
+  }
+  if (!plan.cancelledAt && !planHasEnded(plan)) {
+    res.status(400).json({ error: "The event is still going" });
+    return;
+  }
+  if (action === "delete") {
+    store.deleteGroupConversation(planId);
+    store.updatePlan(planId, { chatEnabled: false, chatKeptAt: null });
+  } else {
+    store.updatePlan(planId, { chatKeptAt: new Date().toISOString() });
+  }
+  store.log("plan_chat_cleanup", { planId, by: userId, action });
+  res.json(await planSummary(store.findPlanById(planId)!, userId));
 });

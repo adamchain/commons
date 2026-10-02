@@ -196,6 +196,7 @@ export function CreatePlanPage() {
       image?: string;
       siteName?: string;
     },
+    chatEnabled: true,
   });
   const [submitting, setSubmitting] = useState(false);
   const [showMore, setShowMore] = useState(false);
@@ -405,6 +406,7 @@ export function CreatePlanPage() {
           capacity: prev.capacity !== null ? String(prev.capacity) : f.capacity,
           joinType: prev.joinType,
           flyerDataUrl: prev.flyerDataUrl ?? null,
+          chatEnabled: prev.chatEnabled !== false,
         }));
         setPath("plan");
       })
@@ -465,6 +467,7 @@ export function CreatePlanPage() {
           flyerDataUrl: prev.flyerDataUrl ?? null,
           flyerLinkUrl: prev.flyerLinkUrl ?? "",
           flyerLinkPreview: prev.flyerLinkPreview ?? null,
+          chatEnabled: prev.chatEnabled !== false,
         }));
         if (prev.capacity !== null || prev.flyerLinkUrl) setShowMore(true);
         setPath("plan");
@@ -518,6 +521,7 @@ export function CreatePlanPage() {
           capacity: prev.capacity !== null ? String(prev.capacity) : f.capacity,
           joinType: prev.joinType,
           flyerDataUrl: prev.flyerDataUrl ?? null,
+          chatEnabled: prev.chatEnabled !== false,
         }));
         const crew = [
           ...prev.participants.going,
@@ -671,6 +675,7 @@ export function CreatePlanPage() {
           fromPlanId: replanFromId || undefined,
           communityId: effectiveCommunityId ?? undefined,
           communityVisibility: effectiveCommunityId ? communityVisibility : undefined,
+          chatEnabled: form.chatEnabled,
         }),
       });
       // The co-host (seeded inviteUser) is already added server-side — don't
@@ -729,6 +734,7 @@ export function CreatePlanPage() {
           flyerLinkUrl: normalizeHttpUrl(form.flyerLinkUrl) ?? null,
           flyerLinkPreview: form.flyerLinkPreview ?? null,
           hostEmoji: VIBE_OPTIONS.find((o) => o.id === form.vibes[0])?.emoji ?? "✨",
+          chatEnabled: form.chatEnabled,
         }),
       });
       const nextDate = form.isFlexibleDate ? FLEXIBLE_DATE_PLACEHOLDER : form.date;
@@ -801,6 +807,7 @@ export function CreatePlanPage() {
           flyerLinkUrl: normalizeHttpUrl(form.flyerLinkUrl) ?? null,
           hostEmoji: VIBE_OPTIONS.find((o) => o.id === form.vibes[0])?.emoji ?? "✨",
           inviteUserIds: [...invitedIds],
+          chatEnabled: form.chatEnabled,
         }),
       });
       navigate(`/plans/${lockFromId}`);
@@ -1499,6 +1506,19 @@ export function CreatePlanPage() {
             </div>
           </div>
 
+          <div className="settings-row">
+            <span className="settings-row-label">Group chat</span>
+            <FlexToggle
+              variant="switch"
+              active={form.chatEnabled}
+              label={form.chatEnabled ? "On" : "Off"}
+              onClick={(e) => {
+                e.preventDefault();
+                setForm((f) => ({ ...f, chatEnabled: !f.chatEnabled }));
+              }}
+            />
+          </div>
+
           {/* Granular hand-pick inside Your Network. Empty list = full network. */}
           {form.visibility === "network" && (
             <div className="settings-handpick">
@@ -1779,6 +1799,7 @@ type FormShape = {
     image?: string;
     siteName?: string;
   };
+  chatEnabled: boolean;
 };
 
 /**
@@ -2085,6 +2106,19 @@ function IdeaForm({
                 Your network
               </button>
             </div>
+          </div>
+
+          <div className="settings-row">
+            <span className="settings-row-label">Group chat</span>
+            <FlexToggle
+              variant="switch"
+              active={form.chatEnabled}
+              label={form.chatEnabled ? "On" : "Off"}
+              onClick={(e) => {
+                e.preventDefault();
+                setForm((f) => ({ ...f, chatEnabled: !f.chatEnabled }));
+              }}
+            />
           </div>
 
           {form.visibility === "network" && (

@@ -119,6 +119,7 @@ function EditForm({
     flyerDataUrl: plan.flyerDataUrl ?? null,
     flyerLinkUrl: plan.flyerLinkUrl ?? "",
     flyerLinkPreview: (plan.flyerLinkPreview ?? null) as LinkPreview | null,
+    chatEnabled: plan.chatEnabled !== false,
   });
   const [submitErr, setSubmitErr] = useState<string | null>(null);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
@@ -236,6 +237,7 @@ function EditForm({
           capacity: capacityNum,
           joinType: capacityNum !== null ? "approve" : "open",
           visibility: form.visibility,
+          chatEnabled: form.chatEnabled,
         }),
       });
       setPlan(updated);
@@ -270,6 +272,7 @@ function EditForm({
     form.capacity,
     form.joinType,
     form.visibility,
+    form.chatEnabled,
   ]);
 
   async function saveCover(): Promise<void> {
@@ -584,6 +587,24 @@ function EditForm({
               }}
             >
               <span className="visibility-option-title">Your Network</span>
+            </button>
+          </div>
+          <div className="form-row-flex" style={{ marginTop: 12 }}>
+            <div className="form-row-flex-main">
+              <label className="form-question">Group chat</label>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              className={`flex-switch ${form.chatEnabled ? "is-on" : ""}`}
+              aria-checked={form.chatEnabled}
+              aria-label="Group chat"
+              onClick={() => {
+                lastInstantGroup.current = "who";
+                setForm((f) => ({ ...f, chatEnabled: !f.chatEnabled }));
+              }}
+            >
+              <span className="flex-switch-knob" />
             </button>
           </div>
           <div className="form-row-flex" style={{ marginTop: 12 }}>

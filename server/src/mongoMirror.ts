@@ -16,6 +16,7 @@ import {
   CardImageModel,
   CommunityMemberModel,
   CommunityModel,
+  CommunityPostLikeModel,
   CommunityPostModel,
   ConversationModel,
   DeclineModel,
@@ -43,6 +44,7 @@ import { UserModel } from "./models/User.js";
 import type {
   CardImageRecord,
   CommunityMemberRecord,
+  CommunityPostLikeRecord,
   CommunityPostRecord,
   CommunityRecord,
   ConversationRecord,
@@ -345,6 +347,28 @@ export const mongoMirror = {
   },
   upsertCommunityPost(p: CommunityPostRecord): void {
     upsert(CommunityPostModel as never, p, `upsertCommunityPost ${p.id}`);
+  },
+  upsertCommunityPostLike(l: CommunityPostLikeRecord): void {
+    upsertByFilter(
+      CommunityPostLikeModel as never,
+      { postId: l.postId, userId: l.userId },
+      l,
+      `upsertCommunityPostLike ${l.postId}/${l.userId}`,
+    );
+  },
+  deleteCommunityPostLike(postId: string, userId: string): void {
+    if (!isMongoConnected()) return;
+    const p = CommunityPostLikeModel.deleteOne({ postId, userId })
+      .exec()
+      .catch((err) => fail(`deleteCommunityPostLike ${postId}/${userId}`, err));
+    track(p);
+  },
+  deleteCommunityPostLikesByPost(postId: string): void {
+    if (!isMongoConnected()) return;
+    const p = CommunityPostLikeModel.deleteMany({ postId })
+      .exec()
+      .catch((err) => fail(`deleteCommunityPostLikesByPost ${postId}`, err));
+    track(p);
   },
   deleteCommunityPostsByCommunity(communityId: string): void {
     if (!isMongoConnected()) return;

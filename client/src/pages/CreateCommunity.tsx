@@ -36,6 +36,9 @@ export function CreateCommunityPage() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [instagram, setInstagram] = useState("");
+  const [tiktok, setTiktok] = useState("");
+  const [linktree, setLinktree] = useState("");
   const [categories, setCategories] = useState<CommunityCategory[]>([]);
   const [city, setCity] = useState("");
   const [visibility, setVisibility] = useState<CommunityAccessLevel>("everyone");
@@ -117,6 +120,11 @@ export function CreateCommunityPage() {
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim(),
+          socialLinks: {
+            instagram: instagram.trim(),
+            tiktok: tiktok.trim(),
+            linktree: linktree.trim(),
+          },
           category: categories[0],
           categories,
           screeningQuestion: screeningOn ? screening.trim() || undefined : undefined,
@@ -343,6 +351,43 @@ export function CreateCommunityPage() {
             </label>
 
             <div className="luma-card cmy-create-screen-card">
+              <p className="cmy-create-vis-label">Socials</p>
+              <p className="cmy-hint">Optional. Handles only — members can tap through from the community page.</p>
+              <div className="cmy-social-fields">
+                <label className="cmy-field">
+                  <span>Instagram</span>
+                  <input
+                    className="cmy-input"
+                    value={instagram}
+                    placeholder="@handle"
+                    maxLength={200}
+                    onChange={(e) => setInstagram(e.target.value)}
+                  />
+                </label>
+                <label className="cmy-field">
+                  <span>TikTok</span>
+                  <input
+                    className="cmy-input"
+                    value={tiktok}
+                    placeholder="@handle"
+                    maxLength={200}
+                    onChange={(e) => setTiktok(e.target.value)}
+                  />
+                </label>
+                <label className="cmy-field">
+                  <span>Linktree</span>
+                  <input
+                    className="cmy-input"
+                    value={linktree}
+                    placeholder="linktr.ee/you"
+                    maxLength={200}
+                    onChange={(e) => setLinktree(e.target.value)}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="luma-card cmy-create-screen-card">
               <div className="cmy-toggle-row">
                 <div>
                   <p className="cmy-create-vis-label">Screening questions</p>
@@ -438,8 +483,10 @@ export function CreateCommunityPage() {
           src={cropSrc}
           shape="rect"
           aspect={16 / 9}
+          stageMax={420}
           outputPx={1200}
           title="Position your cover"
+          subtitle="Drag and zoom. The cover keeps this wide shape."
           onCancel={() => setCropSrc(null)}
           onConfirm={(dataUrl) => {
             setCoverImage(dataUrl);

@@ -209,6 +209,10 @@ export interface PlanRecord {
    * yes | no | rescheduled — null/absent = unanswered.
    */
   happenedOutcome?: "yes" | "no" | "rescheduled" | null;
+  /** Group chat for this event. Absent or true = on. False hides and blocks the thread. */
+  chatEnabled?: boolean;
+  /** Host chose to keep the group chat after the event ended. */
+  chatKeptAt?: string | null;
   createdAt: string;
 }
 
@@ -521,6 +525,13 @@ export interface CommunityPostRecord {
   deletedAt?: string | null;
 }
 
+/** A member's like on a bulletin post. Unique on (postId, userId). */
+export interface CommunityPostLikeRecord {
+  postId: string;
+  userId: string;
+  createdAt: string;
+}
+
 export interface NotificationRecord {
   id: string;
   userId: string;
@@ -672,6 +683,7 @@ interface Snapshot {
   communities: CommunityRecord[];
   communityMembers: CommunityMemberRecord[];
   communityPosts: CommunityPostRecord[];
+  communityPostLikes: CommunityPostLikeRecord[];
   interestForums: InterestForumRecord[];
   forumMemberships: ForumMembershipRecord[];
   forumPosts: ForumPostRecord[];
@@ -705,6 +717,7 @@ function emptySnapshot(): Snapshot {
     communities: [],
     communityMembers: [],
     communityPosts: [],
+    communityPostLikes: [],
     interestForums: [],
     forumMemberships: [],
     forumPosts: [],
@@ -767,6 +780,7 @@ function load(): Snapshot {
       communities: parsed.communities ?? [],
       communityMembers: parsed.communityMembers ?? [],
       communityPosts: parsed.communityPosts ?? [],
+      communityPostLikes: parsed.communityPostLikes ?? [],
       interestForums: parsed.interestForums ?? [],
       forumMemberships: parsed.forumMemberships ?? [],
       forumPosts: parsed.forumPosts ?? [],
@@ -1530,6 +1544,17 @@ export const store = {
   findGroupConversationByPlan(planId: string): ConversationRecord | undefined {
     return snapshot.conversations.find((c) => c.planId === planId && c.type === "group");
   },
+  /** Remove a plan's group thread and its messages. DMs on the plan stay. */
+  deleteGroupConversation(planId: string): boolean {
+    const conv = this.findGroupConversationByPlan(planId);
+    if (!conv) return false;
+    snapshot.messages = snapshot.messages.filter((m) => m.conversationId !== conv.id);
+    snapshot.conversations = snapshot.conversations.filter((c) => c.id !== conv.id);
+    mongoMirror.deleteMessagesByConversation(conv.id);
+    mongoMirror.deleteConversation(conv.id);
+    persist();
+    return true;
+  },
   findDmInPlan(planId: string, a: string, b: string): ConversationRecord | undefined {
     return snapshot.conversations.find(
       (c) =>
@@ -2257,6 +2282,7 @@ export const store = {
     creationStatus?: CommunityCreationStatus;
     screeningQuestion?: string | null;
     city?: string | null;
+    socialLinks?: CommunityRecord["socialLinks"];
     visibility?: CommunityAccessLevel;
     bulletinPermission?: CommunityPostingPermission;
     planPostingPermission?: CommunityPostingPermission;
@@ -2287,6 +2313,7 @@ export const store = {
       visibility: input.visibility ?? "everyone",
       screeningQuestion: input.screeningQuestion ?? null,
       city: input.city?.trim() ? input.city.trim().slice(0, 80) : null,
+      socialLinks: input.socialLinks ?? null,
       rejectionNote: null,
       submittedAt: now,
       reviewedAt: approved ? now : null,
@@ -2385,10 +2412,19 @@ export const store = {
     );
     mongoMirror.deleteCommunityMembersByCommunity(communityId);
 
+    const removedPostIds = new Set(
+      snapshot.communityPosts.filter((p) => p.communityId === communityId).map((p) => p.id),
+    );
     snapshot.communityPosts = snapshot.communityPosts.filter(
       (p) => p.communityId !== communityId,
     );
     mongoMirror.deleteCommunityPostsByCommunity(communityId);
+    if (removedPostIds.size > 0) {
+      snapshot.communityPostLikes = snapshot.communityPostLikes.filter(
+        (like) => !removedPostIds.has(like.postId),
+      );
+      for (const postId of removedPostIds) mongoMirror.deleteCommunityPostLikesByPost(postId);
+    }
 
     const conv = this.findCommunityConversation(communityId);
     if (conv) {
@@ -2630,7 +2666,55 @@ export const store = {
     }
     persist();
     mongoMirror.upsertCommunityPost(row);
+    this.clearCommunityPostLikes(id);
     return row;
+  },
+  communityPostLikeStats(postId: string, viewerId: string): { likeCount: number; likedByMe: boolean } {
+    let likeCount = 0;
+    let likedByMe = false;
+    for (const like of snapshot.communityPostLikes) {
+      if (like.postId !== postId) continue;
+      likeCount += 1;
+      if (like.userId === viewerId) likedByMe = true;
+    }
+    return { likeCount, likedByMe };
+  },
+  /** Toggle the viewer's like. Undefined when the post is missing or not live. */
+  toggleCommunityPostLike(
+    postId: string,
+    userId: string,
+  ): { likeCount: number; likedByMe: boolean } | undefined {
+    const post = this.findCommunityPostById(postId);
+    if (!post || (post.approvalStatus ?? "approved") !== "approved") return undefined;
+    const existing = snapshot.communityPostLikes.find(
+      (like) => like.postId === postId && like.userId === userId,
+    );
+    if (existing) {
+      snapshot.communityPostLikes = snapshot.communityPostLikes.filter((like) => like !== existing);
+      mongoMirror.deleteCommunityPostLike(postId, userId);
+    } else {
+      const like: CommunityPostLikeRecord = {
+        postId,
+        userId,
+        createdAt: new Date().toISOString(),
+      };
+      snapshot.communityPostLikes.push(like);
+      mongoMirror.upsertCommunityPostLike(like);
+    }
+    persist();
+    return this.communityPostLikeStats(postId, userId);
+  },
+  clearCommunityPostLikes(postId: string): void {
+    const ids = new Set(
+      snapshot.communityPosts
+        .filter((post) => post.id === postId || post.parentId === postId)
+        .map((post) => post.id),
+    );
+    ids.add(postId);
+    if (!snapshot.communityPostLikes.some((like) => ids.has(like.postId))) return;
+    snapshot.communityPostLikes = snapshot.communityPostLikes.filter((like) => !ids.has(like.postId));
+    for (const id of ids) mongoMirror.deleteCommunityPostLikesByPost(id);
+    persist();
   },
 
   // ---- Community chat (persistent group thread, not tied to a plan) ----

@@ -718,7 +718,9 @@ button.cmy-joined-pill {
 }
 .cmy-cover {
   position: relative;
-  height: 220px;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
   display: flex;
   align-items: flex-end;
   overflow: hidden;
@@ -1222,6 +1224,29 @@ button.cmy-joined-pill {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.16);
 }
+.cmy-post-react {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+}
+.cmy-like-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-body-small);
+  font-weight: 600;
+  cursor: pointer;
+}
+.cmy-like-btn.is-active,
+.cmy-like-btn:hover {
+  color: var(--accent);
+}
 .cmy-reply-btn {
   appearance: none;
   align-self: flex-start;
@@ -1586,7 +1611,7 @@ button.cmy-joined-pill {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.16);
 }
-.cmy-textarea { resize: vertical; }
+.cmy-textarea { resize: vertical; white-space: pre-wrap; }
 .cmy-toggle-row {
   display: flex;
   align-items: center;
@@ -1881,6 +1906,9 @@ button.cmy-joined-pill {
   flex-shrink: 0;
   min-width: 148px;
 }
+.cmy-create .cover-picker--filled .cover-picker-img {
+  aspect-ratio: 16 / 9;
+}
 .cmy-create .cmy-seg--active {
   background: var(--card);
   color: var(--ink);
@@ -1899,6 +1927,7 @@ button.cmy-joined-pill {
   font-size: var(--text-body);
   line-height: 1.55;
   box-shadow: none;
+  white-space: pre-wrap;
 }
 .cmy-create-desc:focus {
   outline: none;

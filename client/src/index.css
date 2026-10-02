@@ -1646,6 +1646,33 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   padding: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
+.plan-chat-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.plan-chat-toggle-label {
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--ink);
+}
+.plan-chat-cleanup-title {
+  margin: 0 0 8px;
+  font-size: var(--text-card);
+  font-weight: 700;
+}
+.plan-chat-cleanup-copy {
+  margin: 0 0 16px;
+  color: var(--text-muted);
+  font-size: var(--text-body);
+  line-height: 1.45;
+}
+.plan-chat-cleanup-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .plan-detail-link {
   display: flex;
   align-items: center;
@@ -3961,6 +3988,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   font-size: var(--text-body);
   line-height: 1.5;
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 .plan-description-link {
   color: var(--accent);
@@ -13389,6 +13417,7 @@ button.xpl-photo-tile {
   font-size: var(--text-body);
   line-height: 1.45;
   color: var(--text-muted);
+  white-space: pre-wrap;
 }
 .linked-text-link {
   color: var(--accent);
@@ -15416,6 +15445,7 @@ button.xpl-photo-tile {
   font-size: var(--text-body);
   line-height: 1.45;
   color: var(--text-muted);
+  white-space: pre-wrap;
 }
 .profile-other-ctas {
   display: flex;

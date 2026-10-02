@@ -12,6 +12,7 @@ export function AvatarCropModal({
   outputPx = 512,
   aspect = 1,
   shape = "circle",
+  stageMax = STAGE_MAX,
   title = "Position your photo",
   subtitle = "Drag to move, slide to zoom.",
   onCancel,
@@ -23,14 +24,26 @@ export function AvatarCropModal({
   /** Width / height of the crop frame. */
   aspect?: number;
   shape?: "circle" | "rect";
+  /** Longest side of the on-screen crop frame, in pixels. */
+  stageMax?: number;
   title?: string;
   subtitle?: string;
   onCancel: () => void;
   onConfirm: (dataUrl: string) => void;
 }) {
   const safeAspect = aspect > 0 ? aspect : 1;
-  const stageW = safeAspect >= 1 ? STAGE_MAX : Math.round(STAGE_MAX * safeAspect);
-  const stageH = safeAspect >= 1 ? Math.round(STAGE_MAX / safeAspect) : STAGE_MAX;
+  const [viewportW, setViewportW] = useState(() =>
+    typeof window === "undefined" ? 390 : window.innerWidth,
+  );
+  useEffect(() => {
+    const onResize = () => setViewportW(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const requested = stageMax > 120 ? stageMax : STAGE_MAX;
+  const frame = Math.min(requested, Math.max(220, viewportW - 64));
+  const stageW = safeAspect >= 1 ? frame : Math.round(frame * safeAspect);
+  const stageH = safeAspect >= 1 ? Math.round(frame / safeAspect) : frame;
   const outW = outputPx;
   const outH = Math.max(1, Math.round(outputPx / safeAspect));
 

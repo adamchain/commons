@@ -11,6 +11,7 @@ import { ALL_INTERESTS } from "../types/shared.js";
 import type {
   CardImageRecord,
   CommunityMemberRecord,
+  CommunityPostLikeRecord,
   CommunityPostRecord,
   CommunityRecord,
   ConversationRecord,
@@ -87,6 +88,8 @@ const PlanSchema = new Schema<PlanRecord>(
     lockedAt: { type: String, default: null },
     cancelledAt: { type: String, default: null },
     upForGrabsAt: { type: String, default: null },
+    chatEnabled: { type: Boolean, default: true },
+    chatKeptAt: { type: String, default: null },
     flyerDataUrl: { type: String },
     flyerLinkUrl: { type: String },
     flyerLinkPreview: {
@@ -408,6 +411,20 @@ CommunityPostSchema.index({ id: 1 }, { unique: true });
 CommunityPostSchema.index({ communityId: 1, createdAt: -1 });
 CommunityPostSchema.index({ communityId: 1, parentId: 1, createdAt: 1 });
 export const CommunityPostModel = compile<CommunityPostRecord>("CommunityPost", CommunityPostSchema);
+
+const CommunityPostLikeSchema = new Schema<CommunityPostLikeRecord>(
+  {
+    postId: { type: String, required: true },
+    userId: { type: String, required: true },
+    createdAt: { type: String, required: true },
+  },
+  { collection: "communityPostLikes" },
+);
+CommunityPostLikeSchema.index({ postId: 1, userId: 1 }, { unique: true });
+export const CommunityPostLikeModel = compile<CommunityPostLikeRecord>(
+  "CommunityPostLike",
+  CommunityPostLikeSchema,
+);
 
 // Interest Forums — one row per InterestTag (citywide topic boards).
 const InterestForumSchema = new Schema<InterestForumRecord>(

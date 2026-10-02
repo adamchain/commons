@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Calendar, LayoutDashboard, MessageCircle, Send, Users } from "lucide-react";
+import { ArrowLeft, Calendar, Heart, LayoutDashboard, MessageCircle, Send, Users } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
@@ -817,6 +817,35 @@ function BulletinTab({
     onPendingChange?.();
   }
 
+  async function toggleLike(post: CommunityPostDTO) {
+    const nextLiked = !post.likedByMe;
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === post.id
+          ? {
+              ...p,
+              likedByMe: nextLiked,
+              likeCount: Math.max(0, (p.likeCount ?? 0) + (nextLiked ? 1 : -1)),
+            }
+          : p,
+      ),
+    );
+    try {
+      const stats = await api<{ id: string; likeCount: number; likedByMe: boolean }>(
+        `/api/communities/${community.id}/posts/${post.id}/like`,
+        { method: "POST" },
+      );
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === stats.id ? { ...p, likeCount: stats.likeCount, likedByMe: stats.likedByMe } : p,
+        ),
+      );
+    } catch (e) {
+      setPostErr(parseApiError(e));
+      await load();
+    }
+  }
+
   function postMenu(p: CommunityPostDTO) {
     const canReport = Boolean(user && user.id !== p.author.id);
     if (!p.canDelete && !canReport) return null;
@@ -952,6 +981,20 @@ function BulletinTab({
                   </li>
                 ))}
               </ul>
+            )}
+            {p.approvalStatus === "approved" && (
+              <div className="cmy-post-react">
+                <button
+                  type="button"
+                  className={`cmy-like-btn ${p.likedByMe ? "is-active" : ""}`}
+                  aria-pressed={Boolean(p.likedByMe)}
+                  aria-label={p.likedByMe ? "Unlike" : "Like"}
+                  onClick={() => void toggleLike(p)}
+                >
+                  <Heart size={14} strokeWidth={2} fill={p.likedByMe ? "currentColor" : "none"} aria-hidden="true" />
+                  {(p.likeCount ?? 0) > 0 ? p.likeCount : "Like"}
+                </button>
+              </div>
             )}
             {canReply && (
               replyTo === p.id ? (
@@ -1621,8 +1664,10 @@ function SettingsTab({
           src={cropSrc}
           shape="rect"
           aspect={16 / 9}
+          stageMax={420}
           outputPx={1200}
           title="Position your cover"
+          subtitle="Drag and zoom. The cover keeps this wide shape."
           onCancel={() => setCropSrc(null)}
           onConfirm={(dataUrl) => {
             setCoverImage(dataUrl);

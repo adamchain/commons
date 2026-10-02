@@ -210,6 +210,10 @@ export interface PlanDTO {
   upForGrabsAt?: string | null;
   /** Host answer to "Did this happen?" */
   happenedOutcome?: "yes" | "no" | "rescheduled" | null;
+  /** Group chat for this event. False means the thread is off. */
+  chatEnabled: boolean;
+  /** Set when the host keeps the group chat after the event ends. */
+  chatKeptAt?: string | null;
   /** Optional flyer/cover — uploaded data URL or library https URL. */
   flyerDataUrl?: string;
   /** Optional shareable link (event page, ticket page, etc.). */
@@ -693,6 +697,8 @@ export interface CommunityPostDTO {
   createdAt: string;
   /** Viewer may delete this post (own post, or organizer/admin on any). */
   canDelete: boolean;
+  likeCount: number;
+  likedByMe: boolean;
   replies: CommunityPostDTO[];
 }
 

@@ -140,7 +140,11 @@ async function toCommunityDTO(
     bulletinRequiresApproval: community.bulletinRequiresApproval ?? false,
     visibility: community.visibility ?? "everyone",
     city: community.city?.trim() || null,
-    screeningQuestion: isOrganizer ? community.screeningQuestion ?? null : null,
+    // Joiners have to see the question to answer it. Active members don't.
+    screeningQuestion:
+      isOrganizer || membership?.status !== "active"
+        ? community.screeningQuestion ?? null
+        : null,
     hasScreening: !!community.screeningQuestion,
     createdAt: community.createdAt,
     myMembership: membership
@@ -249,6 +253,7 @@ function postDTO(
     approvalStatus: status === "pending" ? "pending" : "approved",
     createdAt: post.createdAt,
     canDelete: viewerIsOrganizer || post.authorId === viewerId,
+    ...store.communityPostLikeStats(post.id, viewerId),
     replies,
   };
 }
@@ -424,7 +429,25 @@ communitiesRouter.post("/", requireAuth, async (req, res) => {
   const city =
     typeof cityRaw === "string" && cityRaw.trim() ? cityRaw.trim().slice(0, 80) : null;
 
-  const filtered = textBlockedReason(name, description, screeningQuestion, city);
+  let socialLinks: CommunityRecord["socialLinks"] = null;
+  if (req.body?.socialLinks != null) {
+    const links = parseCommunitySocialLinks(req.body.socialLinks);
+    if (links === "invalid") {
+      res.status(400).json({ error: "Use a handle for Instagram, TikTok, and Linktree." });
+      return;
+    }
+    socialLinks = links;
+  }
+
+  const filtered = textBlockedReason(
+    name,
+    description,
+    screeningQuestion,
+    city,
+    socialLinks?.instagram,
+    socialLinks?.tiktok,
+    socialLinks?.linktree,
+  );
   if (filtered) {
     res.status(400).json({ error: filtered });
     return;
@@ -439,6 +462,7 @@ communitiesRouter.post("/", requireAuth, async (req, res) => {
     organizerId: userId,
     screeningQuestion,
     city,
+    socialLinks,
     visibility:
       req.body?.visibility === "members_only" ? "members_only" : "everyone",
     creationStatus: "pending",
@@ -1295,6 +1319,31 @@ communitiesRouter.post("/:id/posts/:postId/pin", requireAuth, async (req, res) =
   }
   store.setCommunityPostPinned(post.id, Boolean(req.body?.pinned));
   res.json({ ok: true });
+});
+
+// POST /api/communities/:id/posts/:postId/like — toggle a like on a live bulletin post.
+communitiesRouter.post("/:id/posts/:postId/like", requireAuth, async (req, res) => {
+  const viewerId = String(req.userId);
+  const community = store.findCommunityById(String(req.params.id));
+  if (!community) {
+    res.status(404).json({ error: "Community not found" });
+    return;
+  }
+  if (!canViewCommunityBoard(community, viewerId)) {
+    res.status(403).json({ error: "Join the community to like posts" });
+    return;
+  }
+  const post = store.findCommunityPostById(String(req.params.postId));
+  if (!post || post.communityId !== community.id) {
+    res.status(404).json({ error: "Post not found" });
+    return;
+  }
+  const stats = store.toggleCommunityPostLike(post.id, viewerId);
+  if (!stats) {
+    res.status(400).json({ error: "That post can't be liked yet" });
+    return;
+  }
+  res.json({ id: post.id, ...stats });
 });
 
 // DELETE /api/communities/:id/posts/:postId — author deletes own; organizer any.

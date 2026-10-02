@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronRight, ExternalLink, Hand, Pencil, Send, UserPlus, X } from "lucide-react";
@@ -72,6 +72,10 @@ export function PlanDetailPage() {
   const [showHostSheet, setShowHostSheet] = useState(false);
   const [chatPreview, setChatPreview] = useState<MessageDTO[] | null>(null);
   const [chatConvId, setChatConvId] = useState<string | null>(null);
+  const [chatCleanupOpen, setChatCleanupOpen] = useState(false);
+  const chatCleanupDismissed = useRef<string | null>(null);
+  const [chatCleanupBusy, setChatCleanupBusy] = useState(false);
+  const [chatToggleBusy, setChatToggleBusy] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -110,7 +114,11 @@ export function PlanDetailPage() {
   // page shows chat — join=0 so merely opening the page doesn't add the
   // viewer to the inbox thread.
   useEffect(() => {
-    if (!plan || !user) return;
+    if (!plan || !user || plan.chatEnabled === false) {
+      setChatPreview(plan?.chatEnabled === false ? [] : null);
+      setChatConvId(null);
+      return;
+    }
     setChatPreview(null);
     void (async () => {
       try {
@@ -122,7 +130,16 @@ export function PlanDetailPage() {
         setChatPreview([]);
       }
     })();
-  }, [plan?.id, user?.id]);
+  }, [plan?.id, plan?.chatEnabled, user?.id]);
+
+  useEffect(() => {
+    if (!plan || !user) return;
+    if (chatCleanupDismissed.current === plan.id) return;
+    const hosting =
+      plan.creator.id === user.id || (plan.coHosts?.some((h) => h.id === user.id) ?? false);
+    const ended = Boolean(plan.cancelledAt) || planHasEnded(plan);
+    setChatCleanupOpen(ended && hosting && plan.chatEnabled !== false && !plan.chatKeptAt);
+  }, [plan, user]);
 
   if (!plan || !user) {
     return (
@@ -350,7 +367,7 @@ export function PlanDetailPage() {
               {interestedCount} interested
             </span>
           </button>
-          {!isPast && !plan.cancelledAt && goingCount <= 1 && (
+          {!isPast && !plan.cancelledAt && goingCount <= 1 && !(plan.communityId && !isHosting) && (
             <button
               type="button"
               className="plan-detail-share-nudge"
@@ -486,7 +503,34 @@ export function PlanDetailPage() {
           </div>
         )}
 
-        {!plan.cancelledAt && (
+        {isHosting && !plan.cancelledAt && (
+          <div className="plan-detail-card plan-chat-toggle">
+            <span className="plan-chat-toggle-label">Group chat</span>
+            <button
+              type="button"
+              role="switch"
+              className={`flex-switch ${plan.chatEnabled !== false ? "is-on" : ""}`}
+              aria-checked={plan.chatEnabled !== false}
+              aria-label="Group chat"
+              disabled={chatToggleBusy}
+              onClick={() => {
+                const next = plan.chatEnabled === false;
+                setChatToggleBusy(true);
+                void api<PlanDTO>(`/api/plans/${plan.id}`, {
+                  method: "PATCH",
+                  body: JSON.stringify({ chatEnabled: next }),
+                })
+                  .then((updated) => setPlan(updated))
+                  .catch(() => undefined)
+                  .finally(() => setChatToggleBusy(false));
+              }}
+            >
+              <span className="flex-switch-knob" />
+            </button>
+          </div>
+        )}
+
+        {!plan.cancelledAt && plan.chatEnabled !== false && (
           <ChatPreviewCard
             planId={plan.id}
             messages={chatPreview}
@@ -673,6 +717,62 @@ export function PlanDetailPage() {
       </div>
 
       {showShare && <ShareSheet plan={plan} isOwn={isHosting} onClose={() => setShowShare(false)} />}
+      {chatCleanupOpen && (
+        <BottomSheet
+          onClose={() => {
+            chatCleanupDismissed.current = plan.id;
+            setChatCleanupOpen(false);
+          }}
+          ariaLabel="Delete the chat?"
+        >
+          <h2 className="plan-chat-cleanup-title">Delete this chat?</h2>
+          <p className="plan-chat-cleanup-copy">
+            The event is over. You can delete the group chat, or keep it so people can still look back.
+          </p>
+          <div className="plan-chat-cleanup-actions">
+            <Button
+              variant="primary"
+              block
+              disabled={chatCleanupBusy}
+              onClick={() => {
+                setChatCleanupBusy(true);
+                void api<PlanDTO>(`/api/plans/${plan.id}/chat-cleanup`, {
+                  method: "POST",
+                  body: JSON.stringify({ action: "delete" }),
+                })
+                  .then((updated) => {
+                    setPlan(updated);
+                    setChatCleanupOpen(false);
+                  })
+                  .catch(() => undefined)
+                  .finally(() => setChatCleanupBusy(false));
+              }}
+            >
+              Delete chat
+            </Button>
+            <Button
+              variant="secondary"
+              block
+              disabled={chatCleanupBusy}
+              onClick={() => {
+                setChatCleanupBusy(true);
+                void api<PlanDTO>(`/api/plans/${plan.id}/chat-cleanup`, {
+                  method: "POST",
+                  body: JSON.stringify({ action: "keep" }),
+                })
+                  .then((updated) => {
+                    setPlan(updated);
+                    setChatCleanupOpen(false);
+                  })
+                  .catch(() => undefined)
+                  .finally(() => setChatCleanupBusy(false));
+              }}
+            >
+              Keep it
+            </Button>
+          </div>
+        </BottomSheet>
+      )}
       {showGetThere && <GetThereSheet plan={plan} onClose={() => setShowGetThere(false)} />}
       {showInvite && (
         <InviteSheet planId={plan.id} planTitle={plan.title} onClose={() => setShowInvite(false)} />
