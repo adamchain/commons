@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { isNative } from "../lib/platform";
 
 export type MentionPerson = { id: string; firstName: string };
 
@@ -44,7 +45,10 @@ export function ComposerField({
     const el = ref.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
+    el.style.overflowY = "hidden";
+    const next = Math.min(el.scrollHeight, 200);
+    el.style.height = `${next}px`;
+    el.style.overflowY = next >= 200 ? "auto" : "hidden";
   }, [value]);
 
   const mention = activeMention(value, caret);
@@ -96,7 +100,7 @@ export function ComposerField({
         value={value}
         disabled={disabled}
         autoFocus={autoFocus}
-        enterKeyHint="send"
+        enterKeyHint={isNative() ? "enter" : "send"}
         onChange={(e) => {
           onChange(e.target.value);
           setCaret(e.target.selectionStart ?? e.target.value.length);
@@ -108,7 +112,8 @@ export function ComposerField({
             onEscape?.();
             return;
           }
-          if (e.key === "Enter" && !e.shiftKey) {
+          // On iOS the return key is the only way to start a new line. Send stays on the button.
+          if (e.key === "Enter" && !e.shiftKey && !isNative()) {
             e.preventDefault();
             if (matches[0] && mention && mention.query !== "") {
               insert(matches[0]);

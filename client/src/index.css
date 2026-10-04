@@ -6425,7 +6425,7 @@ a.action-btn--stack {
   line-height: 1.35;
   box-shadow: var(--shadow-sm);
   resize: none;
-  max-height: 140px;
+  max-height: 200px;
   overflow-y: auto;
 }
 .composer-field {
@@ -6477,8 +6477,8 @@ a.action-btn--stack {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: var(--card);
   color: var(--faint);
