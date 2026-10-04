@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { BarChart2, BellOff, MessageCircle, Pin, Trash2 } from "lucide-react";
@@ -9,6 +9,14 @@ import { BottomSheet } from "../components/ui/BottomSheet";
 import { Button } from "../components/ui/Button";
 import { sentenceCaseTitle } from "../lib/format";
 import { type ConversationSummaryDTO } from "../types/shared";
+
+const PULL_THRESHOLD = 52;
+const PULL_MAX = 96;
+const PULL_MIN_SPIN_MS = 1250;
+
+function rubberBandPull(dy: number): number {
+  return Math.min(dy * 0.5, PULL_MAX);
+}
 
 function previewLooksLikePoll(text: string | null | undefined): boolean {
   if (!text) return false;
@@ -220,18 +228,128 @@ export function MessagesPage() {
   const [dismissBusy, setDismissBusy] = useState(false);
   const [dismissErr, setDismissErr] = useState<string | null>(null);
   const [pinErr, setPinErr] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const indicatorRef = useRef<HTMLDivElement>(null);
+  const refreshingRef = useRef(false);
+  const pullRef = useRef({ startY: 0, armed: false, distance: 0 });
+
+  const setPullVisual = useCallback((distance: number, spinning = false) => {
+    const content = contentRef.current;
+    const indicator = indicatorRef.current;
+    if (!content || !indicator) return;
+    const progress = Math.min(distance / PULL_THRESHOLD, 1);
+    content.style.transform = distance > 0 ? `translate3d(0, ${distance}px, 0)` : "";
+    indicator.style.opacity = spinning ? "1" : String(Math.max(0.15, progress));
+    indicator.style.transform = `translate3d(-50%, ${Math.max(0, distance - 24)}px, 0) scale(${0.55 + progress * 0.45})`;
+    const spinner = indicator.querySelector<HTMLElement>(".feed-pull-spinner");
+    if (!spinner) return;
+    spinner.classList.toggle("is-spinning", spinning);
+    if (!spinning) spinner.style.transform = `rotate(${progress * 300}deg)`;
+    else spinner.style.transform = "";
+  }, []);
+
+  const resetPullVisual = useCallback(() => {
+    const content = contentRef.current;
+    const indicator = indicatorRef.current;
+    const ease = "transform 200ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms ease";
+    if (content) {
+      content.style.transition = ease;
+      content.style.transform = "";
+    }
+    if (indicator) {
+      indicator.style.transition = ease;
+      indicator.style.opacity = "0";
+      indicator.style.transform = "translate3d(-50%, 0, 0) scale(0.55)";
+    }
+    window.setTimeout(() => {
+      if (content) content.style.transition = "";
+      if (indicator) indicator.style.transition = "";
+    }, 210);
+    pullRef.current.distance = 0;
+    pullRef.current.armed = false;
+  }, []);
+
+  const loadInbox = useCallback(async (opts?: { pull?: boolean }) => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    const showPull = Boolean(opts?.pull);
+    const startedAt = Date.now();
+    if (showPull) {
+      setRefreshing(true);
+      setPullVisual(pullRef.current.distance || 36, true);
+    }
+    try {
+      const rows = await api<ConversationSummaryDTO[]>("/api/conversations");
+      setItems(sortInbox(rows));
+      setReady(true);
+      if (showPull) window.dispatchEvent(new CustomEvent("commons:notifications-changed"));
+    } catch {
+      if (!showPull) setItems([]);
+      setReady(true);
+    } finally {
+      if (showPull) {
+        const elapsed = Date.now() - startedAt;
+        await new Promise((r) => setTimeout(r, Math.max(0, PULL_MIN_SPIN_MS - elapsed)));
+      }
+      refreshingRef.current = false;
+      setRefreshing(false);
+      if (showPull) resetPullVisual();
+    }
+  }, [resetPullVisual, setPullVisual]);
 
   useEffect(() => {
-    void api<ConversationSummaryDTO[]>("/api/conversations")
-      .then((rows) => {
-        setItems(sortInbox(rows));
-        setReady(true);
-      })
-      .catch(() => {
-        setItems([]);
-        setReady(true);
-      });
-  }, []);
+    void loadInbox();
+  }, [loadInbox]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onStart = (e: TouchEvent) => {
+      if (refreshingRef.current) return;
+      if (el.scrollTop <= 1 && e.touches.length === 1) {
+        pullRef.current.startY = e.touches[0]!.clientY;
+        pullRef.current.armed = true;
+      } else {
+        pullRef.current.armed = false;
+      }
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!pullRef.current.armed || refreshingRef.current) return;
+      const dy = e.touches[0]!.clientY - pullRef.current.startY;
+      if (dy <= 0) {
+        pullRef.current.distance = 0;
+        setPullVisual(0);
+        return;
+      }
+      if (el.scrollTop > 1) {
+        pullRef.current.armed = false;
+        return;
+      }
+      e.preventDefault();
+      const distance = rubberBandPull(dy);
+      pullRef.current.distance = distance;
+      setPullVisual(distance);
+    };
+    const onEnd = () => {
+      if (!pullRef.current.armed && pullRef.current.distance <= 0) return;
+      const { distance } = pullRef.current;
+      pullRef.current.armed = false;
+      if (distance >= PULL_THRESHOLD) void loadInbox({ pull: true });
+      else resetPullVisual();
+    };
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd, { passive: true });
+    el.addEventListener("touchcancel", onEnd, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+    };
+  }, [loadInbox, resetPullVisual, setPullVisual]);
 
   async function togglePin(conversationId: string) {
     const current = items.find((c) => c.conversationId === conversationId);
@@ -299,9 +417,19 @@ export function MessagesPage() {
 
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar app-shell--messages-lock">
+      <div
+        ref={indicatorRef}
+        className="feed-pull-indicator"
+        aria-hidden={!refreshing}
+        role={refreshing ? "status" : undefined}
+        aria-label={refreshing ? "Refreshing" : undefined}
+      >
+        <span className="feed-pull-spinner" />
+      </div>
       <ScreenTitle title="Messages" />
 
-      <div className="messages-scroll">
+      <div ref={scrollRef} className="messages-scroll">
+      <div ref={contentRef} className="feed-pull-content">
       {!ready ? (
         <div className="feed-skeleton" aria-hidden="true">
           <div className="feed-skeleton-card" />
@@ -400,6 +528,7 @@ export function MessagesPage() {
           </div>
         </>
       )}
+      </div>
       </div>
 
       {dismissTarget && (
