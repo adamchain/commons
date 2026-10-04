@@ -141,8 +141,9 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
     if (!plan) continue;
     if (plan.chatEnabled === false) continue;
     if (plan.creatorId !== userId && store.isBlockedEitherWay(userId, plan.creatorId)) continue;
-    const conv = store.findGroupConversationByPlan(planId);
-    if (conv && store.hasLeftConversation(userId, conv.id)) continue;
+    const groups = store.listGroupConversationsByPlan(planId);
+    const conv = groups[0];
+    if (groups.some((c) => store.hasLeftConversation(userId, c.id))) continue;
     const msgs = conv ? store.listMessagesForConversation(conv.id) : [];
     const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
     const hasRealChatter = msgs.some((m) => m.kind !== "system");
@@ -181,8 +182,9 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
     if (membership.status !== "active") continue;
     const community = store.findCommunityById(membership.communityId);
     if (!community || community.hiddenAt || !community.chatEnabled || community.creationStatus !== "approved") continue;
-    const conv = store.findCommunityConversation(community.id);
-    if (conv && store.hasLeftConversation(userId, conv.id)) continue;
+    const groups = store.listCommunityConversations(community.id);
+    const conv = groups[0] ?? store.findCommunityConversation(community.id);
+    if (groups.some((c) => store.hasLeftConversation(userId, c.id))) continue;
     const msgs = conv ? store.listMessagesForConversation(conv.id) : [];
     const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
     summaries.push({
@@ -709,14 +711,22 @@ chatRouter.post("/inbox/hide", requireAuth, (req, res) => {
       res.status(404).json({ error: "Not found" });
       return;
     }
-    convId = store.ensureCommunityConversation(communityId, []).id;
+    const existing = store.listCommunityConversations(communityId);
+    convId = (existing[0] ?? store.ensureCommunityConversation(communityId, [])).id;
+    for (const c of store.listCommunityConversations(communityId)) {
+      store.setConversationLeft(userId, c.id, true);
+    }
   } else if (planId) {
     const plan = store.findPlanById(planId);
     if (!plan) {
       res.status(404).json({ error: "Not found" });
       return;
     }
-    convId = store.ensureGroupConversation(planId, [plan.creatorId]).id;
+    const existing = store.listGroupConversationsByPlan(planId);
+    convId = (existing[0] ?? store.ensureGroupConversation(planId, [plan.creatorId])).id;
+    for (const c of store.listGroupConversationsByPlan(planId)) {
+      store.setConversationLeft(userId, c.id, true);
+    }
   } else {
     res.status(400).json({ error: "Nothing to remove" });
     return;
@@ -739,10 +749,18 @@ chatRouter.post("/conversations/:id/leave", requireAuth, (req, res) => {
   }
   if (conv.type === "dm") {
     store.setConversationLeft(userId, convId, true);
+    if (!conv.planId && !conv.communityId) store.setDmHiddenFrom(convId, userId, true);
     res.json({ ok: true });
     return;
   }
-  store.removeConversationParticipant(convId, userId);
+  const related = conv.communityId
+    ? store.listCommunityConversations(conv.communityId)
+    : conv.planId
+      ? store.listGroupConversationsByPlan(conv.planId)
+      : [conv];
+  for (const c of related.length > 0 ? related : [conv]) {
+    store.removeConversationParticipant(c.id, userId);
+  }
   res.json({ ok: true });
 });
 

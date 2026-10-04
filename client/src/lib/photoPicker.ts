@@ -20,6 +20,7 @@ export async function pickPhotoNative(opts: PickPhotoOptions = {}): Promise<stri
     height: opts.maxPx ?? 512,
     resultType: CameraResultType.DataUrl,
     source: opts.preferCamera ? CameraSource.Camera : CameraSource.Prompt,
+    correctOrientation: true,
     allowEditing: false,
   });
   return photo.dataUrl ?? null;

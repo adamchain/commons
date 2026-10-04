@@ -1548,7 +1548,13 @@ export const store = {
 
   // Conversations + Messages
   findGroupConversationByPlan(planId: string): ConversationRecord | undefined {
-    return snapshot.conversations.find((c) => c.planId === planId && c.type === "group");
+    return this.listGroupConversationsByPlan(planId)[0];
+  },
+  listGroupConversationsByPlan(planId: string): ConversationRecord[] {
+    return snapshot.conversations.filter((c) => c.planId === planId && c.type === "group");
+  },
+  listCommunityConversations(communityId: string): ConversationRecord[] {
+    return snapshot.conversations.filter((c) => c.communityId === communityId);
   },
   /** Remove a plan's group thread and its messages. DMs on the plan stay. */
   deleteGroupConversation(planId: string): boolean {

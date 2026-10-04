@@ -22,22 +22,36 @@ export async function getCurrentCoords(opts: Options = {}): Promise<Coords | nul
         const req = await Geolocation.requestPermissions({ permissions: ["location"] });
         if (req.location !== "granted") return null;
       }
-      const pos = await Geolocation.getCurrentPosition({
-        enableHighAccuracy: true,
-        timeout,
-        maximumAge: 60 * 1000,
-      });
+      // A cached or coarse fix returns as soon as the system permission
+      // dialog closes. High accuracy can sit on this screen for the whole timeout.
+      const quick = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: false,
+        timeout: Math.min(timeout, 4000),
+        maximumAge: 5 * 60 * 1000,
+      }).catch(() => null);
+      const pos =
+        quick ??
+        (await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: Math.min(timeout, 5000),
+          maximumAge: 0,
+        }));
       return { lat: pos.coords.latitude, lng: pos.coords.longitude };
     } catch {
       return null;
     }
   }
   if (typeof navigator === "undefined" || !("geolocation" in navigator)) return null;
-  return new Promise((resolve) => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => resolve(null),
-      { enableHighAccuracy: true, timeout, maximumAge: 60 * 1000 },
-    );
-  });
+  const read = (high: boolean, wait: number, maxAge: number) =>
+    new Promise<Coords | null>((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => resolve(null),
+        { enableHighAccuracy: high, timeout: wait, maximumAge: maxAge },
+      );
+    });
+  return (
+    (await read(false, Math.min(timeout, 4000), 5 * 60 * 1000)) ??
+    (await read(true, Math.min(timeout, 5000), 0))
+  );
 }

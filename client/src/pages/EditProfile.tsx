@@ -166,6 +166,12 @@ function EditProfileForm({
           onConfirm={(dataUrl) => {
             pickPhoto(dataUrl);
             setCropSrc(null);
+            void api<MeDTO>("/api/auth/me", {
+              method: "PATCH",
+              body: JSON.stringify({ avatarPhotoDataUrl: dataUrl, avatarParams: null }),
+            })
+              .then((next) => setUser(next))
+              .catch(() => setError("Couldn't save that photo. Try again."));
           }}
         />
       )}

@@ -811,6 +811,10 @@ a.btn-primary[aria-disabled="true"] {
 
 /* ---------- Avatars + participant lists ---------- */
 
+img.avatar {
+  object-fit: cover;
+  object-position: center;
+}
 .avatar {
   width: 36px;
   height: 36px;
@@ -4337,6 +4341,17 @@ a.action-btn--stack {
 .plan-dropout-row .participation { margin-top: 0; }
 
 /* Sheet — one template: handle, full-bleed to the bottom, shared radius/padding. */
+.sheet-dismiss {
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-height: 48px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
 .sheet-backdrop,
 .filter-sheet-backdrop,
 .cover-lib-backdrop,
@@ -4995,7 +5010,7 @@ a.action-btn--stack {
   z-index: 1;
   background: var(--card, var(--surface));
   transition: transform 180ms ease;
-  touch-action: pan-y;
+  touch-action: pan-x pan-y;
 }
 .messages-swipe-front .messages-row {
   border-bottom: none;

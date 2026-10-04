@@ -167,6 +167,17 @@ export function BottomSheet({
       role="presentation"
       onClick={onBackdropClick}
     >
+      <button
+        type="button"
+        className="sheet-dismiss"
+        aria-label="Close"
+        disabled={closeDisabled}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (closeDisabled || Date.now() < ignoreUntil.current) return;
+          onClose();
+        }}
+      />
       <div
         ref={sheetRef}
         className={`sheet ${className}`.trim()}

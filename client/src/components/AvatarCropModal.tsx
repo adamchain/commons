@@ -52,6 +52,7 @@ export function AvatarCropModal({
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const drag = useRef<{ px: number; py: number; ox: number; oy: number } | null>(null);
+  const placed = useRef(false);
 
   const coverScale = natural ? Math.max(stageW / natural.w, stageH / natural.h) : 1;
   const effScale = coverScale * zoom;
@@ -74,6 +75,7 @@ export function AvatarCropModal({
   useEffect(() => {
     setZoom(1);
     setNatural(null);
+    placed.current = false;
     const img = new Image();
     img.onload = () => {
       imgRef.current = img;
@@ -83,7 +85,8 @@ export function AvatarCropModal({
   }, [src]);
 
   useEffect(() => {
-    if (!natural) return;
+    if (!natural || placed.current) return;
+    placed.current = true;
     const cover = Math.max(stageW / natural.w, stageH / natural.h);
     setOffset({
       x: (stageW - natural.w * cover) / 2,

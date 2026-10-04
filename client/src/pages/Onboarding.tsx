@@ -412,9 +412,13 @@ export function OnboardingPage() {
     return (
       <LocationStep
         onSave={async (shared) => {
-          if (shared) await patchMe({ location: shared });
-          else await patchMe({ location: null });
           setStep("interests");
+          try {
+            if (shared) await patchMe({ location: shared });
+            else await patchMe({ location: null });
+          } catch {
+            /* Interests can still load if the location save is slow or fails. */
+          }
         }}
         // Location is the first step after the access-code gate, so "back" has
         // nowhere else sensible to land — re-showing the gate (already passed,
@@ -449,6 +453,13 @@ export function OnboardingPage() {
             avatarParams: avatarParams ?? undefined,
           });
           setStep("age");
+        }}
+        onPhoto={async (avatarPhotoDataUrl) => {
+          const me = await api<MeDTO>("/api/auth/me", {
+            method: "PATCH",
+            body: JSON.stringify({ avatarPhotoDataUrl, avatarParams: null }),
+          });
+          setUser(me);
         }}
         onBack={() => setStep("interests")}
       />
@@ -1079,6 +1090,7 @@ function InterestsStep({ me, onSave, onBack }: { me: MeDTO; onSave: (interests: 
 function ProfileStep({
   me,
   onSave,
+  onPhoto,
   onBack,
 }: {
   me: MeDTO;
@@ -1090,6 +1102,7 @@ function ProfileStep({
     photoDataUrl: string | null,
     avatarParams: string | null,
   ) => Promise<void>;
+  onPhoto?: (photoDataUrl: string) => Promise<void>;
   onBack?: () => void;
 }) {
   const [firstName, setFirstName] = useState(me.firstName);
@@ -1215,6 +1228,7 @@ function ProfileStep({
           onConfirm={(dataUrl) => {
             pickPhoto(dataUrl);
             setCropSrc(null);
+            void onPhoto?.(dataUrl);
           }}
         />
       )}

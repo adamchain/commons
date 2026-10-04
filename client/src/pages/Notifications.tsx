@@ -47,9 +47,24 @@ export function NotificationsPage() {
   const [hasPlans, setHasPlans] = useState(false);
 
   useEffect(() => {
-    void api<{ notifications: NotificationDTO[] }>("/api/notifications")
-      .then((r) => setItems(r.notifications))
-      .catch(() => setItems([]));
+    let alive = true;
+    void (async () => {
+      try {
+        const r = await api<{ notifications: NotificationDTO[] }>("/api/notifications");
+        if (!alive) return;
+        const seenAt = new Date().toISOString();
+        setItems(r.notifications.map((n) => ({ ...n, readAt: n.readAt ?? seenAt })));
+        if (r.notifications.some((n) => n.readAt === null)) {
+          await api("/api/notifications/read", { method: "POST" });
+          window.dispatchEvent(new CustomEvent("commons:notifications-changed"));
+        }
+      } catch {
+        if (alive) setItems([]);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -77,17 +92,23 @@ export function NotificationsPage() {
 
   function markAllRead() {
     setItems((prev) => prev?.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })) ?? prev);
-    void api("/api/notifications/read", { method: "POST" }).catch(() => undefined);
+    void api("/api/notifications/read", { method: "POST" })
+      .then(() => window.dispatchEvent(new CustomEvent("commons:notifications-changed")))
+      .catch(() => undefined);
   }
 
   function clearAll() {
     setItems([]);
-    void api("/api/notifications/clear", { method: "POST" }).catch(() => undefined);
+    void api("/api/notifications/clear", { method: "POST" })
+      .then(() => window.dispatchEvent(new CustomEvent("commons:notifications-changed")))
+      .catch(() => undefined);
   }
 
   function dismiss(id: string) {
     setItems((prev) => (prev ?? []).filter((n) => n.id !== id));
-    void api(`/api/notifications/${id}`, { method: "DELETE" }).catch(() => undefined);
+    void api(`/api/notifications/${id}`, { method: "DELETE" })
+      .then(() => window.dispatchEvent(new CustomEvent("commons:notifications-changed")))
+      .catch(() => undefined);
   }
 
   if (items === null) return <LoadingScreen tagline="Catching up" />;

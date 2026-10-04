@@ -588,7 +588,10 @@ function JoinControl({
   onJoined: () => void;
   compact?: boolean;
 }) {
-  const [asking, setAsking] = useState(false);
+  const needsQuestion = Boolean(community.hasScreening || community.screeningQuestion?.trim());
+  // The header pill is too small to hold the question. The locked panel shows
+  // it immediately so a private community doesn't skip the screener.
+  const [asking, setAsking] = useState(!compact && needsQuestion);
   const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -600,7 +603,10 @@ function JoinControl({
     if (community.myMembership?.status === "active" || !community.myMembership) {
       setRequested(false);
     }
-  }, [community.myMembership?.status]);
+    if (!compact && (community.hasScreening || community.screeningQuestion?.trim())) {
+      setAsking(true);
+    }
+  }, [community.myMembership?.status, community.hasScreening, community.screeningQuestion, compact]);
 
   async function doJoin(screeningAnswer?: string) {
     if (busy) return;
@@ -667,11 +673,12 @@ function JoinControl({
     );
   }
 
-  // Visitor
-  if (community.hasScreening && asking) {
+  // Visitor. Compact controls scroll to the full question instead of
+  // rendering a second form inside the header row.
+  if (needsQuestion && asking && !compact) {
     return (
-      <div className="cmy-join-col cmy-screen">
-        <p className="cmy-screen-q">{community.screeningQuestion ?? "A quick question before you join:"}</p>
+      <div className="cmy-join-col cmy-screen" id="cmy-screening">
+        <p className="cmy-screen-q">{community.screeningQuestion?.trim() || "A quick question before you join:"}</p>
         <textarea
           className="cmy-textarea"
           rows={3}
@@ -709,7 +716,17 @@ function JoinControl({
         type="button"
         className={compact ? "cmy-joined-pill cmy-compact-join" : "cmy-btn cmy-btn--primary cmy-btn--sm"}
         disabled={busy}
-        onClick={() => (community.hasScreening ? setAsking(true) : void doJoin())}
+        onClick={() => {
+          if (needsQuestion) {
+            if (compact) {
+              document.getElementById("cmy-screening")?.scrollIntoView({ behavior: "smooth", block: "center" });
+              return;
+            }
+            setAsking(true);
+            return;
+          }
+          void doJoin();
+        }}
       >
         {busy
           ? needsApproval
