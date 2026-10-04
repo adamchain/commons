@@ -233,7 +233,7 @@ open client/ios/App/App.xcworkspace
 1. **Select the "App" target** in Xcode navigator
 2. **Go to General tab**
 3. **Update Identity section:**
-   - **Display Name:** Commons
+   - **Display Name:** COMMONS
    - **Bundle Identifier:** com.oncommons.mvp
    - **Version:** 1.0 (or your version)
    - **Build:** Increment from last submission (e.g., 14, 15, 16...)

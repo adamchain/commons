@@ -2,7 +2,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
   appId: "com.oncommons.mvp",
-  appName: "Commons",
+  appName: "COMMONS",
   webDir: "dist",
   backgroundColor: "#f0e9df",
   ios: {

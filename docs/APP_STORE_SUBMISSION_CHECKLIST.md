@@ -193,7 +193,7 @@ If you encounter errors:
 
 - [ ] **App created in App Store Connect**
   - Navigate to: https://appstoreconnect.apple.com → My Apps → + (New App)
-  - Name: Commons
+  - Name: COMMONS
   - Bundle ID: com.oncommons.mvp
 
 - [ ] **App Information completed**
@@ -244,8 +244,8 @@ If you encounter errors:
   - See: `/workspace/docs/APP_STORE_CONNECT_METADATA.md` for content ideas
 
 - [ ] **App description and metadata added**
-  - App Name: Commons
-  - Subtitle: Neighborhood plans and community
+  - App Name: COMMONS
+  - Subtitle: The Plans and Communities App
   - Promotional Text (optional)
   - Description (4000 char max)
   - Keywords (100 char max)

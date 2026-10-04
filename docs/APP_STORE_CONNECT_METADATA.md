@@ -2,8 +2,8 @@
 
 ## Basic App Information
 
-**App Name:** Commons  
-**Subtitle:** Neighborhood plans and community  
+**App Name:** COMMONS  
+**Subtitle:** The Plans and Communities App  
 **Bundle ID:** com.oncommons.mvp  
 **SKU:** commons-mvp-001
 
