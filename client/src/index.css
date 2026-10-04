@@ -3317,17 +3317,25 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   flex-direction: column;
   gap: 12px;
 }
-.onboarding-card--landing .onboarding-input {
+.onboarding-card--landing .onboarding-input,
+.onboarding-card--landing .onboarding-country {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.35);
   color: #fff;
   font-size: var(--text-card-large);
+}
+.onboarding-card--landing .onboarding-input {
   text-align: center;
+}
+.onboarding-card--landing .onboarding-country-input {
+  color: #fff;
+  font-size: inherit;
 }
 .onboarding-card--landing .onboarding-input::placeholder {
   color: rgba(255, 255, 255, 0.55);
 }
-.onboarding-card--landing .onboarding-input:focus {
+.onboarding-card--landing .onboarding-input:focus,
+.onboarding-card--landing .onboarding-country:focus-within {
   border-color: #fff;
   outline: none;
 }
@@ -3391,6 +3399,32 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   color: var(--text-muted);
 }
 .onboarding-body { display: flex; flex-direction: column; gap: 14px; margin-top: 12px; }
+.onboarding-phone-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.onboarding-country {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex: 0 0 auto;
+  padding: 0 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-body);
+}
+.onboarding-country-input {
+  width: 3.2ch;
+  border: 0;
+  padding: 14px 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
 .onboarding-input {
   width: 100%;
   padding: 14px;
@@ -3403,6 +3437,9 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
+}
+.onboarding-phone-row .onboarding-input {
+  flex: 1;
 }
 .onboarding-input-code {
   letter-spacing: 0.4em;
@@ -13379,13 +13416,18 @@ button.xpl-photo-tile {
   justify-content: center;
   width: 18px;
   height: 18px;
-  border: 1.5px solid var(--accent);
+  border: 1.5px solid var(--text-muted);
   border-radius: 4px;
-  color: var(--accent);
+  color: transparent;
   font-size: var(--text-body-small);
   font-weight: 800;
   line-height: 1;
   margin-top: 1px;
+  background: var(--surface);
+}
+.legal-agree-chip.is-active .legal-agree-chip-check {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 .legal-consent-intro {
   margin: 14px 0 8px;

@@ -106,6 +106,9 @@ export function OnboardingPage() {
   // step. Read once so a refresh mid-onboarding doesn't re-prompt or bypass it.
   const [gatePassed, setGatePassed] = useState<boolean>(() => isGatePassed() || eventRef);
   const [phoneNumber, setPhoneNumber] = useState(nav?.phoneNumber ?? "");
+  const [countryCode, setCountryCode] = useState("1");
+  /** E.164 number the code was actually sent to. The field stays the national number. */
+  const [sentPhone, setSentPhone] = useState(nav?.phoneNumber ?? "");
   const [smsConfigured, setSmsConfigured] = useState<boolean | null>(nav?.smsConfigured ?? null);
   /** Set after requesting a code; drives code length rules (Verify vs local dev). */
   const [authMode, setAuthMode] = useState<"verify" | "dev" | null>(nav?.authMode ?? null);
@@ -148,11 +151,12 @@ export function OnboardingPage() {
   }, [user, step, gatePassed]);
 
   useEffect(() => {
+    if (countryCode !== "1") return;
     const formatted = formatPhoneInput(phoneNumber);
     if (formatted !== phoneNumber) {
       setPhoneNumber(formatted);
     }
-  }, [phoneNumber]);
+  }, [phoneNumber, countryCode]);
 
   useEffect(() => {
     if (step !== "code" || busy) return;
@@ -175,9 +179,9 @@ export function OnboardingPage() {
         authMode?: "verify" | "dev";
       }>("/api/auth/request-code", {
         method: "POST",
-        body: JSON.stringify({ phoneNumber }),
+        body: JSON.stringify({ phoneNumber: composePhone(countryCode, phoneNumber) }),
       });
-      setPhoneNumber(result.phoneNumber);
+      setSentPhone(result.phoneNumber);
       setSmsConfigured(result.smsConfigured);
       setAuthMode(result.authMode ?? (result.smsConfigured ? "verify" : "dev"));
       setStep("code");
@@ -196,7 +200,7 @@ export function OnboardingPage() {
     try {
       const result = await api<MeDTO & { token?: string }>("/api/auth/verify-code", {
         method: "POST",
-        body: JSON.stringify({ phoneNumber, code }),
+        body: JSON.stringify({ phoneNumber: sentPhone || phoneNumber, code }),
       });
       const { token, ...me } = result;
       if (token) await setAuthToken(token);
@@ -260,11 +264,11 @@ export function OnboardingPage() {
   }
 
   if (step === "phone") {
-    const phoneValid = isValidPhoneInput(phoneNumber);
+    const phoneValid = isValidPhoneInput(composePhone(countryCode, phoneNumber));
     const digitsOnly = phoneNumber.replace(/\D/g, "");
     // Only flag a finished number. Showing this after the first few digits
     // reads as a failure while the person is still typing.
-    const showInvalidPhone = digitsOnly.length >= 10 && !phoneValid;
+    const showInvalidPhone = digitsOnly.length >= (countryCode === "1" ? 10 : 6) && !phoneValid;
     return (
       <OnboardingShell
         landing
@@ -276,18 +280,40 @@ export function OnboardingPage() {
           else navigate("/welcome");
         }}
       >
-        <input
-          className="onboarding-input"
-          type="tel"
-          inputMode="tel"
-          autoComplete="tel"
-          placeholder="(555) 555-0100"
-          value={phoneNumber}
-          onChange={(e) => {
-            setPhoneNumber(formatPhoneInput(e.target.value));
-            setError(null);
-          }}
-        />
+        <div className="onboarding-phone-row">
+          <label className="onboarding-country">
+            <span aria-hidden="true">+</span>
+            <input
+              className="onboarding-country-input"
+              type="text"
+              inputMode="numeric"
+              autoComplete="tel-country-code"
+              maxLength={3}
+              aria-label="Country code"
+              value={countryCode}
+              onChange={(e) => {
+                const next = e.target.value.replace(/\D/g, "").slice(0, 3);
+                setCountryCode(next);
+                if (next !== "1") setPhoneNumber(phoneNumber.replace(/\D/g, ""));
+                else setPhoneNumber(formatPhoneInput(phoneNumber));
+                setError(null);
+              }}
+            />
+          </label>
+          <input
+            className="onboarding-input"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel-national"
+            placeholder={countryCode === "1" ? "(555) 555-0100" : "Phone number"}
+            value={phoneNumber}
+            onChange={(e) => {
+              const raw = e.target.value;
+              setPhoneNumber(countryCode === "1" ? formatPhoneInput(raw) : raw.replace(/\D/g, "").slice(0, 14));
+              setError(null);
+            }}
+          />
+        </div>
         {showInvalidPhone && (
           <div className="onboarding-error">Enter a valid phone number.</div>
         )}
@@ -311,7 +337,7 @@ export function OnboardingPage() {
   }
   if (step === "code") {
     return (
-      <OnboardingShell title="Check your texts." subtitle={`Sent to ${phoneNumber}`}>
+      <OnboardingShell title="Check your texts." subtitle={`Sent to ${formatPhoneInput(sentPhone) || sentPhone}`}>
         <input
           className="onboarding-input onboarding-input-code"
           type="text"
@@ -624,7 +650,14 @@ function formatError(e: unknown): string {
   return msg || "Something went wrong";
 }
 
-/** Formats US numbers as users type, while still allowing +country input. */
+/** Country code plus the national number, as the server expects it. */
+function composePhone(countryCode: string, national: string): string {
+  const cc = countryCode.replace(/\D/g, "");
+  const digits = national.replace(/\D/g, "");
+  if (!cc || !digits) return "";
+  return `+${cc}${digits}`;
+}
+
 /** Floating activity icons — same vocabulary as LoadingScreen to make sign-in feel continuous. */
 const ONBOARDING_ICONS: Array<{
   key: string;
@@ -938,16 +971,15 @@ function LegalConsentStep({
         type="button"
         className={`legal-agree-chip ${agreed ? "is-active" : ""}`}
         disabled={!bothRead}
-        aria-pressed={agreed}
+        role="checkbox"
+        aria-checked={agreed}
         onClick={() => {
           if (bothRead) setAgreed((v) => !v);
         }}
       >
-        {agreed && (
-          <span className="legal-agree-chip-check" aria-hidden="true">
-            ✓
-          </span>
-        )}
+        <span className="legal-agree-chip-check" aria-hidden="true">
+          {agreed ? "✓" : ""}
+        </span>
         <span>
           I have read and agree to the Commons Community Guidelines, Terms of Service, and Privacy
           Policy. I understand COMMONS has no tolerance for objectionable content or abusive users.
