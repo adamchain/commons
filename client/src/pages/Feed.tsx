@@ -425,7 +425,7 @@ export function FeedPage() {
               className={view === "plans" ? "is-active" : ""}
               onClick={() => setView("plans")}
             >
-              Plans
+              All Plans
             </button>
             <button
               type="button"

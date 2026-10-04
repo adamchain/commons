@@ -9153,8 +9153,17 @@ a.action-btn--stack {
 .week-strip--scroll .week-strip-day {
   flex: 0 0 auto;
   width: 44px;
-  padding-top: 18px;
   scroll-snap-align: start;
+}
+.week-strip-month-pin {
+  flex: 0 0 auto;
+  align-self: center;
+  min-width: 32px;
+  font-size: var(--text-micro);
+  letter-spacing: 0.08em;
+  font-weight: 800;
+  color: var(--red);
+  line-height: 1;
 }
 
 .week-strip-day {
@@ -9178,12 +9187,12 @@ a.action-btn--stack {
 
 .week-strip-day.has-plans::after {
   content: "";
-  width: 3px;
-  height: 3px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
-  background: var(--faint);
+  background: var(--red);
   margin-top: 3px;
-  opacity: 0.5;
+  opacity: 1;
 }
 
 .week-strip-wrap {

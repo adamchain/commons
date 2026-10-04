@@ -51,9 +51,7 @@ export function WeekStrip({
         date,
         iso: isoDay(date),
         label: dowLabels[date.getDay() === 0 ? 6 : date.getDay() - 1] ?? "",
-        monthLabel: date.getDate() === 1 || i === 0
-          ? date.toLocaleDateString(undefined, { month: "short" })
-          : null,
+        monthLabel: date.toLocaleDateString(undefined, { month: "short" }),
       });
     }
     return { todayIso: isoDay(today), days };
@@ -71,6 +69,28 @@ export function WeekStrip({
   const stripRef = useRef<HTMLElement>(null);
   const todayBtnRef = useRef<HTMLButtonElement>(null);
   const [todayInView, setTodayInView] = useState(true);
+  const [pinnedMonth, setPinnedMonth] = useState(
+    () => week.days[0]?.monthLabel ?? "",
+  );
+
+  useEffect(() => {
+    const strip = stripRef.current;
+    if (!strip) return;
+    const updateMonth = () => {
+      const buttons = strip.querySelectorAll<HTMLButtonElement>(".week-strip-day");
+      const edge = strip.getBoundingClientRect().left + 4;
+      let month = week.days[0]?.monthLabel ?? "";
+      for (const button of buttons) {
+        if (button.getBoundingClientRect().right < edge) continue;
+        month = button.dataset.month || month;
+        break;
+      }
+      setPinnedMonth(month);
+    };
+    updateMonth();
+    strip.addEventListener("scroll", updateMonth, { passive: true });
+    return () => strip.removeEventListener("scroll", updateMonth);
+  }, [week.days]);
 
   useEffect(() => {
     const strip = stripRef.current;
@@ -101,6 +121,9 @@ export function WeekStrip({
 
   return (
     <div className="week-strip-wrap">
+      {pinnedMonth ? (
+        <span className="week-strip-month-pin">{pinnedMonth}</span>
+      ) : null}
       <section
         id="week-strip-days"
         ref={stripRef}
@@ -117,12 +140,12 @@ export function WeekStrip({
               ref={isToday ? todayBtnRef : undefined}
               type="button"
               className={`week-strip-day ${hasPlans ? "has-plans" : ""} ${isToday ? "is-today" : ""} ${isSelected ? "is-selected" : ""}`}
+              data-month={monthLabel ?? undefined}
               title={date.toLocaleDateString()}
               onClick={() => onSelectDay(isSelected ? null : iso)}
               aria-pressed={isSelected}
               aria-current={isToday ? "date" : undefined}
             >
-              {monthLabel && <span className="week-strip-month">{monthLabel}</span>}
               <span className="week-strip-dow">{label}</span>
               <span className="week-strip-num">{date.getDate()}</span>
             </button>

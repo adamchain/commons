@@ -111,6 +111,19 @@ export function PlanCard({
             ) : hasEnded && !hideHappened ? (
               <span className="plan-card-kind-pill is-happened">Happened</span>
             ) : null}
+            {capacityFill && (
+              <button
+                type="button"
+                className="plan-card-capacity"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  openPlan("#guests");
+                }}
+              >
+                {capacityFill}
+              </button>
+            )}
             {plan.communityId && plan.communityName && navFrom.from !== "community" ? (
               <span
                 className="plan-card-community-pill"
@@ -132,19 +145,6 @@ export function PlanCard({
                 <span className="plan-card-community-pill-text">{plan.communityName}</span>
               </span>
             ) : null}
-            {capacityFill && (
-              <button
-                type="button"
-                className="plan-card-capacity"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  openPlan("#guests");
-                }}
-              >
-                {capacityFill}
-              </button>
-            )}
           </header>
           <h3 className="plan-card-title">{title}</h3>
           <div className="plan-card-meta-row">
