@@ -1332,6 +1332,7 @@ button.cmy-joined-pill {
 }
 .cmy-member-link-row:hover .cmy-member-name { color: var(--community-pink); }
 .cmy-member-name { font-weight: 600; color: var(--ink-900); font-size: var(--type-body); flex: 1; }
+.cmy-member-name .cmy-answer { display: block; margin-top: 2px; font-weight: 400; }
 .cmy-network-btn {
   appearance: none;
   flex-shrink: 0;

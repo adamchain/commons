@@ -1324,7 +1324,10 @@ function MembersTab({
             <li key={m.user.id} className="cmy-member-row">
               <Link to={`/profile/${m.user.id}`} state={{ from: "community", communityId: community.id }} className="cmy-member-link-row">
                 <Avatar seed={m.user.avatarSeed} style={m.user.avatarStyle} photoDataUrl={m.user.avatarPhotoDataUrl} params={m.user.avatarParams} size="sm" />
-                <span className="cmy-member-name">{m.user.firstName} {m.user.lastName ?? ""}</span>
+                <span className="cmy-member-name">
+                  {m.user.firstName} {m.user.lastName ?? ""}
+                  {canManage && m.screeningAnswer && <span className="cmy-answer">“{m.screeningAnswer}”</span>}
+                </span>
               </Link>
               <MemberNetworkButton
                 userId={m.user.id}

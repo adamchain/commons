@@ -503,6 +503,35 @@ function sharedNetwork(
   return n;
 }
 
+/** Keep the answer even if the request is later declined or the person leaves. */
+function rememberScreeningAnswer(community: CommunityRecord, userId: string, answer: string): void {
+  const text = answer.trim().slice(0, 1000);
+  if (!text) return;
+  const at = new Date().toISOString();
+  const log = (community.screeningLog ?? []).filter((row) => row.userId !== userId);
+  log.push({ userId, answer: text, at });
+  store.updateCommunity(community.id, { screeningLog: log.slice(-200) });
+}
+
+/** Newest answer per person, from the log plus anyone still pending or a member. */
+function screeningAnswersFor(community: CommunityRecord): { userId: string; answer: string; at: string }[] {
+  const byUser = new Map<string, { userId: string; answer: string; at: string }>();
+  const put = (userId: string, answer: string | null | undefined, at: string) => {
+    const text = answer?.trim();
+    if (!text) return;
+    const prev = byUser.get(userId);
+    if (!prev || at >= prev.at) byUser.set(userId, { userId, answer: text, at });
+  };
+  for (const row of community.screeningLog ?? []) put(row.userId, row.answer, row.at);
+  for (const member of [
+    ...store.listActiveCommunityMembers(community.id),
+    ...store.listPendingCommunityMembers(community.id),
+  ]) {
+    put(member.userId, member.screeningAnswer, member.joinedAt);
+  }
+  return [...byUser.values()].sort((a, b) => b.at.localeCompare(a.at));
+}
+
 // GET /api/communities/:id/dashboard — organizer metrics, join/post queue, members.
 communitiesRouter.get("/:id/dashboard", requireAuth, async (req, res) => {
   const viewerId = String(req.userId);
@@ -524,10 +553,12 @@ communitiesRouter.get("/:id/dashboard", requireAuth, async (req, res) => {
   });
   const pending = store.listPendingCommunityMembers(community.id);
   const posts = store.listPendingCommunityPosts(community.id);
+  const screeningRows = screeningAnswersFor(community);
   const users = await findUsersByIds([
     ...active.map((m) => m.userId),
     ...pending.map((m) => m.userId),
     ...posts.map((p) => p.authorId),
+    ...screeningRows.map((row) => row.userId),
     community.organizerId,
   ]);
   const organizer = users.get(community.organizerId);
@@ -555,7 +586,13 @@ communitiesRouter.get("/:id/dashboard", requireAuth, async (req, res) => {
       createdAt: p.createdAt,
       author: publicFor(p.authorId, users),
     })),
-    memberList: active.map((m) => memberDTO(m, users, community.organizerId, false, organizer)),
+    screeningQuestion: community.screeningQuestion?.trim() || null,
+    screeningLog: screeningRows.map((row) => ({
+      user: publicFor(row.userId, users),
+      answer: row.answer,
+      at: row.at,
+    })),
+    memberList: active.map((m) => memberDTO(m, users, community.organizerId, true, organizer)),
     subAccount: (() => {
       const sub = store.findUserByManagedCommunity(community.id);
       if (!sub) return null;
@@ -730,6 +767,7 @@ communitiesRouter.post("/:id/join", requireAuth, async (req, res) => {
       status: "pending",
       screeningAnswer: answer || null,
     });
+    if (answer) rememberScreeningAnswer(community, userId, answer);
     // Notify the organizer (in-app + push). Never fail the join if notify hiccups.
     try {
       await emit({
@@ -950,7 +988,7 @@ communitiesRouter.get("/:id/members", requireAuth, async (req, res) => {
   const viewer = await findUserById(viewerId);
 
   res.json({
-    members: active.map((m) => memberDTO(m, users, community.organizerId, false, viewer)),
+    members: active.map((m) => memberDTO(m, users, community.organizerId, isOrganizer, viewer)),
     pending: pending.map((m) => memberDTO(m, users, community.organizerId, true, viewer)),
   });
 });

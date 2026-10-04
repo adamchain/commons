@@ -23,7 +23,7 @@ import {
 } from "../types/shared.js";
 import { onPlanCreatedVenueNudge, notifyInterestedPlanLocked } from "../lib/nudges.js";
 import { emit } from "../lib/notify.js";
-import { planHasEnded, planRequiresHostApproval, plansOverlap, FLEXIBLE_DATE_PLACEHOLDER, thisWeekAnchorDate } from "../lib/planTime.js";
+import { planEndTimestamp, planHasEnded, planRequiresHostApproval, plansOverlap, FLEXIBLE_DATE_PLACEHOLDER, thisWeekAnchorDate } from "../lib/planTime.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
 import { communityCreationBlockReason } from "../lib/communityAccess.js";
 import { unfurlLink } from "./linkPreview.js";
@@ -34,6 +34,16 @@ export const plansRouter = Router();
 
 function isPlanHost(plan: { creatorId: string; coHostIds?: string[] }, userId: string): boolean {
   return plan.creatorId === userId || (plan.coHostIds ?? []).includes(userId);
+}
+
+/** Host, co-host, or the community organizer — the people who can close the chat. */
+function canCleanupPlanChat(plan: { creatorId: string; coHostIds?: string[]; communityId?: string | null }, userId: string): boolean {
+  if (isPlanHost(plan, userId)) return true;
+  if (!plan.communityId) return false;
+  const community = store.findCommunityById(plan.communityId);
+  if (!community) return false;
+  if (community.organizerId === userId) return true;
+  return store.findUserByManagedCommunity(community.id)?.id === userId;
 }
 
 function planChatOn(plan: { chatEnabled?: boolean } | null | undefined): boolean {
@@ -282,6 +292,25 @@ plansRouter.get("/", requireAuth, async (req, res) => {
     }),
   );
   res.json(summaries);
+});
+
+/** The most recently finished plan whose chat the viewer still hasn't kept or deleted. */
+plansRouter.get("/chat-cleanup-pending", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const pending = store
+    .listPlans()
+    .filter((plan) => {
+      if (plan.chatEnabled === false || plan.chatKeptAt) return false;
+      if (!plan.cancelledAt && !planHasEnded(plan)) return false;
+      return canCleanupPlanChat(plan, userId);
+    })
+    .sort((a, b) => planEndTimestamp(b) - planEndTimestamp(a));
+  const next = pending[0];
+  if (!next) {
+    res.json({ plan: null });
+    return;
+  }
+  res.json({ plan: await planSummary(next, userId) });
 });
 
 plansRouter.post("/", requireAuth, async (req, res) => {
@@ -1632,7 +1661,7 @@ plansRouter.post("/:id/chat-cleanup", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Plan not found" });
     return;
   }
-  if (!isPlanHost(plan, userId)) {
+  if (!canCleanupPlanChat(plan, userId)) {
     res.status(403).json({ error: "Only the host can update the chat" });
     return;
   }

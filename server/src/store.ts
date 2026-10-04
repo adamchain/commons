@@ -486,6 +486,8 @@ export interface CommunityRecord {
   /** Who can see inside (bulletin/events/members). Discovery info stays public either way. */
   visibility: CommunityAccessLevel;
   screeningQuestion?: string | null;
+  /** Answers people gave to the screening question, kept after approve or decline. */
+  screeningLog?: { userId: string; answer: string; at: string }[];
   /** City, neighborhood, or venue chosen at creation. */
   city?: string | null;
   /** Optional admin note captured on rejection, shown to the creator. */

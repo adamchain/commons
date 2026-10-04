@@ -356,6 +356,10 @@ const CommunitySchema = new Schema<CommunityRecord>(
     bulletinRequiresApproval: { type: Boolean, default: false },
     visibility: { type: String, enum: ["everyone", "members_only"], default: "everyone" },
     screeningQuestion: { type: String, default: null },
+    screeningLog: {
+      type: [{ userId: { type: String }, answer: { type: String }, at: { type: String } }],
+      default: undefined,
+    },
     city: { type: String, default: null },
     rejectionNote: { type: String, default: null },
     submittedAt: { type: String, required: true },

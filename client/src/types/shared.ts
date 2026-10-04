@@ -805,6 +805,8 @@ export interface CommunityDashboardDTO {
   growth: { newMembers: number; points: { label: string; count: number }[] };
   requests: (CommunityMemberDTO & { mutualCount: number })[];
   pendingPosts: { id: string; content: string; createdAt: string; author: PublicUser }[];
+  screeningQuestion?: string | null;
+  screeningLog?: { user: PublicUser; answer: string; at: string }[];
   memberList: CommunityMemberDTO[];
   /** Community persona the organizer can switch into. Null until they make one. */
   subAccount: { id: string; firstName: string; avatarPhotoDataUrl?: string } | null;

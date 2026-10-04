@@ -689,6 +689,10 @@ export interface CommunityDashboardDTO {
   growth: { newMembers: number; points: { label: string; count: number }[] };
   requests: (CommunityMemberDTO & { mutualCount: number })[];
   pendingPosts: { id: string; content: string; createdAt: string; author: PublicUser }[];
+  /** Question people answered to join, when the community asks one. */
+  screeningQuestion: string | null;
+  /** Everyone who answered, including people who were declined or later left. */
+  screeningLog: { user: PublicUser; answer: string; at: string }[];
   memberList: CommunityMemberDTO[];
   /** Community persona the organizer can switch into. Null until they make one. */
   subAccount: { id: string; firstName: string; avatarPhotoDataUrl?: string } | null;
