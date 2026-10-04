@@ -41,7 +41,9 @@ export function AvatarCropModal({
     return () => window.removeEventListener("resize", onResize);
   }, []);
   const requested = stageMax > 120 ? stageMax : STAGE_MAX;
-  const frame = Math.min(requested, Math.max(220, viewportW - 64));
+  // Stay inside the dialog. The backdrop and card each pad 20px, so a frame
+  // based on the raw window width used to spill past the card and clip the crop.
+  const frame = Math.min(requested, Math.max(200, viewportW - 88));
   const stageW = safeAspect >= 1 ? frame : Math.round(frame * safeAspect);
   const stageH = safeAspect >= 1 ? Math.round(frame / safeAspect) : frame;
   const outW = outputPx;
@@ -170,7 +172,7 @@ export function AvatarCropModal({
           className="avatar-crop-zoom"
           type="range"
           min={1}
-          max={3}
+          max={4}
           step={0.01}
           value={zoom}
           onChange={(e) => onZoom(Number(e.target.value))}

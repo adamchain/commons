@@ -9399,8 +9399,8 @@ a.action-btn--stack {
 .plan-card-flyer {
   position: relative;
   margin: 0;
-  height: 128px;
-  aspect-ratio: auto;
+  height: auto;
+  aspect-ratio: 3 / 2;
   overflow: hidden;
   border-radius: 20px 20px 0 0;
   background: var(--surface-2);
