@@ -2645,6 +2645,14 @@ export const store = {
     mongoMirror.upsertCommunityPost(row);
     return row;
   },
+  updateCommunityPostContent(id: string, content: string): CommunityPostRecord | undefined {
+    const row = snapshot.communityPosts.find((p) => p.id === id && !p.deletedAt);
+    if (!row) return undefined;
+    row.content = content;
+    persist();
+    mongoMirror.upsertCommunityPost(row);
+    return row;
+  },
   setCommunityPostApprovalStatus(
     id: string,
     status: "approved" | "rejected",

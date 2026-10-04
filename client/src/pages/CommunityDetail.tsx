@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Calendar, Heart, LayoutDashboard, MessageCircle, Send, Users } from "lucide-react";
+import { ArrowLeft, Calendar, Heart, LayoutDashboard, MessageCircle, Pencil, Send, Users } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { ComposerField, MentionText, type MentionPerson } from "../components/ComposerField";
@@ -763,6 +763,9 @@ function BulletinTab({
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyDraft, setReplyDraft] = useState("");
   const [replyBusy, setReplyBusy] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
 
   const load = useCallback(async () => {
     const r = await api<{ posts: CommunityPostDTO[]; pending?: CommunityPostDTO[] }>(
@@ -866,6 +869,85 @@ function BulletinTab({
     }
   }
 
+  function startEdit(p: CommunityPostDTO) {
+    setEditingId(p.id);
+    setEditDraft(p.content);
+    setPostErr(null);
+  }
+
+  async function saveEdit(postId: string) {
+    setEditBusy(true);
+    setPostErr(null);
+    try {
+      await api(`/api/communities/${community.id}/posts/${postId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ content: editDraft.trim() }),
+      });
+      setEditingId(null);
+      setEditDraft("");
+      await load();
+    } catch (e) {
+      setPostErr(parseApiError(e));
+    } finally {
+      setEditBusy(false);
+    }
+  }
+
+  function editControl(p: CommunityPostDTO) {
+    if (user?.id !== p.author.id) return null;
+    return (
+      <button type="button" className="cmy-icon-btn" aria-label="Edit post" onClick={() => startEdit(p)}>
+        <Pencil size={14} strokeWidth={2} aria-hidden="true" />
+      </button>
+    );
+  }
+
+  function postBody(p: CommunityPostDTO) {
+    if (editingId === p.id) {
+      return (
+        <div className="cmy-reply-composer">
+          <textarea
+            className="cmy-input cmy-textarea"
+            value={editDraft}
+            rows={3}
+            maxLength={4000}
+            aria-label="Edit post"
+            onChange={(e) => setEditDraft(e.target.value)}
+          />
+          <button
+            type="button"
+            className="cmy-btn cmy-btn--primary cmy-btn--sm"
+            disabled={editBusy || (!editDraft.trim() && !p.image)}
+            onClick={() => void saveEdit(p.id)}
+          >
+            {editBusy ? "Saving…" : "Save"}
+          </button>
+          <button
+            type="button"
+            className="cmy-btn cmy-btn--ghost cmy-btn--sm"
+            disabled={editBusy}
+            onClick={() => {
+              setEditingId(null);
+              setEditDraft("");
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      );
+    }
+    return (
+      <>
+        {p.content && (
+          <p className="cmy-post-body">
+            <MentionText text={p.content} people={people} />
+          </p>
+        )}
+        {p.image && <img className="cmy-post-image" src={p.image} alt="" loading="lazy" />}
+      </>
+    );
+  }
+
   function postMenu(p: CommunityPostDTO) {
     const canReport = Boolean(user && user.id !== p.author.id);
     if (!p.canDelete && !canReport) return null;
@@ -921,9 +1003,9 @@ function BulletinTab({
                   <Avatar seed={p.author.avatarSeed} style={p.author.avatarStyle} photoDataUrl={p.author.avatarPhotoDataUrl} params={p.author.avatarParams} size="sm" />
                   <span className="cmy-post-name">{p.author.firstName}</span>
                   <span className="cmy-post-time">{formatRelative(p.createdAt)}</span>
+                  {editControl(p)}
                 </div>
-                {p.content && <p className="cmy-post-body"><MentionText text={p.content} people={people} /></p>}
-                {p.image && <img className="cmy-post-image" src={p.image} alt="" loading="lazy" />}
+                {postBody(p)}
                 <div className="cmy-join-row">
                   <button type="button" className="cmy-btn cmy-btn--primary cmy-btn--sm" onClick={() => approve(p.id)}>
                     Approve
@@ -949,10 +1031,12 @@ function BulletinTab({
                   <span className="cmy-post-name">{p.author.firstName}</span>
                   <span className="cmy-pending-badge">Pending</span>
                   <span className="cmy-post-time">{formatRelative(p.createdAt)}</span>
-                  <div className="cmy-post-actions">{postMenu(p)}</div>
+                  <div className="cmy-post-actions">
+                    {editControl(p)}
+                    {postMenu(p)}
+                  </div>
                 </div>
-                {p.content && <p className="cmy-post-body"><MentionText text={p.content} people={people} /></p>}
-                {p.image && <img className="cmy-post-image" src={p.image} alt="" loading="lazy" />}
+                {postBody(p)}
               </li>
             ))}
           </ul>
@@ -976,6 +1060,7 @@ function BulletinTab({
               {p.pinned && <span className="cmy-pinned-label">📌 Pinned</span>}
               <span className="cmy-post-time">{formatRelative(p.createdAt)}</span>
               <div className="cmy-post-actions">
+                {editControl(p)}
                 {community.isOrganizer && (
                   <button type="button" className="cmy-icon-btn" onClick={() => togglePin(p)} title={p.pinned ? "Unpin" : "Pin"}>
                     {p.pinned ? "📌" : "📍"}
@@ -984,8 +1069,7 @@ function BulletinTab({
                 {postMenu(p)}
               </div>
             </div>
-            {p.content && <p className="cmy-post-body"><MentionText text={p.content} people={people} /></p>}
-            {p.image && <img className="cmy-post-image" src={p.image} alt="" loading="lazy" />}
+            {postBody(p)}
             {(p.replies?.length ?? 0) > 0 && (
               <ul className="cmy-reply-list">
                 {(p.replies ?? []).map((r) => (
@@ -995,9 +1079,10 @@ function BulletinTab({
                       <div className="cmy-reply-top">
                         <span className="cmy-post-name">{r.author.firstName}</span>
                         <span className="cmy-post-time">{formatRelative(r.createdAt)}</span>
+                        {editControl(r)}
                         {postMenu(r)}
                       </div>
-                      {r.content && <p className="cmy-post-body"><MentionText text={r.content} people={people} /></p>}
+                      {postBody(r)}
                     </div>
                   </li>
                 ))}

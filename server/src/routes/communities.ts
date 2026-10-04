@@ -1384,6 +1384,43 @@ communitiesRouter.post("/:id/posts/:postId/like", requireAuth, async (req, res) 
   res.json({ id: post.id, ...stats });
 });
 
+// PATCH /api/communities/:id/posts/:postId — author edits their own post or reply.
+communitiesRouter.patch("/:id/posts/:postId", requireAuth, async (req, res) => {
+  const viewerId = String(req.userId);
+  const community = store.findCommunityById(String(req.params.id));
+  if (!community) {
+    res.status(404).json({ error: "Community not found" });
+    return;
+  }
+  const post = store.findCommunityPostById(String(req.params.postId));
+  if (!post || post.communityId !== community.id) {
+    res.status(404).json({ error: "Post not found" });
+    return;
+  }
+  if (post.authorId !== viewerId) {
+    res.status(403).json({ error: "You can only edit your own posts" });
+    return;
+  }
+  const content = String(req.body?.content ?? "").trim().slice(0, 4000);
+  if (!content && !post.image) {
+    res.status(400).json({ error: "Write something to post" });
+    return;
+  }
+  const filtered = textBlockedReason(content);
+  if (filtered) {
+    res.status(400).json({ error: filtered });
+    return;
+  }
+  const updated = store.updateCommunityPostContent(post.id, content);
+  if (!updated) {
+    res.status(404).json({ error: "Post not found" });
+    return;
+  }
+  const users = await findUsersByIds([updated.authorId]);
+  const viewerIsOrganizer = isCommunityOrganizer(community, viewerId);
+  res.json(postDTO(updated, users, community.organizerId, viewerId, viewerIsOrganizer));
+});
+
 // DELETE /api/communities/:id/posts/:postId — author deletes own; organizer any.
 communitiesRouter.delete("/:id/posts/:postId", requireAuth, async (req, res) => {
   const viewerId = String(req.userId);
