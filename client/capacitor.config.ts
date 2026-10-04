@@ -4,8 +4,10 @@ const config: CapacitorConfig = {
   appId: "com.oncommons.mvp",
   appName: "Commons",
   webDir: "dist",
+  backgroundColor: "#f0e9df",
   ios: {
     contentInset: "never",
+    backgroundColor: "#f0e9df",
   },
   plugins: {
     PushNotifications: {

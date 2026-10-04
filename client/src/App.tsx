@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { App as CapApp } from "@capacitor/app";
 import { useAuth } from "./context/AuthContext";
@@ -46,9 +46,6 @@ import { SettingsForumsPage } from "./pages/SettingsForums";
 import { CreateCommunityPage } from "./pages/CreateCommunity";
 import { HelpChatPage } from "./pages/HelpChat";
 
-const APP_BOOT_AT = Date.now();
-const MIN_BOOT_SPLASH_MS = 600;
-
 function Protected({
   children,
   allowIncomplete = false,
@@ -58,18 +55,9 @@ function Protected({
 }) {
   const { user, loading } = useAuth();
   const location = useLocation();
-  const [bootSplashDone, setBootSplashDone] = useState(
-    () => Date.now() - APP_BOOT_AT >= MIN_BOOT_SPLASH_MS,
-  );
-  useEffect(() => {
-    if (bootSplashDone) return;
-    const remaining = MIN_BOOT_SPLASH_MS - (Date.now() - APP_BOOT_AT);
-    const t = setTimeout(() => setBootSplashDone(true), Math.max(0, remaining));
-    return () => clearTimeout(t);
-  }, [bootSplashDone]);
   // Cold start only. If we already have a session, never flash the COMMONS
   // splash on in-app navigations (Settings, etc.).
-  if (!user && (loading || !bootSplashDone)) {
+  if (!user && loading) {
     return <LoadingScreen simple tagline="A place for plans meant to be shared." />;
   }
   // The app is iOS-only; on the web there's nothing to sign into, so send
