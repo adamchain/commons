@@ -12,6 +12,7 @@ import {
   MapPin,
   MessageCircle,
   MoreHorizontal,
+  Plus,
   Share2,
   UserMinus,
   UserPlus,
@@ -1453,12 +1454,22 @@ function NetworkCard({ network }: { network: PublicUser[] | null }) {
   const isEmpty = count === 0;
   return (
     <div className="profile-network-card">
-      <Link to="/network" className="profile-network-card-head">
-        <span className="profile-network-card-label">Network</span>
-        <span className="profile-network-card-count">
-          {count} {count === 1 ? "person" : "people"}
-        </span>
-      </Link>
+      <div className="profile-network-card-head">
+        <Link to="/network" state={{ from: "profile" }} className="profile-network-card-head-link">
+          <span className="profile-network-card-label">Network</span>
+          <span className="profile-network-card-count">
+            {count} {count === 1 ? "person" : "people"}
+          </span>
+        </Link>
+        <Link
+          to="/network?add=1"
+          state={{ from: "profile" }}
+          className="profile-network-add"
+          aria-label="Find people"
+        >
+          <Plus size={18} strokeWidth={2.2} aria-hidden="true" />
+        </Link>
+      </div>
       <Link to="/network" className="profile-network-card-slots" aria-hidden="true">
         {firstFive.map((u) => (
           <span key={u.id} className="profile-network-slot profile-network-slot--filled">
@@ -1482,7 +1493,7 @@ function NetworkCard({ network }: { network: PublicUser[] | null }) {
           <p className="profile-network-card-empty">
             Your people aren't here yet — find them or invite them.
           </p>
-          <Link to="/network?add=1" className="btn-primary btn-block profile-network-card-invite">
+          <Link to="/network?add=1" state={{ from: "profile" }} className="btn-primary btn-block profile-network-card-invite">
             Add people
           </Link>
           <Link to="/invite" className="btn-link profile-network-card-seeall">
@@ -1491,10 +1502,10 @@ function NetworkCard({ network }: { network: PublicUser[] | null }) {
         </>
       ) : (
         <div className="profile-network-card-links">
-          <Link to="/network?add=1" className="btn-link profile-network-card-seeall">
+          <Link to="/network?add=1" state={{ from: "profile" }} className="btn-link profile-network-card-seeall">
             Add people
           </Link>
-          <Link to="/network" className="btn-link profile-network-card-seeall">
+          <Link to="/network" state={{ from: "profile" }} className="btn-link profile-network-card-seeall">
             See all →
           </Link>
         </div>

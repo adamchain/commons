@@ -4901,12 +4901,31 @@ a.action-btn--stack {
 /* Network card (profile menu) — matches the wireframe. */
 .profile-network-card-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 14px;
+}
+.profile-network-card-head-link {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
   text-decoration: none;
   color: inherit;
+}
+.profile-network-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--red);
+  color: #fff;
+  flex-shrink: 0;
 }
 .profile-network-card-label {
   font-size: var(--text-body-small);
@@ -8875,6 +8894,8 @@ a.action-btn--stack {
 .top-bar-icon-btn--avatar .avatar {
   display: block;
   flex-shrink: 0;
+  width: 28px;
+  height: 28px;
 }
 
 /* Small unread dot on the notifications bell — driven by real unread state. */
@@ -10280,7 +10301,7 @@ a.action-btn--stack {
 .bottom-nav > a:nth-child(1) { justify-self: start; }
 .bottom-nav > a:nth-child(3) { justify-self: end; }
 
-/* Five-slot layout: Home · Explore · + · Messages · Profile. Even columns,
+/* Five-slot layout: Home · Communities · + · Messages · Network. Even columns,
    each tab centered in its cell. */
 .bottom-nav--five {
   grid-template-columns: repeat(2, 1fr) auto repeat(2, 1fr);
@@ -10395,8 +10416,8 @@ a.action-btn--stack {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   background: var(--red);
   color: #fff;
@@ -10410,8 +10431,8 @@ a.action-btn--stack {
 }
 
 .bottom-nav-cta svg {
-  width: 20px;
-  height: 20px;
+  width: 28px;
+  height: 28px;
   color: #fff;
 }
 

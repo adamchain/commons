@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Users } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
@@ -27,8 +27,10 @@ type Row = {
  */
 export function NetworkPage() {
   const { user } = useAuth();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const adding = searchParams.get("add") === "1";
+  const fromProfile = (location.state as { from?: string } | null)?.from === "profile";
   const searchRef = useRef<HTMLInputElement>(null);
   const [network, setNetwork] = useState<NetworkMember[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -120,11 +122,13 @@ export function NetworkPage() {
 
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar network-page">
-      <header className="app-header app-header--minimal">
-        <Link to={profileTo} className="back-circle" aria-label="Back">
-          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
-        </Link>
-      </header>
+      {(adding || fromProfile) && (
+        <header className="app-header app-header--minimal">
+          <Link to={adding && fromProfile ? "/network" : profileTo} state={fromProfile ? { from: "profile" } : undefined} className="back-circle" aria-label="Back">
+            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
+          </Link>
+        </header>
+      )}
       <ScreenTitle title={adding ? "Add people" : "My network"} subtitle={adding ? "Search by name, then connect." : undefined} />
 
       <div className="network-search-wrap">

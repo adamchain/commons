@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Users, Plus, MessageCircle } from "lucide-react";
+import { Home, UserRound, Users, Plus, MessageCircle } from "lucide-react";
 import { api } from "../api/http";
-import { Avatar } from "./Avatar";
 import { useAuth } from "../context/AuthContext";
 import { needsOnboarding } from "../lib/onboarding";
 import type { ConversationSummaryDTO } from "../types/shared";
 
 /**
- * Bottom nav — Home · Communities · Plus (create) · MessageCircle · User.
+ * Bottom nav — Home · Communities · Plus (create) · Messages · Network.
  * Height 58px, bg card, borderTop border. Active = red; inactive = faint.
  * Plus: 44×44 circle, red, icon 20 white.
  */
@@ -65,8 +64,6 @@ export function BottomNav() {
     needsOnboarding(user);
   if (hide) return null;
 
-  const profileTo = user ? `/profile/${user.id}` : "/onboarding";
-
   return (
     <nav className="bottom-nav bottom-nav--five" aria-label="Primary">
       <NavLink
@@ -100,7 +97,7 @@ export function BottomNav() {
       </NavLink>
 
       <NavLink to="/plans/new" className="bottom-nav-cta" aria-label="Make a plan">
-        <Plus size={20} strokeWidth={2.2} color="white" />
+        <Plus size={28} strokeWidth={2.2} color="white" />
       </NavLink>
 
       <NavLink
@@ -118,25 +115,14 @@ export function BottomNav() {
       </NavLink>
 
       <NavLink
-        to={profileTo}
+        to="/network"
         className={({ isActive }) => `bottom-nav-item ${isActive ? "is-active" : ""}`}
-        aria-label="Your profile"
+        aria-label="Network"
       >
         <span className="bottom-nav-icon-wrap">
-          {user ? (
-            <Avatar
-              seed={user.avatarSeed}
-              style={user.avatarStyle}
-              photoDataUrl={user.avatarPhotoDataUrl}
-              params={user.avatarParams}
-              name={user.firstName || undefined}
-              size="xs"
-            />
-          ) : (
-            <span className="bottom-nav-avatar-placeholder" aria-hidden="true" />
-          )}
+          <UserRound size={22} strokeWidth={1.6} />
         </span>
-        <span className="bottom-nav-label">Profile</span>
+        <span className="bottom-nav-label">Network</span>
       </NavLink>
     </nav>
   );
