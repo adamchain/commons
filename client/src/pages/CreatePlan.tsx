@@ -672,7 +672,7 @@ export function CreatePlanPage() {
           coHostIds: inviteUserId ? [inviteUserId] : undefined,
           visibility: form.visibility,
           capacity: capacityNum,
-          joinType: capacityNum !== null ? "approve" : "open",
+          joinType: capacityNum !== null && form.joinType === "approve" ? "approve" : "open",
           isRecurring: form.recurrence !== "none",
           recurrence: form.recurrence,
           repeatDays:
@@ -742,7 +742,7 @@ export function CreatePlanPage() {
           isThisWeek: Boolean(form.isThisWeek) && !form.isFlexibleDate,
           visibility: form.visibility,
           capacity: capacityNum,
-          joinType: capacityNum !== null ? "approve" : "open",
+          joinType: capacityNum !== null && form.joinType === "approve" ? "approve" : "open",
           flyerDataUrl: form.flyerDataUrl ?? null,
           flyerLinkUrl: normalizeHttpUrl(form.flyerLinkUrl) ?? null,
           flyerLinkPreview: form.flyerLinkPreview ?? null,
@@ -825,7 +825,7 @@ export function CreatePlanPage() {
           isFlexibleTime: form.isFlexibleTime,
           visibility: form.visibility,
           capacity: capacityNum,
-          joinType: capacityNum !== null ? "approve" : "open",
+          joinType: capacityNum !== null && form.joinType === "approve" ? "approve" : "open",
           flyerDataUrl: form.flyerDataUrl ?? null,
           flyerLinkUrl: normalizeHttpUrl(form.flyerLinkUrl) ?? null,
           hostEmoji: VIBE_OPTIONS.find((o) => o.id === form.vibes[0])?.emoji ?? "✨",
@@ -1600,9 +1600,25 @@ export function CreatePlanPage() {
               )}
 
               {form.capacityOn && (
-                <p className="form-help" style={{ marginTop: 8 }}>
-                  People apply as Interested. You review and let them in.
-                </p>
+                <div className="form-row-flex" style={{ marginTop: 12 }}>
+                  <div className="form-row-flex-main">
+                    <label className="form-question">Approve who joins</label>
+                    <p className="form-help">
+                      {form.joinType === "approve"
+                        ? "People tap Interested. You let them in."
+                        : "People tap Join until it's full."}
+                    </p>
+                  </div>
+                  <FlexToggle
+                    active={form.joinType === "approve"}
+                    variant="switch"
+                    label="Approve who joins"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setForm((f) => ({ ...f, joinType: f.joinType === "approve" ? "open" : "approve" }));
+                    }}
+                  />
+                </div>
               )}
             </section>
 

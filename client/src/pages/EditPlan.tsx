@@ -235,7 +235,7 @@ function EditForm({
           neighborhoodId: form.neighborhoodId || undefined,
           isFlexibleLocation: form.isFlexibleLocation,
           capacity: capacityNum,
-          joinType: capacityNum !== null ? "approve" : "open",
+          joinType: capacityNum !== null && form.joinType === "approve" ? "approve" : "open",
           visibility: form.visibility,
           chatEnabled: form.chatEnabled,
         }),
@@ -635,9 +635,29 @@ function EditForm({
             </button>
           </div>
           {form.capacityOn && (
-            <p className="form-help" style={{ marginTop: 8 }}>
-              People apply as Interested. You review and let them in.
-            </p>
+            <div className="form-row-flex" style={{ marginTop: 12 }}>
+              <div className="form-row-flex-main">
+                <label className="form-question">Approve who joins</label>
+                <p className="form-help">
+                  {form.joinType === "approve"
+                    ? "People tap Interested. You let them in."
+                    : "People tap Join until it's full."}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                className={`flex-switch ${form.joinType === "approve" ? "is-on" : ""}`}
+                aria-checked={form.joinType === "approve"}
+                aria-label="Approve who joins"
+                onClick={() => {
+                  lastInstantGroup.current = "who";
+                  setForm((f) => ({ ...f, joinType: f.joinType === "approve" ? "open" : "approve" }));
+                }}
+              >
+                <span className="flex-switch-knob" />
+              </button>
+            </div>
           )}
         </section>
 

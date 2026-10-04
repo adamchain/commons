@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
 import type { JoinType, ParticipationState, PlanKind } from "../types/shared";
-import { isPlanAtCapacity, planCapacityValue } from "../lib/planTime";
+import { isPlanAtCapacity } from "../lib/planTime";
 import { JoinConfirmPopup, joinConfirmKind, type JoinConfirmKind } from "./JoinConfirmPopup";
 import { BottomSheet } from "./ui/BottomSheet";
 
@@ -167,12 +167,9 @@ export function ParticipationButtons({
   const interestedActive = state === "interested";
   const loose = planKind === "looking_for";
   const isFull = !isHosting && isPlanAtCapacity(capacity, goingCount) && !goingActive;
-  const isApproveOnly =
-    !isHosting &&
-    (joinType === "approve" || planCapacityValue(capacity) !== null) &&
-    !goingActive;
-  // A capped or host-review plan can't take a direct Join. Everything else,
-  // including ideas, offers Join and Interested together.
+  const isApproveOnly = !isHosting && joinType === "approve" && !goingActive;
+  // Approval means Interested until the host lets you in. A full plan does too.
+  // An open plan with room offers Join, even when it has a capacity.
   const interestedOnly = (isFull || isApproveOnly) && !goingActive;
 
   return (

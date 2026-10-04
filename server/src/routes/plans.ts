@@ -469,8 +469,8 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   if (typeof rawCapacity === "number" && Number.isFinite(rawCapacity) && rawCapacity > 0) {
     capacity = Math.floor(rawCapacity);
   }
-  // Capacity always means host-review: joiners apply as Interested.
-  const joinType: JoinType = capacity !== null ? "approve" : "open";
+  // Capacity is a headcount. Approval is a separate choice: Interested until the host lets them in.
+  const joinType: JoinType = capacity !== null && req.body?.joinType === "approve" ? "approve" : "open";
 
   // Co-hosts — "make a plan with X" co-creates with the picked person. Validate
   // they're real users, never include the creator, cap at a sane number.
@@ -733,7 +733,12 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
     else if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {
       patch.capacity = Math.floor(raw);
     }
-    patch.joinType = patch.capacity ? "approve" : "open";
+  }
+  const nextCapacity = patch.capacity !== undefined ? patch.capacity : plan.capacity ?? null;
+  if (!nextCapacity) {
+    patch.joinType = "open";
+  } else if (req.body?.joinType === "approve" || req.body?.joinType === "open") {
+    patch.joinType = req.body.joinType;
   }
   if (req.body?.flyerDataUrl !== undefined) {
     const raw = req.body.flyerDataUrl;
@@ -1135,7 +1140,10 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
   }
   if (capacity !== undefined) patch.capacity = capacity;
   const lockedCapacity = capacity !== undefined ? capacity : plan.capacity;
-  patch.joinType = lockedCapacity ? "approve" : "open";
+  if (!lockedCapacity) patch.joinType = "open";
+  else if (req.body?.joinType === "approve" || req.body?.joinType === "open") {
+    patch.joinType = req.body.joinType;
+  }
   if (req.body?.neighborhoodId !== undefined) {
     const hood = store.resolveNeighborhoodId(String(req.body.neighborhoodId ?? "").trim());
     if (hood) patch.neighborhoodId = hood;
