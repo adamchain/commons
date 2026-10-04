@@ -2811,6 +2811,9 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   font-size: var(--text-body-small);
   color: var(--danger);
 }
+.create-plan-photo-error {
+  margin: 8px 16px 0;
+}
 
 /* Failed post — keeps the draft on screen and offers a one-tap retry (req 6.8). */
 .form-error-banner {

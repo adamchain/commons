@@ -494,8 +494,12 @@ plansRouter.post("/", requireAuth, async (req, res) => {
         ).slice(0, 80)
       : [];
 
-  // Optional flyer — uploaded data URL or library https cover.
+  // Cover photo is required to post a plan.
   const flyerDataUrl = normalizeFlyerDataUrl(req.body?.flyerDataUrl);
+  if (!flyerDataUrl) {
+    res.status(400).json({ error: "A photo is required." });
+    return;
+  }
 
   // Optional shareable link. Preview text and image are fetched here, not
   // taken from the client, so a pasted link can't smuggle arbitrary content.
@@ -1078,8 +1082,8 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
     }
   }
 
-  // Optional cover chosen at lock-in (upload or library). Null clears; omit
-  // leaves the existing flyer alone.
+  // Cover chosen at lock-in (upload or library). Null clears; omit leaves the
+  // existing flyer alone. A plan still needs a photo once it's locked in.
   const flyerInBody = req.body?.flyerDataUrl;
   const flyerPatch =
     flyerInBody === null || flyerInBody === ""
@@ -1090,6 +1094,11 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
             return normalized ? { flyerDataUrl: normalized } : {};
           })()
         : {};
+  const nextFlyer = "flyerDataUrl" in flyerPatch ? flyerPatch.flyerDataUrl : plan.flyerDataUrl;
+  if (!nextFlyer) {
+    res.status(400).json({ error: "A photo is required." });
+    return;
+  }
 
   // Keep planKind as looking_for after a lock so the card on the feed shows
   // "Plan created" rather than becoming an indistinguishable confirmed plan —

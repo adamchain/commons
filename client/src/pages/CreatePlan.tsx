@@ -597,6 +597,7 @@ export function CreatePlanPage() {
       ? "Enter a number of spots, or turn off the limit."
       : null;
   const titleError = !form.title.trim() ? "Give your plan a title." : null;
+  const photoError = !form.flyerDataUrl ? "A photo is required." : null;
 
   // F.6 — flag exactly what's missing inline, next to the field, and scroll
   // it into view, instead of leaving the host to guess from a generic bottom
@@ -604,6 +605,10 @@ export function CreatePlanPage() {
   const validate = (): boolean => {
     setError(null);
     setAttemptedSubmit(true);
+    if (photoError) {
+      document.getElementById("create-plan-cover")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return false;
+    }
     if (titleError) {
       titleInputRef.current?.focus();
       titleInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1124,7 +1129,7 @@ export function CreatePlanPage() {
         </button>
       </header>
       <form id="create-plan-form" onSubmit={submit}>
-      <div className={`plan-detail-hero${form.flyerDataUrl ? "" : " plan-detail-hero--empty"}`}>
+      <div id="create-plan-cover" className={`plan-detail-hero${form.flyerDataUrl ? "" : " plan-detail-hero--empty"}`}>
         {form.flyerDataUrl && <img src={form.flyerDataUrl} alt="" />}
         {form.flyerDataUrl ? (
           <div className="plan-detail-hero-cover-overlay">
@@ -1148,7 +1153,6 @@ export function CreatePlanPage() {
         ) : coverPickerOpen ? (
           <div className="plan-detail-hero-cover-empty">
             <span className="cover-picker-title">Add a cover photo</span>
-            <span className="cover-picker-sub">Optional</span>
             <div className="cover-picker-buttons">
               <button type="button" className="cover-btn" onClick={() => setShowCoverLib(true)}>
                 <ImagePlus size={16} strokeWidth={1.8} aria-hidden="true" />
@@ -1162,7 +1166,7 @@ export function CreatePlanPage() {
         ) : (
           <button type="button" className="plan-detail-hero-cover-cta" onClick={() => setCoverPickerOpen(true)}>
             <Camera size={18} strokeWidth={1.8} aria-hidden="true" />
-            Add a cover photo (optional)
+            Add a cover photo
           </button>
         )}
         <input
@@ -1177,6 +1181,9 @@ export function CreatePlanPage() {
           }}
         />
       </div>
+      {attemptedSubmit && photoError && (
+        <p className="luma-inline-error create-plan-photo-error">{photoError}</p>
+      )}
 
       <div className="plan-detail-body">
       {(inviteUserId && inviteUserName) || inviteNames.length > 0 || lockFromId ? (
@@ -2083,6 +2090,7 @@ function IdeaForm({
         </div>
         {titleMissing && <p className="luma-inline-error">Add a few words about the idea.</p>}
 
+        <div id="create-plan-cover">
         {form.flyerDataUrl ? (
           <div className="cover-picker cover-picker--filled idea-cover-picker">
             <img className="cover-picker-img" src={form.flyerDataUrl} alt="" />
@@ -2108,7 +2116,6 @@ function IdeaForm({
         ) : coverPickerOpen ? (
           <div className="cover-picker idea-cover-picker">
             <span className="cover-picker-title">Add a cover photo</span>
-            <span className="cover-picker-sub">Optional</span>
             <div className="cover-picker-buttons">
               <button type="button" className="cover-btn" onClick={onOpenLibrary}>
                 <ImagePlus size={16} strokeWidth={1.8} aria-hidden="true" />
@@ -2126,9 +2133,13 @@ function IdeaForm({
             onClick={() => setCoverPickerOpen(true)}
           >
             <Camera size={16} strokeWidth={1.8} aria-hidden="true" />
-            Add a cover photo (optional)
+            Add a cover photo
           </button>
         )}
+        {attemptedSubmit && !form.flyerDataUrl && (
+          <p className="luma-inline-error">A photo is required.</p>
+        )}
+        </div>
 
         <p className="form-eyebrow">Settings</p>
         <div className="settings-card">
