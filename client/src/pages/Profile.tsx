@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState, type ReactElement } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { AvatarCropModal } from "../components/AvatarCropModal";
 import { CommunityStatusPill } from "../components/CommunityStatusPill";
 import { CommunityCoverThumb, PlanCoverThumb, planPhotoUrl } from "../components/CoverThumb";
 import { LinkedText } from "../components/LinkedText";
@@ -27,6 +28,9 @@ import { ReportModal } from "../components/PlanSafetyMenu";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanWhenLine } from "../lib/format";
+import { fileToResizedDataUrl } from "../lib/imageResize";
+import { isNative } from "../lib/platform";
+import { pickPhotoNative } from "../lib/photoPicker";
 import { isIdeaPlan } from "../lib/planTime";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import {
@@ -124,7 +128,22 @@ export function ProfilePage() {
   const [actionSheetOpen, setActionSheetOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [showProfileTip, setShowProfileTip] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const photoRef = useRef<HTMLInputElement>(null);
   const isSelf = user?.id === userId;
+
+  async function openPhotoEditor() {
+    if (isNative()) {
+      try {
+        const dataUrl = await pickPhotoNative({ maxPx: 1600, quality: 0.9 });
+        if (dataUrl) setCropSrc(dataUrl);
+      } catch {
+        /* canceled */
+      }
+      return;
+    }
+    photoRef.current?.click();
+  }
 
   const reloadProfile = () =>
     void api<ProfilePayload>(`/api/profile/${userId}`).then(setProfile).catch(() => setProfile(null));
@@ -487,10 +506,11 @@ export function ProfilePage() {
     <main className="app-shell app-shell--with-nav app-shell--with-topbar profile-shell">
       <section className="profile-hero">
         <div className="profile-hero-main">
-          <Link
-            to={`/profile/${userId}/edit`}
+          <button
+            type="button"
             className="profile-hero-avatar-btn"
             aria-label="Update profile photo"
+            onClick={() => void openPhotoEditor()}
           >
             <Avatar
               seed={profile.user.avatarSeed}
@@ -503,7 +523,21 @@ export function ProfilePage() {
             <span className="profile-hero-avatar-edit" aria-hidden="true">
               <Camera size={11} strokeWidth={2} />
             </span>
-          </Link>
+          </button>
+          <input
+            ref={photoRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              fileToResizedDataUrl(f, 1600, 0.9)
+                .then(setCropSrc)
+                .catch(() => undefined);
+              if (photoRef.current) photoRef.current.value = "";
+            }}
+          />
           <div className="profile-hero-text">
             <div className="profile-name">{displayName}</div>
             {locationLabel && (
@@ -525,7 +559,7 @@ export function ProfilePage() {
                 </div>
               </div>
               <Link to={`/profile/${userId}/edit`} className="profile-edit-btn">
-                Edit
+                Edit Profile
               </Link>
             </div>
           </div>
@@ -636,6 +670,26 @@ export function ProfilePage() {
           <span className="settings-feedback-sub">Tell us what's working and what's not</span>
         </span>
       </a>
+
+      {cropSrc && (
+        <AvatarCropModal
+          src={cropSrc}
+          outputPx={512}
+          onCancel={() => setCropSrc(null)}
+          onConfirm={(dataUrl) => {
+            setCropSrc(null);
+            void api<MeDTO>("/api/auth/me", {
+              method: "PATCH",
+              body: JSON.stringify({ avatarPhotoDataUrl: dataUrl, avatarParams: null }),
+            })
+              .then((next) => {
+                setUser(next);
+                reloadProfile();
+              })
+              .catch(() => undefined);
+          }}
+        />
+      )}
 
       {showProfileTip && (
         <BottomSheet onClose={dismissProfileTip}>
@@ -1167,6 +1221,17 @@ function FriendButton({
 }
 
 
+function PlansEmpty() {
+  return (
+    <div className="profile-plans-empty">
+      <p className="profile-plans-empty-title">This is where your plans live!</p>
+      <Link to="/" className="btn-primary profile-plans-empty-btn">
+        Make or join a plan
+      </Link>
+    </div>
+  );
+}
+
 function MonthCalendar({ plans, profileUserId }: { plans: PlanDTO[]; profileUserId: string }) {
   const profileBack: NavFromState = { from: "profile", profileUserId };
   const [monthOffset, setMonthOffset] = useState(0);
@@ -1318,7 +1383,10 @@ function YourPlansBlock({
       )}
 
       {view === "calendar" && (
-        <MonthCalendar plans={upcoming} profileUserId={profileUserId} />
+        <>
+          <MonthCalendar plans={upcoming} profileUserId={profileUserId} />
+          {isSelf && upcoming.length === 0 && <PlansEmpty />}
+        </>
       )}
 
       {view === "list" && (
@@ -1363,11 +1431,11 @@ function YourPlansBlock({
                 </button>
               )}
             </div>
+          ) : isSelf ? (
+            <PlansEmpty />
           ) : (
             <p className="empty-state" style={{ marginTop: 8 }}>
-              {isSelf
-                ? "Quiet calendar — go join something, or post your own."
-                : "Quiet over here."}
+              Quiet over here.
             </p>
           )}
 

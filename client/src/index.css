@@ -4797,6 +4797,22 @@ a.action-btn--stack {
   font-size: var(--text-body-small);
   margin-top: 6px;
 }
+.profile-plans-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 8px;
+}
+.profile-plans-empty-title {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 700;
+  color: var(--ink);
+}
+.profile-plans-empty-btn {
+  text-decoration: none;
+}
 .profile-edit-btn {
   flex-shrink: 0;
   border: 1.5px solid var(--tan-mid);
@@ -15620,12 +15636,13 @@ button.xpl-photo-tile {
 }
 .profile-other-ctas {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
   margin-bottom: 0;
 }
 .profile-other-cta {
-  flex: 1 1 0;
+  flex: none;
+  width: 100%;
   min-width: 0;
   display: inline-flex;
   align-items: center;
