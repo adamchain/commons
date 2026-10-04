@@ -1292,6 +1292,7 @@ plansRouter.put("/:id/participation", requireAuth, async (req, res) => {
         body,
         planId: plan.id,
         profileUserId: userId,
+        ...(plan.communityId ? { communityId: plan.communityId } : {}),
         dedupKey: hostId === plan.creatorId ? dedupKey : `${dedupKey}:${hostId}`,
       });
     }

@@ -479,6 +479,15 @@ export interface NotificationDTO {
   profileUserId?: string;
   /** Present on community notifications — links to the community page. */
   communityId?: string;
+  /** Person the row is about, when the event has one. Photos stay off data-URL blobs that would blow up the list. */
+  actor?: {
+    id: string;
+    firstName: string;
+    avatarSeed: string;
+    avatarStyle?: AvatarStyle;
+    avatarParams?: string;
+    avatarPhotoDataUrl?: string;
+  };
   createdAt: string;
   readAt: string | null;
 }

@@ -19,9 +19,18 @@ function pathForPushData(data: unknown): string | null {
   if (d.kind === "communityPostPending" && d.communityId) {
     return `/communities/${d.communityId}/dashboard?section=bulletin`;
   }
+  if (d.kind === "newGroupChatMessage" && d.profileUserId && !d.planId) return `/dm/${d.profileUserId}`;
   if (d.conversationId && d.planId) return `/plans/${d.planId}/chat`;
-  if (d.communityId) return `/communities/${d.communityId}`;
+  if (
+    d.communityId &&
+    (d.kind === "communityRequestApproved" ||
+      d.kind === "communityRequestDeclined" ||
+      d.kind === "communityPlanPosted")
+  ) {
+    return `/communities/${d.communityId}`;
+  }
   if (d.planId) return `/plans/${d.planId}`;
+  if (d.communityId) return `/communities/${d.communityId}`;
   return null;
 }
 

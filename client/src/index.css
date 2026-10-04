@@ -9646,7 +9646,7 @@ a.action-btn--stack {
 .notif-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   margin-bottom: 18px;
 }
@@ -9772,6 +9772,20 @@ a.action-btn--stack {
   gap: 8px;
 }
 
+.notif-section-label {
+  margin: 4px 2px 0;
+  font-size: var(--text-micro);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.notif-list,
+.notif-row {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
 .notif-row {
   display: grid;
   grid-template-columns: auto 1fr auto auto;
@@ -9783,6 +9797,15 @@ a.action-btn--stack {
   border-radius: 14px;
   color: var(--text);
   transition: background 120ms ease;
+}
+.notif-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.notif-row-decline {
+  border-color: var(--border);
+  color: var(--text);
 }
 .notif-row--grabs {
   border-color: rgba(var(--accent-rgb), 0.35);
@@ -10643,6 +10666,22 @@ a.action-btn--stack {
 }
 .settings-row:hover {
   background: var(--surface-2);
+}
+.settings-row-action {
+  appearance: none;
+  border: 1px solid var(--red);
+  background: transparent;
+  color: var(--red);
+  border-radius: var(--r-control);
+  padding: 6px 10px;
+  font-size: var(--text-caption);
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.settings-row-action:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 .settings-row-icon {
   flex-shrink: 0;

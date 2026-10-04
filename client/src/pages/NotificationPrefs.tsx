@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { PushNotifications } from "@capacitor/push-notifications";
 import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { useAuth } from "../context/AuthContext";
+import { ensurePushRegistered } from "../lib/push";
+import { isNative } from "../lib/platform";
 import {
   DEFAULT_NOTIFICATION_PREFS,
   type MeDTO,
@@ -124,11 +127,7 @@ export function NotificationPrefsPage() {
       </Group>
 
       <Group label="How">
-        <InfoRow
-          icon="🔔"
-          title="Push notifications"
-          sub="On"
-        />
+        <PushSetupRow />
         <InfoRow
           icon="💬"
           title="SMS"
@@ -196,6 +195,64 @@ function ToggleRow({
           aria-label={title}
         />
       </label>
+    </div>
+  );
+}
+
+function PushSetupRow() {
+  const [status, setStatus] = useState<"checking" | "granted" | "denied" | "prompt" | "web">("checking");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!isNative()) {
+      setStatus("web");
+      return;
+    }
+    void PushNotifications.checkPermissions()
+      .then((s) => {
+        setStatus(s.receive === "granted" ? "granted" : s.receive === "denied" ? "denied" : "prompt");
+      })
+      .catch(() => setStatus("prompt"));
+  }, []);
+
+  async function enable() {
+    setBusy(true);
+    try {
+      await ensurePushRegistered();
+      const s = await PushNotifications.checkPermissions();
+      setStatus(s.receive === "granted" ? "granted" : s.receive === "denied" ? "denied" : "prompt");
+    } catch {
+      setStatus("prompt");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const sub =
+    status === "granted"
+      ? "On"
+      : status === "denied"
+        ? "Off — allow Commons in iOS Settings"
+        : status === "web"
+          ? "Turn these on in the iOS app"
+          : status === "checking"
+            ? "Checking…"
+            : "Off";
+
+  return (
+    <div className="settings-row">
+      <span className="settings-row-icon" aria-hidden="true">
+        <span style={{ fontSize: 18 }}>🔔</span>
+      </span>
+      <div className="settings-row-body">
+        <div className="settings-row-title">Push notifications</div>
+        <div className="settings-row-sub" style={{ whiteSpace: "normal" }}>{sub}</div>
+      </div>
+      {status === "prompt" && (
+        <button type="button" className="settings-row-action" disabled={busy} onClick={() => void enable()}>
+          {busy ? "Turning on…" : "Turn on"}
+        </button>
+      )}
     </div>
   );
 }

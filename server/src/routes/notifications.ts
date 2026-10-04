@@ -1,26 +1,43 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { store } from "../store.js";
+import { findUsersByIds } from "../userRepo.js";
 import type { NotificationDTO } from "../types/shared.js";
 
 export const notificationsRouter = Router();
 
-notificationsRouter.get("/", requireAuth, (req, res) => {
+notificationsRouter.get("/", requireAuth, async (req, res) => {
   const userId = String(req.userId);
   const rows = store
     .listNotificationsForUser(userId, 50)
     .filter((n) => n.kind !== "communityReview");
-  const dtos: NotificationDTO[] = rows.map((n) => ({
-    id: n.id,
-    kind: n.kind,
-    body: n.body,
-    planId: n.planId,
-    conversationId: n.conversationId,
-    profileUserId: n.profileUserId,
-    communityId: n.communityId,
-    createdAt: n.createdAt,
-    readAt: n.readAt,
-  }));
+  const users = await findUsersByIds(rows.map((n) => n.profileUserId).filter((id): id is string => Boolean(id)));
+  const dtos: NotificationDTO[] = rows.map((n) => {
+    const actor = n.profileUserId ? users.get(n.profileUserId) : undefined;
+    return {
+      id: n.id,
+      kind: n.kind,
+      body: n.body,
+      planId: n.planId,
+      conversationId: n.conversationId,
+      profileUserId: n.profileUserId,
+      communityId: n.communityId,
+      ...(actor
+        ? {
+            actor: {
+              id: actor.id,
+              firstName: actor.firstName || "Someone",
+              avatarSeed: actor.avatarSeed,
+              avatarStyle: actor.avatarStyle,
+              ...(actor.avatarParams ? { avatarParams: actor.avatarParams } : {}),
+              ...(actor.avatarPhotoDataUrl ? { avatarPhotoDataUrl: actor.avatarPhotoDataUrl } : {}),
+            },
+          }
+        : {}),
+      createdAt: n.createdAt,
+      readAt: n.readAt,
+    };
+  });
   res.json({ notifications: dtos });
 });
 

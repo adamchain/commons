@@ -585,6 +585,14 @@ export interface NotificationDTO {
   profileUserId?: string;
   /** Present on community notifications — links to the community page. */
   communityId?: string;
+  actor?: {
+    id: string;
+    firstName: string;
+    avatarSeed: string;
+    avatarStyle?: AvatarStyle;
+    avatarParams?: string;
+    avatarPhotoDataUrl?: string;
+  };
   createdAt: string;
   readAt: string | null;
 }

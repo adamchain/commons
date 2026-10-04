@@ -93,6 +93,7 @@ export async function emit(input: {
     if (input.planId) data.planId = input.planId;
     if (input.conversationId) data.conversationId = input.conversationId;
     if (input.communityId) data.communityId = input.communityId;
+    if (input.profileUserId) data.profileUserId = input.profileUserId;
     // Fire-and-forget — a push failure should never fail the in-app write.
     void sendPushToUser(input.userId, { title: "Commons", body: input.body, data }).catch((err) => {
       console.error("[notify] push send failed", err instanceof Error ? err.message : err);

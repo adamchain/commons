@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   AlarmClock,
+  ArrowLeft,
   Bell,
   Calendar,
   CheckCircle2,
@@ -26,6 +27,7 @@ import {
   Clock,
 } from "lucide-react";
 import { api } from "../api/http";
+import { Avatar } from "../components/Avatar";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
@@ -90,6 +92,9 @@ export function NotificationsPage() {
     [items],
   );
 
+  const requests = sorted.filter((n) => REQUEST_KINDS.has(n.kind));
+  const activity = sorted.filter((n) => !REQUEST_KINDS.has(n.kind));
+
   function markAllRead() {
     setItems((prev) => prev?.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })) ?? prev);
     void api("/api/notifications/read", { method: "POST" })
@@ -116,15 +121,18 @@ export function NotificationsPage() {
   return (
     <main className="app-shell app-shell--mid app-shell--with-nav app-shell--with-topbar notif-page">
       <div className="notif-header">
-        <h1 className="notif-title">Notifications</h1>
         <button
           type="button"
-          className="notif-close"
-          aria-label="Close notifications"
-          onClick={() => navigate("/")}
+          className="back-circle"
+          aria-label="Back"
+          onClick={() => {
+            if (window.history.length > 1) navigate(-1);
+            else navigate("/");
+          }}
         >
-          ×
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </button>
+        <h1 className="notif-title">Notifications</h1>
       </div>
 
       {sorted.length > 0 && (
@@ -139,7 +147,7 @@ export function NotificationsPage() {
               disabled={unreadCount === 0}
               onClick={markAllRead}
             >
-              Mark all read
+              Mark all as read
             </button>
             <button
               type="button"
@@ -165,13 +173,28 @@ export function NotificationsPage() {
           cta={hasPlans ? undefined : { to: "/", label: "See what's happening" }}
         />
       ) : (
-        <section className="notif-section">
-          <div className="notif-list">
-            {sorted.map((n) => (
-              <NotifRow key={n.id} item={n} onDismiss={() => dismiss(n.id)} />
-            ))}
-          </div>
-        </section>
+        <>
+          {requests.length > 0 && (
+            <section className="notif-section">
+              <h2 className="notif-section-label">Requests</h2>
+              <div className="notif-list">
+                {requests.map((n) => (
+                  <NotifRow key={n.id} item={n} onDismiss={() => dismiss(n.id)} />
+                ))}
+              </div>
+            </section>
+          )}
+          {activity.length > 0 && (
+            <section className="notif-section">
+              <h2 className="notif-section-label">Activity</h2>
+              <div className="notif-list">
+                {activity.map((n) => (
+                  <NotifRow key={n.id} item={n} onDismiss={() => dismiss(n.id)} />
+                ))}
+              </div>
+            </section>
+          )}
+        </>
       )}
     </main>
   );
@@ -186,13 +209,24 @@ function NotifRow({ item, onDismiss }: { item: NotificationDTO; onDismiss: () =>
     /added you|wants to add you|accept to connect/i.test(item.body);
   const inner = (
     <>
-      <span className="notif-row-icon" aria-hidden="true">
-        {iconFor(item.kind)}
-      </span>
+      {item.actor ? (
+        <Avatar
+          seed={item.actor.avatarSeed}
+          style={item.actor.avatarStyle}
+          photoDataUrl={item.actor.avatarPhotoDataUrl}
+          params={item.actor.avatarParams}
+          name={item.actor.firstName}
+          size="sm"
+        />
+      ) : (
+        <span className="notif-row-icon" aria-hidden="true">
+          {iconFor(item.kind)}
+        </span>
+      )}
       <div className="notif-row-body">
         <div className="notif-row-title">{item.body}</div>
         {isGrabs && <span className="notif-row-cta">Take over hosting</span>}
-        {isNetworkAdd && item.profileUserId && <NetworkAccept userId={item.profileUserId} />}
+        {isNetworkAdd && item.profileUserId && <NetworkRespond userId={item.profileUserId} />}
         <div className="notif-row-sub">{formatRelative(item.createdAt)}</div>
       </div>
       {item.readAt === null && <span className="notif-row-unread" aria-label="Unread" />}
@@ -240,32 +274,55 @@ function hrefFor(n: NotificationDTO): string | null {
   if (n.kind === "communityPostPending" && n.communityId) {
     return `/communities/${n.communityId}/dashboard?section=bulletin`;
   }
-  // Other community pings route to the community page.
-  if (n.communityId) return `/communities/${n.communityId}`;
+  if (
+    n.communityId &&
+    (n.kind === "communityRequestApproved" ||
+      n.kind === "communityRequestDeclined" ||
+      n.kind === "communityPlanPosted")
+  ) {
+    return `/communities/${n.communityId}`;
+  }
+  // A join or interested ping on a community plan still opens the plan.
   if (n.planId) return `/plans/${n.planId}`;
+  if (n.communityId) return `/communities/${n.communityId}`;
   return null;
 }
 
-function NetworkAccept({ userId }: { userId: string }) {
-  const [state, setState] = useState<"idle" | "ok" | "err">("idle");
-  async function accept(e: { preventDefault(): void; stopPropagation(): void }) {
+const REQUEST_KINDS = new Set<NotificationKind>([
+  "networkRequest",
+  "communityJoinRequest",
+  "communityPostPending",
+]);
+
+function NetworkRespond({ userId }: { userId: string }) {
+  const [state, setState] = useState<"idle" | "ok" | "no" | "err">("idle");
+  async function respond(
+    path: "network-accept" | "network-decline",
+    e: { preventDefault(): void; stopPropagation(): void },
+  ) {
     e.preventDefault();
     e.stopPropagation();
     try {
-      await api("/api/auth/network-accept", {
+      await api(`/api/auth/${path}`, {
         method: "POST",
         body: JSON.stringify({ userId }),
       });
-      setState("ok");
+      setState(path === "network-accept" ? "ok" : "no");
     } catch {
       setState("err");
     }
   }
   if (state === "ok") return <span className="notif-row-cta">You're connected</span>;
+  if (state === "no") return <span className="notif-row-cta">Declined</span>;
   return (
-    <button type="button" className="notif-row-cta notif-row-accept" onClick={(e) => void accept(e)}>
-      {state === "err" ? "Couldn't accept — try their profile" : "Accept"}
-    </button>
+    <span className="notif-row-actions">
+      <button type="button" className="notif-row-cta notif-row-accept" onClick={(e) => void respond("network-accept", e)}>
+        {state === "err" ? "Try again" : "Accept"}
+      </button>
+      <button type="button" className="notif-row-cta notif-row-decline" onClick={(e) => void respond("network-decline", e)}>
+        Decline
+      </button>
+    </span>
   );
 }
 

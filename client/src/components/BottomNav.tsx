@@ -34,6 +34,7 @@ export function BottomNav() {
     load();
     const t = setInterval(load, 15000);
     window.addEventListener("focus", load);
+    window.addEventListener("commons:notifications-changed", load);
     const onVisible = () => {
       if (!document.hidden) load();
     };
@@ -42,6 +43,7 @@ export function BottomNav() {
       cancelled = true;
       clearInterval(t);
       window.removeEventListener("focus", load);
+      window.removeEventListener("commons:notifications-changed", load);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [user?.id, pathname]);
