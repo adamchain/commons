@@ -842,7 +842,7 @@ function buildAcquisition(input: {
     codes,
     byType: [
       { kind: "creator", label: "Creator", signups: codes.length },
-      { kind: "group_chat", label: "Group chat", signups: 0 },
+      { kind: "group_chat", label: "Group Chat", signups: 0 },
       { kind: "community", label: "Community", signups: 0 },
     ],
     downloadsTracked: false,

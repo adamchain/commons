@@ -1964,7 +1964,7 @@ function SettingsTab({
           onToggle={() => setOpenRow((r) => (r === "channels" ? null : "channels"))}
         >
           <div className="cmy-toggle-row">
-            <span>Group chat</span>
+            <span>Group Chat</span>
             <button
               type="button"
               className={`cmy-chip-toggle ${chatEnabled ? "is-active" : ""}`}

@@ -591,14 +591,14 @@ function EditForm({
           </div>
           <div className="form-row-flex" style={{ marginTop: 12 }}>
             <div className="form-row-flex-main">
-              <label className="form-question">Group chat</label>
+              <label className="form-question">Group Chat</label>
             </div>
             <button
               type="button"
               role="switch"
               className={`flex-switch ${form.chatEnabled ? "is-on" : ""}`}
               aria-checked={form.chatEnabled}
-              aria-label="Group chat"
+              aria-label="Group Chat"
               onClick={() => {
                 lastInstantGroup.current = "who";
                 setForm((f) => ({ ...f, chatEnabled: !f.chatEnabled }));

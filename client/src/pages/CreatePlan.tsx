@@ -1537,13 +1537,13 @@ export function CreatePlanPage() {
                 aria-pressed={form.visibility === "network"}
               >
                 <Users size={12} strokeWidth={1.8} aria-hidden="true" />
-                Your network
+                Your Network
               </button>
             </div>
           </div>
 
           <div className="settings-row">
-            <span className="settings-row-label">Group chat</span>
+            <span className="settings-row-label">Group Chat</span>
             <FlexToggle
               variant="switch"
               active={form.chatEnabled}
@@ -1574,7 +1574,7 @@ export function CreatePlanPage() {
             onClick={() => setShowMore((s) => !s)}
             aria-expanded={showMore}
           >
-            <span className="settings-row-label">Additional details</span>
+            <span className="settings-row-label">Additional Details</span>
             <ChevronIcon open={showMore} />
           </button>
 
@@ -2162,13 +2162,13 @@ function IdeaForm({
                 aria-pressed={form.visibility === "network"}
               >
                 <Users size={12} strokeWidth={1.8} aria-hidden="true" />
-                Your network
+                Your Network
               </button>
             </div>
           </div>
 
           <div className="settings-row">
-            <span className="settings-row-label">Group chat</span>
+            <span className="settings-row-label">Group Chat</span>
             <FlexToggle
               variant="switch"
               active={form.chatEnabled}
@@ -2198,7 +2198,7 @@ function IdeaForm({
             onClick={() => setDetailsOpen((v) => !v)}
             aria-expanded={detailsOpen}
           >
-            <span className="settings-row-label">Additional details</span>
+            <span className="settings-row-label">Additional Details</span>
             <ChevronIcon open={detailsOpen} />
           </button>
 

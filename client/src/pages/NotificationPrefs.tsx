@@ -101,7 +101,7 @@ export function NotificationPrefsPage() {
 
       <Group label="Social">
         <ToggleRow
-          title="Group chat messages"
+          title="Group Chat messages"
           sub="Plans you're going to"
           on={current.newGroupChatMessage}
           busy={busy === "newGroupChatMessage"}

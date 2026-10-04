@@ -33,7 +33,7 @@ export const ORGANIZER_GUIDELINE_TOOLS: Array<{ title: string; body: string }> =
     body: "Your gatherings, so members can see what's coming and RSVP.",
   },
   {
-    title: "Group chat",
+    title: "Group Chat",
     body: "The everyday back-and-forth.",
   },
   {

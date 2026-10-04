@@ -506,13 +506,13 @@ export function PlanDetailPage() {
 
         {isHosting && !plan.cancelledAt && (
           <div className="plan-detail-card plan-chat-toggle">
-            <span className="plan-chat-toggle-label">Group chat</span>
+            <span className="plan-chat-toggle-label">Group Chat</span>
             <button
               type="button"
               role="switch"
               className={`flex-switch ${plan.chatEnabled !== false ? "is-on" : ""}`}
               aria-checked={plan.chatEnabled !== false}
-              aria-label="Group chat"
+              aria-label="Group Chat"
               disabled={chatToggleBusy}
               onClick={() => {
                 const next = plan.chatEnabled === false;
