@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
-import { Link } from "react-router-dom";
-import { BarChart2, BellOff, MessageCircle, Pin, Trash2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { BarChart2, BellOff, MessageCircle, Pin, SquarePen, Trash2 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
+import { Avatar } from "../components/Avatar";
 import { PlanCoverThumb } from "../components/CoverThumb";
 import { EmptyCard, ScreenTitle } from "../components/ui";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { Button } from "../components/ui/Button";
 import { sentenceCaseTitle } from "../lib/format";
-import { type ConversationSummaryDTO } from "../types/shared";
+import { type ConversationSummaryDTO, type PublicUser } from "../types/shared";
 
 const PULL_THRESHOLD = 52;
 const PULL_MAX = 96;
@@ -222,7 +223,10 @@ function SwipeRemoveRow({
 }
 
 export function MessagesPage() {
+  const navigate = useNavigate();
   const [items, setItems] = useState<ConversationSummaryDTO[]>([]);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composePeople, setComposePeople] = useState<PublicUser[] | null>(null);
   const [ready, setReady] = useState(false);
   const [dismissTarget, setDismissTarget] = useState<ConversationSummaryDTO | null>(null);
   const [dismissBusy, setDismissBusy] = useState(false);
@@ -302,6 +306,20 @@ export function MessagesPage() {
   useEffect(() => {
     void loadInbox();
   }, [loadInbox]);
+
+  useEffect(() => {
+    if (!composeOpen) return;
+    const ac = new AbortController();
+    setComposePeople(null);
+    void api<{ users: PublicUser[] }>("/api/auth/network", { signal: ac.signal })
+      .then((r) => {
+        if (!ac.signal.aborted) setComposePeople(r.users);
+      })
+      .catch(() => {
+        if (!ac.signal.aborted) setComposePeople([]);
+      });
+    return () => ac.abort();
+  }, [composeOpen]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -426,7 +444,17 @@ export function MessagesPage() {
       >
         <span className="feed-pull-spinner" />
       </div>
-      <ScreenTitle title="Messages" />
+      <div className="messages-title-row">
+        <ScreenTitle title="Messages" />
+        <button
+          type="button"
+          className="messages-compose"
+          aria-label="New message"
+          onClick={() => setComposeOpen(true)}
+        >
+          <SquarePen size={18} strokeWidth={1.8} aria-hidden="true" />
+        </button>
+      </div>
 
       <div ref={scrollRef} className="messages-scroll">
       <div ref={contentRef} className="feed-pull-content">
@@ -530,6 +558,49 @@ export function MessagesPage() {
       )}
       </div>
       </div>
+
+      {composeOpen && (
+        <BottomSheet onClose={() => setComposeOpen(false)} ariaLabel="New message">
+          <h2 className="sheet-title">New message</h2>
+          <p className="sheet-copy">Message someone in your network.</p>
+          {composePeople === null ? (
+            <div className="feed-skeleton" aria-busy="true" aria-label="Loading your network">
+              <div className="feed-skeleton-card" />
+            </div>
+          ) : composePeople.length === 0 ? (
+            <>
+              <p className="sheet-copy">Add people first, then you can message them here.</p>
+              <Button variant="primary" block onClick={() => navigate("/network?add=1")}>
+                Find people
+              </Button>
+            </>
+          ) : (
+            <div className="messages-compose-list">
+              {composePeople.map((person) => {
+                const name = [person.firstName, person.lastName].filter(Boolean).join(" ") || "Friend";
+                return (
+                  <button
+                    key={person.id}
+                    type="button"
+                    className="messages-compose-row"
+                    onClick={() => navigate(`/dm/${person.id}`, { state: { from: "messages" } })}
+                  >
+                    <Avatar
+                      seed={person.avatarSeed}
+                      style={person.avatarStyle}
+                      photoDataUrl={person.avatarPhotoDataUrl}
+                      params={person.avatarParams}
+                      name={person.firstName}
+                      size="sm"
+                    />
+                    <span>{name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </BottomSheet>
+      )}
 
       {dismissTarget && (
         <BottomSheet

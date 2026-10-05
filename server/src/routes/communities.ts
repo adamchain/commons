@@ -8,6 +8,7 @@ import {
 } from "../store.js";
 import { deleteUser, findUserById, findUsersByIds } from "../userRepo.js";
 import { userToPublic, planSummary } from "./plans.js";
+import { mentionedUserIds } from "../lib/mentions.js";
 import { emit } from "../lib/notify.js";
 import { listAdminPhones } from "../lib/adminPhones.js";
 import { isQaOrTestCommunityName } from "../lib/qaCommunities.js";
@@ -1219,6 +1220,31 @@ communitiesRouter.get("/:id/posts", requireAuth, async (req, res) => {
   });
 });
 
+/** A live bulletin post tells each tagged member they were mentioned. */
+async function notifyBulletinMentions(
+  community: { id: string; name: string; organizerId: string },
+  authorId: string,
+  content: string,
+  postId: string,
+) {
+  if (!content.includes("@")) return;
+  const ids = store.listActiveCommunityMembers(community.id).map((m) => m.userId);
+  ids.push(community.organizerId);
+  const people = await findUsersByIds(ids);
+  const author = await findUserById(authorId);
+  const authorName = author?.firstName || "Someone";
+  for (const userId of mentionedUserIds(content, people.values())) {
+    if (userId === authorId) continue;
+    await emit({
+      userId,
+      kind: "newGroupChatMessage",
+      body: `${authorName} mentioned you in "${community.name}"`,
+      communityId: community.id,
+      dedupKey: `mention:post:${postId}:${userId}`,
+    });
+  }
+}
+
 // POST /api/communities/:id/posts — post to the bulletin (per bulletin_permission).
 communitiesRouter.post("/:id/posts", requireAuth, async (req, res) => {
   const viewerId = String(req.userId);
@@ -1283,6 +1309,13 @@ communitiesRouter.post("/:id/posts", requireAuth, async (req, res) => {
     approvalStatus: needsApproval ? "pending" : "approved",
     parentId,
   });
+  if (!needsApproval) {
+    try {
+      await notifyBulletinMentions(community, viewerId, content, post.id);
+    } catch (err) {
+      console.error("[communities] mention notify failed", err instanceof Error ? err.message : err);
+    }
+  }
   if (needsApproval) {
     const author = await findUserById(viewerId);
     try {
@@ -1330,6 +1363,11 @@ communitiesRouter.post("/:id/posts/:postId/approve", requireAuth, async (req, re
   }
   store.setCommunityPostApprovalStatus(post.id, "approved");
   store.log("community_post_approved", { communityId: community.id, postId: post.id });
+  try {
+    await notifyBulletinMentions(community, post.authorId, post.content, post.id);
+  } catch (err) {
+    console.error("[communities] mention notify failed", err instanceof Error ? err.message : err);
+  }
   res.json({ ok: true });
 });
 

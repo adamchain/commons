@@ -307,6 +307,9 @@ function NotifRow({ item, onDismiss }: { item: NotificationDTO; onDismiss: () =>
 }
 
 function hrefFor(n: NotificationDTO): string | null {
+  if (n.kind === "newGroupChatMessage" && n.communityId && !n.planId) {
+    return n.conversationId ? `/communities/${n.communityId}/chat` : `/communities/${n.communityId}`;
+  }
   if (n.kind === "newGroupChatMessage" && n.profileUserId && !n.planId) return `/dm/${n.profileUserId}`;
   if (n.kind === "newGroupChatMessage" && n.planId) return `/plans/${n.planId}/chat`;
   if (n.kind === "welcome") return "/settings/interests";

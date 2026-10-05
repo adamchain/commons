@@ -5153,6 +5153,53 @@ a.action-btn--stack {
   line-height: 1.6;
   margin: 0 0 20px;
 }
+.messages-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.messages-title-row .screen-title {
+  margin-bottom: 16px;
+}
+.messages-compose {
+  width: 40px;
+  height: 40px;
+  margin-top: 2px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.messages-compose-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.messages-compose-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 2px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.messages-compose-row:last-child {
+  border-bottom: none;
+}
 .messages-card {
   background: var(--surface);
   border-radius: 18px;

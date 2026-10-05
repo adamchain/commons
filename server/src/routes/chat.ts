@@ -4,6 +4,7 @@ import { store } from "../store.js";
 import type { ConversationRecord } from "../store.js";
 import { findUserById, findUsersByIds } from "../userRepo.js";
 import { userToPublic } from "./plans.js";
+import { mentionedUserIds } from "../lib/mentions.js";
 import { emit } from "../lib/notify.js";
 import { ensureConnectRequest } from "./auth.js";
 import {
@@ -447,32 +448,47 @@ chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => 
       }
       const sender = await findUserById(userId);
       const senderName = sender?.firstName || "Someone";
+      const other = await findUserById(otherId);
+      const tagged = other ? mentionedUserIds(storedBody, [other]).has(otherId) : false;
       await emit({
         userId: otherId,
         kind: "newGroupChatMessage",
-        body: `${senderName}: ${messagePreview(message)}`,
+        body: tagged ? `${senderName} mentioned you` : `${senderName}: ${messagePreview(message)}`,
         conversationId: convId,
         profileUserId: userId,
-        dedupKey: `newDirectMessage:${message.id}:${otherId}`,
+        dedupKey: tagged
+          ? `mention:${message.id}:${otherId}`
+          : `newDirectMessage:${message.id}:${otherId}`,
       });
     }
   } else if (conv.type === "group") {
     const sender = await findUserById(userId);
     const senderName = sender?.firstName || "Someone";
     const plan = store.findPlanById(conv.planId);
-    const planTitle = plan?.title ?? "your plan";
+    const community = conv.communityId ? store.findCommunityById(conv.communityId) : undefined;
+    const place = community?.name ?? plan?.title ?? "your plan";
+    const participants = storedBody.includes("@")
+      ? [...(await findUsersByIds(conv.participantIds)).values()]
+      : [];
+    const mentioned = mentionedUserIds(storedBody, participants);
     // Dedup per (conversation, recipient) — one "new message" until the user
-    // reads. Once they mark notifications read, dedup advances by message id.
+    // reads. A tagged person gets a mention instead of the generic ping.
     for (const recipientId of conv.participantIds) {
       if (recipientId === userId) continue;
       if (store.isBlockedEitherWay(userId, recipientId)) continue;
+      const tagged = mentioned.has(recipientId);
       await emit({
         userId: recipientId,
         kind: "newGroupChatMessage",
-        body: `${senderName} in "${planTitle}": ${messagePreview(message)}`,
+        body: tagged
+          ? `${senderName} mentioned you in "${place}"`
+          : `${senderName} in "${place}": ${messagePreview(message)}`,
         planId: conv.planId,
+        communityId: conv.communityId,
         conversationId: convId,
-        dedupKey: `newGroupChatMessage:${message.id}:${recipientId}`,
+        dedupKey: tagged
+          ? `mention:${message.id}:${recipientId}`
+          : `newGroupChatMessage:${message.id}:${recipientId}`,
       });
     }
   }
