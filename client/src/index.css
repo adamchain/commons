@@ -1683,22 +1683,6 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   font-weight: 600;
   color: var(--ink);
 }
-.plan-chat-cleanup-title {
-  margin: 0 0 8px;
-  font-size: var(--text-card);
-  font-weight: 700;
-}
-.plan-chat-cleanup-copy {
-  margin: 0 0 16px;
-  color: var(--text-muted);
-  font-size: var(--text-body);
-  line-height: 1.45;
-}
-.plan-chat-cleanup-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
 .plan-detail-link {
   display: flex;
   align-items: center;
@@ -7839,8 +7823,17 @@ a.action-btn--stack {
   max-width: 320px;
   height: 28px;
   margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
   background: transparent;
+  box-shadow: none;
   accent-color: var(--accent);
+}
+.avatar-crop-zoom:focus {
+  outline: none;
+  border: 0;
+  box-shadow: none;
 }
 .avatar-crop-zoom::-webkit-slider-runnable-track {
   height: 4px;

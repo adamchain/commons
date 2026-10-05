@@ -725,13 +725,13 @@ export function PlanDetailPage() {
             chatCleanupDismissed.current = plan.id;
             setChatCleanupOpen(false);
           }}
-          ariaLabel="Delete the chat?"
+          labelledBy="chat-cleanup-title"
         >
-          <h2 className="plan-chat-cleanup-title">Delete this chat?</h2>
-          <p className="plan-chat-cleanup-copy">
+          <h2 id="chat-cleanup-title" className="sheet-title">Delete this chat?</h2>
+          <p className="sheet-copy">
             The event is over. You can delete the group chat, or keep it so people can still look back.
           </p>
-          <div className="plan-chat-cleanup-actions">
+          <div className="sheet-actions">
             <Button
               variant="primary"
               block

@@ -68,12 +68,12 @@ export function ChatCleanupPrompt() {
   }
 
   return (
-    <BottomSheet onClose={dismiss} ariaLabel="Delete the chat?">
-      <h2 className="plan-chat-cleanup-title">Delete this chat?</h2>
-      <p className="plan-chat-cleanup-copy">
+    <BottomSheet onClose={dismiss} labelledBy="chat-cleanup-title">
+      <h2 id="chat-cleanup-title" className="sheet-title">Delete this chat?</h2>
+      <p className="sheet-copy">
         {plan.title} is over. You can delete the group chat, or keep it so people can still look back.
       </p>
-      <div className="plan-chat-cleanup-actions">
+      <div className="sheet-actions">
         <Button variant="primary" block disabled={busy} onClick={() => void choose("delete")}>
           Delete chat
         </Button>
