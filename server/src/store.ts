@@ -167,6 +167,8 @@ export interface PlanRecord {
   capacity?: number | null;
   /** How RSVPs are accepted; defaults to "open" if absent. */
   joinType?: JoinType;
+  /** Host closed the plan. New people can't tap Join even if spots remain. */
+  markedFull?: boolean;
   isRecurring?: boolean;
   /**
    * Series lineage for recurring plans. When `isRecurring` is true on the first

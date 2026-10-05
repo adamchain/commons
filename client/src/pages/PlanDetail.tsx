@@ -570,6 +570,7 @@ export function PlanDetailPage() {
               capacity={plan.capacity}
               goingCount={plan.participants.going.length}
               joinType={plan.joinType}
+              markedFull={plan.markedFull}
               isHosting={isHosting}
               onJustMarkedGoing={() => setShowInvite(true)}
               onConfirmClose={(kind) => {

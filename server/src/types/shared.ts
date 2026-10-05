@@ -200,6 +200,8 @@ export interface PlanDTO {
   capacity: number | null;
   /** How RSVPs are accepted when capacity is set. */
   joinType: JoinType;
+  /** Host marked the plan full. Join is closed even if spots remain. */
+  markedFull: boolean;
   isRecurring: boolean;
   /** Series anchor — null for one-offs, shared across every instance of a recurring plan. */
   seriesId: string | null;

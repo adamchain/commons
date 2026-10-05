@@ -115,6 +115,7 @@ function EditForm({
     capacityOn: plan.capacity !== null,
     capacity: plan.capacity ? String(plan.capacity) : "6",
     joinType: plan.joinType,
+    markedFull: plan.markedFull === true,
     visibility: plan.visibility,
     flyerDataUrl: plan.flyerDataUrl ?? null,
     flyerLinkUrl: plan.flyerLinkUrl ?? "",
@@ -236,6 +237,7 @@ function EditForm({
           isFlexibleLocation: form.isFlexibleLocation,
           capacity: capacityNum,
           joinType: capacityNum !== null && form.joinType === "approve" ? "approve" : "open",
+          markedFull: form.markedFull,
           visibility: form.visibility,
           chatEnabled: form.chatEnabled,
         }),
@@ -271,6 +273,7 @@ function EditForm({
     form.capacityOn,
     form.capacity,
     form.joinType,
+    form.markedFull,
     form.visibility,
     form.chatEnabled,
   ]);
@@ -632,6 +635,27 @@ function EditForm({
               title="Set limit"
             >
               <span>Set limit</span>
+            </button>
+          </div>
+          <div className="form-row-flex" style={{ marginTop: 12 }}>
+            <div className="form-row-flex-main">
+              <label className="form-question">Full</label>
+              <p className="form-help">
+                {form.markedFull ? "Join is closed. People can still mark Interested." : "Turn this on when there are no spots left."}
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              className={`flex-switch ${form.markedFull ? "is-on" : ""}`}
+              aria-checked={form.markedFull}
+              aria-label="Mark plan as full"
+              onClick={() => {
+                lastInstantGroup.current = "who";
+                setForm((f) => ({ ...f, markedFull: !f.markedFull }));
+              }}
+            >
+              <span className="flex-switch-knob" />
             </button>
           </div>
           {form.capacityOn && (

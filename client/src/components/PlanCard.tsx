@@ -49,7 +49,7 @@ export function PlanCard({
   const goingCount = plan.participants.going.length;
   const interestedCount = plan.participants.interested.length;
   const capacity = planCapacityValue(plan.capacity);
-  const isFull = isPlanAtCapacity(capacity, goingCount);
+  const isFull = plan.markedFull || isPlanAtCapacity(capacity, goingCount);
   const capacityFill =
     capacity !== null && !hasEnded && !isCancelled
       ? `${Math.max(0, capacity - Math.min(goingCount, capacity))}/${capacity} spots`
@@ -196,6 +196,9 @@ export function PlanCard({
                   />
                 )}
               </div>
+              )}
+              {isHosting && isFull && !hasEnded && !isCancelled && (
+                <span className="plan-card-quick-join is-full">Full</span>
               )}
               {!isHosting && !hasEnded && !isCancelled && (
                 <QuickJoin
@@ -369,7 +372,11 @@ function QuickJoin({
   return (
     <>
       <div className="plan-card-rsvp" onClick={stopNav}>
-        {showJoin ? (
+        {isFull && !goingActive && !interestedActive ? (
+          <button type="button" className="plan-card-quick-join is-full" disabled>
+            Full
+          </button>
+        ) : showJoin ? (
           <button
             type="button"
             className="plan-card-quick-join is-join"

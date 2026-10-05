@@ -93,11 +93,11 @@ export function TopBar() {
           className="top-bar-icon-btn"
           aria-label={hasUnread ? "Notifications, unread" : "Notifications"}
         >
-          <Bell size={18} strokeWidth={1.6} />
+          <Bell size={22} strokeWidth={1.7} />
           {hasUnread && <span className="top-bar-bell-dot" aria-hidden="true" />}
         </Link>
         <Link to="/settings" className="top-bar-icon-btn" aria-label="Settings">
-          <Settings size={18} strokeWidth={1.6} />
+          <Settings size={22} strokeWidth={1.7} />
         </Link>
         {user && (
           <Link

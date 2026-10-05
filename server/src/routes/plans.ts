@@ -188,6 +188,7 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     communityVisibility: plan.communityId ? plan.communityVisibility ?? "public" : null,
     capacity: plan.capacity ?? null,
     joinType: plan.joinType ?? "open",
+    markedFull: plan.markedFull === true,
     isRecurring: plan.isRecurring ?? false,
     seriesId: plan.seriesId ?? null,
     lockedAt: plan.lockedAt ?? null,
@@ -731,6 +732,9 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
       patch.visibilityCommunityTag = raw as InterestTag;
     }
   }
+  if (typeof req.body?.markedFull === "boolean") {
+    patch.markedFull = req.body.markedFull;
+  }
   if (req.body?.capacity !== undefined) {
     const raw = req.body.capacity;
     if (raw === null) patch.capacity = null;
@@ -1258,6 +1262,10 @@ plansRouter.put("/:id/participation", requireAuth, async (req, res) => {
   // non-host go directly — they must apply (be interested) until the host
   // promotes them.
   if (state === "going" && plan.creatorId !== userId && existing?.state !== "going") {
+    if (plan.markedFull) {
+      res.status(409).json({ error: "This plan is full." });
+      return;
+    }
     if (planRequiresHostApproval(plan)) {
       res.status(403).json({ error: "This plan is invite-only — request to join instead." });
       return;

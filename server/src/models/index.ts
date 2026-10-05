@@ -83,6 +83,7 @@ const PlanSchema = new Schema<PlanRecord>(
     communityVisibility: { type: String, enum: ["public", "community_only", null], default: null },
     capacity: { type: Number, default: null },
     joinType: { type: String, enum: ["open", "approve"], default: "open" },
+    markedFull: { type: Boolean, default: false },
     isRecurring: { type: Boolean, default: false },
     seriesId: { type: String, default: null },
     lockedAt: { type: String, default: null },

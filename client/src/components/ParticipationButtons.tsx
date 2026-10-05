@@ -49,6 +49,7 @@ export function ParticipationButtons({
   capacity = null,
   goingCount = 0,
   joinType = "open",
+  markedFull = false,
   isHosting = false,
   onJustMarkedGoing,
   onConfirmClose,
@@ -62,6 +63,8 @@ export function ParticipationButtons({
   /** Current count of "going" participants (for full/approve display). */
   goingCount?: number;
   joinType?: JoinType;
+  /** Host closed the plan. New people can't tap Join. */
+  markedFull?: boolean;
   /** Host bypasses capacity and approve gates. */
   isHosting?: boolean;
   /** Called the first time someone confirms Join — opens the invite sheet. */
@@ -166,7 +169,7 @@ export function ParticipationButtons({
   const goingActive = state === "going";
   const interestedActive = state === "interested";
   const loose = planKind === "looking_for";
-  const isFull = !isHosting && isPlanAtCapacity(capacity, goingCount) && !goingActive;
+  const isFull = !isHosting && (markedFull || isPlanAtCapacity(capacity, goingCount)) && !goingActive;
   const isApproveOnly = !isHosting && joinType === "approve" && !goingActive;
   // Approval means Interested until the host lets you in. A full plan does too.
   // An open plan with room offers Join, even when it has a capacity.
