@@ -4401,8 +4401,12 @@ a.action-btn--stack {
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
   display: flex;
-  align-items: flex-end;
-  justify-content: stretch;
+  /* Column, not row: the dismiss target sits above the sheet and grows to
+     fill the dimmed area. A row puts that button beside the sheet and
+     squeezes every popup into the right half of the screen. */
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
   padding: 0;
   /* Above the fixed bottom nav (z-index 50) so the sheet's lower buttons
      (Cancel, Copy link…) aren't hidden behind the footer bar. */
@@ -4417,6 +4421,9 @@ a.action-btn--stack {
 .profile-action-sheet {
   width: 100%;
   max-width: none;
+  align-self: stretch;
+  flex: 0 1 auto;
+  min-height: 0;
   margin: 0;
   background: var(--surface);
   border-radius: var(--r-lg) var(--r-lg) 0 0;
@@ -7586,20 +7593,58 @@ a.action-btn--stack {
   max-width: none;
   pointer-events: none;
 }
-/* Circular hole punched over the square stage to show the final crop. */
+/* Dim everything outside the circle the avatar actually shows.
+   A radial-gradient 50% hole is half the diagonal, so it covered the whole
+   square and the guide didn't match the round profile picture. This circle
+   is the stage's inscribed circle: same edge as border-radius: 50%. */
 .avatar-crop-mask {
   position: absolute;
   inset: 0;
-  border-radius: 12px;
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45) inset;
-  -webkit-mask: radial-gradient(circle at center, transparent 49.5%, #000 50%);
-  mask: radial-gradient(circle at center, transparent 49.5%, #000 50%);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 9999px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.92);
   pointer-events: none;
 }
 .avatar-crop-zoom {
+  -webkit-appearance: none;
+  appearance: none;
   width: 100%;
   max-width: 320px;
+  height: 28px;
+  margin: 0;
+  background: transparent;
   accent-color: var(--accent);
+}
+.avatar-crop-zoom::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--tan-mid);
+  border-radius: 4px;
+}
+.avatar-crop-zoom::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -9px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
+}
+.avatar-crop-zoom::-moz-range-track {
+  height: 4px;
+  background: var(--tan-mid);
+  border-radius: 4px;
+  border: 0;
+}
+.avatar-crop-zoom::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
 }
 .avatar-crop-actions {
   display: flex;

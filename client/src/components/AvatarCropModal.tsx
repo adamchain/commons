@@ -58,8 +58,6 @@ export function AvatarCropModal({
 
   const coverScale = natural ? Math.max(stageW / natural.w, stageH / natural.h) : 1;
   const effScale = coverScale * zoom;
-  const dispW = natural ? natural.w * effScale : stageW;
-  const dispH = natural ? natural.h * effScale : stageH;
 
   function clampWith(o: { x: number; y: number }, eff: number) {
     const w = natural ? natural.w * eff : stageW;
@@ -159,9 +157,10 @@ export function AvatarCropModal({
               alt=""
               draggable={false}
               style={{
-                width: dispW,
-                height: dispH,
-                transform: `translate(${offset.x}px, ${offset.y}px)`,
+                width: natural.w,
+                height: natural.h,
+                transformOrigin: "0 0",
+                transform: `translate(${offset.x}px, ${offset.y}px) scale(${effScale})`,
               }}
             />
           )}
