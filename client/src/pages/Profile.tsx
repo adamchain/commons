@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -17,7 +17,6 @@ import {
   Share2,
   UserMinus,
   UserPlus,
-  Users,
 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
@@ -367,18 +366,20 @@ export function ProfilePage() {
           )}
 
           <div className="profile-other-ctas">
-            <FriendButton profile={profile} onUpdated={reloadProfile} variant="other" />
-            <OtherMessageButton
-              sharedPlanId={profile.sharedPlanId}
-              profileUserId={userId}
-              inNetwork={profile.network.inMyNetwork}
-            />
+            <div className="profile-other-cta-row">
+              <FriendButton profile={profile} onUpdated={reloadProfile} variant="other" />
+              <OtherMessageButton
+                sharedPlanId={profile.sharedPlanId}
+                profileUserId={userId}
+                inNetwork={profile.network.inMyNetwork}
+              />
+            </div>
             <Link
               to={`/plans/new?inviteUser=${encodeURIComponent(userId)}&inviteName=${encodeURIComponent(profile.user.firstName)}`}
               className="profile-other-cta profile-other-cta--message"
             >
               <CalendarPlus size={16} strokeWidth={2} aria-hidden="true" />
-              Make a Plan
+              Make a plan
             </Link>
           </div>
 
@@ -403,73 +404,51 @@ export function ProfilePage() {
           )}
         </section>
 
+        {profile.network.inMyNetwork && (profile.communities?.length ?? 0) > 0 && (
+          <section className="profile-other-section">
+            <h3 className="profile-other-section-label">Communities</h3>
+            <div className="profile-photo-row">
+              {(profile.communities ?? []).map((c) => (
+                <Link
+                  key={c.id}
+                  to={`/communities/${c.id}`}
+                  state={{ from: "profile", profileUserId: userId }}
+                  className="profile-photo-card"
+                >
+                  <CommunityCoverThumb
+                    coverImage={c.coverImage}
+                    category={c.category}
+                    className="profile-photo-card-media"
+                  />
+                  <span className="profile-photo-card-title">{c.name}</span>
+                  {c.myRole === "organizer" && <span className="profile-photo-card-meta">Organizer</span>}
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
         {profile.plansGated ? (
           <section className="profile-other-section">
-            <h3 className="profile-other-section-label">Upcoming Plans</h3>
+            <h3 className="profile-other-section-label">Plans</h3>
             <p className="profile-social-locked">
               You&apos;re on this one together. The rest of their calendar takes a connection.
             </p>
             {profile.upcoming.length > 0 && (
-              <div className="profile-other-plans">
-                {profile.upcoming.map((p) => (
-                  <OtherPlanRow key={p.id} plan={p} profileUserId={userId} />
-                ))}
-              </div>
+              <OtherPlanCards plans={profile.upcoming} profileUserId={userId} />
             )}
           </section>
         ) : profile.upcoming.length > 0 ? (
           <section className="profile-other-section">
             <div className="profile-other-section-head">
-              <h3 className="profile-other-section-label">Upcoming Plans</h3>
+              <h3 className="profile-other-section-label">Plans</h3>
               <span className="profile-other-section-count">
                 {profile.upcoming.length} plan{profile.upcoming.length === 1 ? "" : "s"}
               </span>
             </div>
-            <div className="profile-other-plans">
-              {profile.network.inMyNetwork ? (
-                <PreviewRows
-                  key={`${userId}-plans`}
-                  items={profile.upcoming}
-                  moreSingular="plan"
-                  renderItem={(p) => <OtherPlanRow plan={p} profileUserId={userId} />}
-                />
-              ) : (
-                profile.upcoming.map((p) => (
-                  <OtherPlanRow key={p.id} plan={p} profileUserId={userId} />
-                ))
-              )}
-            </div>
+            <OtherPlanCards plans={profile.upcoming} profileUserId={userId} />
           </section>
         ) : null}
-
-        {profile.network.inMyNetwork && (profile.communities?.length ?? 0) > 0 && (
-          <section className="profile-other-section">
-            <div className="profile-other-communities-card">
-            <h3 className="profile-other-section-label">Communities</h3>
-            <div className="profile-other-communities">
-              <PreviewRows
-                key={`${userId}-communities`}
-                items={profile.communities ?? []}
-                moreSingular="community"
-                renderItem={(c) => (
-                  <Link to={`/communities/${c.id}`} state={{ from: "profile", profileUserId: userId }} className="profile-other-community-row">
-                    <CommunityCoverThumb
-                      coverImage={c.coverImage}
-                      category={c.category}
-                      className="cover-thumb-frame--sm"
-                    />
-                    <span className="profile-other-community-info">
-                      <span className="profile-other-community-name">{c.name}</span>
-                    </span>
-                    {c.myRole === "organizer" && <span className="profile-community-tag">Organizer</span>}
-                    <ChevronRight size={13} strokeWidth={1.6} className="profile-other-community-chevron" aria-hidden="true" />
-                  </Link>
-                )}
-              />
-            </div>
-            </div>
-          </section>
-        )}
 
         {actionSheetOpen && (
           <ProfileActionSheet
@@ -770,51 +749,6 @@ function OtherMessageButton({
   );
 }
 
-const PREVIEW_COUNT = 3;
-
-function moreCountLabel(count: number, singular: string): string {
-  const noun = count === 1 ? singular : singular === "community" ? "communities" : `${singular}s`;
-  return `${count} more ${noun}`;
-}
-
-/** First three stay visible. Anything past that opens from a dropdown. */
-function PreviewRows<T extends { id: string }>({
-  items,
-  moreSingular,
-  renderItem,
-}: {
-  items: T[];
-  moreSingular: string;
-  renderItem: (item: T) => ReactElement;
-}) {
-  const [open, setOpen] = useState(false);
-  const preview = items.slice(0, PREVIEW_COUNT);
-  const rest = items.slice(PREVIEW_COUNT);
-  return (
-    <>
-      {preview.map((item) => (
-        <div key={item.id} className="profile-preview-row">{renderItem(item)}</div>
-      ))}
-      {rest.length > 0 && (
-        <div className="profile-more">
-          <button
-            type="button"
-            className="profile-past-toggle profile-more-toggle"
-            aria-expanded={open}
-            onClick={() => setOpen((v) => !v)}
-          >
-            <span>{open ? "Show less" : moreCountLabel(rest.length, moreSingular)}</span>
-            <span className={`profile-past-chevron ${open ? "is-open" : ""}`} aria-hidden="true">›</span>
-          </button>
-          {open && rest.map((item) => (
-            <div key={item.id} className="profile-preview-row">{renderItem(item)}</div>
-          ))}
-        </div>
-      )}
-    </>
-  );
-}
-
 function formatCompactPlanTime(time: string): string {
   const [hStr, mStr = "00"] = time.split(":");
   const h = Number(hStr);
@@ -840,28 +774,27 @@ function formatOtherPlanWhen(plan: PlanDTO): string {
   return `${day} · ${formatCompactPlanTime(plan.time)}`;
 }
 
-function OtherPlanRow({ plan, profileUserId }: { plan: PlanDTO; profileUserId: string }) {
-  const going = plan.participants.going.length;
+function OtherPlanCards({ plans, profileUserId }: { plans: PlanDTO[]; profileUserId: string }) {
   return (
-    <Link
-      to={`/plans/${plan.id}`}
-      state={{ from: "profile", profileUserId }}
-      className="profile-other-plan-card"
-    >
-      <PlanCoverThumb
-        planId={plan.id}
-        flyerDataUrl={planPhotoUrl(plan)}
-        isIdea={isIdeaPlan(plan)}
-      />
-      <span className="profile-other-plan-body">
-        <span className="profile-other-plan-title">{plan.title}</span>
-        <span className="profile-other-plan-date">{formatOtherPlanWhen(plan)}</span>
-      </span>
-      <span className="profile-other-plan-going">
-        <Users size={12} strokeWidth={1.8} aria-hidden="true" />
-        {going}
-      </span>
-    </Link>
+    <div className="profile-photo-row">
+      {plans.map((plan) => (
+        <Link
+          key={plan.id}
+          to={`/plans/${plan.id}`}
+          state={{ from: "profile", profileUserId }}
+          className="profile-photo-card"
+        >
+          <PlanCoverThumb
+            planId={plan.id}
+            flyerDataUrl={planPhotoUrl(plan)}
+            isIdea={isIdeaPlan(plan)}
+            className="profile-photo-card-media"
+          />
+          <span className="profile-photo-card-title">{plan.title}</span>
+          <span className="profile-photo-card-meta">{formatOtherPlanWhen(plan)}</span>
+        </Link>
+      ))}
+    </div>
   );
 }
 

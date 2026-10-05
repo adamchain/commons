@@ -16001,6 +16001,14 @@ button.xpl-photo-tile {
   gap: 8px;
   margin-bottom: 0;
 }
+.profile-other-cta-row {
+  display: flex;
+  gap: 8px;
+}
+.profile-other-cta-row .profile-other-cta {
+  flex: 1;
+  width: auto;
+}
 .profile-other-cta {
   flex: none;
   width: 100%;
