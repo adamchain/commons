@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
@@ -307,6 +307,38 @@ export function CommunityDashboardPage() {
                 </div>
               </div>
             </div>
+          </section>
+
+          <section className="cmy-dash-card">
+            <div className="cmy-dash-card-head">
+              <div>
+                <h2>Joins and interest</h2>
+                <p>People who joined or marked interested on a plan in this community.</p>
+              </div>
+            </div>
+            {(data.planActivity ?? []).length === 0 ? (
+              <p className="cmy-dash-empty">Nobody has joined or marked interested yet.</p>
+            ) : (
+              <ul className="cmy-dash-people">
+                {(data.planActivity ?? []).map((row) => (
+                  <li key={row.id} className="cmy-dash-person">
+                    <Avatar
+                      seed={row.user.avatarSeed}
+                      style={row.user.avatarStyle}
+                      photoDataUrl={row.user.avatarPhotoDataUrl}
+                      params={row.user.avatarParams}
+                      size="sm"
+                    />
+                    <div className="cmy-dash-person-copy">
+                      <Link to={`/plans/${row.planId}`} className="cmy-dash-person-name">
+                        {personName(row.user)} {row.state === "going" ? "joined" : "is interested in"} {row.planTitle}
+                      </Link>
+                      <span className="cmy-dash-person-sub">{formatRelative(row.at)}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           <section className="cmy-dash-card">

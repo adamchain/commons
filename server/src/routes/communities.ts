@@ -554,11 +554,28 @@ communitiesRouter.get("/:id/dashboard", requireAuth, async (req, res) => {
   const pending = store.listPendingCommunityMembers(community.id);
   const posts = store.listPendingCommunityPosts(community.id);
   const screeningRows = screeningAnswersFor(community);
+  const communityPlans = store
+    .listPlans()
+    .filter((plan) => plan.communityId === community.id && !plan.cancelledAt);
+  const planById = new Map(communityPlans.map((plan) => [plan.id, plan]));
+  const planActivityRows = store
+    .listAllParticipations()
+    .filter((row) => {
+      const plan = planById.get(row.planId);
+      return Boolean(
+        plan &&
+          (row.state === "going" || row.state === "interested") &&
+          row.userId !== plan.creatorId,
+      );
+    })
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, 20);
   const users = await findUsersByIds([
     ...active.map((m) => m.userId),
     ...pending.map((m) => m.userId),
     ...posts.map((p) => p.authorId),
     ...screeningRows.map((row) => row.userId),
+    ...planActivityRows.map((row) => row.userId),
     community.organizerId,
   ]);
   const organizer = users.get(community.organizerId);
@@ -602,6 +619,18 @@ communitiesRouter.get("/:id/dashboard", requireAuth, async (req, res) => {
         ...(sub.avatarPhotoDataUrl ? { avatarPhotoDataUrl: sub.avatarPhotoDataUrl } : {}),
       };
     })(),
+    planActivity: planActivityRows.flatMap((row) => {
+      const plan = planById.get(row.planId);
+      if (!plan || (row.state !== "going" && row.state !== "interested")) return [];
+      return [{
+        id: row.id,
+        state: row.state,
+        at: row.updatedAt,
+        planId: plan.id,
+        planTitle: plan.title,
+        user: publicFor(row.userId, users),
+      }];
+    }),
   };
   res.json(body);
 });

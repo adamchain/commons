@@ -698,6 +698,15 @@ export interface CommunityDashboardDTO {
   memberList: CommunityMemberDTO[];
   /** Community persona the organizer can switch into. Null until they make one. */
   subAccount: { id: string; firstName: string; avatarPhotoDataUrl?: string } | null;
+  /** Recent joins and interested marks on plans posted in this community. */
+  planActivity: {
+    id: string;
+    state: "going" | "interested";
+    at: string;
+    planId: string;
+    planTitle: string;
+    user: PublicUser;
+  }[];
 }
 
 export interface CommunityPostDTO {

@@ -43,6 +43,9 @@ export function NotificationsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [items, setItems] = useState<NotificationDTO[] | null>(null);
+  const [tab, setTab] = useState<"activity" | "requests">("activity");
+  const [openedUnread, setOpenedUnread] = useState(0);
+  const [openedRequestUnread, setOpenedRequestUnread] = useState(false);
   // F.8 — the empty state reads differently once you're actually plugged
   // into a plan; find out before deciding which warm line to show.
   const [hasPlans, setHasPlans] = useState(false);
@@ -54,6 +57,10 @@ export function NotificationsPage() {
         const r = await api<{ notifications: NotificationDTO[] }>("/api/notifications");
         if (!alive) return;
         const seenAt = new Date().toISOString();
+        setOpenedUnread(r.notifications.filter((n) => n.readAt === null).length);
+        setOpenedRequestUnread(
+          r.notifications.some((n) => n.readAt === null && REQUEST_KINDS.has(n.kind)),
+        );
         setItems(r.notifications.map((n) => ({ ...n, readAt: n.readAt ?? seenAt })));
         if (r.notifications.some((n) => n.readAt === null)) {
           await api("/api/notifications/read", { method: "POST" });
@@ -93,8 +100,11 @@ export function NotificationsPage() {
 
   const requests = sorted.filter((n) => REQUEST_KINDS.has(n.kind));
   const activity = sorted.filter((n) => !REQUEST_KINDS.has(n.kind));
+  const visible = tab === "requests" ? requests : activity;
 
   function markAllRead() {
+    setOpenedUnread(0);
+    setOpenedRequestUnread(false);
     setItems((prev) => prev?.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })) ?? prev);
     void api("/api/notifications/read", { method: "POST" })
       .then(() => window.dispatchEvent(new CustomEvent("commons:notifications-changed")))
@@ -102,6 +112,8 @@ export function NotificationsPage() {
   }
 
   function clearAll() {
+    setOpenedUnread(0);
+    setOpenedRequestUnread(false);
     setItems([]);
     void api("/api/notifications/clear", { method: "POST" })
       .then(() => window.dispatchEvent(new CustomEvent("commons:notifications-changed")))
@@ -156,7 +168,34 @@ export function NotificationsPage() {
           <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </button>
         <h1 className="notif-title">Notifications</h1>
+        {openedUnread > 0 && (
+          <span className="notif-count-badge">{openedUnread > 9 ? "9+" : openedUnread}</span>
+        )}
       </div>
+
+      {sorted.length > 0 && (
+        <div className="notif-tabs" role="tablist" aria-label="Notification sections">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "activity"}
+            className={`notif-tab${tab === "activity" ? " is-active" : ""}`}
+            onClick={() => setTab("activity")}
+          >
+            Activity
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "requests"}
+            className={`notif-tab${tab === "requests" ? " is-active" : ""}`}
+            onClick={() => setTab("requests")}
+          >
+            Requests
+            {openedRequestUnread && <span className="notif-tab-dot" aria-label="Unread requests" />}
+          </button>
+        </div>
+      )}
 
       {sorted.length > 0 && (
         <div className="notif-toolbar">
@@ -195,29 +234,18 @@ export function NotificationsPage() {
           }
           cta={hasPlans ? undefined : { to: "/", label: "See what's happening" }}
         />
+      ) : visible.length === 0 ? (
+        <p className="notif-tab-empty">
+          {tab === "requests" ? "No requests right now." : "Nothing new in activity."}
+        </p>
       ) : (
-        <>
-          {requests.length > 0 && (
-            <section className="notif-section">
-              <h2 className="notif-section-label">Requests</h2>
-              <div className="notif-list">
-                {requests.map((n) => (
-                  <NotifRow key={n.id} item={n} onDismiss={() => dismiss(n.id)} />
-                ))}
-              </div>
-            </section>
-          )}
-          {activity.length > 0 && (
-            <section className="notif-section">
-              <h2 className="notif-section-label">Activity</h2>
-              <div className="notif-list">
-                {activity.map((n) => (
-                  <NotifRow key={n.id} item={n} onDismiss={() => dismiss(n.id)} />
-                ))}
-              </div>
-            </section>
-          )}
-        </>
+        <section className="notif-section">
+          <div className="notif-list">
+            {visible.map((n) => (
+              <NotifRow key={n.id} item={n} onDismiss={() => dismiss(n.id)} />
+            ))}
+          </div>
+        </section>
       )}
     </main>
   );
