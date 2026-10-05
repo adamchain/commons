@@ -896,12 +896,29 @@ authRouter.post("/friend-remove", requireAuth, async (req, res) => {
     res.status(404).json({ error: "User not found" });
     return;
   }
+  // Connect is mutual, so leaving has to drop both sides. Otherwise they
+  // still see you as added after you remove them.
   const myNet = new Set(viewer.networkIds ?? []);
-  const existed = myNet.delete(targetId);
-  await updateUser(userId, { networkIds: [...myNet] });
-  if (existed) {
-    store.deleteRelationship(userId, targetId, "network");
+  myNet.delete(targetId);
+  const myIncoming = new Set(viewer.incomingNetworkRequests ?? []);
+  myIncoming.delete(targetId);
+  await updateUser(userId, { networkIds: [...myNet], incomingNetworkRequests: [...myIncoming] });
+
+  const target = await findUserById(targetId);
+  if (target) {
+    const theirNet = new Set(target.networkIds ?? []);
+    const theirHadMe = theirNet.delete(userId);
+    const theirIncoming = new Set(target.incomingNetworkRequests ?? []);
+    const clearedRequest = theirIncoming.delete(userId);
+    if (theirHadMe || clearedRequest) {
+      await updateUser(targetId, {
+        networkIds: [...theirNet],
+        incomingNetworkRequests: [...theirIncoming],
+      });
+    }
   }
+  store.deleteRelationship(userId, targetId, "network");
+  store.deleteRelationship(targetId, userId, "network");
   const me = await userToMe(userId);
   res.json({ ok: true, me });
 });

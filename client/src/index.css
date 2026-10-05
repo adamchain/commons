@@ -14329,6 +14329,55 @@ button.xpl-photo-tile {
   font-weight: 700;
   text-decoration: none;
 }
+.network-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+.network-tab {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--ink);
+  font-weight: 700;
+  font-size: var(--text-body-small);
+}
+.network-tab.is-active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+.network-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin: 0 0 14px;
+  padding-bottom: 2px;
+}
+.network-chip {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--ink);
+  font-weight: 650;
+  font-size: var(--text-body-small);
+}
+.network-chip.is-active {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+.network-suggest-label {
+  margin: 18px 2px 8px;
+  font-size: var(--text-body-small);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
 
 .plan-participation-slot {
   margin-top: 4px;

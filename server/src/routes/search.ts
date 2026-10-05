@@ -4,6 +4,7 @@ import { isOnboardingFinished } from "../lib/onboarding.js";
 import { store, type UserRecord } from "../store.js";
 import { findUserById, findUsersByIds } from "../userRepo.js";
 import { INTEREST_LABELS, COMMUNITY_CATEGORY_LABELS, type InterestTag, type CommunityCategory } from "../types/shared.js";
+import { isCommunitySubAccount } from "../lib/subAccounts.js";
 import { planSummary, planVisibleToViewer, userToPublic } from "./plans.js";
 import { communityCategoriesOf } from "../types/shared.js";
 import type { PersonSearchResultDTO, SearchResultsDTO, CommunityCardDTO, PublicUser } from "../types/shared.js";
@@ -171,4 +172,73 @@ searchRouter.get("/", requireAuth, async (req, res) => {
 
   const result: SearchResultsDTO = { plans, people, communities };
   res.json(result);
+});
+
+// GET /api/search/discover?interest=coffee — people to add, matched on interests.
+searchRouter.get("/discover", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const me = await findUserById(userId);
+  if (!me) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  if (!isOnboardingFinished(me)) {
+    res.status(403).json({ error: "Finish setting up your profile to continue" });
+    return;
+  }
+  const asked = String(req.query.interest ?? "").trim();
+  const interest = (Object.keys(INTEREST_LABELS) as InterestTag[]).includes(asked as InterestTag)
+    ? (asked as InterestTag)
+    : null;
+  const mine = new Set(me.interests ?? []);
+  const viewerNetwork = new Set(me.networkIds ?? []);
+  const myPlanIds = planIdsForUser(userId);
+  const hoodName = (u: UserRecord): string | null => {
+    const hoodId = u.neighborhoodId ?? u.neighborhoodIds?.[0] ?? null;
+    if (!hoodId) return null;
+    return store.findNeighborhoodById(hoodId)?.name ?? null;
+  };
+
+  const ranked = store.listUsers()
+    .filter((u) => {
+      if (u.id === userId) return false;
+      if (!u.onboardingComplete) return false;
+      if (u.discoverableBySearch === false) return false;
+      if (isCommunitySubAccount(u)) return false;
+      if (store.isBlockedEitherWay(userId, u.id)) return false;
+      if (store.isUserEjected(u.id)) return false;
+      if (viewerNetwork.has(u.id)) return false;
+      const tags = u.interests ?? [];
+      if (interest) return tags.includes(interest);
+      return mine.size === 0 || tags.some((tag) => mine.has(tag));
+    })
+    .map((u) => {
+      const tags = u.interests ?? [];
+      const shared = [...mine].filter((tag) => tags.includes(tag));
+      const mutualCount = (u.networkIds ?? []).filter((id) => viewerNetwork.has(id)).length;
+      const theirPlanIds = planIdsForUser(u.id);
+      let sharedPlans = 0;
+      for (const id of myPlanIds) if (theirPlanIds.has(id)) sharedPlans++;
+      const focus = interest ?? shared[0] ?? null;
+      const reason = mutualCount > 0
+        ? `${mutualCount} mutual`
+        : focus
+          ? `Also into ${INTEREST_LABELS[focus]}`
+          : hoodName(u) ?? "On Commons";
+      const requestSent = (u.incomingNetworkRequests ?? []).includes(userId);
+      const row: PersonSearchResultDTO = {
+        user: userToPublic(u),
+        neighborhoodName: hoodName(u),
+        sharedPlansCount: sharedPlans,
+        networkStatus: requestSent ? "pending" : "none",
+        mutualCount,
+        reason,
+      };
+      return { row, shared: shared.length, mutualCount };
+    })
+    .sort((a, b) => b.shared - a.shared || b.mutualCount - a.mutualCount || a.row.user.firstName.localeCompare(b.row.user.firstName))
+    .slice(0, 24)
+    .map((item) => item.row);
+
+  res.json({ people: ranked });
 });

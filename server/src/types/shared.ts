@@ -854,6 +854,8 @@ export interface PersonSearchResultDTO {
   networkStatus: NetworkLinkStatus;
   /** People who are in both networks. */
   mutualCount: number;
+  /** Why this person was suggested, such as a shared interest. */
+  reason?: string;
 }
 
 export interface SearchResultsDTO {
