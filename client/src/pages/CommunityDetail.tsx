@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Calendar, LayoutDashboard, MessageCircle, Pencil, Send, Users } from "lucide-react";
+import { ArrowLeft, Calendar, LayoutDashboard, MessageCircle, Pencil, Pin, Send, Users } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { ComposerField, MentionText, type MentionPerson } from "../components/ComposerField";
@@ -1102,8 +1102,14 @@ function BulletinTab({
               <div className="cmy-post-actions">
                 {editControl(p)}
                 {community.isOrganizer && (
-                  <button type="button" className="cmy-icon-btn" onClick={() => togglePin(p)}>
-                    {p.pinned ? "Unpin" : "Pin"}
+                  <button
+                    type="button"
+                    className={`cmy-pin-btn${p.pinned ? " is-on" : ""}`}
+                    aria-label={p.pinned ? "Unpin" : "Pin"}
+                    aria-pressed={p.pinned}
+                    onClick={() => togglePin(p)}
+                  >
+                    <Pin size={16} strokeWidth={1.8} aria-hidden="true" />
                   </button>
                 )}
                 {postMenu(p)}

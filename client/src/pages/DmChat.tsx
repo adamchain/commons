@@ -843,7 +843,7 @@ function DmUnavailable({
 
 function ArrowSendIcon() {
   return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path d="M5 12h14" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
       <path d="m13 6 6 6-6 6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>

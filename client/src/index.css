@@ -4267,8 +4267,8 @@ a.action-btn--stack {
 .chat-preview-card--composer .chat-composer-send.is-ready:disabled,
 .chat-preview-card--thread .chat-composer-send.is-ready,
 .chat-preview-card--thread .chat-composer-send.is-ready:disabled {
-  width: 48px;
-  height: 48px;
+  width: 36px;
+  height: 36px;
   background: var(--red);
   border: none;
   color: #fff;
@@ -4278,8 +4278,8 @@ a.action-btn--stack {
 }
 .chat-preview-card--thread .chat-composer-send.is-ready,
 .chat-preview-card--thread .chat-composer-send.is-ready:disabled {
-  width: 48px;
-  height: 48px;
+  width: 36px;
+  height: 36px;
   box-shadow: none;
 }
 .chat-preview-card--composer .chat-composer-send.is-ready:disabled,
@@ -4933,6 +4933,56 @@ a.action-btn--stack {
 .profile-section-label--inline {
   margin: 0;
 }
+.network-top {
+  background: #fff;
+  border-radius: 20px;
+  padding: 14px 14px 12px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow-card);
+}
+.network-top .screen-title {
+  margin-bottom: 12px;
+}
+.network-top .network-tabs {
+  margin-bottom: 0;
+}
+.profile-section-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 14px;
+  box-shadow: var(--shadow-card);
+}
+.profile-more-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-top: 10px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+.profile-more-arrow.is-open svg {
+  transform: rotate(90deg);
+}
+.cmy-pin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #7a7a8a;
+  cursor: pointer;
+}
+.cmy-pin-btn.is-on {
+  color: #4a4a58;
+}
 .profile-photo-row {
   display: flex;
   gap: 10px;
@@ -5160,7 +5210,10 @@ a.action-btn--stack {
   gap: 12px;
 }
 .messages-title-row .screen-title {
-  margin-bottom: 16px;
+  margin-bottom: 8px;
+}
+.messages-title-row {
+  margin-bottom: 14px;
 }
 .messages-compose {
   width: 40px;
@@ -6727,10 +6780,10 @@ a.action-btn--stack {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
-  min-width: 48px;
-  min-height: 48px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
   border-radius: 50%;
   background: var(--card);
   color: var(--faint);
@@ -6739,8 +6792,8 @@ a.action-btn--stack {
   transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
 }
 .chat-composer-send svg {
-  width: 28px;
-  height: 28px;
+  width: 18px;
+  height: 18px;
 }
 .chat-composer-send:not(:disabled):hover {
   color: var(--ink);
@@ -9938,6 +9991,22 @@ a.action-btn--stack {
   padding: 20px 16px calc(32px + var(--nav-height, 58px) + env(safe-area-inset-bottom, 0px));
   padding-top: calc(var(--topbar-height, 56px) + env(safe-area-inset-top, 0px) + 20px);
 }
+.notif-top {
+  background: #fff;
+  border-radius: 20px;
+  padding: 14px 14px 12px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow-card);
+}
+.notif-top .notif-header {
+  margin-bottom: 12px;
+}
+.notif-top .notif-tabs {
+  margin-bottom: 0;
+}
+.notif-top .notif-toolbar {
+  margin-top: 10px;
+}
 .notif-header {
   display: flex;
   align-items: center;
@@ -9984,9 +10053,10 @@ a.action-btn--stack {
   font-size: var(--text-body-small);
 }
 .notif-tab.is-active {
-  background: var(--ink);
+  background: #fff;
   border-color: var(--ink);
-  color: #fff;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
 }
 .notif-tab-dot {
   width: 8px;
@@ -9995,7 +10065,7 @@ a.action-btn--stack {
   background: var(--red);
 }
 .notif-tab.is-active .notif-tab-dot {
-  background: #fff;
+  background: var(--red);
 }
 .notif-tab-empty {
   margin: 12px 2px 0;
@@ -16552,10 +16622,10 @@ span.profile-other-cta {
 }
 .helpchat-send {
   flex-shrink: 0;
-  width: 48px;
-  height: 48px;
-  min-width: 48px;
-  min-height: 48px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
   border-radius: 50%;
   background: var(--red);
   color: #fff;

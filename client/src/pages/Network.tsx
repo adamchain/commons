@@ -148,15 +148,17 @@ export function NetworkPage() {
           </Link>
         </header>
       )}
-      <ScreenTitle title="People" subtitle={tab === "search" ? "Search by name, then add them." : "Find people who are into the same things."} />
+      <div className="network-top">
+      <ScreenTitle title="Network" subtitle={tab === "search" ? "People you've added." : "Find people who are into the same things."} />
 
-      <div className="network-tabs" role="tablist" aria-label="People">
+      <div className="network-tabs" role="tablist" aria-label="Network">
         <button type="button" role="tab" aria-selected={tab === "discover"} className={`network-tab${tab === "discover" ? " is-active" : ""}`} onClick={() => setTab("discover")}>
           Discover
         </button>
         <button type="button" role="tab" aria-selected={tab === "search"} className={`network-tab${tab === "search" ? " is-active" : ""}`} onClick={() => setTab("search")}>
-          Search
+          Your Network
         </button>
+      </div>
       </div>
 
       {tab === "discover" ? (
@@ -314,7 +316,8 @@ function NetworkRow({
   const navigate = useNavigate();
   const { user, neighborhoodName, mutualCount, networkStatus, reason } = row;
   const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || "Friend";
-  const meta = reason
+  const keptReason = reason && !reason.startsWith("Also into") ? reason : null;
+  const meta = keptReason
     || [neighborhoodName, mutualCount > 0 ? `${mutualCount} mutual` : null].filter(Boolean).join(" · ");
 
   return (

@@ -155,6 +155,7 @@ export function NotificationsPage() {
 
   return (
     <main className="app-shell app-shell--mid app-shell--with-nav app-shell--with-topbar notif-page">
+      <div className="notif-top">
       <div className="notif-header">
         <button
           type="button"
@@ -221,6 +222,7 @@ export function NotificationsPage() {
           </div>
         </div>
       )}
+      </div>
 
       {sorted.length === 0 ? (
         <EmptyCard

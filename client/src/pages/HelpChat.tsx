@@ -551,7 +551,7 @@ export function HelpChatPage() {
             disabled={!input.trim() || streaming}
             onClick={() => void send(input)}
           >
-            <ArrowUp size={28} strokeWidth={2.4} aria-hidden="true" />
+            <ArrowUp size={18} strokeWidth={2.2} aria-hidden="true" />
           </button>
         </div>
         <button

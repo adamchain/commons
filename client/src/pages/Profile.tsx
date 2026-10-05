@@ -13,7 +13,6 @@ import {
   MessageCircle,
   MoreHorizontal,
   Plus,
-  Settings,
   Share2,
   UserMinus,
   UserPlus,
@@ -405,7 +404,7 @@ export function ProfilePage() {
         </section>
 
         {profile.network.inMyNetwork && (profile.communities?.length ?? 0) > 0 && (
-          <section className="profile-other-section">
+          <section className="profile-other-section profile-section-card">
             <h3 className="profile-other-section-label">Communities</h3>
             <div className="profile-photo-row">
               {(profile.communities ?? []).map((c) => (
@@ -429,7 +428,7 @@ export function ProfilePage() {
         )}
 
         {profile.plansGated ? (
-          <section className="profile-other-section">
+          <section className="profile-other-section profile-section-card">
             <h3 className="profile-other-section-label">Plans</h3>
             <p className="profile-social-locked">
               You&apos;re on this one together. The rest of their calendar takes a connection.
@@ -439,7 +438,7 @@ export function ProfilePage() {
             )}
           </section>
         ) : profile.upcoming.length > 0 ? (
-          <section className="profile-other-section">
+          <section className="profile-other-section profile-section-card">
             <div className="profile-other-section-head">
               <h3 className="profile-other-section-label">Plans</h3>
               <span className="profile-other-section-count">
@@ -557,7 +556,7 @@ export function ProfilePage() {
         />
       </section>
 
-      <section className="profile-block" id="profile-communities">
+      <section className="profile-block profile-section-card" id="profile-communities">
         <div className="profile-block-heading-row">
           <h3 className="profile-section-label profile-section-label--inline">Communities</h3>
           <div className="profile-plans-toggle" role="tablist" aria-label="Communities">
@@ -1249,14 +1248,12 @@ function YourPlansBlock({
   view: "list" | "calendar";
   onViewChange: (v: "list" | "calendar") => void;
 }) {
-  const [upcomingExpanded, setUpcomingExpanded] = useState(false);
-  const [pastOpen, setPastOpen] = useState(false);
-  const visibleUpcoming = upcomingExpanded ? upcoming : upcoming.slice(0, 3);
-  const hiddenCount = Math.max(0, upcoming.length - visibleUpcoming.length);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const visibleUpcoming = moreOpen ? upcoming : upcoming.slice(0, 3);
   const profileBack: NavFromState = { from: "profile", profileUserId };
 
   return (
-    <section className="profile-block" id={id}>
+    <section className="profile-block profile-section-card" id={id}>
       <div className="profile-block-heading-row">
         <h3 className="profile-section-label profile-section-label--inline">Plans</h3>
         {isSelf && (
@@ -1315,14 +1312,15 @@ function YourPlansBlock({
                   </Link>
                 ))}
               </div>
-              {hiddenCount > 0 && (
-                <button type="button" className="profile-show-more-row" onClick={() => setUpcomingExpanded(true)}>
-                  Show {hiddenCount} more
-                </button>
-              )}
-              {upcomingExpanded && upcoming.length > 3 && (
-                <button type="button" className="profile-show-more-row" onClick={() => setUpcomingExpanded(false)}>
-                  Show less
+              {(upcoming.length > 3 || past.length > 0) && (
+                <button
+                  type="button"
+                  className={`profile-more-arrow${moreOpen ? " is-open" : ""}`}
+                  aria-expanded={moreOpen}
+                  aria-label={moreOpen ? "Show fewer plans" : "Show more plans"}
+                  onClick={() => setMoreOpen((v) => !v)}
+                >
+                  <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
                 </button>
               )}
               {isSelf && (
@@ -1339,43 +1337,26 @@ function YourPlansBlock({
             </p>
           )}
 
-          {past.length > 0 && (
-            <>
-              <button
-                type="button"
-                className="profile-past-toggle"
-                aria-expanded={pastOpen}
-                onClick={() => setPastOpen((v) => !v)}
-              >
-                <span>{past.length} past {past.length === 1 ? "plan" : "plans"}</span>
-                <span className={`profile-past-chevron ${pastOpen ? "is-open" : ""}`}>›</span>
-              </button>
-              {pastOpen && (
-                <div className="profile-plan-card" style={{ marginTop: 8 }}>
-                  {past.map((p) => (
-                    // Past events are just a record: title + date. "Do it again"
-                    // lives on the event page itself, not as a per-row button.
-                    <Link
-                    key={p.id}
-                    to={`/plans/${p.id}`}
-                    state={profileBack}
-                    className="profile-plan-row"
-                  >
-                      <PlanCoverThumb
-                        planId={p.id}
-                        flyerDataUrl={planPhotoUrl(p)}
-                        isIdea={isIdeaPlan(p)}
-                        className="cover-thumb--sm"
-                      />
-                      <span className="profile-plan-text">
-                        <span className="profile-list-title">{p.title}</span>
-                        <span className="profile-list-when">{formatPlanDate(p.date)}</span>
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </>
+          {moreOpen && past.length > 0 && (
+            <div className="profile-photo-row profile-photo-row--past">
+              {past.map((p) => (
+                <Link
+                  key={p.id}
+                  to={`/plans/${p.id}`}
+                  state={profileBack}
+                  className="profile-photo-card"
+                >
+                  <PlanCoverThumb
+                    planId={p.id}
+                    flyerDataUrl={planPhotoUrl(p)}
+                    isIdea={isIdeaPlan(p)}
+                    className="profile-photo-card-media"
+                  />
+                  <span className="profile-photo-card-title">{p.title}</span>
+                  <span className="profile-photo-card-meta">{formatPlanDate(p.date)}</span>
+                </Link>
+              ))}
+            </div>
           )}
         </>
       )}
@@ -1391,14 +1372,6 @@ function ProfileMenu() {
         <span className="profile-menu-text">
           <span className="profile-menu-label">Invite friends</span>
           <span className="profile-menu-sub">Share your codes</span>
-        </span>
-        <ChevronRight size={13} strokeWidth={1.6} className="profile-menu-chevron" aria-hidden="true" />
-      </Link>
-
-      <Link to="/settings" className="profile-menu-row">
-        <span className="profile-menu-icon" aria-hidden="true"><Settings size={18} strokeWidth={1.8} /></span>
-        <span className="profile-menu-text">
-          <span className="profile-menu-label">Settings</span>
         </span>
         <ChevronRight size={13} strokeWidth={1.6} className="profile-menu-chevron" aria-hidden="true" />
       </Link>
