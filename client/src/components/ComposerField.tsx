@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { isNative } from "../lib/platform";
+import { LinkedText } from "./LinkedText";
 
 export type MentionPerson = { id: string; firstName: string };
 
@@ -138,7 +139,7 @@ export function MentionText({ text, people }: { text: string; people: MentionPer
   return (
     <>
       {parts.map((part, i) => {
-        if (!part.startsWith("@")) return <span key={i}>{part}</span>;
+        if (!part.startsWith("@")) return <LinkedText key={i} text={part} />;
         const person = byName.get(part.slice(1).toLowerCase());
         if (!person) return <span key={i}>{part}</span>;
         return (

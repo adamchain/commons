@@ -565,31 +565,37 @@ export function CommunityDashboardPage() {
         </div>
       )}
 
-      {section === "members" && (data.screeningLog ?? []).length > 0 && (
+      {section === "members" && ((data.screeningQuestion ?? "").trim() || (data.screeningLog ?? []).length > 0) && (
         <section className="cmy-dash-card">
           <div className="cmy-dash-card-head">
-            <h2>Screener answers</h2>
+            <div>
+              <h2>Screener answers</h2>
+              {data.screeningQuestion?.trim() ? <p>{data.screeningQuestion}</p> : null}
+            </div>
             <span className="cmy-dash-count">{data.screeningLog?.length ?? 0}</span>
           </div>
-          {data.screeningQuestion && <p className="cmy-dash-empty">{data.screeningQuestion}</p>}
-          <ul className="cmy-dash-people">
-            {(data.screeningLog ?? []).map((row) => (
-              <li key={row.user.id} className="cmy-dash-person">
-                <Avatar
-                  seed={row.user.avatarSeed}
-                  style={row.user.avatarStyle}
-                  photoDataUrl={row.user.avatarPhotoDataUrl}
-                  params={row.user.avatarParams}
-                  size="sm"
-                />
-                <div className="cmy-dash-person-copy">
-                  <span className="cmy-dash-person-name">{personName(row.user)}</span>
-                  <span className="cmy-dash-person-sub">{formatRelative(row.at)}</span>
-                  <span className="cmy-dash-person-answer">“{row.answer}”</span>
-                </div>
-              </li>
-            ))}
-          </ul>
+          {(data.screeningLog ?? []).length === 0 ? (
+            <p className="cmy-dash-empty">No answers yet.</p>
+          ) : (
+            <ul className="cmy-dash-people">
+              {(data.screeningLog ?? []).map((row) => (
+                <li key={row.user.id} className="cmy-dash-person">
+                  <Avatar
+                    seed={row.user.avatarSeed}
+                    style={row.user.avatarStyle}
+                    photoDataUrl={row.user.avatarPhotoDataUrl}
+                    params={row.user.avatarParams}
+                    size="sm"
+                  />
+                  <div className="cmy-dash-person-copy">
+                    <span className="cmy-dash-person-name">{personName(row.user)}</span>
+                    <span className="cmy-dash-person-sub">{formatRelative(row.at)}</span>
+                    <span className="cmy-dash-person-answer">“{row.answer}”</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
 

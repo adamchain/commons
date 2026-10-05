@@ -1183,11 +1183,9 @@ button.cmy-joined-pill {
 .cmy-post-actions .plan-safety-menu,
 .cmy-reply-top .plan-safety-menu { margin-top: 0; }
 .cmy-org-badge {
-  color: var(--community-pink);
-  font-size: var(--type-label);
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  text-transform: none; /* no caps — final pass */
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-weight: 600;
   white-space: nowrap;
 }
 .cmy-org-badge--pill {
@@ -1270,21 +1268,23 @@ button.cmy-joined-pill {
   font-weight: 600;
   cursor: pointer;
 }
-.cmy-like-btn.is-active,
-.cmy-like-btn:hover {
-  color: var(--accent);
+.cmy-like-btn.is-active {
+  font-weight: 700;
+}
+.cmy-react-sep {
+  color: var(--text-muted);
+  font-size: var(--text-body-small);
+  line-height: 1;
 }
 .cmy-reply-btn {
   appearance: none;
-  align-self: flex-start;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 2px;
+  margin: 0;
   padding: 0;
   background: none;
   border: none;
-  color: var(--community-pink);
+  color: var(--text-muted);
   font-weight: 600;
   font-size: var(--text-body-small);
   cursor: pointer;

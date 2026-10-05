@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Calendar, Heart, LayoutDashboard, MessageCircle, Pencil, Send, Users } from "lucide-react";
+import { ArrowLeft, Calendar, LayoutDashboard, MessageCircle, Pencil, Send, Users } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { ComposerField, MentionText, type MentionPerson } from "../components/ComposerField";
@@ -1098,13 +1098,12 @@ function BulletinTab({
               <Avatar seed={p.author.avatarSeed} style={p.author.avatarStyle} photoDataUrl={p.author.avatarPhotoDataUrl} params={p.author.avatarParams} size="sm" />
               <span className="cmy-post-name">{p.author.firstName}</span>
               {p.authorIsOrganizer && <span className="cmy-org-badge">Organizer</span>}
-              {p.pinned && <span className="cmy-pinned-label">📌 Pinned</span>}
               <span className="cmy-post-time">{formatRelative(p.createdAt)}</span>
               <div className="cmy-post-actions">
                 {editControl(p)}
                 {community.isOrganizer && (
-                  <button type="button" className="cmy-icon-btn" onClick={() => togglePin(p)} title={p.pinned ? "Unpin" : "Pin"}>
-                    {p.pinned ? "📌" : "📍"}
+                  <button type="button" className="cmy-icon-btn" onClick={() => togglePin(p)}>
+                    {p.pinned ? "Unpin" : "Pin"}
                   </button>
                 )}
                 {postMenu(p)}
@@ -1138,64 +1137,75 @@ function BulletinTab({
                   aria-label={p.likedByMe ? "Unlike" : "Like"}
                   onClick={() => void toggleLike(p)}
                 >
-                  <Heart size={14} strokeWidth={2} fill={p.likedByMe ? "currentColor" : "none"} aria-hidden="true" />
-                  {(p.likeCount ?? 0) > 0 ? p.likeCount : "Like"}
+                  {(p.likeCount ?? 0) > 0 ? `Like · ${p.likeCount}` : "Like"}
                 </button>
+                {canReply && <span className="cmy-react-sep" aria-hidden="true">|</span>}
+                {canReply && (
+                  replyTo === p.id ? (
+                    <button
+                      type="button"
+                      className="cmy-reply-btn"
+                      onClick={() => {
+                        setReplyTo(null);
+                        setReplyDraft("");
+                      }}
+                    >
+                      Reply
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="cmy-reply-btn"
+                      onClick={() => {
+                        setReplyTo(p.id);
+                        setReplyDraft("");
+                        setPostErr(null);
+                      }}
+                    >
+                      Reply
+                    </button>
+                  )
+                )}
               </div>
             )}
-            {canReply && (
-              replyTo === p.id ? (
-                <div className="cmy-reply-composer">
-                  <ComposerField
-                    className="cmy-composer-input"
-                    placeholder={`Reply to ${p.author.firstName}…`}
-                    value={replyDraft}
-                    autoFocus
-                    people={people}
-                    disabled={replyBusy}
-                    onChange={setReplyDraft}
-                    onSubmit={() => {
-                      if (!replyBusy && replyDraft.trim()) void submitReply(p.id);
-                    }}
-                    onEscape={() => {
-                      setReplyTo(null);
-                      setReplyDraft("");
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="cmy-btn cmy-btn--primary cmy-btn--sm"
-                    disabled={replyBusy || !replyDraft.trim()}
-                    onClick={() => void submitReply(p.id)}
-                  >
-                    Reply
-                  </button>
-                  <button
-                    type="button"
-                    className="cmy-btn cmy-btn--ghost cmy-btn--sm"
-                    disabled={replyBusy}
-                    onClick={() => {
-                      setReplyTo(null);
-                      setReplyDraft("");
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
+            {canReply && replyTo === p.id && (
+              <div className="cmy-reply-composer">
+                <ComposerField
+                  className="cmy-composer-input"
+                  placeholder={`Reply to ${p.author.firstName}…`}
+                  value={replyDraft}
+                  autoFocus
+                  people={people}
+                  disabled={replyBusy}
+                  onChange={setReplyDraft}
+                  onSubmit={() => {
+                    if (!replyBusy && replyDraft.trim()) void submitReply(p.id);
+                  }}
+                  onEscape={() => {
+                    setReplyTo(null);
+                    setReplyDraft("");
+                  }}
+                />
                 <button
                   type="button"
-                  className="cmy-reply-btn"
+                  className="cmy-btn cmy-btn--primary cmy-btn--sm"
+                  disabled={replyBusy || !replyDraft.trim()}
+                  onClick={() => void submitReply(p.id)}
+                >
+                  Reply
+                </button>
+                <button
+                  type="button"
+                  className="cmy-btn cmy-btn--ghost cmy-btn--sm"
+                  disabled={replyBusy}
                   onClick={() => {
-                    setReplyTo(p.id);
+                    setReplyTo(null);
                     setReplyDraft("");
-                    setPostErr(null);
                   }}
                 >
-                  <MessageCircle size={14} strokeWidth={2} aria-hidden="true" />
-                  Reply{p.replies?.length ? ` · ${p.replies.length}` : ""}
+                  Cancel
                 </button>
-              )
+              </div>
             )}
           </li>
         ))}
