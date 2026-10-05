@@ -764,7 +764,7 @@ export function ChatPage() {
               disabled={sending || (!body.trim() && !pendingImage)}
               aria-label="Send message"
             >
-              <ArrowUp size={20} strokeWidth={2.2} aria-hidden="true" />
+              <ArrowUp size={28} strokeWidth={2.4} aria-hidden="true" />
             </button>
           </div>
         </form>

@@ -1199,7 +1199,7 @@ function ChatPreviewCard({
         onClick={() => void send()}
         aria-label="Send"
       >
-        <ChevronRight size={20} strokeWidth={2.5} aria-hidden="true" />
+        <ChevronRight size={28} strokeWidth={2.4} aria-hidden="true" />
       </button>
     </div>
   );

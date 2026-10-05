@@ -4278,8 +4278,8 @@ a.action-btn--stack {
 }
 .chat-preview-card--thread .chat-composer-send.is-ready,
 .chat-preview-card--thread .chat-composer-send.is-ready:disabled {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   box-shadow: none;
 }
 .chat-preview-card--composer .chat-composer-send.is-ready:disabled,
@@ -6566,14 +6566,20 @@ a.action-btn--stack {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
   border-radius: 50%;
   background: var(--card);
   color: var(--faint);
   border: 1px solid var(--border);
   flex-shrink: 0;
   transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+.chat-composer-send svg {
+  width: 28px;
+  height: 28px;
 }
 .chat-composer-send:not(:disabled):hover {
   color: var(--ink);
@@ -16328,8 +16334,10 @@ span.profile-other-cta {
 }
 .helpchat-send {
   flex-shrink: 0;
-  width: 34px;
-  height: 34px;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
   border-radius: 50%;
   background: var(--red);
   color: #fff;
