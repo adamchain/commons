@@ -484,7 +484,7 @@ chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => 
           ? `${senderName} mentioned you in "${place}"`
           : `${senderName} in "${place}": ${messagePreview(message)}`,
         planId: conv.planId,
-        communityId: conv.communityId,
+        communityId: conv.communityId ?? undefined,
         conversationId: convId,
         dedupKey: tagged
           ? `mention:${message.id}:${recipientId}`
