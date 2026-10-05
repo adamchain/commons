@@ -1,7 +1,7 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Search, Users } from "lucide-react";
-import { api } from "../api/http";
+import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
 import { JoinConfirmPopup } from "../components/JoinConfirmPopup";
@@ -215,8 +215,8 @@ function CommunityJoinCta({
         myMembershipStatus: nextStatus,
         memberCount: nextStatus === "active" ? community.memberCount + 1 : community.memberCount,
       });
-    } catch {
-      /* rail CTA fails quietly — the full community page has the real error state */
+    } catch (e) {
+      if (/screening/i.test(parseApiError(e))) onRequest();
     } finally {
       setBusy(false);
     }

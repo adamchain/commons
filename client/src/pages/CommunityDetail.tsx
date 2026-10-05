@@ -157,6 +157,16 @@ export function CommunityDetailPage() {
   const canLeave =
     community.creationStatus === "approved" && isActiveMember && !community.isOrganizer;
   const canShare = community.creationStatus === "approved";
+  // Private (and any screened) communities must show the question next to Join.
+  // It used to live only in the locked tab, below the fold, and the header
+  // button tried to smooth-scroll there — that scroll does not run on iOS.
+  const needsScreening = Boolean(community.hasScreening || community.screeningQuestion?.trim());
+  const joinStatus = community.myMembership?.status;
+  const showScreeningForm =
+    needsScreening &&
+    !community.isOrganizer &&
+    joinStatus !== "active" &&
+    joinStatus !== "pending";
 
   async function leaveCommunity() {
     if (leaveBusy || !canLeave) return;
@@ -269,14 +279,26 @@ export function CommunityDetailPage() {
                 <span className="cmy-header-org">{placeLabel}</span>
               </span>
             </button>
-            <JoinControl
-              community={community}
-              onChange={setCommunity}
-              reload={load}
-              onJoined={() => setJoinConfirm(true)}
-              compact
-            />
+            {!showScreeningForm && (
+              <JoinControl
+                community={community}
+                onChange={setCommunity}
+                reload={load}
+                onJoined={() => setJoinConfirm(true)}
+                compact
+              />
+            )}
           </div>
+          {showScreeningForm && (
+            <div className="cmy-header-join" id="cmy-header-join">
+              <JoinControl
+                community={community}
+                onChange={setCommunity}
+                reload={load}
+                onJoined={() => setJoinConfirm(true)}
+              />
+            </div>
+          )}
           {(community.description || community.organizer) && (
             <div className="cmy-about">
               {community.description && (
@@ -360,6 +382,7 @@ export function CommunityDetailPage() {
           onChange={setCommunity}
           reload={load}
           onJoined={() => setJoinConfirm(true)}
+          deferQuestion={showScreeningForm}
         />
       ))}
       {tab === "events" && (
@@ -380,6 +403,7 @@ export function CommunityDetailPage() {
             onChange={setCommunity}
             reload={load}
             onJoined={() => setJoinConfirm(true)}
+            deferQuestion={showScreeningForm}
           />
         )
       )}
@@ -396,6 +420,7 @@ export function CommunityDetailPage() {
           onChange={setCommunity}
           reload={load}
           onJoined={() => setJoinConfirm(true)}
+          deferQuestion={showScreeningForm}
         />
       ))}
       {tab === "settings" && canManage && (
@@ -545,11 +570,14 @@ function LockedPanel({
   onChange,
   reload,
   onJoined,
+  deferQuestion = false,
 }: {
   community: CommunityDTO;
   onChange: (c: CommunityDTO) => void;
   reload: () => Promise<void>;
   onJoined: () => void;
+  /** Question already sits in the header — don't render a second copy down here. */
+  deferQuestion?: boolean;
 }) {
   const pending = community.myMembership?.status === "pending";
   return (
@@ -566,7 +594,13 @@ function LockedPanel({
           <>
             <p className="cmy-locked-text">It&apos;s quiet until you&apos;re in.</p>
             <div className="cmy-locked-join">
-              <JoinControl community={community} onChange={onChange} reload={reload} onJoined={onJoined} />
+              <JoinControl
+                community={community}
+                onChange={onChange}
+                reload={reload}
+                onJoined={onJoined}
+                deferQuestion={deferQuestion}
+              />
             </div>
           </>
         )}
@@ -575,23 +609,31 @@ function LockedPanel({
   );
 }
 
+function focusScreeningQuestion() {
+  const el = document.getElementById("cmy-screening") ?? document.getElementById("cmy-header-join");
+  // "smooth" is a no-op in the iOS web view, so the question looked missing.
+  el?.scrollIntoView({ block: "center" });
+  document.querySelector<HTMLTextAreaElement>("#cmy-screening textarea")?.focus();
+}
+
 function JoinControl({
   community,
   onChange,
   reload,
   onJoined,
   compact = false,
+  deferQuestion = false,
 }: {
   community: CommunityDTO;
   onChange: (c: CommunityDTO) => void;
   reload: () => Promise<void>;
   onJoined: () => void;
   compact?: boolean;
+  /** Header already shows the question. This control only jumps back to it. */
+  deferQuestion?: boolean;
 }) {
   const needsQuestion = Boolean(community.hasScreening || community.screeningQuestion?.trim());
-  // The header pill is too small to hold the question. The locked panel shows
-  // it immediately so a private community doesn't skip the screener.
-  const [asking, setAsking] = useState(!compact && needsQuestion);
+  const [asking, setAsking] = useState(!compact && !deferQuestion && needsQuestion);
   const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -603,10 +645,10 @@ function JoinControl({
     if (community.myMembership?.status === "active" || !community.myMembership) {
       setRequested(false);
     }
-    if (!compact && (community.hasScreening || community.screeningQuestion?.trim())) {
+    if (!compact && !deferQuestion && (community.hasScreening || community.screeningQuestion?.trim())) {
       setAsking(true);
     }
-  }, [community.myMembership?.status, community.hasScreening, community.screeningQuestion, compact]);
+  }, [community.myMembership?.status, community.hasScreening, community.screeningQuestion, compact, deferQuestion]);
 
   async function doJoin(screeningAnswer?: string) {
     if (busy) return;
@@ -673,9 +715,8 @@ function JoinControl({
     );
   }
 
-  // Visitor. Compact controls scroll to the full question instead of
-  // rendering a second form inside the header row.
-  if (needsQuestion && asking && !compact) {
+  // The question lives in the header. Compact and locked-tab controls jump to it.
+  if (needsQuestion && asking && !compact && !deferQuestion) {
     return (
       <div className="cmy-join-col cmy-screen" id="cmy-screening">
         <p className="cmy-screen-q">{community.screeningQuestion?.trim() || "A quick question before you join:"}</p>
@@ -718,8 +759,8 @@ function JoinControl({
         disabled={busy}
         onClick={() => {
           if (needsQuestion) {
-            if (compact) {
-              document.getElementById("cmy-screening")?.scrollIntoView({ behavior: "smooth", block: "center" });
+            if (compact || deferQuestion) {
+              focusScreeningQuestion();
               return;
             }
             setAsking(true);

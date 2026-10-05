@@ -851,6 +851,28 @@ button.cmy-joined-pill {
 .cmy-header-row > .cmy-join-col {
   flex: 1 1 100%;
 }
+.cmy-header-join {
+  width: 100%;
+}
+.cmy-header-join .cmy-join-col,
+.cmy-header-join .cmy-screen {
+  width: 100%;
+  align-items: stretch;
+}
+.cmy-header-join .cmy-screen-q,
+.cmy-locked-join .cmy-screen-q {
+  text-align: left;
+  line-height: 1.35;
+}
+.cmy-header-join .cmy-join-row,
+.cmy-locked-join .cmy-screen .cmy-join-row {
+  justify-content: flex-start;
+}
+.cmy-locked-join .cmy-screen {
+  width: 100%;
+  align-self: stretch;
+  align-items: stretch;
+}
 .cmy-title-row { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
 .cmy-name {
   font-size: var(--type-display);

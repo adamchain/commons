@@ -216,7 +216,7 @@ export function OnboardingPage() {
       setSmsConfigured(result.smsConfigured);
       setAuthMode(result.authMode ?? (result.smsConfigured ? "verify" : "dev"));
       if (result.reused) {
-        setCodeHint("We already texted a code. Give it a minute, then use that text.");
+        setCodeHint("Use the code in the text we already sent. Asking again would cancel it.");
       } else if (hasSentCode.current) {
         setCodeHint("Sent a new code. Use the latest text.");
         armFreshCode();
@@ -361,9 +361,10 @@ export function OnboardingPage() {
         )}
         {error && <div className="onboarding-error">{error}</div>}
         <button
+          type="button"
           className="btn-primary btn-block"
           disabled={busy || !phoneValid}
-          onClick={requestCode}
+          onClick={() => void requestCode()}
         >
           {busy ? "Sending…" : "Get started"}
         </button>

@@ -13,8 +13,13 @@ function getClient(): ReturnType<typeof twilio> {
   return twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!);
 }
 
-/** A second send inside this window would cancel the text that's already on its way. */
-const SEND_COOLDOWN_MS = 30_000;
+/**
+ * Twilio cancels the previous code as soon as a new verification is created.
+ * People often tap resend while the first text is still arriving, then the
+ * code they type (from either text) comes back expired. Hold the same
+ * verification for its normal life instead of starting another one.
+ */
+const SEND_COOLDOWN_MS = 10 * 60 * 1000;
 /** A duplicate check of a code we just approved should still sign the person in. */
 const APPROVAL_GRACE_MS = 60_000;
 

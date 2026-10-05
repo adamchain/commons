@@ -1,7 +1,7 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Plus, Search, Users } from "lucide-react";
-import { api } from "../api/http";
+import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { CommunityCover } from "../components/CommunityCover";
 import { CommunityStatusPill } from "../components/CommunityStatusPill";
@@ -418,8 +418,10 @@ function CommunityJoinLink({ c, onJoined }: { c: CommunityCardDTO; onJoined: (up
         myRole: nextStatus === "active" ? "member" : c.myRole,
         memberCount: nextStatus === "active" ? c.memberCount + 1 : c.memberCount,
       });
-    } catch {
-      /* card CTA fails quietly — the full community page has the real error state */
+    } catch (e) {
+      if (/screening/i.test(parseApiError(e))) {
+        navigate(`/communities/${c.id}`);
+      }
     } finally {
       setBusy(false);
     }

@@ -32,18 +32,27 @@ export function AvatarCropModal({
   onConfirm: (dataUrl: string) => void;
 }) {
   const safeAspect = aspect > 0 ? aspect : 1;
-  const [viewportW, setViewportW] = useState(() =>
-    typeof window === "undefined" ? 390 : window.innerWidth,
-  );
-  useEffect(() => {
-    const onResize = () => setViewportW(window.innerWidth);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
+  const cardRef = useRef<HTMLDivElement | null>(null);
   const requested = stageMax > 120 ? stageMax : STAGE_MAX;
-  // Stay inside the dialog. The backdrop and card each pad 20px, so a frame
-  // based on the raw window width used to spill past the card and clip the crop.
-  const frame = Math.min(requested, Math.max(200, viewportW - 88));
+  const [frame, setFrame] = useState(() => {
+    const vw = typeof window === "undefined" ? 390 : window.innerWidth;
+    return Math.min(requested, Math.max(200, vw - 88));
+  });
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!card) return;
+    const measure = () => {
+      const style = getComputedStyle(card);
+      const pad = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+      const available = card.clientWidth - pad;
+      if (available < 80) return;
+      setFrame(Math.min(requested, Math.floor(available)));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, [requested]);
   const stageW = safeAspect >= 1 ? frame : Math.round(frame * safeAspect);
   const stageH = safeAspect >= 1 ? Math.round(frame / safeAspect) : frame;
   const outW = outputPx;
@@ -54,7 +63,7 @@ export function AvatarCropModal({
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const drag = useRef<{ px: number; py: number; ox: number; oy: number } | null>(null);
-  const placed = useRef(false);
+  const touched = useRef(false);
 
   const coverScale = natural ? Math.max(stageW / natural.w, stageH / natural.h) : 1;
   const effScale = coverScale * zoom;
@@ -75,7 +84,7 @@ export function AvatarCropModal({
   useEffect(() => {
     setZoom(1);
     setNatural(null);
-    placed.current = false;
+    touched.current = false;
     const img = new Image();
     img.onload = () => {
       imgRef.current = img;
@@ -85,8 +94,7 @@ export function AvatarCropModal({
   }, [src]);
 
   useEffect(() => {
-    if (!natural || placed.current) return;
-    placed.current = true;
+    if (!natural || touched.current) return;
     const cover = Math.max(stageW / natural.w, stageH / natural.h);
     setOffset({
       x: (stageW - natural.w * cover) / 2,
@@ -96,6 +104,7 @@ export function AvatarCropModal({
 
   function onZoom(nextZoom: number) {
     if (!natural) return;
+    touched.current = true;
     const oldEff = coverScale * zoom;
     const newEff = coverScale * nextZoom;
     const cx = stageW / 2;
@@ -107,6 +116,7 @@ export function AvatarCropModal({
   }
 
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    touched.current = true;
     e.currentTarget.setPointerCapture(e.pointerId);
     drag.current = { px: e.clientX, py: e.clientY, ox: offset.x, oy: offset.y };
   }
@@ -138,12 +148,12 @@ export function AvatarCropModal({
 
   return (
     <div className="modal-backdrop" onClick={onCancel}>
-      <div className="modal-card avatar-crop-modal" onClick={(e) => e.stopPropagation()}>
+      <div ref={cardRef} className="modal-card avatar-crop-modal" onClick={(e) => e.stopPropagation()}>
         <h2 className="avatar-crop-title">{title}</h2>
         <p className="avatar-crop-sub">{subtitle}</p>
 
         <div
-          className={`avatar-crop-stage${shape === "rect" ? " avatar-crop-stage--rect" : ""}`}
+          className={`avatar-crop-stage${shape === "rect" ? " avatar-crop-stage--rect" : " avatar-crop-stage--circle"}`}
           style={{ width: stageW, height: stageH }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -157,14 +167,13 @@ export function AvatarCropModal({
               alt=""
               draggable={false}
               style={{
-                width: natural.w,
-                height: natural.h,
-                transformOrigin: "0 0",
-                transform: `translate(${offset.x}px, ${offset.y}px) scale(${effScale})`,
+                width: natural.w * effScale,
+                height: natural.h * effScale,
+                transform: `translate(${offset.x}px, ${offset.y}px)`,
               }}
             />
           )}
-          {shape === "circle" && <div className="avatar-crop-mask" aria-hidden="true" />}
+          {shape === "circle" && <div className="avatar-crop-ring" aria-hidden="true" />}
         </div>
 
         <input
