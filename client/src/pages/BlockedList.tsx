@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
-import { LoadingScreen } from "../components/LoadingScreen";
 import type { PublicUser } from "../types/shared";
 
 /** Settings → Blocked. Lists everyone the signed-in user has blocked, with a one-tap unblock. */
@@ -32,7 +31,22 @@ export function BlockedListPage() {
     }
   }
 
-  if (users === null) return <LoadingScreen tagline="Loading blocked accounts" />;
+  if (users === null) {
+    return (
+      <main className="app-shell app-shell--with-nav app-shell--with-topbar">
+        <header className="app-header app-header--minimal">
+          <Link to="/settings" className="back-circle" aria-label="Back">
+            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
+          </Link>
+        </header>
+        <h1 className="brand" style={{ marginBottom: 4 }}>Blocked</h1>
+        <div className="feed-skeleton" aria-busy="true" aria-label="Loading blocked accounts">
+          <div className="feed-skeleton-card" />
+          <div className="feed-skeleton-card" />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">

@@ -11,6 +11,7 @@ import { WeekStrip } from "../components/WeekStrip";
 import { EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { FLEXIBLE_DATE_PLACEHOLDER, isIdeaPlan, planHasEnded } from "../lib/planTime";
+import { peekFeedPlans, retireFeedPlans } from "../lib/feedPrefetch";
 import { consumeFeedScroll } from "../lib/navState";
 import type { AgeRange, InterestTag, MeDTO, NetworkPromptDTO, PlanDTO } from "../types/shared";
 
@@ -168,7 +169,27 @@ export function FeedPage() {
   }, [fetchPlans]);
 
   useEffect(() => {
-    void fetchPlans();
+    const shared = peekFeedPlans();
+    if (!shared) {
+      void fetchPlans();
+      return;
+    }
+    let alive = true;
+    void shared
+      .then((rows) => {
+        if (!alive) return;
+        retireFeedPlans();
+        setPlans(rows);
+        setFeedReady(true);
+      })
+      .catch(() => {
+        if (!alive) return;
+        retireFeedPlans();
+        void fetchPlans();
+      });
+    return () => {
+      alive = false;
+    };
   }, [fetchPlans]);
 
   // Tapping Home while already on the feed snaps to top and re-pulls plans.

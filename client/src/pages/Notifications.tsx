@@ -28,7 +28,6 @@ import {
 } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
-import { LoadingScreen } from "../components/LoadingScreen";
 import { EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { formatRelative } from "../lib/format";
@@ -116,7 +115,31 @@ export function NotificationsPage() {
       .catch(() => undefined);
   }
 
-  if (items === null) return <LoadingScreen tagline="Catching up" />;
+  if (items === null) {
+    return (
+      <main className="app-shell app-shell--mid app-shell--with-nav app-shell--with-topbar notif-page">
+        <div className="notif-header">
+          <button
+            type="button"
+            className="back-circle"
+            aria-label="Back"
+            onClick={() => {
+              if (window.history.length > 1) navigate(-1);
+              else navigate("/");
+            }}
+          >
+            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
+          </button>
+          <h1 className="notif-title">Notifications</h1>
+        </div>
+        <div className="feed-skeleton" aria-busy="true" aria-label="Loading notifications">
+          <div className="feed-skeleton-card" />
+          <div className="feed-skeleton-card" />
+          <div className="feed-skeleton-card" />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="app-shell app-shell--mid app-shell--with-nav app-shell--with-topbar notif-page">

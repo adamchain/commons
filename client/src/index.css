@@ -2854,16 +2854,6 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   justify-content: center;
   z-index: 100;
   overflow: hidden;
-  animation: loader-fade-in 240ms ease;
-}
-
-@keyframes loader-fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
 }
 
 .loader-center {

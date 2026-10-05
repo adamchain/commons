@@ -4,7 +4,6 @@ import { ArrowLeft, Calendar, Star } from "lucide-react";
 import { api } from "../api/http";
 import { PlanCoverThumb, planPhotoUrl } from "../components/CoverThumb";
 import { InterestGlyph } from "../components/InterestGlyph";
-import { LoadingScreen } from "../components/LoadingScreen";
 import { EmptyCard, Label, ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanWhenWhereLine, sentenceCaseTitle } from "../lib/format";
@@ -32,7 +31,17 @@ export function MyPlansPage() {
     void load();
   }, [user?.id]);
 
-  if (!plans || !user) return <LoadingScreen tagline="Plans" />;
+  if (!plans || !user) {
+    return (
+      <main className="app-shell app-shell--with-nav app-shell--with-topbar my-plans-page">
+        <ScreenTitle title="Plans" />
+        <div className="feed-skeleton" aria-busy="true" aria-label="Loading plans">
+          <div className="feed-skeleton-card" />
+          <div className="feed-skeleton-card" />
+        </div>
+      </main>
+    );
+  }
 
   const isUpcoming = (p: PlanDTO) => !p.cancelledAt && !planHasEnded(p);
   const upcoming = plans

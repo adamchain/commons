@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { api } from "../api/http";
+import { prefetchFeedPlans } from "../lib/feedPrefetch";
 import { ensurePushRegistered } from "../lib/push";
 import type { MeDTO } from "../types/shared";
 
@@ -35,6 +36,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    // Same moment as the session check, so the home feed is usually ready
+    // when the splash comes down instead of starting a second wait.
+    prefetchFeedPlans();
     void refreshUser();
   }, []);
 
