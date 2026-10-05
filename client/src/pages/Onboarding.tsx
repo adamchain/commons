@@ -118,9 +118,16 @@ export function OnboardingPage() {
   );
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [codeHint, setCodeHint] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [holdAutofill, setHoldAutofill] = useState(false);
   const lastAutoSubmittedCode = useRef<string | null>(null);
   const verifyInFlight = useRef(false);
+  const verified = useRef(false);
+  const requestInFlight = useRef(false);
+  const userEditedCode = useRef(false);
+  const sendGen = useRef(0);
+  const hasSentCode = useRef(Boolean(nav?.phoneNumber));
   // Access code for the launch gate. Accepts the shared exclusive code OR a
   // personal invite code from an existing member. Prefilled from ?invite= on a
   // share link, or from location.state.inviteCode when handed off from the
@@ -159,7 +166,7 @@ export function OnboardingPage() {
   }, [phoneNumber, countryCode]);
 
   useEffect(() => {
-    if (step !== "code" || busy) return;
+    if (step !== "code" || busy || holdAutofill || verified.current) return;
     if (code.length !== 6) {
       lastAutoSubmittedCode.current = null;
       return;
@@ -167,9 +174,30 @@ export function OnboardingPage() {
     if (lastAutoSubmittedCode.current === code) return;
     lastAutoSubmittedCode.current = code;
     void verifyCode();
-  }, [step, code, busy]);
+  }, [step, code, busy, holdAutofill]);
+
+  function armFreshCode() {
+    const gen = ++sendGen.current;
+    userEditedCode.current = false;
+    lastAutoSubmittedCode.current = null;
+    setCode("");
+    setHoldAutofill(true);
+    // The keyboard can drop the previous text's code into the field as soon
+    // as it appears. Hold auto-submit, then clear that leftover so it isn't
+    // checked against the new code.
+    window.setTimeout(() => {
+      if (sendGen.current !== gen) return;
+      if (!userEditedCode.current) {
+        lastAutoSubmittedCode.current = null;
+        setCode("");
+      }
+      setHoldAutofill(false);
+    }, 1600);
+  }
 
   async function requestCode() {
+    if (requestInFlight.current) return;
+    requestInFlight.current = true;
     setError(null);
     setBusy(true);
     try {
@@ -177,23 +205,36 @@ export function OnboardingPage() {
         phoneNumber: string;
         smsConfigured: boolean;
         authMode?: "verify" | "dev";
+        reused?: boolean;
       }>("/api/auth/request-code", {
         method: "POST",
-        body: JSON.stringify({ phoneNumber: composePhone(countryCode, phoneNumber) }),
+        body: JSON.stringify({
+          phoneNumber: step === "code" && sentPhone ? sentPhone : composePhone(countryCode, phoneNumber),
+        }),
       });
       setSentPhone(result.phoneNumber);
       setSmsConfigured(result.smsConfigured);
       setAuthMode(result.authMode ?? (result.smsConfigured ? "verify" : "dev"));
+      if (result.reused) {
+        setCodeHint("We already texted a code. Give it a minute, then use that text.");
+      } else if (hasSentCode.current) {
+        setCodeHint("Sent a new code. Use the latest text.");
+        armFreshCode();
+      } else {
+        setCodeHint(null);
+      }
+      hasSentCode.current = true;
       setStep("code");
     } catch (e) {
       setError(formatError(e));
     } finally {
+      requestInFlight.current = false;
       setBusy(false);
     }
   }
 
   async function verifyCode() {
-    if (verifyInFlight.current) return;
+    if (verifyInFlight.current || verified.current) return;
     verifyInFlight.current = true;
     setError(null);
     setBusy(true);
@@ -202,6 +243,7 @@ export function OnboardingPage() {
         method: "POST",
         body: JSON.stringify({ phoneNumber: sentPhone || phoneNumber, code }),
       });
+      verified.current = true;
       const { token, ...me } = result;
       if (token) await setAuthToken(token);
       setUser(me);
@@ -214,7 +256,7 @@ export function OnboardingPage() {
         setStep(pickInitial(me, gatePassed));
       }
     } catch (e) {
-      setError(formatError(e));
+      if (!verified.current) setError(formatError(e));
     } finally {
       verifyInFlight.current = false;
       setBusy(false);
@@ -346,21 +388,36 @@ export function OnboardingPage() {
           maxLength={authMode === "dev" ? 6 : 10}
           placeholder={authMode === "dev" ? "123456" : "Code"}
           value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+          onKeyDown={() => {
+            userEditedCode.current = true;
+          }}
+          onPaste={() => {
+            userEditedCode.current = true;
+          }}
+          onChange={(e) => {
+            setCode(e.target.value.replace(/\D/g, ""));
+            if (error) setError(null);
+          }}
         />
         {error && <div className="onboarding-error">{error}</div>}
+        {codeHint && !error && <p className="onboarding-fineprint">{codeHint}</p>}
         {authMode === "dev" && import.meta.env.DEV && (
           <p className="onboarding-fineprint">Use the code from the server terminal (local dev).</p>
         )}
         <button
+          type="button"
           className="btn-primary btn-block"
           disabled={
             busy ||
+            holdAutofill ||
             (authMode === "dev" ? code.length !== 6 : code.length < 4 || code.length > 10)
           }
-          onClick={verifyCode}
+          onClick={() => void verifyCode()}
         >
           {busy ? "Verifying…" : "Verify"}
+        </button>
+        <button type="button" className="btn-link" disabled={busy} onClick={() => void requestCode()}>
+          Resend code
         </button>
         <button className="btn-link" onClick={() => setStep("phone")} type="button">
           Wrong number?

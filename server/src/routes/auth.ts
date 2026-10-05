@@ -211,7 +211,14 @@ authRouter.post("/request-code", limitRequestByPhone, limitRequestByIp, async (r
 
   if (isTwilioVerifyConfigured()) {
     try {
-      await startPhoneVerification(phone);
+      const started = await startPhoneVerification(phone);
+      res.json({
+        ok: true,
+        phoneNumber: phone,
+        smsConfigured: true,
+        authMode: "verify" as const,
+        reused: started.reused,
+      });
     } catch (err) {
       console.error("[auth] Twilio Verify send failed", err);
       const twilio = parseTwilioError(err);
@@ -223,9 +230,7 @@ authRouter.post("/request-code", limitRequestByPhone, limitRequestByIp, async (r
         return;
       }
       res.status(502).json({ error: "Could not send verification text. Try again in a moment." });
-      return;
     }
-    res.json({ ok: true, phoneNumber: phone, smsConfigured: true, authMode: "verify" as const });
     return;
   }
 
@@ -252,9 +257,9 @@ authRouter.post("/verify-code", limitVerifyByPhone, limitVerifyByIp, async (req,
     }
     // Valid test code — skip Twilio + sms-code checks, fall through to sign-in.
   } else if (isTwilioVerifyConfigured()) {
-    let approved = false;
+    let result: Awaited<ReturnType<typeof checkPhoneVerification>>;
     try {
-      approved = await checkPhoneVerification(phone, code);
+      result = await checkPhoneVerification(phone, code);
     } catch (err) {
       console.error("[auth] Twilio Verify check failed", err);
       const twilio = parseTwilioError(err);
@@ -269,8 +274,12 @@ authRouter.post("/verify-code", limitVerifyByPhone, limitVerifyByIp, async (req,
       res.status(502).json({ error: "Verification failed. Try again." });
       return;
     }
-    if (!approved) {
-      res.status(401).json({ error: "Invalid or expired code" });
+    if (result === "expired") {
+      res.status(401).json({ error: "That code expired. Request a new one and use the latest text." });
+      return;
+    }
+    if (result !== "approved") {
+      res.status(401).json({ error: "That code doesn't match. Check the latest text and try again." });
       return;
     }
   } else if (!store.consumeSmsCode(phone, code)) {

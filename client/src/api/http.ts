@@ -42,7 +42,9 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     headers,
   });
 
-  if (response.status === 401 && isNative()) {
+  // A wrong verification code is a 401 too. Clearing storage here wiped a
+  // session that a duplicate check had just saved, so sign-in looked expired.
+  if (response.status === 401 && isNative() && !path.startsWith("/api/auth/verify-code")) {
     await clearAuthToken();
   }
 
