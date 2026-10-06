@@ -198,6 +198,7 @@ export function CreatePlanPage() {
     },
     chatEnabled: true,
     networkEveryone: false,
+    markedFull: false,
   });
   const [submitting, setSubmitting] = useState(false);
   const [showMore, setShowMore] = useState(false);
@@ -469,6 +470,7 @@ export function CreatePlanPage() {
           flyerLinkUrl: prev.flyerLinkUrl ?? "",
           flyerLinkPreview: prev.flyerLinkPreview ?? null,
           chatEnabled: prev.chatEnabled !== false,
+          markedFull: prev.markedFull === true,
         }));
         if (prev.capacity !== null || prev.flyerLinkUrl) setShowMore(true);
         setPath("plan");
@@ -753,6 +755,7 @@ export function CreatePlanPage() {
           flyerLinkPreview: form.flyerLinkPreview ?? null,
           hostEmoji: VIBE_OPTIONS.find((o) => o.id === form.vibes[0])?.emoji ?? "✨",
           chatEnabled: form.chatEnabled,
+          markedFull: form.markedFull,
         }),
       });
       const nextDate = form.isFlexibleDate ? FLEXIBLE_DATE_PLACEHOLDER : form.date;
@@ -1627,6 +1630,28 @@ export function CreatePlanPage() {
                   />
                 </div>
               )}
+
+              {editingPlanId && (
+                <div className="form-row-flex" style={{ marginTop: 12 }}>
+                  <div className="form-row-flex-main">
+                    <label className="form-question">Mark as full</label>
+                    <p className="form-help">
+                      {form.markedFull
+                        ? "Plan shows as Full. New joins are blocked."
+                        : "Turn on to show this plan as full."}
+                    </p>
+                  </div>
+                  <FlexToggle
+                    active={form.markedFull}
+                    variant="switch"
+                    label="Mark as full"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setForm((f) => ({ ...f, markedFull: !f.markedFull }));
+                    }}
+                  />
+                </div>
+              )}
             </section>
 
             {/* Repeats — Zoom-style cadence dropdown */}
@@ -1855,6 +1880,7 @@ type FormShape = {
   chatEnabled: boolean;
   /** Network posts start as a hand-picked list. True shares with the whole network. */
   networkEveryone: boolean;
+  markedFull: boolean;
 };
 
 /**
