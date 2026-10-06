@@ -1087,8 +1087,8 @@ function BulletinTab({
       {livePosts.length === 0 && pending.length === 0 && myPending.length === 0 && (
         <TabEmpty
           icon={<MessageCircle size={24} strokeWidth={1.6} />}
-          headline="It's quiet in here."
-          body="Somebody's gotta go first."
+          headline={canPost ? "It's quiet in here." : "Nothing here yet."}
+          body={canPost ? "Somebody's gotta go first." : "Drop a hello, question or recommendation!"}
         />
       )}
       <ul className="cmy-post-list">
@@ -1523,11 +1523,32 @@ function CommunitySocialPills({
       Icon: TikTokGlyph,
     },
     {
+      key: "youtube",
+      label: "YouTube",
+      handle: links?.youtube,
+      href: (h: string) => `https://youtube.com/@${encodeURIComponent(h)}`,
+      Icon: YouTubeGlyph,
+    },
+    {
+      key: "venmo",
+      label: "Venmo",
+      handle: links?.venmo,
+      href: (h: string) => `https://venmo.com/${encodeURIComponent(h)}`,
+      Icon: VenmoGlyph,
+    },
+    {
       key: "linktree",
       label: "Linktree",
       handle: links?.linktree,
       href: (h: string) => `https://linktr.ee/${encodeURIComponent(h)}`,
       Icon: LinktreeGlyph,
+    },
+    {
+      key: "website",
+      label: "Website",
+      handle: links?.website,
+      href: (h: string) => h.startsWith("http") ? h : `https://${h}`,
+      Icon: WebsiteGlyph,
     },
   ];
   const visible = isOrganizer ? items : items.filter((it) => it.handle);
@@ -1592,6 +1613,31 @@ function LinktreeGlyph() {
   );
 }
 
+function YouTubeGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8ZM9.6 15.6V8.4l6.3 3.6-6.3 3.6Z" />
+    </svg>
+  );
+}
+
+function VenmoGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M18.9 2C19.6 3.2 20 4.6 20 6.1c0 4.6-3.9 10.6-7.1 14.8H5.5L2 2.8l6.2-.6 1.8 7.3C11.3 7 12.4 4.1 12.4 2c0-.7-.1-1.3-.3-1.9L18.9 2Z" />
+    </svg>
+  );
+}
+
+function WebsiteGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  );
+}
+
 function SettingsTab({
   community,
   members,
@@ -1619,6 +1665,9 @@ function SettingsTab({
   const [instagram, setInstagram] = useState(community.socialLinks?.instagram ?? "");
   const [tiktok, setTiktok] = useState(community.socialLinks?.tiktok ?? "");
   const [linktree, setLinktree] = useState(community.socialLinks?.linktree ?? "");
+  const [youtube, setYoutube] = useState(community.socialLinks?.youtube ?? "");
+  const [venmo, setVenmo] = useState(community.socialLinks?.venmo ?? "");
+  const [website, setWebsite] = useState(community.socialLinks?.website ?? "");
   const [categories, setCategories] = useState<CommunityCategory[]>(() => communityCategoriesOf(community));
   const [screening, setScreening] = useState(community.screeningQuestion ?? "");
   const [coverImage, setCoverImage] = useState<string | null>(community.coverImage ?? null);
@@ -1644,6 +1693,9 @@ function SettingsTab({
     setInstagram(community.socialLinks?.instagram ?? "");
     setTiktok(community.socialLinks?.tiktok ?? "");
     setLinktree(community.socialLinks?.linktree ?? "");
+    setYoutube(community.socialLinks?.youtube ?? "");
+    setVenmo(community.socialLinks?.venmo ?? "");
+    setWebsite(community.socialLinks?.website ?? "");
     setCategories(communityCategoriesOf(community));
     setScreening(community.screeningQuestion ?? "");
     setCoverImage(community.coverImage ?? null);
@@ -1712,6 +1764,9 @@ function SettingsTab({
             instagram,
             tiktok,
             linktree,
+            youtube,
+            venmo,
+            website,
           },
           category: categories[0],
           categories,
@@ -1731,6 +1786,9 @@ function SettingsTab({
       setInstagram(updated.socialLinks?.instagram ?? "");
       setTiktok(updated.socialLinks?.tiktok ?? "");
       setLinktree(updated.socialLinks?.linktree ?? "");
+      setYoutube(updated.socialLinks?.youtube ?? "");
+      setVenmo(updated.socialLinks?.venmo ?? "");
+      setWebsite(updated.socialLinks?.website ?? "");
       setCategories(communityCategoriesOf(updated));
       setScreening(updated.screeningQuestion ?? "");
       setCoverImage(updated.coverImage ?? null);
@@ -1917,6 +1975,26 @@ function SettingsTab({
             />
           </label>
           <label className="cmy-field">
+            <span>YouTube</span>
+            <input
+              className="cmy-input"
+              value={youtube}
+              placeholder="@handle"
+              maxLength={200}
+              onChange={(e) => setYoutube(e.target.value)}
+            />
+          </label>
+          <label className="cmy-field">
+            <span>Venmo</span>
+            <input
+              className="cmy-input"
+              value={venmo}
+              placeholder="@handle"
+              maxLength={200}
+              onChange={(e) => setVenmo(e.target.value)}
+            />
+          </label>
+          <label className="cmy-field">
             <span>Linktree</span>
             <input
               className="cmy-input"
@@ -1924,6 +2002,16 @@ function SettingsTab({
               placeholder="linktr.ee/you"
               maxLength={200}
               onChange={(e) => setLinktree(e.target.value)}
+            />
+          </label>
+          <label className="cmy-field">
+            <span>Website</span>
+            <input
+              className="cmy-input"
+              value={website}
+              placeholder="https://yoursite.com"
+              maxLength={500}
+              onChange={(e) => setWebsite(e.target.value)}
             />
           </label>
           </div>

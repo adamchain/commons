@@ -7,7 +7,6 @@ import {
   CalendarPlus,
   Camera,
   Check,
-  ChevronDown,
   ChevronRight,
   Flag,
   MapPin,
@@ -1210,8 +1209,7 @@ function MonthCalendar({ plans, profileUserId }: { plans: PlanDTO[]; profileUser
 }
 
 /**
- * Combined Plans section — upcoming photo cards (first three, then more),
- * a calendar view, and a past-plans accordion.
+ * Combined Plans section — upcoming photo cards (first three) and a calendar view.
  */
 function YourPlansBlock({
   id,
@@ -1230,7 +1228,6 @@ function YourPlansBlock({
   view: "list" | "calendar";
   onViewChange: (v: "list" | "calendar") => void;
 }) {
-  const [pastOpen, setPastOpen] = useState(false);
   const visibleUpcoming = upcoming.slice(0, 3);
   const profileBack: NavFromState = { from: "profile", profileUserId };
 
@@ -1311,40 +1308,6 @@ function YourPlansBlock({
         </>
       )}
 
-      {past.length > 0 && (
-        <div className="profile-past">
-          <button
-            type="button"
-            className={`profile-past-toggle${pastOpen ? " is-open" : ""}`}
-            aria-expanded={pastOpen}
-            onClick={() => setPastOpen((v) => !v)}
-          >
-            Past plans
-            <ChevronDown size={16} strokeWidth={2} aria-hidden="true" />
-          </button>
-          {pastOpen && (
-            <div className="profile-photo-row profile-photo-row--past">
-              {past.map((p) => (
-                <Link
-                  key={p.id}
-                  to={`/plans/${p.id}`}
-                  state={profileBack}
-                  className="profile-photo-card"
-                >
-                  <PlanCoverThumb
-                    planId={p.id}
-                    flyerDataUrl={planPhotoUrl(p)}
-                    isIdea={isIdeaPlan(p)}
-                    className="profile-photo-card-media"
-                  />
-                  <span className="profile-photo-card-title">{p.title}</span>
-                  <span className="profile-photo-card-meta">{formatPlanDate(p.date)}</span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </section>
   );
 }

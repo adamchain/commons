@@ -5,6 +5,7 @@ import { App as CapApp } from "@capacitor/app";
 import { useAuth } from "./context/AuthContext";
 import { BottomNav } from "./components/BottomNav";
 import { ChatCleanupPrompt } from "./components/ChatCleanupPrompt";
+import { SmsConsentPrompt } from "./components/SmsConsentPrompt";
 import { CoachMarks } from "./components/CoachMarks";
 import { TopBar } from "./components/TopBar";
 import { LoadingScreen } from "./components/LoadingScreen";
@@ -187,6 +188,7 @@ export default function App() {
     <>
       <TopBar />
       <ChatCleanupPrompt />
+      <SmsConsentPrompt />
       <Routes>
         <Route path="/welcome" element={<LandingPage />} />
         <Route path="/legal/:slug" element={<LegalPage />} />

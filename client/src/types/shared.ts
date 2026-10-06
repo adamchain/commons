@@ -724,11 +724,14 @@ export interface CommunityMembershipView {
   status: CommunityMemberStatus;
 }
 
-/** Instagram, TikTok, and Linktree handles for a community. Stored without @ or a URL. */
+/** Social handles and links for a community. Handles stored without @; website is a full URL. */
 export interface CommunitySocialLinks {
   instagram?: string;
   tiktok?: string;
   linktree?: string;
+  youtube?: string;
+  venmo?: string;
+  website?: string;
 }
 
 export interface CommunityDTO {
