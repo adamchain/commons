@@ -3399,7 +3399,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   align-items: center;
   gap: 1px;
   flex: 0 0 auto;
-  padding: 0 12px;
+  padding: 14px 12px;
   border-radius: 14px;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -3409,7 +3409,7 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
 .onboarding-country-input {
   width: 3.2ch;
   border: 0;
-  padding: 14px 0;
+  padding: 0;
   background: transparent;
   color: inherit;
   font: inherit;

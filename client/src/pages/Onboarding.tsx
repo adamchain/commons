@@ -330,11 +330,6 @@ export function OnboardingPage() {
         landing
         title=""
         subtitle="A place for plans meant to be shared."
-        onBack={() => {
-          if (!isNative()) navigate("/welcome");
-          else if (window.history.length > 1) navigate(-1);
-          else navigate("/welcome");
-        }}
       >
         <div className="onboarding-phone-row">
           <label className="onboarding-country">
