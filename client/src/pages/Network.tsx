@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Users } from "lucide-react";
 import { api } from "../api/http";
@@ -137,7 +137,11 @@ export function NetworkPage() {
   }
 
   const profileTo = user ? `/profile/${user.id}` : "/";
-  const chips = user?.interests?.length ? user.interests : ALL_INTERESTS.slice(0, 6);
+  const chips = ALL_INTERESTS;
+
+  useLayoutEffect(() => {
+    if (fromProfile || adding) window.scrollTo(0, 0);
+  }, [fromProfile, adding]);
 
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar network-page">
@@ -149,7 +153,7 @@ export function NetworkPage() {
         </header>
       )}
       <div className="network-top">
-      <ScreenTitle title="Network" subtitle={tab === "search" ? "People you've added." : "Find people who are into the same things."} />
+      <ScreenTitle title="Network" />
 
       <div className="network-tabs" role="tablist" aria-label="Network">
         <button type="button" role="tab" aria-selected={tab === "discover"} className={`network-tab${tab === "discover" ? " is-active" : ""}`} onClick={() => setTab("discover")}>
@@ -314,11 +318,13 @@ function NetworkRow({
   actionLabel?: string;
 }) {
   const navigate = useNavigate();
-  const { user, neighborhoodName, mutualCount, networkStatus, reason } = row;
+  const { user, mutualCount, networkStatus, reason } = row;
   const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || "Friend";
-  const keptReason = reason && !reason.startsWith("Also into") ? reason : null;
-  const meta = keptReason
-    || [neighborhoodName, mutualCount > 0 ? `${mutualCount} mutual` : null].filter(Boolean).join(" · ");
+  const meta = reason && !reason.startsWith("Also into")
+    ? reason
+    : mutualCount > 0
+      ? `${mutualCount} mutual`
+      : "";
 
   return (
     <div className="network-row">

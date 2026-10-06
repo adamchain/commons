@@ -5014,13 +5014,24 @@ a.action-btn--stack {
 }
 .profile-network-people {
   display: flex;
+  align-items: flex-start;
   gap: 14px;
-  overflow-x: auto;
+  overflow: hidden;
   padding: 4px 2px 2px;
+}
+.profile-network-faces {
+  display: flex;
+  gap: 14px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-x: auto;
   scrollbar-width: none;
 }
-.profile-network-people::-webkit-scrollbar {
+.profile-network-faces::-webkit-scrollbar {
   display: none;
+}
+.profile-network-person--more {
+  flex: 0 0 56px;
 }
 .profile-network-person {
   flex: 0 0 56px;
@@ -14403,6 +14414,14 @@ button.xpl-photo-tile {
 .network-search-wrap:focus-within {
   border-color: var(--accent);
 }
+.network-page .app-header--minimal {
+  position: sticky;
+  top: calc(var(--topbar-height, 56px) + env(safe-area-inset-top, 0px));
+  z-index: 25;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  background: var(--bg);
+}
 .network-page .network-search-wrap,
 .cmy-list .cmy-search {
   padding-top: 6px;
@@ -14574,10 +14593,9 @@ button.xpl-photo-tile {
 }
 .network-chips {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  overflow-x: auto;
   margin: 0 0 14px;
-  padding-bottom: 2px;
 }
 .network-chip {
   flex-shrink: 0;

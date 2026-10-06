@@ -224,7 +224,7 @@ searchRouter.get("/discover", requireAuth, async (req, res) => {
         ? `${mutualCount} mutual`
         : focus
           ? `Also into ${INTEREST_LABELS[focus]}`
-          : hoodName(u) ?? "On Commons";
+          : undefined;
       const requestSent = (u.incomingNetworkRequests ?? []).includes(userId);
       const row: PersonSearchResultDTO = {
         user: userToPublic(u),

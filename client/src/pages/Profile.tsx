@@ -1391,7 +1391,7 @@ function MailIcon() {
 /** Network card — named faces, then a way to add more people. */
 function NetworkCard({ network }: { network: PublicUser[] | null }) {
   const count = network?.length ?? 0;
-  const firstFive = (network ?? []).slice(0, 5);
+  const shown = (network ?? []).slice(0, 4);
   const isEmpty = count === 0;
   return (
     <div className="profile-network-card">
@@ -1409,22 +1409,24 @@ function NetworkCard({ network }: { network: PublicUser[] | null }) {
         </p>
       ) : (
         <div className="profile-network-people">
-          {firstFive.map((u) => (
-            <Link key={u.id} to={`/profile/${u.id}`} state={{ from: "profile" }} className="profile-network-person">
-              <Avatar
-                seed={u.avatarSeed}
-                style={u.avatarStyle}
-                photoDataUrl={u.avatarPhotoDataUrl}
-                params={u.avatarParams}
-                name={u.firstName}
-                size="md"
-              />
-              <span>{u.firstName || "Friend"}</span>
-            </Link>
-          ))}
-          {count > firstFive.length && (
+          <div className="profile-network-faces">
+            {shown.map((u) => (
+              <Link key={u.id} to={`/profile/${u.id}`} state={{ from: "profile" }} className="profile-network-person">
+                <Avatar
+                  seed={u.avatarSeed}
+                  style={u.avatarStyle}
+                  photoDataUrl={u.avatarPhotoDataUrl}
+                  params={u.avatarParams}
+                  name={u.firstName}
+                  size="md"
+                />
+                <span>{u.firstName || "Friend"}</span>
+              </Link>
+            ))}
+          </div>
+          {count > shown.length && (
             <Link to="/network" state={{ from: "profile" }} className="profile-network-person profile-network-person--more">
-              <span className="profile-network-more-count">+{count - firstFive.length}</span>
+              <span className="profile-network-more-count">+{count - shown.length}</span>
               <span>More</span>
             </Link>
           )}
