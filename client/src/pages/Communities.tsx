@@ -111,7 +111,10 @@ export function CommunitiesPage() {
     return hay.includes(q);
   };
   const browse = all.filter((c) => matchesCat(c) && matchesQuery(c));
-  const featured = pickFeatured(browse, category, user?.interests ?? []);
+  const yourBrowse = browse.filter((c) => c.myMembershipStatus === "active");
+  const otherBrowse = browse.filter((c) => c.myMembershipStatus !== "active");
+  // Hero is always one of the user's communities first; fall back to general list if not a member of any.
+  const featured = pickFeatured(yourBrowse.length > 0 ? yourBrowse : otherBrowse, category, user?.interests ?? []);
   const restBrowse = browse.filter((c) => c.id !== featured?.id);
   const yourRest = restBrowse.filter((c) => c.myMembershipStatus === "active");
   const otherRest = restBrowse.filter((c) => c.myMembershipStatus !== "active");
