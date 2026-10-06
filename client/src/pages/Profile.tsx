@@ -7,6 +7,7 @@ import {
   CalendarPlus,
   Camera,
   Check,
+  ChevronDown,
   ChevronRight,
   Flag,
   MapPin,
@@ -95,6 +96,8 @@ interface ProfilePayload {
   socialLinks: { instagram?: string; tiktok?: string } | null;
   /** True when upcoming/past plans are hidden until the viewer is in-network or has a completed shared plan. */
   plansGated?: boolean;
+  /** Plans and communities are hidden. Strangers see a private-profile note instead. */
+  profilePrivate?: boolean;
   network: {
     inMyNetwork: boolean;
     requestSent?: boolean;
@@ -403,51 +406,51 @@ export function ProfilePage() {
           )}
         </section>
 
-        {profile.network.inMyNetwork && (profile.communities?.length ?? 0) > 0 && (
-          <section className="profile-other-section profile-section-card">
-            <h3 className="profile-other-section-label">Communities</h3>
-            <div className="profile-photo-row">
-              {(profile.communities ?? []).map((c) => (
-                <Link
-                  key={c.id}
-                  to={`/communities/${c.id}`}
-                  state={{ from: "profile", profileUserId: userId }}
-                  className="profile-photo-card"
-                >
-                  <CommunityCoverThumb
-                    coverImage={c.coverImage}
-                    category={c.category}
-                    className="profile-photo-card-media"
-                  />
-                  <span className="profile-photo-card-title">{c.name}</span>
-                  {c.myRole === "organizer" && <span className="profile-photo-card-meta">Organizer</span>}
-                </Link>
-              ))}
-            </div>
+        {profile.profilePrivate ? (
+          <section className="profile-section-card profile-private-note">
+            <p>This profile is private - add them to your network to see what they&apos;re up to</p>
           </section>
-        )}
-
-        {profile.plansGated ? (
-          <section className="profile-other-section profile-section-card">
-            <h3 className="profile-other-section-label">Plans</h3>
-            <p className="profile-social-locked">
-              You&apos;re on this one together. The rest of their calendar takes a connection.
-            </p>
-            {profile.upcoming.length > 0 && (
-              <OtherPlanCards plans={profile.upcoming} profileUserId={userId} />
+        ) : (
+          <>
+            {(profile.communities?.length ?? 0) > 0 && (
+              <section className="profile-block profile-section-card">
+                <div className="profile-block-heading-row">
+                  <h3 className="profile-section-label profile-section-label--inline">Communities</h3>
+                </div>
+                <div className="profile-photo-row">
+                  {(profile.communities ?? []).map((c) => (
+                    <Link
+                      key={c.id}
+                      to={`/communities/${c.id}`}
+                      state={{ from: "profile", profileUserId: userId }}
+                      className="profile-photo-card"
+                    >
+                      <CommunityCoverThumb
+                        coverImage={c.coverImage}
+                        category={c.category}
+                        className="profile-photo-card-media"
+                      />
+                      <span className="profile-photo-card-title">{c.name}</span>
+                      {c.myRole === "organizer" && <span className="profile-photo-card-meta">Organizer</span>}
+                    </Link>
+                  ))}
+                </div>
+              </section>
             )}
-          </section>
-        ) : profile.upcoming.length > 0 ? (
-          <section className="profile-other-section profile-section-card">
-            <div className="profile-other-section-head">
-              <h3 className="profile-other-section-label">Plans</h3>
-              <span className="profile-other-section-count">
-                {profile.upcoming.length} plan{profile.upcoming.length === 1 ? "" : "s"}
-              </span>
-            </div>
-            <OtherPlanCards plans={profile.upcoming} profileUserId={userId} />
-          </section>
-        ) : null}
+
+            {profile.upcoming.length > 0 && (
+              <section className="profile-block profile-section-card">
+                <div className="profile-block-heading-row">
+                  <h3 className="profile-section-label profile-section-label--inline">Plans</h3>
+                  <span className="profile-other-section-count">
+                    {profile.upcoming.length} plan{profile.upcoming.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <OtherPlanCards plans={profile.upcoming} profileUserId={userId} />
+              </section>
+            )}
+          </>
+        )}
 
         {actionSheetOpen && (
           <ProfileActionSheet
@@ -619,19 +622,6 @@ export function ProfilePage() {
       />
 
       <ProfileMenu />
-
-      <a
-        className="settings-feedback"
-        href="https://docs.google.com/forms/u/0/d/e/1FAIpQLSfiQUov1e2K9wUlgvIR26Qxnm9MPhQ88MHgophxKS4AClZwZQ/viewform"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <FeedbackGlyph />
-        <span className="settings-feedback-text">
-          Share beta feedback
-          <span className="settings-feedback-sub">Tell us what's working and what's not</span>
-        </span>
-      </a>
 
       {cropSrc && (
         <AvatarCropModal
@@ -991,14 +981,6 @@ function TikTokGlyph() {
   );
 }
 
-function FeedbackGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-    </svg>
-  );
-}
-
 function FriendButton({
   profile,
   onUpdated,
@@ -1248,8 +1230,8 @@ function YourPlansBlock({
   view: "list" | "calendar";
   onViewChange: (v: "list" | "calendar") => void;
 }) {
-  const [moreOpen, setMoreOpen] = useState(false);
-  const visibleUpcoming = moreOpen ? upcoming : upcoming.slice(0, 3);
+  const [pastOpen, setPastOpen] = useState(false);
+  const visibleUpcoming = upcoming.slice(0, 3);
   const profileBack: NavFromState = { from: "profile", profileUserId };
 
   return (
@@ -1312,22 +1294,6 @@ function YourPlansBlock({
                   </Link>
                 ))}
               </div>
-              {(upcoming.length > 3 || past.length > 0) && (
-                <button
-                  type="button"
-                  className={`profile-more-arrow${moreOpen ? " is-open" : ""}`}
-                  aria-expanded={moreOpen}
-                  aria-label={moreOpen ? "Show fewer plans" : "Show more plans"}
-                  onClick={() => setMoreOpen((v) => !v)}
-                >
-                  <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
-                </button>
-              )}
-              {isSelf && (
-                <Link to="/my-plans" state={profileBack} className="profile-see-all-link profile-see-all-link--below">
-                  See all plans →
-                </Link>
-              )}
             </>
           ) : isSelf ? (
             <PlansEmpty />
@@ -1337,7 +1303,26 @@ function YourPlansBlock({
             </p>
           )}
 
-          {moreOpen && past.length > 0 && (
+          {isSelf && (upcoming.length > 0 || past.length > 0) && (
+            <Link to="/my-plans" state={profileBack} className="profile-see-all-link profile-see-all-link--below">
+              See all plans →
+            </Link>
+          )}
+        </>
+      )}
+
+      {past.length > 0 && (
+        <div className="profile-past">
+          <button
+            type="button"
+            className={`profile-past-toggle${pastOpen ? " is-open" : ""}`}
+            aria-expanded={pastOpen}
+            onClick={() => setPastOpen((v) => !v)}
+          >
+            Past plans
+            <ChevronDown size={16} strokeWidth={2} aria-hidden="true" />
+          </button>
+          {pastOpen && (
             <div className="profile-photo-row profile-photo-row--past">
               {past.map((p) => (
                 <Link
@@ -1358,7 +1343,7 @@ function YourPlansBlock({
               ))}
             </div>
           )}
-        </>
+        </div>
       )}
     </section>
   );

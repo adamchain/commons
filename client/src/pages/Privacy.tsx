@@ -3,30 +3,45 @@ import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { BottomSheet } from "../components/ui/BottomSheet";
+import { Button } from "../components/ui/Button";
 import { useAuth } from "../context/AuthContext";
 import type { MeDTO } from "../types/shared";
 
-/** Settings → Privacy. Discoverability toggle + entry to the blocked list. */
+/** Settings → Privacy. Private account by default, then who can see plans and communities. */
 export function PrivacyPage() {
   const { user, setUser } = useAuth();
   const [busy, setBusy] = useState(false);
+  const [confirmPublic, setConfirmPublic] = useState(false);
 
   if (!user) return <LoadingScreen tagline="Loading privacy settings" />;
 
-  async function toggleDiscoverable() {
-    if (busy || !user) return;
+  async function save(
+    patch: Partial<Pick<MeDTO, "discoverableBySearch" | "profilePublic" | "showPlansPublicly" | "showCommunitiesPublicly">>,
+  ): Promise<MeDTO | null> {
+    if (busy || !user) return null;
     setBusy(true);
     try {
       const updated = await api<MeDTO>("/api/auth/me", {
         method: "PATCH",
-        body: JSON.stringify({ discoverableBySearch: !user.discoverableBySearch }),
+        body: JSON.stringify(patch),
       });
       setUser(updated);
+      return updated;
     } catch {
-      /* keep previous state on failure */
+      return null;
     } finally {
       setBusy(false);
     }
+  }
+
+  function onPublicToggle() {
+    if (!user || busy) return;
+    if (user.profilePublic) {
+      void save({ profilePublic: false, showPlansPublicly: false, showCommunitiesPublicly: false });
+      return;
+    }
+    setConfirmPublic(true);
   }
 
   return (
@@ -40,6 +55,69 @@ export function PrivacyPage() {
       <p className="brand-tagline" style={{ marginBottom: 12, textTransform: "none", letterSpacing: 0 }}>
         Who can find and see you on COMMONS.
       </p>
+
+      <section className="settings-group">
+        <div className="settings-group-label">Account</div>
+        <div className="settings-card">
+          <div className="settings-row">
+            <div className="settings-row-body" style={{ paddingLeft: 0 }}>
+              <div className="settings-row-title">Public account</div>
+              <div className="settings-row-sub" style={{ whiteSpace: "normal" }}>
+                Off by default. People outside your network can&apos;t see your plans or communities.
+              </div>
+            </div>
+            <label className="pref-toggle">
+              <input
+                type="checkbox"
+                checked={user.profilePublic}
+                disabled={busy}
+                onChange={onPublicToggle}
+                aria-label="Public account"
+              />
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section className="settings-group">
+        <div className="settings-group-label">Plans and communities</div>
+        <div className="settings-card">
+          <div className="settings-row">
+            <div className="settings-row-body" style={{ paddingLeft: 0 }}>
+              <div className="settings-row-title">Plans</div>
+              <div className="settings-row-sub" style={{ whiteSpace: "normal" }}>
+                Others can see your plans without being in your network.
+              </div>
+            </div>
+            <label className="pref-toggle">
+              <input
+                type="checkbox"
+                checked={user.profilePublic && user.showPlansPublicly}
+                disabled={busy || !user.profilePublic}
+                onChange={() => void save({ showPlansPublicly: !user.showPlansPublicly })}
+                aria-label="Others can see your plans"
+              />
+            </label>
+          </div>
+          <div className="settings-row">
+            <div className="settings-row-body" style={{ paddingLeft: 0 }}>
+              <div className="settings-row-title">Communities</div>
+              <div className="settings-row-sub" style={{ whiteSpace: "normal" }}>
+                Others can see your communities without being in your network.
+              </div>
+            </div>
+            <label className="pref-toggle">
+              <input
+                type="checkbox"
+                checked={user.profilePublic && user.showCommunitiesPublicly}
+                disabled={busy || !user.profilePublic}
+                onChange={() => void save({ showCommunitiesPublicly: !user.showCommunitiesPublicly })}
+                aria-label="Others can see your communities"
+              />
+            </label>
+          </div>
+        </div>
+      </section>
 
       <section className="settings-group">
         <div className="settings-group-label">Discovery</div>
@@ -56,7 +134,7 @@ export function PrivacyPage() {
                 type="checkbox"
                 checked={user.discoverableBySearch}
                 disabled={busy}
-                onChange={() => void toggleDiscoverable()}
+                onChange={() => void save({ discoverableBySearch: !user.discoverableBySearch })}
                 aria-label="Discoverable by name search"
               />
             </label>
@@ -80,6 +158,36 @@ export function PrivacyPage() {
           </Link>
         </div>
       </section>
+
+      {confirmPublic && (
+        <BottomSheet onClose={() => !busy && setConfirmPublic(false)} labelledBy="public-account-title">
+          <h2 id="public-account-title" className="sheet-title">Make your account public?</h2>
+          <p className="sheet-copy">
+            Making your account public allows others to see your plans and communities without being in your network
+          </p>
+          <div className="sheet-actions">
+            <Button
+              variant="primary"
+              block
+              disabled={busy}
+              onClick={() => {
+                void save({
+                  profilePublic: true,
+                  showPlansPublicly: true,
+                  showCommunitiesPublicly: true,
+                }).then((updated) => {
+                  if (updated) setConfirmPublic(false);
+                });
+              }}
+            >
+              Make public
+            </Button>
+            <Button variant="secondary" block disabled={busy} onClick={() => setConfirmPublic(false)}>
+              Cancel
+            </Button>
+          </div>
+        </BottomSheet>
+      )}
     </main>
   );
 }

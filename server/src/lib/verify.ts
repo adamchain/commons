@@ -30,6 +30,12 @@ const checksInFlight = new Map<string, Promise<PhoneCheckResult>>();
 
 export type PhoneCheckResult = "approved" | "mismatch" | "expired";
 
+/** True while the last text's code should still be the one they enter. */
+export function verificationStillOpen(to: string): boolean {
+  const last = recentSends.get(to) ?? 0;
+  return Date.now() - last < SEND_COOLDOWN_MS;
+}
+
 /**
  * Starts an SMS verification. A second call for the same number while one is
  * in flight, or within the cooldown, does not ask Twilio again — a new
@@ -37,8 +43,7 @@ export type PhoneCheckResult = "approved" | "mismatch" | "expired";
  * the text the person actually received as expired.
  */
 export async function startPhoneVerification(to: string): Promise<{ reused: boolean }> {
-  const last = recentSends.get(to) ?? 0;
-  if (Date.now() - last < SEND_COOLDOWN_MS) return { reused: true };
+  if (verificationStillOpen(to)) return { reused: true };
 
   const existing = sendsInFlight.get(to);
   if (existing) {

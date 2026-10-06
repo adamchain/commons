@@ -387,6 +387,12 @@ export interface MeDTO {
   blockedUserIds?: string[];
   /** Whether this user's name surfaces in People search results. Defaults to true. */
   discoverableBySearch: boolean;
+  /** Private unless they opt in. Public shows plans and communities outside their network. */
+  profilePublic: boolean;
+  /** Strangers can see plans. Only applies while the account is public. */
+  showPlansPublicly: boolean;
+  /** Strangers can see communities. Only applies while the account is public. */
+  showCommunitiesPublicly: boolean;
   /** Conversation ids this user has muted. */
   mutedConversationIds?: string[];
   /** Conversations the user explicitly left / removed from inbox. */

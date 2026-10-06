@@ -168,7 +168,7 @@ export function SettingsPage() {
           to="/settings/privacy"
           icon={<LockIcon />}
           title="Privacy"
-          sub="Search, blocking, reports"
+          sub="Public account, search, blocking"
         />
       </SettingsGroup>
 

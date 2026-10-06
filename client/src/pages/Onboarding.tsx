@@ -120,14 +120,16 @@ export function OnboardingPage() {
   const [error, setError] = useState<string | null>(null);
   const [codeHint, setCodeHint] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [holdAutofill, setHoldAutofill] = useState(false);
+  const [holdAutofill, setHoldAutofill] = useState(() => Boolean(nav?.phoneNumber));
   const lastAutoSubmittedCode = useRef<string | null>(null);
   const verifyInFlight = useRef(false);
   const verified = useRef(false);
   const requestInFlight = useRef(false);
   const userEditedCode = useRef(false);
   const sendGen = useRef(0);
+  const codeFilledAt = useRef(0);
   const hasSentCode = useRef(Boolean(nav?.phoneNumber));
+  const armedInitial = useRef(false);
   // Access code for the launch gate. Accepts the shared exclusive code OR a
   // personal invite code from an existing member. Prefilled from ?invite= on a
   // share link, or from location.state.inviteCode when handed off from the
@@ -178,22 +180,33 @@ export function OnboardingPage() {
 
   function armFreshCode() {
     const gen = ++sendGen.current;
+    const started = Date.now();
     userEditedCode.current = false;
     lastAutoSubmittedCode.current = null;
+    codeFilledAt.current = 0;
     setCode("");
     setHoldAutofill(true);
-    // The keyboard can drop the previous text's code into the field as soon
-    // as it appears. Hold auto-submit, then clear that leftover so it isn't
-    // checked against the new code.
+    // The keyboard can drop the previous text's code in immediately, and
+    // checking that canceled code is what comes back as "expired." A real
+    // text takes longer than this, so only clear a value that landed too fast.
     window.setTimeout(() => {
       if (sendGen.current !== gen) return;
-      if (!userEditedCode.current) {
+      const filledAt = codeFilledAt.current;
+      const stale = filledAt > 0 && filledAt - started < 400 && !userEditedCode.current;
+      if (stale) {
         lastAutoSubmittedCode.current = null;
+        codeFilledAt.current = 0;
         setCode("");
       }
       setHoldAutofill(false);
-    }, 1600);
+    }, 450);
   }
+
+  useEffect(() => {
+    if (armedInitial.current || !nav?.phoneNumber) return;
+    armedInitial.current = true;
+    armFreshCode();
+  }, [nav?.phoneNumber]);
 
   async function requestCode() {
     if (requestInFlight.current) return;
@@ -222,6 +235,7 @@ export function OnboardingPage() {
         armFreshCode();
       } else {
         setCodeHint(null);
+        armFreshCode();
       }
       hasSentCode.current = true;
       setStep("code");
@@ -396,7 +410,9 @@ export function OnboardingPage() {
             userEditedCode.current = true;
           }}
           onChange={(e) => {
-            setCode(e.target.value.replace(/\D/g, ""));
+            const next = e.target.value.replace(/\D/g, "");
+            codeFilledAt.current = next ? Date.now() : 0;
+            setCode(next);
             if (error) setError(null);
           }}
         />

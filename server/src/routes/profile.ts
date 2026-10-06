@@ -80,17 +80,18 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
     .slice(0, 3)
     .map((u) => userToPublic(u));
 
-  // Plans stay private until the viewer is in-network or has already hung out
-  // (a shared plan whose calendar day has passed). Joining an *upcoming* plan
-  // together does not unlock the rest of their calendar — that was a date-parse
-  // bug (`new Date("YYYY-MM-DD")` is UTC midnight and treats "today" as past).
-  // Face + interests stay public.
+  // Face + interests stay public. Plans and communities stay in-network unless
+  // this person has made the account public and left that section on.
   const inEitherNetwork = inMyNetwork || targetNetwork.has(viewerId);
   const sharedCompleted = hasSharedCompletedPlan(targetId, viewerId, todayIso);
-  const showFullProfile = isSelf || inEitherNetwork || sharedCompleted;
-  // Same gate as plans: strangers don't get Instagram/TikTok until you're
-  // connected or you've already hung out.
-  const socialLinks = showFullProfile ? (target.socialLinks ?? null) : null;
+  // Accounts are private unless the person opts in. Network still sees
+  // everything. Public only opens the pieces they left on in Settings.
+  const connected = isSelf || inEitherNetwork;
+  const plansOpen = connected || (target.profilePublic === true && target.showPlansPublicly === true);
+  const communitiesOpen =
+    connected || (target.profilePublic === true && target.showCommunitiesPublicly === true);
+  // Social links stay on the older rule: connected, or you've already hung out.
+  const socialLinks = isSelf || inEitherNetwork || sharedCompleted ? (target.socialLinks ?? null) : null;
   const sharedUpcoming = sharedPlanId ? upcoming.filter((p) => p.id === sharedPlanId) : [];
 
   res.json({
@@ -102,10 +103,10 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
       hosted: allPlans.length,
       joined: joinedCount,
     },
-    upcoming: showFullProfile
+    upcoming: plansOpen
       ? await Promise.all(upcoming.map((p) => planSummary(p, viewerId)))
       : await Promise.all(sharedUpcoming.map((p) => planSummary(p, viewerId))),
-    past: showFullProfile
+    past: plansOpen
       ? past
           .slice(-5)
           .reverse()
@@ -122,7 +123,8 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
       : [],
     sharedPlanId,
     socialLinks,
-    plansGated: !showFullProfile && !isSelf,
+    plansGated: !plansOpen && !isSelf,
+    profilePrivate: !isSelf && !plansOpen && !communitiesOpen,
     network: {
       inMyNetwork,
       requestSent,
@@ -132,7 +134,7 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
     },
     // Someone in your network: their communities, from their point of view
     // so an Organizer tag means they run it.
-    communities: inMyNetwork ? await communityCardsForUser(targetId) : [],
+    communities: communitiesOpen ? await communityCardsForUser(targetId) : [],
   });
 });
 

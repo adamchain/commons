@@ -82,6 +82,15 @@ export interface UserRecord {
   blockedUserIds?: string[];
   /** Whether this user's name surfaces in People search results. Missing/undefined defaults to true. */
   discoverableBySearch?: boolean;
+  /**
+   * Private by default. Public lets people outside this user's network see the
+   * plans and communities they have chosen to show.
+   */
+  profilePublic?: boolean;
+  /** When the account is public, strangers can see this person's plans. */
+  showPlansPublicly?: boolean;
+  /** When the account is public, strangers can see this person's communities. */
+  showCommunitiesPublicly?: boolean;
   /** Device location the user chose to share. Used to rank nearby plans. */
   locationLat?: number | null;
   locationLng?: number | null;

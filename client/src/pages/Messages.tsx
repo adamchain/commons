@@ -456,7 +456,7 @@ export function MessagesPage() {
         </button>
       </div>
 
-      <div ref={scrollRef} className="messages-scroll">
+      <div ref={scrollRef} className={`messages-scroll${ready && items.length === 0 ? " messages-scroll--empty" : ""}`}>
       <div ref={contentRef} className="feed-pull-content">
       {!ready ? (
         <div className="feed-skeleton" aria-hidden="true">

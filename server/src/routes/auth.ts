@@ -2,7 +2,12 @@ import { Router } from "express";
 import { isAdminPhone } from "../lib/adminPhones.js";
 import { sessionVersionMatches, signSessionToken, verifySessionToken } from "../lib/jwt.js";
 import { normalizePhone } from "../lib/phone.js";
-import { checkPhoneVerification, isTwilioVerifyConfigured, startPhoneVerification } from "../lib/verify.js";
+import {
+  checkPhoneVerification,
+  isTwilioVerifyConfigured,
+  startPhoneVerification,
+  verificationStillOpen,
+} from "../lib/verify.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { INVITE_CODES_PER_USER, normalizeInviteCode, store } from "../store.js";
@@ -144,6 +149,9 @@ export function meFromUser(user: UserRecord): MeDTO {
     notificationPrefs: { ...DEFAULT_NOTIFICATION_PREFS, ...(user.notificationPrefs ?? {}) },
     blockedUserIds: user.blockedUserIds?.length ? user.blockedUserIds : [],
     discoverableBySearch: user.discoverableBySearch !== false,
+    profilePublic: user.profilePublic === true,
+    showPlansPublicly: user.showPlansPublicly === true,
+    showCommunitiesPublicly: user.showCommunitiesPublicly === true,
     mutedConversationIds: user.mutedConversationIds?.length ? user.mutedConversationIds : [],
     leftConversationIds: user.leftConversationIds?.length ? user.leftConversationIds : [],
     pinnedConversationIds: user.pinnedConversationIds?.length ? user.pinnedConversationIds : [],
@@ -275,7 +283,13 @@ authRouter.post("/verify-code", limitVerifyByPhone, limitVerifyByIp, async (req,
       return;
     }
     if (result === "expired") {
-      res.status(401).json({ error: "That code expired. Request a new one and use the latest text." });
+      // A resend cancels the text they may already have. If that text is still
+      // the live one, don't tell them to request another.
+      res.status(401).json({
+        error: verificationStillOpen(phone)
+          ? "That code is from an older text. Use the latest one we sent."
+          : "That code expired. Request a new one and use the latest text.",
+      });
       return;
     }
     if (result !== "approved") {
@@ -518,6 +532,15 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
   }
   if (typeof req.body?.discoverableBySearch === "boolean") {
     patch.discoverableBySearch = req.body.discoverableBySearch;
+  }
+  if (typeof req.body?.profilePublic === "boolean") {
+    patch.profilePublic = req.body.profilePublic;
+  }
+  if (typeof req.body?.showPlansPublicly === "boolean") {
+    patch.showPlansPublicly = req.body.showPlansPublicly;
+  }
+  if (typeof req.body?.showCommunitiesPublicly === "boolean") {
+    patch.showCommunitiesPublicly = req.body.showCommunitiesPublicly;
   }
   if (req.body?.socialLinks && typeof req.body.socialLinks === "object") {
     const ig = String(req.body.socialLinks.instagram ?? "").replace(/^@/, "").trim();
