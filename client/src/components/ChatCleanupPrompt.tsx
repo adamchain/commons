@@ -71,7 +71,7 @@ export function ChatCleanupPrompt() {
     <BottomSheet onClose={dismiss} labelledBy="chat-cleanup-title">
       <h2 id="chat-cleanup-title" className="sheet-title">Delete this chat?</h2>
       <p className="sheet-copy">
-        {plan.title} is over. You can delete the group chat, or keep it so people can still look back.
+        "{plan.title}" wrapped up. Want to delete the group chat, or keep it so people can still look back?
       </p>
       <div className="sheet-actions">
         <Button variant="primary" block disabled={busy} onClick={() => void choose("delete")}>

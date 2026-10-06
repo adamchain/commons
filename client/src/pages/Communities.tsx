@@ -112,7 +112,10 @@ export function CommunitiesPage() {
   };
   const browse = all.filter((c) => matchesCat(c) && matchesQuery(c));
   const featured = pickFeatured(browse, category, user?.interests ?? []);
-  const ordered = featured ? [featured, ...browse.filter((c) => c.id !== featured.id)] : browse;
+  const restBrowse = browse.filter((c) => c.id !== featured?.id);
+  const yourRest = restBrowse.filter((c) => c.myMembershipStatus === "active");
+  const otherRest = restBrowse.filter((c) => c.myMembershipStatus !== "active");
+  const ordered = featured ? [featured, ...yourRest, ...otherRest] : [...yourRest, ...otherRest];
   const visible = directory ? ordered : ordered.slice(0, shown);
   const hero = visible[0] ?? null;
   const rest = visible.slice(1);

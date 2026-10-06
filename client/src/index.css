@@ -5030,20 +5030,11 @@ a.action-btn--stack {
 .profile-network-people {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  overflow: hidden;
+  justify-content: space-around;
   padding: 0;
 }
 .profile-network-faces {
-  display: flex;
-  gap: 10px;
-  min-width: 0;
-  flex: 1 1 auto;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.profile-network-faces::-webkit-scrollbar {
-  display: none;
+  display: contents;
 }
 .profile-network-person--more {
   flex: 0 0 56px;
@@ -14631,9 +14622,15 @@ button.xpl-photo-tile {
 }
 .network-chips {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   margin: 0 0 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.network-chips::-webkit-scrollbar {
+  display: none;
 }
 .network-chip {
   flex-shrink: 0;
