@@ -123,6 +123,7 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
       : [],
     sharedPlanId,
     socialLinks,
+    profilePhotos: target.profilePhotos ?? [],
     plansGated: !plansOpen && !isSelf,
     profilePrivate: !isSelf && !plansOpen && !communitiesOpen,
     network: {

@@ -5,7 +5,7 @@ import { isAdminPhone } from "../lib/adminPhones.js";
 import { isGcsConfigured, listDefaultCatalog, parseDataUrl, uploadCoverImage } from "../lib/gcs.js";
 import { HELP_TICKET_SECTION_LABELS, store, type CommunityRecord, type HelpTicketRecord } from "../store.js";
 import { emit } from "../lib/notify.js";
-import { listAllUsers, findUserById } from "../userRepo.js";
+import { listAllUsers, findUserById, deleteUser } from "../userRepo.js";
 import { runBehaviorAgent, analyzeUserBehavior } from "../lib/behaviorAgent.js";
 import { communityCategoriesOf, normalizeCommunityCategory } from "../types/shared.js";
 import { buildAdminDashboard, buildCommunityDetail, buildGodView } from "../lib/adminDashboard.js";
@@ -362,6 +362,47 @@ adminRouter.get("/behavior", async (_req, res) => {
     console.error("[admin] behavior agent failed", err);
     res.status(500).json({ error: "Behavior agent failed to run." });
   }
+});
+
+function isTestAccount(user: { accountSource?: string }): boolean {
+  return user.accountSource === "seed";
+}
+
+// DELETE /api/admin/users/:id — seed/demo accounts only. Real signups stay.
+adminRouter.delete("/users/:id", async (req, res) => {
+  const id = String(req.params.id);
+  if (req.userId && req.userId === id) {
+    res.status(400).json({ error: "You can't delete the account you're signed in with." });
+    return;
+  }
+  const user = await findUserById(id);
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  if (!isTestAccount(user)) {
+    res.status(400).json({ error: "Only test accounts can be deleted from here." });
+    return;
+  }
+  const ok = await deleteUser(id);
+  if (!ok) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  store.log("test_account_deleted", { userId: id });
+  res.json({ ok: true });
+});
+
+// POST /api/admin/test-accounts/delete — remove every seed/demo account.
+adminRouter.post("/test-accounts/delete", async (req, res) => {
+  const users = await listAllUsers();
+  const targets = users.filter((u) => isTestAccount(u) && u.id !== req.userId);
+  let deleted = 0;
+  for (const u of targets) {
+    if (await deleteUser(u.id)) deleted += 1;
+  }
+  store.log("test_accounts_deleted", { deleted });
+  res.json({ deleted });
 });
 
 // ---- Event-card image library ----

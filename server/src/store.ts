@@ -61,6 +61,8 @@ export interface UserRecord {
   dismissedNetworkPromptPlanIds?: string[];
   /** Social links — only surfaced to viewers who share a past plan or DM. */
   socialLinks?: { instagram?: string; tiktok?: string };
+  /** Extra profile photos, newest last. Capped at 8. */
+  profilePhotos?: string[];
   /** ISO timestamp the user tapped through the community-guidelines acknowledgment. */
   guidelinesAcknowledgedAt?: string | null;
   /** ISO timestamp the user scrolled through and accepted the Terms of Service. */

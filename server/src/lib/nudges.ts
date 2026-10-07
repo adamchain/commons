@@ -3,6 +3,15 @@ import { planEndTimestamp, planHasEnded, planStartTimestamp } from "./planTime.j
 import { store, type PlanRecord } from "../store.js";
 import { findUserById, findUsersByIds } from "../userRepo.js";
 import { emit } from "./notify.js";
+import { DEFAULT_NOTIFICATION_PREFS, type NotificationPrefs } from "../types/shared.js";
+
+function smsAllowed(
+  user: { notificationPrefs?: Partial<NotificationPrefs> } | undefined,
+  key: keyof NotificationPrefs,
+): boolean {
+  const prefs = { ...DEFAULT_NOTIFICATION_PREFS, ...(user?.notificationPrefs ?? {}) };
+  return prefs[key] !== false;
+}
 
 const REMINDER_SENT = new Set<string>();
 const REVIEW_SENT = new Set<string>();
@@ -27,7 +36,7 @@ export async function onPlanCreatedVenueNudge(plan: PlanRecord): Promise<void> {
       if (row.state !== "going") continue;
       if (row.userId === plan.creatorId) continue;
       const u = await findUserById(row.userId);
-      if (u && !previousVisitors.has(u.id)) {
+      if (u && !previousVisitors.has(u.id) && smsAllowed(u, "postPlanNetworkNudge")) {
         previousVisitors.set(u.id, { phone: u.phoneNumber, firstName: u.firstName || "there" });
       }
     }
@@ -55,7 +64,7 @@ export async function notifyInterestedPlanLocked(plan: PlanRecord, hostFirstName
   const link = `${appOrigin()}/plans/${plan.id}`;
   for (const row of interested) {
     const u = users.get(row.userId);
-    if (!u) continue;
+    if (!u || !smsAllowed(u, "lookingForRecovery")) continue;
     const body = `${hostFirstName} locked in "${plan.title}" — ${plan.location.name}. Details in Commons. ${link}`;
     try {
       await sendTransactionalSms(u.phoneNumber, body);
@@ -102,10 +111,12 @@ export async function runWeekendNudgeIfWeekendEve(): Promise<void> {
     if (!near) continue;
     seen.add(u.id);
     const body = `This weekend on Commons:\n${lines}\n${appOrigin()}/`;
-    try {
-      await sendTransactionalSms(u.phoneNumber, body);
-    } catch (e) {
-      console.error("[nudge] weekend sms", e);
+    if (smsAllowed(u, "weeklyFridayDigest")) {
+      try {
+        await sendTransactionalSms(u.phoneNumber, body);
+      } catch (e) {
+        console.error("[nudge] weekend sms", e);
+      }
     }
     store.log("nudge_weekend_sent", { userId: u.id });
     await emit({
@@ -144,12 +155,16 @@ export async function runPlanReminders(): Promise<void> {
       const u = users.get(uid);
       if (!u) continue;
       const body = `Reminder: "${plan.title}" is coming up soon at ${plan.location.name}. ${appOrigin()}/plans/${plan.id}`;
-      try {
-        await sendTransactionalSms(u.phoneNumber, body);
+      if (smsAllowed(u, "planInTwoHours")) {
+        try {
+          await sendTransactionalSms(u.phoneNumber, body);
+          REMINDER_SENT.add(key);
+          store.log("nudge_reminder_sent", { planId: plan.id, userId: uid });
+        } catch (e) {
+          console.error("[nudge] reminder sms", e);
+        }
+      } else {
         REMINDER_SENT.add(key);
-        store.log("nudge_reminder_sent", { planId: plan.id, userId: uid });
-      } catch (e) {
-        console.error("[nudge] reminder sms", e);
       }
       await emit({
         userId: uid,
@@ -214,6 +229,10 @@ export async function runPostPlanReviewPrompts(): Promise<void> {
       const u = await findUserById(uid);
       if (!u) continue;
       const body = `How was "${plan.title}"? Open Commons to leave quick feedback. ${appOrigin()}/plans/${plan.id}`;
+      if (!smsAllowed(u, "planTomorrow")) {
+        REVIEW_SENT.add(key);
+        continue;
+      }
       try {
         await sendTransactionalSms(u.phoneNumber, body);
         REVIEW_SENT.add(key);

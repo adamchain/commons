@@ -1087,8 +1087,14 @@ function BulletinTab({
       {livePosts.length === 0 && pending.length === 0 && myPending.length === 0 && (
         <TabEmpty
           icon={<MessageCircle size={24} strokeWidth={1.6} />}
-          headline={canPost ? "It's quiet in here." : "Nothing here yet."}
-          body={canPost ? "Somebody's gotta go first." : "Drop a hello, question or recommendation!"}
+          headline={community.isOrganizer ? (canPost ? "It's quiet in here." : "Nothing here yet.") : "Nothing here yet"}
+          body={
+            community.isOrganizer
+              ? canPost
+                ? "Somebody's gotta go first."
+                : "Drop a hello, question or recommendation!"
+              : "Drop a hello, question or recommendation!"
+          }
         />
       )}
       <ul className="cmy-post-list">

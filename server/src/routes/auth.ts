@@ -142,6 +142,7 @@ export function meFromUser(user: UserRecord): MeDTO {
     // Self always sees own social links — visibility check applies only to
     // other-viewer profile reads (see /api/profile).
     socialLinks: user.socialLinks,
+    profilePhotos: user.profilePhotos?.length ? user.profilePhotos : [],
     canAccessAdmin: isAdminPhone(user.phoneNumber),
     guidelinesAcknowledgedAt: user.guidelinesAcknowledgedAt ?? null,
     termsAcceptedAt: user.termsAcceptedAt ?? null,
@@ -549,6 +550,22 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
     if (ig) links.instagram = ig;
     if (tt) links.tiktok = tt;
     patch.socialLinks = ig || tt ? links : undefined;
+  }
+  if (Array.isArray(req.body?.profilePhotos)) {
+    const incoming = req.body.profilePhotos as unknown[];
+    if (incoming.length > 8) {
+      res.status(400).json({ error: "You can add up to 8 photos" });
+      return;
+    }
+    const photos: string[] = [];
+    for (const item of incoming) {
+      if (typeof item !== "string" || !item.startsWith("data:image/") || item.length > 450_000) {
+        res.status(400).json({ error: "Couldn't use one of those photos. Try a smaller image." });
+        return;
+      }
+      photos.push(item);
+    }
+    patch.profilePhotos = photos;
   }
   if (req.body?.notificationPrefs && typeof req.body.notificationPrefs === "object") {
     const incoming = req.body.notificationPrefs as Record<string, unknown>;

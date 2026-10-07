@@ -476,6 +476,8 @@ export interface MeDTO {
   createdAt: string;
   networkUserIds?: string[];
   socialLinks?: SocialLinks;
+  /** Extra profile photos. Empty when none are set. */
+  profilePhotos?: string[];
   /** True when this verified phone may use `/api/admin` and `/admin`. */
   canAccessAdmin?: boolean;
   /** ISO timestamp the user accepted the community guidelines, or null if not yet. */

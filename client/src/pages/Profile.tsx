@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -28,6 +28,7 @@ import { BottomSheet } from "../components/ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanWhenLine } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
+import { resolvePhotoDataUrl } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isIdeaPlan } from "../lib/planTime";
@@ -93,6 +94,7 @@ interface ProfilePayload {
   sharedPlanId: string | null;
   /** Null until viewer earns visibility (shared completed plan or in network). */
   socialLinks: { instagram?: string; tiktok?: string } | null;
+  profilePhotos?: string[];
   /** True when upcoming/past plans are hidden until the viewer is in-network or has a completed shared plan. */
   plansGated?: boolean;
   /** Plans and communities are hidden. Strangers see a private-profile note instead. */
@@ -129,6 +131,7 @@ export function ProfilePage() {
   const [reportOpen, setReportOpen] = useState(false);
   const [showProfileTip, setShowProfileTip] = useState(false);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [avatarZoom, setAvatarZoom] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
   const isSelf = user?.id === userId;
 
@@ -328,7 +331,12 @@ export function ProfilePage() {
 
         <section className="profile-other-hero">
           <div className="profile-other-hero-row">
-            <div className="profile-other-avatar">
+            <button
+              type="button"
+              className="profile-other-avatar profile-avatar-zoom"
+              aria-label={`View ${profile.user.firstName}'s photo`}
+              onClick={() => setAvatarZoom(true)}
+            >
               <Avatar
                 seed={profile.user.avatarSeed}
                 style={profile.user.avatarStyle}
@@ -337,7 +345,7 @@ export function ProfilePage() {
                 name={profile.user.firstName}
                 size="lg"
               />
-            </div>
+            </button>
             <div className="profile-other-hero-text">
               <div className="profile-other-name">{displayName}</div>
               {locationLabel && (
@@ -366,6 +374,12 @@ export function ProfilePage() {
             </p>
           )}
 
+          <SocialPills
+            isSelf={false}
+            instagram={profile.socialLinks?.instagram}
+            tiktok={profile.socialLinks?.tiktok}
+          />
+
           <div className="profile-other-ctas">
             <div className="profile-other-cta-row">
               <FriendButton profile={profile} onUpdated={reloadProfile} variant="other" />
@@ -383,6 +397,8 @@ export function ProfilePage() {
               Make a plan
             </Link>
           </div>
+
+          <ProfileGallery photos={profile.profilePhotos ?? []} canEdit={false} />
 
           {profile.network.mutualCount > 0 && mutualLabel && (
             <div className="profile-other-mutuals">
@@ -449,6 +465,24 @@ export function ProfilePage() {
               </section>
             )}
           </>
+        )}
+
+        {avatarZoom && (
+          <PhotoLightbox label={`${profile.user.firstName}'s photo`} onClose={() => setAvatarZoom(false)}>
+            {profile.user.avatarPhotoDataUrl ? (
+              <img src={profile.user.avatarPhotoDataUrl} alt="" />
+            ) : (
+              <div className="photo-lightbox-avatar">
+                <Avatar
+                  seed={profile.user.avatarSeed}
+                  style={profile.user.avatarStyle}
+                  params={profile.user.avatarParams}
+                  name={profile.user.firstName}
+                  size="xl"
+                />
+              </div>
+            )}
+          </PhotoLightbox>
         )}
 
         {actionSheetOpen && (
@@ -555,6 +589,18 @@ export function ProfilePage() {
           instagram={profile.socialLinks?.instagram}
           tiktok={profile.socialLinks?.tiktok}
           onEdit={() => navigate(`/profile/${userId}/edit`)}
+        />
+        <ProfileGallery
+          photos={profile.profilePhotos ?? []}
+          canEdit
+          onPhotosChange={async (next) => {
+            const updated = await api<MeDTO>("/api/auth/me", {
+              method: "PATCH",
+              body: JSON.stringify({ profilePhotos: next }),
+            });
+            setUser(updated);
+            reloadProfile();
+          }}
         />
       </section>
 
@@ -896,6 +942,147 @@ function ProfileActionSheet({
   );
 }
 
+const MAX_PROFILE_PHOTOS = 8;
+
+function PhotoLightbox({
+  label,
+  onClose,
+  children,
+}: {
+  label: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return createPortal(
+    <div className="photo-lightbox" role="dialog" aria-modal="true" aria-label={label} onClick={onClose}>
+      <button type="button" className="photo-lightbox-close" onClick={onClose}>
+        Close
+      </button>
+      <div className="photo-lightbox-frame" onClick={(e) => e.stopPropagation()}>
+        {children}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function ProfileGallery({
+  photos,
+  canEdit,
+  onPhotosChange,
+}: {
+  photos: string[];
+  canEdit: boolean;
+  onPhotosChange?: (next: string[]) => Promise<void>;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [openAt, setOpenAt] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!canEdit && photos.length === 0) return null;
+
+  async function addFromFile(file: File | null) {
+    if (!onPhotosChange || photos.length >= MAX_PROFILE_PHOTOS) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const dataUrl = await resolvePhotoDataUrl(file, { maxPx: 800, quality: 0.62 });
+      if (!dataUrl) return;
+      await onPhotosChange([...photos, dataUrl].slice(0, MAX_PROFILE_PHOTOS));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't add that photo");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeAt(index: number) {
+    if (!onPhotosChange) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onPhotosChange(photos.filter((_, i) => i !== index));
+      setOpenAt(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't remove that photo");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const openPhoto = openAt != null ? photos[openAt] : null;
+
+  return (
+    <div className="profile-gallery">
+      <div className="profile-gallery-grid">
+        {photos.map((src, i) => (
+          <button
+            key={`${i}-${src.slice(-24)}`}
+            type="button"
+            className="profile-gallery-thumb"
+            aria-label={`View photo ${i + 1}`}
+            onClick={() => setOpenAt(i)}
+          >
+            <img src={src} alt="" />
+          </button>
+        ))}
+        {canEdit && photos.length < MAX_PROFILE_PHOTOS && (
+          <button
+            type="button"
+            className="profile-gallery-add"
+            aria-label="Add a photo"
+            disabled={busy}
+            onClick={() => {
+              if (isNative()) void addFromFile(null);
+              else fileRef.current?.click();
+            }}
+          >
+            <Plus size={18} strokeWidth={2} aria-hidden="true" />
+          </button>
+        )}
+      </div>
+      {canEdit && (
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const file = e.target.files?.[0] ?? null;
+            if (fileRef.current) fileRef.current.value = "";
+            void addFromFile(file);
+          }}
+        />
+      )}
+      {error && <p className="error-text">{error}</p>}
+      {openPhoto && (
+        <PhotoLightbox label={`Photo ${(openAt ?? 0) + 1}`} onClose={() => setOpenAt(null)}>
+          <img src={openPhoto} alt="" />
+          {canEdit && (
+            <button
+              type="button"
+              className="photo-lightbox-remove"
+              disabled={busy}
+              onClick={() => void removeAt(openAt ?? 0)}
+            >
+              {busy ? "Removing…" : "Remove photo"}
+            </button>
+          )}
+        </PhotoLightbox>
+      )}
+    </div>
+  );
+}
+
 /**
  * Instagram + TikTok handles rendered as pills. Active pills (handle set) link
  * out; empty pills show just the brand icon. On your own profile empty pills are
@@ -911,7 +1098,7 @@ function SocialPills({
   isSelf: boolean;
   instagram?: string;
   tiktok?: string;
-  onEdit: () => void;
+  onEdit?: () => void;
 }) {
   const items = [
     {

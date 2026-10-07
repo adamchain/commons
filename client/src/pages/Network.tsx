@@ -167,6 +167,29 @@ export function NetworkPage() {
 
       {tab === "discover" ? (
         <>
+          <div className="network-search-wrap">
+            <SearchIcon />
+            <input
+              className="network-search-input"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search Network"
+              aria-label="Search Network"
+              enterKeyHint="search"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+            />
+            <button
+              type="button"
+              className={`network-search-clear${query ? " is-on" : ""}`}
+              onClick={() => setQuery("")}
+              aria-label="Clear search"
+              tabIndex={query ? 0 : -1}
+            >
+              ×
+            </button>
+          </div>
           <div className="network-chips" role="group" aria-label="Interests">
             <button type="button" className={`network-chip${interest === null ? " is-active" : ""}`} onClick={() => setInterest(null)}>
               All
@@ -182,7 +205,27 @@ export function NetworkPage() {
               </button>
             ))}
           </div>
-          {suggested === null ? (
+          {trimmed ? (
+            rows.length > 0 ? (
+              <div className="network-card">
+                {rows.map((row) => (
+                  <NetworkRow
+                    key={row.user.id}
+                    row={row}
+                    busy={busyId === row.user.id}
+                    onConnect={() => void connect(row.user.id)}
+                    actionLabel="Add"
+                  />
+                ))}
+              </div>
+            ) : !searching && !waitingForResults ? (
+              <p className="network-empty">Nobody by that name.</p>
+            ) : (
+              <div className="feed-skeleton" aria-busy="true" aria-label="Searching">
+                <div className="feed-skeleton-card" />
+              </div>
+            )
+          ) : suggested === null ? (
             <div className="feed-skeleton" aria-busy="true" aria-label="Finding people">
               <div className="feed-skeleton-card" />
               <div className="feed-skeleton-card" />

@@ -444,9 +444,18 @@ const SEGMENT_LABELS: Record<string, string> = {
 };
 
 /** Admin drill-down: a user's full profile details + activity. */
-export function AdminUserDetailModal({ userId, onClose }: { userId: string; onClose: () => void }) {
+export function AdminUserDetailModal({
+  userId,
+  onClose,
+  onDeleted,
+}: {
+  userId: string;
+  onClose: () => void;
+  onDeleted?: () => void;
+}) {
   const [data, setData] = useState<AdminUserDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -459,6 +468,20 @@ export function AdminUserDetailModal({ userId, onClose }: { userId: string; onCl
   }, [userId]);
 
   const interestLabel = (t: string) => (INTEREST_LABELS as Record<string, string>)[t] ?? t;
+
+  async function deleteTestAccount() {
+    const name = data?.user.firstName || "this test account";
+    if (!window.confirm(`Delete ${name}? This removes the test account and can't be undone.`)) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await api(`/api/admin/users/${userId}`, { method: "DELETE" });
+      onDeleted?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Couldn't delete");
+      setDeleting(false);
+    }
+  }
 
   return (
     <div className="admin-modal-backdrop" onClick={onClose}>
@@ -540,6 +563,18 @@ export function AdminUserDetailModal({ userId, onClose }: { userId: string; onCl
                 </div>
               ) : null}
             </dl>
+
+            {data.user.accountSource === "seed" && (
+              <button
+                type="button"
+                className="admin-btn"
+                style={{ marginBottom: "1rem", background: "var(--red, #c13b3b)" }}
+                disabled={deleting}
+                onClick={() => void deleteTestAccount()}
+              >
+                {deleting ? "Deleting…" : "Delete test account"}
+              </button>
+            )}
 
             {data.behavior ? (
               <div className="admin-card" style={{ marginBottom: "1rem" }}>

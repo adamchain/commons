@@ -4925,7 +4925,7 @@ a.action-btn--stack {
   box-shadow: var(--shadow-card);
 }
 .network-top .screen-title {
-  margin-bottom: 12px;
+  margin-bottom: 18px;
 }
 .network-top .network-tabs {
   margin-bottom: 0;
@@ -10406,6 +10406,33 @@ a.action-btn--stack {
 .edit-plan-page .form-card {
   gap: 0;
 }
+.edit-plan-page .form-row-flex {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+.edit-plan-page .form-row-flex-main {
+  flex: 1 1 160px;
+}
+.edit-plan-page .flex-toggle-btn,
+.edit-plan-page .form-row-flex .flex-toggle-btn {
+  margin-top: 0;
+  margin-left: auto;
+}
+.edit-plan-page .form-row-flex-main .number-picker-scroll,
+.edit-plan-page .form-row-flex-main .number-picker-custom {
+  width: 100%;
+  max-width: 100%;
+  margin-top: 8px;
+}
+.edit-plan-page .plan-grabs-confirm-actions {
+  flex-direction: column;
+}
+.edit-plan-page .plan-grabs-confirm-actions .btn-primary,
+.edit-plan-page .plan-grabs-confirm-actions .btn-secondary {
+  flex: none;
+  width: 100%;
+}
 .edit-plan-page .edit-plan-top {
   display: flex;
   align-items: center;
@@ -14251,6 +14278,12 @@ button.xpl-photo-tile {
   flex-direction: column;
   overscroll-behavior: none;
 }
+html:has(.app-shell--messages-lock),
+body:has(.app-shell--messages-lock) {
+  height: 100%;
+  overflow: hidden;
+}
+.app-shell--messages-lock .messages-title-row,
 .app-shell--messages-lock .screen-title,
 .app-shell--messages-lock .messages-tabs {
   flex-shrink: 0;
@@ -14275,9 +14308,11 @@ button.xpl-photo-tile {
   min-height: 0;
 }
 .ref-empty-card--inbox {
-  width: 100%;
+  width: min(100%, 320px);
+  margin: 0 auto;
   background: #fff;
   border: none;
+  border-radius: 20px;
   box-shadow: var(--shadow-card);
 }
 .messages-row-body {
@@ -16044,6 +16079,12 @@ button.xpl-photo-tile {
   background: var(--tan);
   flex-shrink: 0;
 }
+button.profile-other-avatar {
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  display: block;
+}
 .profile-other-avatar .avatar {
   width: 76px !important;
   height: 76px !important;
@@ -16110,6 +16151,92 @@ button.xpl-photo-tile {
   line-height: 1.45;
   color: var(--text-muted);
   white-space: pre-wrap;
+}
+.profile-other-hero .profile-social-pills {
+  margin-top: 0;
+  margin-bottom: 14px;
+}
+.profile-other-hero .social-pill {
+  background: var(--bg);
+}
+.profile-gallery {
+  margin-top: 14px;
+}
+.profile-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.profile-gallery-thumb,
+.profile-gallery-add {
+  aspect-ratio: 1;
+  width: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg);
+  cursor: pointer;
+}
+.profile-gallery-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.profile-gallery-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  border: 1px dashed var(--tan-mid);
+}
+.profile-gallery-add:disabled {
+  opacity: 0.5;
+}
+.photo-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(20, 16, 12, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+}
+.photo-lightbox-frame {
+  max-width: min(92vw, 520px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.photo-lightbox-frame img {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 16px;
+}
+.photo-lightbox-avatar .avatar {
+  width: min(80vw, 320px) !important;
+  height: min(80vw, 320px) !important;
+}
+.photo-lightbox-close,
+.photo-lightbox-remove {
+  border: none;
+  background: #fff;
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-weight: 700;
+  font-size: var(--text-body-small);
+  cursor: pointer;
+}
+.flex-switch:disabled {
+  opacity: 0.55;
+  cursor: progress;
 }
 .profile-other-ctas {
   display: flex;

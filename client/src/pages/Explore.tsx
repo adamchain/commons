@@ -34,6 +34,9 @@ export function ExplorePage() {
     };
   }, []);
 
+  const yours = communities.filter(isYourCommunity);
+  const discover = communities.filter((c) => !isYourCommunity(c));
+
   return (
     <main className="app-shell app-shell--wide app-shell--with-nav xpl">
       <PhotoHero
@@ -48,59 +51,51 @@ export function ExplorePage() {
         }
       />
 
-      {/* Communities — the one live Explore element at launch */}
+      {yours.length > 0 && (
+        <section className="xpl-communities" aria-label="Your communities">
+          <div className="xpl-section-head">
+            <div className="xpl-section-head-text">
+              <Label>Yours</Label>
+              <h2 className="xpl-section-title">Your communities</h2>
+            </div>
+            <Link to="/communities" className="xpl-see-all">
+              See all →
+            </Link>
+          </div>
+          <CommunityRows
+            communities={yours}
+            onJoined={(updated) => {
+              setCommunities((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+              if (updated.myMembershipStatus === "active") setJoinConfirm(true);
+            }}
+            onRequest={(id) => navigate(`/communities/${id}`, { state: { from: "explore" } })}
+          />
+        </section>
+      )}
+
+      {(discover.length > 0 || yours.length === 0) && (
       <section className="xpl-communities" aria-label="Communities">
         <div className="xpl-section-head">
           <div className="xpl-section-head-text">
             <Label>Communities</Label>
             <h2 className="xpl-section-title">Find your people</h2>
           </div>
-          <Link to="/communities" className="xpl-see-all">
-            See all →
-          </Link>
+          {yours.length === 0 && (
+            <Link to="/communities" className="xpl-see-all">
+              See all →
+            </Link>
+          )}
         </div>
-        {communities.length > 0 ? (
-          <ul className="xpl-comm-list">
-            {communities.slice(0, 5).map((c, i) => (
-              <li key={c.id} className="xpl-comm-row-wrap">
-                <Link to={`/communities/${c.id}`} state={{ from: "explore" }} className="xpl-comm-row">
-                  <span className="xpl-comm-num">{String(i + 1).padStart(2, "0")}</span>
-                  <div className="xpl-comm-thumb">
-                    <CommunityCover coverImage={c.coverImage} category={c.category} iconSize={18} />
-                    <span className="xpl-comm-avatar">
-                      <Avatar
-                        seed={c.organizer.avatarSeed}
-                        style={c.organizer.avatarStyle}
-                        photoDataUrl={c.organizer.avatarPhotoDataUrl}
-                        params={c.organizer.avatarParams}
-                        name={c.organizer.firstName}
-                        size="xs"
-                      />
-                    </span>
-                  </div>
-                  <div className="xpl-comm-info">
-                    <div className="xpl-comm-name">
-                      {c.name}
-                      {c.isFounding ? <span className="xpl-comm-founding">Founding</span> : null}
-                    </div>
-                    <div className="xpl-comm-sub">
-                      {communityCategoryLine(c)} · {c.memberCount}{" "}
-                      {c.memberCount === 1 ? "member" : "members"}
-                    </div>
-                  </div>
-                  <CommunityJoinCta
-                    community={c}
-                    onJoined={(updated) => {
-                      setCommunities((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-                      if (updated.myMembershipStatus === "active") setJoinConfirm(true);
-                    }}
-                    onRequest={() => navigate(`/communities/${c.id}`, { state: { from: "explore" } })}
-                  />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : loadedComm ? (
+        {discover.length > 0 ? (
+          <CommunityRows
+            communities={discover.slice(0, 5)}
+            onJoined={(updated) => {
+              setCommunities((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+              if (updated.myMembershipStatus === "active") setJoinConfirm(true);
+            }}
+            onRequest={(id) => navigate(`/communities/${id}`, { state: { from: "explore" } })}
+          />
+        ) : loadedComm && yours.length === 0 ? (
           <EmptyCard
             className="xpl-comm-empty-card"
             icon={<Users size={22} strokeWidth={1.6} color="#3A6A3A" />}
@@ -111,6 +106,7 @@ export function ExplorePage() {
           />
         ) : null}
       </section>
+      )}
 
       {/* Places — coming soon editorial grid */}
       <section className="xpl-places" aria-label="Places">
@@ -161,6 +157,60 @@ export function ExplorePage() {
       </section>
       {joinConfirm && <JoinConfirmPopup kind="community" onClose={() => setJoinConfirm(false)} />}
     </main>
+  );
+}
+
+function isYourCommunity(c: CommunityCardDTO): boolean {
+  return c.myMembershipStatus === "active" || c.myRole === "organizer";
+}
+
+function CommunityRows({
+  communities,
+  onJoined,
+  onRequest,
+}: {
+  communities: CommunityCardDTO[];
+  onJoined: (updated: CommunityCardDTO) => void;
+  onRequest: (id: string) => void;
+}) {
+  return (
+    <ul className="xpl-comm-list">
+      {communities.map((c, i) => (
+        <li key={c.id} className="xpl-comm-row-wrap">
+          <Link to={`/communities/${c.id}`} state={{ from: "explore" }} className="xpl-comm-row">
+            <span className="xpl-comm-num">{String(i + 1).padStart(2, "0")}</span>
+            <div className="xpl-comm-thumb">
+              <CommunityCover coverImage={c.coverImage} category={c.category} iconSize={18} />
+              <span className="xpl-comm-avatar">
+                <Avatar
+                  seed={c.organizer.avatarSeed}
+                  style={c.organizer.avatarStyle}
+                  photoDataUrl={c.organizer.avatarPhotoDataUrl}
+                  params={c.organizer.avatarParams}
+                  name={c.organizer.firstName}
+                  size="xs"
+                />
+              </span>
+            </div>
+            <div className="xpl-comm-info">
+              <div className="xpl-comm-name">
+                {c.name}
+                {c.isFounding ? <span className="xpl-comm-founding">Founding</span> : null}
+              </div>
+              <div className="xpl-comm-sub">
+                {communityCategoryLine(c)} · {c.memberCount}{" "}
+                {c.memberCount === 1 ? "member" : "members"}
+              </div>
+            </div>
+            <CommunityJoinCta
+              community={c}
+              onJoined={onJoined}
+              onRequest={() => onRequest(c.id)}
+            />
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
 

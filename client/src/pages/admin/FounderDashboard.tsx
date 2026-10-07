@@ -362,7 +362,9 @@ export function AdminPage() {
                 onChanged={() => void refresh()}
               />
             )}
-            {page === "users" && <UsersPage data={data} onSelectUser={setSelectedUserId} />}
+            {page === "users" && (
+              <UsersPage data={data} onSelectUser={setSelectedUserId} onChanged={() => void refresh()} />
+            )}
             {page === "map" && <GodView onSelectUser={setSelectedUserId} />}
             {page === "operations" && (
               <Operations data={data} onSelectUser={setSelectedUserId} onChanged={() => void refresh()} />
@@ -371,7 +373,14 @@ export function AdminPage() {
         ) : null}
       </main>
       {selectedUserId ? (
-        <AdminUserDetailModal userId={selectedUserId} onClose={() => setSelectedUserId(null)} />
+        <AdminUserDetailModal
+          userId={selectedUserId}
+          onClose={() => setSelectedUserId(null)}
+          onDeleted={() => {
+            setSelectedUserId(null);
+            void refresh();
+          }}
+        />
       ) : null}
     </div>
   );
@@ -949,12 +958,32 @@ function CommunityDetail({ id, onBack, onChanged }: { id: string; onBack: () => 
 function UsersPage({
   data,
   onSelectUser,
+  onChanged,
 }: {
   data: Dashboard;
   onSelectUser: (id: string) => void;
+  onChanged: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [includeSeed, setIncludeSeed] = useState(false);
+  const [deletingTests, setDeletingTests] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const seedCount = data.operations.users.filter((u) => u.seed).length;
+
+  async function deleteTestAccounts() {
+    if (seedCount === 0) return;
+    if (!window.confirm(`Delete ${seedCount} test account${seedCount === 1 ? "" : "s"}? This can't be undone.`)) return;
+    setDeletingTests(true);
+    setDeleteError(null);
+    try {
+      await api("/api/admin/test-accounts/delete", { method: "POST" });
+      onChanged();
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Couldn't delete test accounts");
+    } finally {
+      setDeletingTests(false);
+    }
+  }
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return data.operations.users
@@ -985,7 +1014,13 @@ function UsersPage({
             <input type="checkbox" checked={includeSeed} onChange={(e) => setIncludeSeed(e.target.checked)} />
             Include demo accounts
           </label>
+          {seedCount > 0 && (
+            <button type="button" className="fdash-linkish" disabled={deletingTests} onClick={() => void deleteTestAccounts()}>
+              {deletingTests ? "Deleting…" : `Delete ${seedCount} test account${seedCount === 1 ? "" : "s"}`}
+            </button>
+          )}
         </div>
+        {deleteError && <p className="fdash-muted">{deleteError}</p>}
         {rows.length === 0 ? (
           <p className="fdash-muted">No matching accounts.</p>
         ) : (

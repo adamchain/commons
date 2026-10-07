@@ -35,9 +35,11 @@ export function NotificationPrefsPage() {
   };
 
   async function toggle(key: keyof NotificationPrefs) {
-    if (busy) return;
+    if (!user || busy) return;
     setBusy(key);
     const next: NotificationPrefs = { ...current, [key]: !current[key] };
+    const snapshot = user;
+    setUser({ ...snapshot, notificationPrefs: next });
     try {
       const updated = await api<MeDTO>("/api/auth/me", {
         method: "PATCH",
@@ -45,7 +47,7 @@ export function NotificationPrefsPage() {
       });
       setUser(updated);
     } catch {
-      /* keep previous state on failure */
+      setUser(snapshot);
     } finally {
       setBusy(null);
     }
@@ -131,7 +133,11 @@ export function NotificationPrefsPage() {
         <InfoRow
           icon="💬"
           title="SMS"
-          sub={user.phoneNumber ? `${user.phoneNumber} · Only for plans starting soon` : "Only for plans starting soon"}
+          sub={
+            user.phoneNumber
+              ? `${user.phoneNumber} · Follows Plan reminders above`
+              : "Follows Plan reminders above"
+          }
         />
       </Group>
     </main>
@@ -142,8 +148,11 @@ export function NotificationPrefsPage() {
     b: keyof NotificationPrefs,
     next: boolean,
   ) {
+    if (!user) return;
     setBusy(a);
     const patched: NotificationPrefs = { ...current, [a]: next, [b]: next };
+    const snapshot = user;
+    setUser({ ...snapshot, notificationPrefs: patched });
     try {
       const updated = await api<MeDTO>("/api/auth/me", {
         method: "PATCH",
@@ -151,7 +160,7 @@ export function NotificationPrefsPage() {
       });
       setUser(updated);
     } catch {
-      /* swallow */
+      setUser(snapshot);
     } finally {
       setBusy(null);
     }
@@ -181,20 +190,33 @@ function ToggleRow({
   onToggle: () => void;
 }) {
   return (
-    <div className="settings-row">
+    <div
+      className="settings-row"
+      role="button"
+      tabIndex={0}
+      aria-pressed={on}
+      aria-disabled={busy}
+      onClick={busy ? undefined : onToggle}
+      onKeyDown={(e) => { if (!busy && (e.key === "Enter" || e.key === " ")) onToggle(); }}
+    >
       <div className="settings-row-body" style={{ paddingLeft: 0 }}>
         <div className="settings-row-title">{title}</div>
         <div className="settings-row-sub" style={{ whiteSpace: "normal" }}>{sub}</div>
       </div>
-      <label className="pref-toggle">
-        <input
-          type="checkbox"
-          checked={on}
-          disabled={busy}
-          onChange={onToggle}
-          aria-label={title}
-        />
-      </label>
+      <button
+        type="button"
+        role="switch"
+        className={`flex-switch${on ? " is-on" : ""}`}
+        aria-checked={on}
+        aria-label={title}
+        disabled={busy}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
+      >
+        <span className="flex-switch-knob" />
+      </button>
     </div>
   );
 }
