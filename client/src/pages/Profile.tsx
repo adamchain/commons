@@ -7,6 +7,7 @@ import {
   CalendarPlus,
   Camera,
   Check,
+  ChevronLeft,
   ChevronRight,
   Flag,
   MapPin,
@@ -27,7 +28,7 @@ import { ReportModal } from "../components/PlanSafetyMenu";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanDate, formatPlanWhenLine } from "../lib/format";
-import { fileToResizedDataUrl } from "../lib/imageResize";
+import { fileToResizedDataUrl, shrinkDataUrl } from "../lib/imageResize";
 import { resolvePhotoDataUrl } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
 import { pickPhotoNative } from "../lib/photoPicker";
@@ -943,32 +944,82 @@ function ProfileActionSheet({
 }
 
 const MAX_PROFILE_PHOTOS = 8;
+const GALLERY_MAX_CHARS = 140_000;
+
+function photoCountLabel(count: number, canEdit: boolean): string {
+  if (count === 0 && canEdit) return "Add photos";
+  if (count === 1) return "1 photo";
+  return `${count} photos`;
+}
 
 function PhotoLightbox({
   label,
   onClose,
+  onPrev,
+  onNext,
+  footer,
   children,
 }: {
   label: string;
   onClose: () => void;
+  onPrev?: () => void;
+  onNext?: () => void;
+  footer?: ReactNode;
   children: ReactNode;
 }) {
+  const touchX = useRef<number | null>(null);
+
   useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft") onPrev?.();
+      if (e.key === "ArrowRight") onNext?.();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose, onPrev, onNext]);
 
   return createPortal(
     <div className="photo-lightbox" role="dialog" aria-modal="true" aria-label={label} onClick={onClose}>
       <button type="button" className="photo-lightbox-close" onClick={onClose}>
         Close
       </button>
-      <div className="photo-lightbox-frame" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="photo-lightbox-frame"
+        onClick={(e) => e.stopPropagation()}
+        onTouchStart={(e) => {
+          touchX.current = e.changedTouches[0]?.clientX ?? null;
+        }}
+        onTouchEnd={(e) => {
+          if (touchX.current == null) return;
+          const dx = (e.changedTouches[0]?.clientX ?? touchX.current) - touchX.current;
+          touchX.current = null;
+          if (dx > 48) onPrev?.();
+          else if (dx < -48) onNext?.();
+        }}
+      >
+        {onPrev && (
+          <button type="button" className="photo-lightbox-nav photo-lightbox-nav--prev" aria-label="Previous photo" onClick={onPrev}>
+            <ChevronLeft size={22} strokeWidth={2} />
+          </button>
+        )}
         {children}
+        {onNext && (
+          <button type="button" className="photo-lightbox-nav photo-lightbox-nav--next" aria-label="Next photo" onClick={onNext}>
+            <ChevronRight size={22} strokeWidth={2} />
+          </button>
+        )}
       </div>
+      {footer && (
+        <div className="photo-lightbox-footer" onClick={(e) => e.stopPropagation()}>
+          {footer}
+        </div>
+      )}
     </div>,
     document.body,
   );
@@ -990,16 +1041,34 @@ function ProfileGallery({
 
   if (!canEdit && photos.length === 0) return null;
 
-  async function addFromFile(file: File | null) {
+  async function toGalleryPhoto(file: File | null): Promise<string | null> {
+    const raw = await resolvePhotoDataUrl(file, { maxPx: 720, quality: 0.6 });
+    if (!raw) return null;
+    if (raw.length <= GALLERY_MAX_CHARS) return raw;
+    return shrinkDataUrl(raw, 720, GALLERY_MAX_CHARS);
+  }
+
+  async function addFromFiles(files: File[]) {
     if (!onPhotosChange || photos.length >= MAX_PROFILE_PHOTOS) return;
+    if (!isNative() && files.length === 0) return;
     setBusy(true);
     setError(null);
     try {
-      const dataUrl = await resolvePhotoDataUrl(file, { maxPx: 800, quality: 0.62 });
-      if (!dataUrl) return;
-      await onPhotosChange([...photos, dataUrl].slice(0, MAX_PROFILE_PHOTOS));
+      const next = [...photos];
+      const picks: Array<File | null> = isNative()
+        ? [null]
+        : files.slice(0, MAX_PROFILE_PHOTOS - photos.length);
+      for (const file of picks) {
+        if (next.length >= MAX_PROFILE_PHOTOS) break;
+        const dataUrl = await toGalleryPhoto(file);
+        if (dataUrl) next.push(dataUrl);
+      }
+      if (next.length !== photos.length) await onPhotosChange(next);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't add that photo");
+      const message = e instanceof Error ? e.message : "";
+      if (!/cancel/i.test(message)) {
+        setError(message || "Couldn't add that photo");
+      }
     } finally {
       setBusy(false);
     }
@@ -1022,7 +1091,11 @@ function ProfileGallery({
   const openPhoto = openAt != null ? photos[openAt] : null;
 
   return (
-    <div className="profile-gallery">
+    <section className="profile-gallery" aria-label="Photos">
+      <div className="profile-gallery-head">
+        <h3 className="profile-section-label profile-section-label--inline">Photos</h3>
+        <span className="profile-gallery-count">{photoCountLabel(photos.length, canEdit)}</span>
+      </div>
       <div className="profile-gallery-grid">
         {photos.map((src, i) => (
           <button
@@ -1039,10 +1112,10 @@ function ProfileGallery({
           <button
             type="button"
             className="profile-gallery-add"
-            aria-label="Add a photo"
+            aria-label="Add photos"
             disabled={busy}
             onClick={() => {
-              if (isNative()) void addFromFile(null);
+              if (isNative()) void addFromFiles([]);
               else fileRef.current?.click();
             }}
           >
@@ -1055,31 +1128,37 @@ function ProfileGallery({
           ref={fileRef}
           type="file"
           accept="image/*"
+          multiple
           style={{ display: "none" }}
           onChange={(e) => {
-            const file = e.target.files?.[0] ?? null;
+            const files = e.target.files ? Array.from(e.target.files) : [];
             if (fileRef.current) fileRef.current.value = "";
-            void addFromFile(file);
+            void addFromFiles(files);
           }}
         />
       )}
       {error && <p className="error-text">{error}</p>}
       {openPhoto && (
-        <PhotoLightbox label={`Photo ${(openAt ?? 0) + 1}`} onClose={() => setOpenAt(null)}>
+        <PhotoLightbox
+          label={`Photo ${(openAt ?? 0) + 1} of ${photos.length}`}
+          onClose={() => setOpenAt(null)}
+          footer={
+            canEdit ? (
+              <button
+                type="button"
+                className="photo-lightbox-remove"
+                disabled={busy}
+                onClick={() => void removeAt(openAt ?? 0)}
+              >
+                {busy ? "Removing…" : "Remove photo"}
+              </button>
+            ) : undefined
+          }
+        >
           <img src={openPhoto} alt="" />
-          {canEdit && (
-            <button
-              type="button"
-              className="photo-lightbox-remove"
-              disabled={busy}
-              onClick={() => void removeAt(openAt ?? 0)}
-            >
-              {busy ? "Removing…" : "Remove photo"}
-            </button>
-          )}
         </PhotoLightbox>
       )}
-    </div>
+    </section>
   );
 }
 

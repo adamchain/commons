@@ -10,7 +10,7 @@ import { PollCard } from "../components/PollCard";
 import { PollSheet } from "../components/PollSheet";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { Button } from "../components/ui/Button";
-import { EmptyCard } from "../components/ui";
+import { ChatEmpty, EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import type { NavFromState } from "../lib/navState";
@@ -487,10 +487,13 @@ export function DmChatPage() {
         )}
 
         {!blocked && (
-        <div ref={scrollRef} className="chat-messages">
+        <div
+          ref={scrollRef}
+          className={`chat-messages${ready && messages.length === 0 ? " chat-messages--empty" : ""}`}
+        >
           {!ready && <p className="network-empty">Opening chat…</p>}
           {ready && conv && messages.length === 0 && !conv.awaitingAccept && (
-            <p className="network-empty">Say hi — this chat is just the two of you.</p>
+            <ChatEmpty title="It's quiet in here." body="Say hi — this chat is just the two of you." />
           )}
           {messages.map((m) => {
             if (m.kind === "system") {
@@ -577,7 +580,7 @@ export function DmChatPage() {
               </div>
             );
           })}
-          <div ref={endRef} className="chat-messages-end" aria-hidden="true" />
+          {messages.length > 0 && <div ref={endRef} className="chat-messages-end" aria-hidden="true" />}
         </div>
         )}
 

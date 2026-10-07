@@ -207,6 +207,7 @@ export function PlanCard({
                   state={plan.myState ?? null}
                   isFull={isFull}
                   requiresApproval={planRequiresHostApproval(plan)}
+                  limitedApproval={planRequiresHostApproval(plan) && capacity !== null}
                   onPlanRefresh={onPlanRefresh}
                 />
               )}
@@ -302,6 +303,7 @@ function QuickJoin({
   state,
   isFull,
   requiresApproval,
+  limitedApproval,
   onPlanRefresh,
 }: {
   planId: string;
@@ -309,6 +311,8 @@ function QuickJoin({
   state: "going" | "interested" | null;
   isFull: boolean;
   requiresApproval: boolean;
+  /** Capacity is set and the host chooses who gets a spot. */
+  limitedApproval: boolean;
   onPlanRefresh?: () => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -335,7 +339,7 @@ function QuickJoin({
       } else {
         await api(`/api/plans/${planId}/participation`, { method: "DELETE" });
       }
-      setConfirm(joinConfirmKind(next, { isIdea: isLooking }));
+      setConfirm(joinConfirmKind(next, { isIdea: isLooking, limitedApproval }));
       onPlanRefresh?.();
     } catch {
       /* surface nothing on the card */

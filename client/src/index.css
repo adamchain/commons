@@ -6603,8 +6603,9 @@ a.action-btn--stack {
 .profile-do-again { font-size: var(--text-body-small); white-space: nowrap; }
 
 .chat-empty-card {
-  margin: 40px auto;
+  margin: 0 auto;
   max-width: 320px;
+  width: min(100%, 320px);
   text-align: center;
   padding: 32px 24px;
   background: var(--card);
@@ -8930,6 +8931,9 @@ a.action-btn--stack {
   padding: 28px 22px 24px;
   box-shadow: var(--shadow);
   animation: join-confirm-card-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.join-confirm-card--wide {
+  max-width: 340px;
 }
 .join-confirm-card--celebrate .join-confirm-icon {
   background: var(--card);
@@ -14261,6 +14265,14 @@ button.xpl-photo-tile {
   /* Room for the heart under the last bubble, above the composer. */
   padding-bottom: 20px;
 }
+.chat-messages--empty {
+  overflow: hidden;
+  justify-content: center;
+  align-items: center;
+  padding-top: 0;
+  padding-bottom: 0;
+  overscroll-behavior: none;
+}
 .chat-messages-end {
   width: 100%;
   height: 1px;
@@ -14279,8 +14291,11 @@ button.xpl-photo-tile {
   overscroll-behavior: none;
 }
 html:has(.app-shell--messages-lock),
-body:has(.app-shell--messages-lock) {
-  height: 100%;
+body:has(.app-shell--messages-lock),
+#root:has(.app-shell--messages-lock) {
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 100dvh;
   overflow: hidden;
 }
 .app-shell--messages-lock .messages-title-row,
@@ -14297,6 +14312,7 @@ body:has(.app-shell--messages-lock) {
 }
 .app-shell--messages-lock .messages-scroll.messages-scroll--empty {
   overflow: hidden;
+  overscroll-behavior: none;
   display: flex;
   flex-direction: column;
 }
@@ -16160,23 +16176,44 @@ button.profile-other-avatar {
   background: var(--bg);
 }
 .profile-gallery {
-  margin-top: 14px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.profile-gallery-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.profile-gallery-count {
+  font-size: var(--text-body-small);
+  font-weight: 500;
+  color: var(--faint);
 }
 .profile-gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.profile-gallery-grid::-webkit-scrollbar {
+  display: none;
 }
 .profile-gallery-thumb,
 .profile-gallery-add {
-  aspect-ratio: 1;
-  width: 100%;
+  /* Community covers are 148×96. Same shape, a little larger. */
+  flex: 0 0 164px;
+  width: 164px;
+  height: 106px;
   padding: 0;
   border: none;
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
   background: var(--bg);
-  cursor: pointer;
+  cursor: zoom-in;
 }
 .profile-gallery-thumb img {
   width: 100%;
@@ -16190,6 +16227,7 @@ button.profile-other-avatar {
   justify-content: center;
   color: var(--ink);
   border: 1px dashed var(--tan-mid);
+  cursor: pointer;
 }
 .profile-gallery-add:disabled {
   opacity: 0.5;
@@ -16207,17 +16245,42 @@ button.profile-other-avatar {
   padding: 24px;
 }
 .photo-lightbox-frame {
-  max-width: min(92vw, 520px);
+  position: relative;
+  max-width: min(96vw, 880px);
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
 }
 .photo-lightbox-frame img {
-  max-width: 100%;
-  max-height: 70vh;
+  display: block;
+  max-width: min(96vw, 880px);
+  max-height: 78vh;
+  width: auto;
+  height: auto;
   object-fit: contain;
   border-radius: 16px;
+}
+.photo-lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.photo-lightbox-nav--prev { left: 10px; }
+.photo-lightbox-nav--next { right: 10px; }
+.photo-lightbox-footer {
+  display: flex;
+  justify-content: center;
 }
 .photo-lightbox-avatar .avatar {
   width: min(80vw, 320px) !important;

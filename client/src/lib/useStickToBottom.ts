@@ -21,7 +21,10 @@ export function useStickToBottom(active: boolean, stickKey: string | number) {
     pinningRef.current = true;
     // Never use scrollIntoView — it scrolls the window / wrong ancestors and
     // leaves this overflow container sitting on older messages.
-    el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+    // An empty thread is a pixel or two taller than the pane (end spacer,
+    // padding). Pinning that nudges the empty card up into a short scroll.
+    const overflow = el.scrollHeight - el.clientHeight;
+    el.scrollTop = overflow > 2 ? overflow : 0;
     atBottomRef.current = true;
     window.setTimeout(() => {
       pinningRef.current = false;

@@ -3,7 +3,12 @@ import { createPortal } from "react-dom";
 import { Check } from "lucide-react";
 import type { ParticipationState } from "../types/shared";
 
-export type JoinConfirmKind = ParticipationState | "dropped" | "community" | "idea_interested";
+export type JoinConfirmKind =
+  | ParticipationState
+  | "dropped"
+  | "community"
+  | "idea_interested"
+  | "limited_interested";
 
 const COPY: Record<JoinConfirmKind, { title: string; sub: string; celebrate: boolean }> = {
   going: {
@@ -19,6 +24,11 @@ const COPY: Record<JoinConfirmKind, { title: string; sub: string; celebrate: boo
   idea_interested: {
     title: "Interested ✓",
     sub: "Head to the chat to coordinate the details",
+    celebrate: true,
+  },
+  limited_interested: {
+    title: "Interested ✓",
+    sub: "This plan has a limited number of spots; keep an eye on your notifications to see if you're in",
     celebrate: true,
   },
   dropped: {
@@ -49,7 +59,8 @@ export function JoinConfirmPopup({
   const { title: defaultTitle, sub, celebrate } = COPY[kind];
   const title = titleOverride ?? defaultTitle;
   const dismiss = useEffectEvent(onClose);
-  const dismissAfter = kind === "idea_interested" ? Math.max(autoDismissMs, 3200) : autoDismissMs;
+  const dismissAfter =
+    kind === "limited_interested" ? 4800 : kind === "idea_interested" ? Math.max(autoDismissMs, 3200) : autoDismissMs;
 
   useEffect(() => {
     const t = window.setTimeout(() => dismiss(), dismissAfter);
@@ -67,10 +78,10 @@ export function JoinConfirmPopup({
       }}
     >
       <div
-        className={`join-confirm-card ${celebrate ? "join-confirm-card--celebrate" : ""}`}
+        className={`join-confirm-card ${celebrate ? "join-confirm-card--celebrate" : ""} ${kind === "limited_interested" ? "join-confirm-card--wide" : ""}`}
         role="status"
         aria-live="polite"
-        aria-label={title}
+        aria-label={`${title}. ${sub}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="join-confirm-icon" aria-hidden="true">
@@ -86,9 +97,12 @@ export function JoinConfirmPopup({
 
 export function joinConfirmKind(
   next: ParticipationState | null,
-  opts?: { isIdea?: boolean },
+  opts?: { isIdea?: boolean; limitedApproval?: boolean },
 ): JoinConfirmKind {
   if (next === "going") return "going";
-  if (next === "interested") return opts?.isIdea ? "idea_interested" : "interested";
+  if (next === "interested") {
+    if (opts?.limitedApproval) return "limited_interested";
+    return opts?.isIdea ? "idea_interested" : "interested";
+  }
   return "dropped";
 }

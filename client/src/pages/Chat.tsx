@@ -6,7 +6,6 @@ import {
   BarChart2,
   ChevronDown,
   ChevronRight,
-  MessageCircle,
   MoreVertical,
   Plus,
 } from "lucide-react";
@@ -18,7 +17,7 @@ import { HoldToDelete } from "../components/HoldToDelete";
 import { BlockConfirmModal, ReportModal } from "../components/PlanSafetyMenu";
 import { PollCard } from "../components/PollCard";
 import { PollSheet } from "../components/PollSheet";
-import { EmptyCard } from "../components/ui";
+import { ChatEmpty } from "../components/ui";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { Button } from "../components/ui/Button";
 import { useAuth } from "../context/AuthContext";
@@ -541,14 +540,9 @@ export function ChatPage() {
           </div>
         )}
 
-        <div ref={scrollRef} className="chat-messages">
+        <div ref={scrollRef} className={`chat-messages${grouped.length === 0 ? " chat-messages--empty" : ""}`}>
           {grouped.length === 0 ? (
-            <EmptyCard
-              icon={<MessageCircle size={22} strokeWidth={1.6} color="var(--red)" />}
-              groupChat
-              title="It's quiet in here."
-              body="Say hi — even a tiny one counts."
-            />
+            <ChatEmpty title="It's quiet in here." body="Say hi — even a tiny one counts." />
           ) : (
             grouped.map((entry) => {
               if (entry.kind === "day") {
@@ -668,7 +662,7 @@ export function ChatPage() {
               );
             })
           )}
-          <div ref={endRef} className="chat-messages-end" aria-hidden="true" />
+          {grouped.length > 0 && <div ref={endRef} className="chat-messages-end" aria-hidden="true" />}
         </div>
 
         <form

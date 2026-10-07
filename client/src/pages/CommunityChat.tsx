@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, BarChart2, MessageCircle } from "lucide-react";
+import { ArrowLeft, BarChart2 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { ComposerField, MentionText } from "../components/ComposerField";
@@ -10,7 +10,7 @@ import { CommunityCoverThumb } from "../components/CoverThumb";
 import { BlockConfirmModal, ReportModal } from "../components/PlanSafetyMenu";
 import { PollCard } from "../components/PollCard";
 import { PollSheet } from "../components/PollSheet";
-import { EmptyCard } from "../components/ui";
+import { ChatEmpty } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { sentenceCaseTitle } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
@@ -559,14 +559,9 @@ export function CommunityChatPage() {
           </div>
         )}
 
-        <div ref={scrollRef} className="chat-messages">
+        <div ref={scrollRef} className={`chat-messages${grouped.length === 0 ? " chat-messages--empty" : ""}`}>
           {grouped.length === 0 ? (
-            <EmptyCard
-              icon={<MessageCircle size={22} strokeWidth={1.6} color="var(--red)" />}
-              groupChat
-              title="It's quiet in here."
-              body="Say hi — even a tiny one counts."
-            />
+            <ChatEmpty title="It's quiet in here." body="Say hi — even a tiny one counts." />
           ) : (
             grouped.map((entry) => {
               if (entry.kind === "day") {
@@ -686,7 +681,7 @@ export function CommunityChatPage() {
               );
             })
           )}
-          <div ref={endRef} className="chat-messages-end" aria-hidden="true" />
+          {grouped.length > 0 && <div ref={endRef} className="chat-messages-end" aria-hidden="true" />}
         </div>
 
         <form

@@ -183,7 +183,7 @@ async function emojiDataUri(emoji: string): Promise<string | null> {
   }
 }
 
-/** Commons wordmark (black type + red thread) for the share-card chip. */
+/** Commons wordmark (black type + red thread on a transparent background). */
 function wordmarkDataUri(): string {
   const buf = readFileSync(fileURLToPath(new URL("../../assets/wordmark.png", import.meta.url)));
   return `data:image/png;base64,${buf.toString("base64")}`;
@@ -206,31 +206,21 @@ function text(value: string, style: Record<string, unknown>): El {
 
 const RED = "#C13B3B";
 const INK = "#1A1A2E";
-const PAPER = "#FDFAF7";
 
-function logoChip(): El {
-  return h(
-    "div",
-    {
-      display: "flex",
-      alignItems: "center",
-      background: PAPER,
-      borderRadius: 16,
-      padding: "10px 16px",
-      boxShadow: "0 8px 24px rgba(0,0,0,0.28)",
+// Natural aspect of assets/wordmark.png (362×114).
+const WORDMARK_WIDTH = 168;
+const WORDMARK_HEIGHT = 53;
+
+function wordmark(): El {
+  return {
+    type: "img",
+    props: {
+      src: wordmarkSrc(),
+      width: WORDMARK_WIDTH,
+      height: WORDMARK_HEIGHT,
+      style: { width: WORDMARK_WIDTH, height: WORDMARK_HEIGHT, objectFit: "contain" },
     },
-    [
-      {
-        type: "img",
-        props: {
-          src: wordmarkSrc(),
-          width: 228,
-          height: 40,
-          style: { width: 228, height: 40, objectFit: "contain" },
-        },
-      },
-    ],
-  );
+  };
 }
 
 function statPill(label: string): El {
@@ -312,7 +302,7 @@ function buildTree(
     })
   );
 
-  // Top: real wordmark on a paper chip (readable on any cover).
+  // Top: wordmark with no plate, so the cover shows through.
   layers.push(
     h(
       "div",
@@ -320,7 +310,7 @@ function buildTree(
         position: "absolute", top: 40, left: 48, right: 48, display: "flex",
         alignItems: "center",
       },
-      [logoChip()],
+      [wordmark()],
     )
   );
 
@@ -376,7 +366,7 @@ function cacheKey(plan: PlanRecord, going: number, interested: number): string {
     plan.hostEmoji ?? "",
     plan.cancelledAt ?? "",
   ].join("|");
-  return `ogv3:${plan.id}:${going}:${interested}:${fp}`;
+  return `ogv4:${plan.id}:${going}:${interested}:${fp}`;
 }
 
 async function renderPlanCard(plan: PlanRecord): Promise<Buffer> {
@@ -501,7 +491,7 @@ function buildCommunityTree(community: CommunityRecord, cover: string | null): E
         position: "absolute", top: 40, left: 48, right: 48, display: "flex",
         alignItems: "center",
       },
-      [logoChip()],
+      [wordmark()],
     ),
   );
 
@@ -548,7 +538,7 @@ function communityCacheKey(community: CommunityRecord): string {
     community.creationStatus,
     community.hiddenAt ?? "",
   ].join("|");
-  return `ogc1:${community.id}:${community.memberCount}:${fp}`;
+  return `ogc2:${community.id}:${community.memberCount}:${fp}`;
 }
 
 async function renderCommunityCard(community: CommunityRecord): Promise<Buffer> {

@@ -103,7 +103,14 @@ export function ParticipationButtons({
       } else {
         await api(`/api/plans/${planId}/participation`, { method: "DELETE" });
       }
-      if (opts?.celebrate !== false) setConfirm(joinConfirmKind(next, { isIdea: planKind === "looking_for" }));
+      if (opts?.celebrate !== false) {
+        setConfirm(
+          joinConfirmKind(next, {
+            isIdea: planKind === "looking_for",
+            limitedApproval: joinType === "approve" && capacity !== null,
+          }),
+        );
+      }
       return true;
     } catch (err) {
       setState(prev);

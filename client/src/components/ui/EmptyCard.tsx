@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { MessageCircle } from "lucide-react";
 
 type Props = {
   icon: ReactNode;
@@ -44,6 +45,19 @@ export function EmptyCard({
         </Link>
       )}
       {footer}
+    </div>
+  );
+}
+
+/** Centered white card with a red headline — empty plan, community, and DM threads. */
+export function ChatEmpty({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="chat-empty-card" role="status">
+      <div className="chat-empty-glyph" aria-hidden="true">
+        <MessageCircle size={22} strokeWidth={1.6} />
+      </div>
+      <h2 className="chat-empty-headline">{title}</h2>
+      <p className="chat-empty-body">{body}</p>
     </div>
   );
 }
