@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
-import { useAuth } from "../context/AuthContext";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Camera, ImagePlus, MapPin } from "lucide-react";
 import { api } from "../api/http";
 import { AvatarCropModal } from "../components/AvatarCropModal";
@@ -31,7 +30,6 @@ import "./Communities.css";
 
 export function CreateCommunityPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const coverRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [name, setName] = useState("");
@@ -165,27 +163,6 @@ export function CreateCommunityPage() {
       }}
     />
   );
-
-  if (user?.accountKind === "community") {
-    return (
-      <main className="app-shell create-plan cmy cmy-create">
-        <header className="app-header app-header--sticky create-header">
-          <Link to="/settings" className="back-circle" aria-label="Settings">
-            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
-          </Link>
-        </header>
-        <div className="cmy-create-screen-card">
-          <h2>Use your personal account</h2>
-          <p className="cmy-hint">
-            This profile is a community sub account. Switch back to your personal account in Settings to start a community.
-          </p>
-          <Link to="/settings" className="cmy-btn cmy-btn--primary">
-            Go to Settings
-          </Link>
-        </div>
-      </main>
-    );
-  }
 
   return (
     <main className="app-shell create-plan cmy cmy-create">

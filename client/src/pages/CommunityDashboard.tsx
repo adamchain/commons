@@ -10,9 +10,7 @@ import {
   type CommunityDashboardDTO,
   type PublicUser,
 } from "../types/shared";
-import { useAuth } from "../context/AuthContext";
 import { formatRelative } from "../lib/format";
-import { switchAccount } from "../lib/switchAccount";
 import "./Communities.css";
 
 type Section = "analytics" | "requests" | "bulletin" | "members";
@@ -108,8 +106,6 @@ export function CommunityDashboardPage() {
   const [hourMode, setHourMode] = useState(true);
   const [weekday, setWeekday] = useState(0);
   const weekdaySet = useRef(false);
-  const { user, setUser } = useAuth();
-  const [accountBusy, setAccountBusy] = useState(false);
   const [memberQuery, setMemberQuery] = useState("");
 
   const load = useCallback(async () => {
@@ -139,34 +135,6 @@ export function CommunityDashboardPage() {
   const hourSeries = useMemo(() => {
     return data?.activeTimes.weekdays.find((row) => row.weekday === weekday) ?? data?.activeTimes.weekdays[0];
   }, [data, weekday]);
-
-  async function makeSubAccount() {
-    if (accountBusy) return;
-    setAccountBusy(true);
-    setErr(null);
-    try {
-      await api(`/api/communities/${id}/sub-account`, { method: "POST" });
-      await load();
-    } catch (e) {
-      setErr(parseApiError(e));
-    } finally {
-      setAccountBusy(false);
-    }
-  }
-
-  async function useSubAccount(accountId: string) {
-    if (accountBusy) return;
-    setAccountBusy(true);
-    setErr(null);
-    try {
-      const me = await switchAccount(accountId);
-      setUser(me);
-      navigate(`/profile/${me.id}`);
-    } catch (e) {
-      setErr(parseApiError(e));
-      setAccountBusy(false);
-    }
-  }
 
   async function run(key: string, task: () => Promise<unknown>) {
     if (busyId) return;
@@ -338,38 +306,6 @@ export function CommunityDashboardPage() {
                   </li>
                 ))}
               </ul>
-            )}
-          </section>
-
-          <section className="cmy-dash-card">
-            <div className="cmy-dash-card-head">
-              <div>
-                <h2>Sub account</h2>
-                <p>Post and show up as {data.name}, separate from your personal profile.</p>
-              </div>
-            </div>
-            {data.subAccount ? (
-              user?.id === data.subAccount.id ? (
-                <p className="cmy-hint">You&apos;re using this account.</p>
-              ) : (
-                <button
-                  type="button"
-                  className="cmy-btn cmy-btn--primary"
-                  disabled={accountBusy}
-                  onClick={() => void useSubAccount(data.subAccount!.id)}
-                >
-                  {accountBusy ? "Switching…" : "Switch to this account"}
-                </button>
-              )
-            ) : (
-              <button
-                type="button"
-                className="cmy-btn cmy-btn--primary"
-                disabled={accountBusy}
-                onClick={() => void makeSubAccount()}
-              >
-                {accountBusy ? "Making…" : "Make a sub account"}
-              </button>
             )}
           </section>
 

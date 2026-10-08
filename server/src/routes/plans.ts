@@ -42,15 +42,14 @@ function canCleanupPlanChat(plan: { creatorId: string; coHostIds?: string[]; com
   if (!plan.communityId) return false;
   const community = store.findCommunityById(plan.communityId);
   if (!community) return false;
-  if (community.organizerId === userId) return true;
-  return store.findUserByManagedCommunity(community.id)?.id === userId;
+  return community.organizerId === userId;
 }
 
 function planChatOn(plan: { chatEnabled?: boolean } | null | undefined): boolean {
   return !!plan && plan.chatEnabled !== false;
 }
 
-/** Organizer + community persona, so RSVPs on a community plan reach whoever is running it. */
+/** Organizer, so RSVPs on a community plan reach whoever is running it. */
 function communityPlanNotify(plan: { communityId?: string | null }): {
   name: string | null;
   extraIds: string[];
@@ -58,10 +57,7 @@ function communityPlanNotify(plan: { communityId?: string | null }): {
   if (!plan.communityId) return { name: null, extraIds: [] };
   const community = store.findCommunityById(plan.communityId);
   if (!community) return { name: null, extraIds: [] };
-  const extraIds = [community.organizerId];
-  const persona = store.findUserByManagedCommunity(community.id);
-  if (persona) extraIds.push(persona.id);
-  return { name: community.name, extraIds };
+  return { name: community.name, extraIds: [community.organizerId] };
 }
 
 /** Accept uploaded data-URLs or library http(s) covers; drop anything else. */

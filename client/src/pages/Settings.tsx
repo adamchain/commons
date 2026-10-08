@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { Avatar } from "../components/Avatar";
 import { api } from "../api/http";
 import { clearAuthToken } from "../api/authToken";
 import { getCurrentCoords } from "../lib/geolocate";
@@ -16,10 +15,8 @@ import { useAuth } from "../context/AuthContext";
 import {
   INTEREST_LABELS,
   type InviteCodeDTO,
-  type LinkedAccountDTO,
   type MeDTO,
 } from "../types/shared";
-import { switchAccount } from "../lib/switchAccount";
 
 /**
  * Grouped settings — ACCOUNT / ACTIVITY / APP cards each with icon rows.
@@ -32,20 +29,12 @@ export function SettingsPage() {
   const [inviteCount, setInviteCount] = useState<number | null>(null);
   const [legalSheet, setLegalSheet] = useState<"terms" | "privacy" | null>(null);
   const [locationOpen, setLocationOpen] = useState(false);
-  const [accounts, setAccounts] = useState<LinkedAccountDTO[]>([]);
-  const [switchingId, setSwitchingId] = useState<string | null>(null);
 
   useEffect(() => {
     void api<{ codes: InviteCodeDTO[] }>("/api/auth/invite-codes")
       .then((r) => setInviteCount(r.codes.filter((c) => c.redeemedAt === null).length))
       .catch(() => setInviteCount(0));
   }, []);
-
-  useEffect(() => {
-    void api<{ accounts: LinkedAccountDTO[] }>("/api/auth/accounts")
-      .then((r) => setAccounts(r.accounts))
-      .catch(() => setAccounts([]));
-  }, [user?.id]);
 
   const signOut = async () => {
     sessionStorage.removeItem("commons_pending_admin_choice");
@@ -63,18 +52,6 @@ export function SettingsPage() {
       ? "What are you into?"
       : current.interests.map((t) => INTEREST_LABELS[t]).join(" · ");
 
-  async function useAccount(accountId: string) {
-    if (switchingId || accountId === current.id) return;
-    setSwitchingId(accountId);
-    try {
-      const me = await switchAccount(accountId);
-      setUser(me);
-      navigate(`/profile/${me.id}`);
-    } catch {
-      setSwitchingId(null);
-    }
-  }
-
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar">
       <header className="app-header app-header--minimal">
@@ -83,41 +60,6 @@ export function SettingsPage() {
         </Link>
       </header>
       <ScreenTitle title="Settings" />
-
-      {accounts.length > 1 && (
-        <SettingsGroup label="Accounts">
-          {accounts.map((account) => {
-            const community = account.kind === "community";
-            const title = community ? account.communityName || account.firstName : "Personal";
-            const sub = account.active
-              ? community
-                ? "Community account · in use"
-                : "Your profile · in use"
-              : switchingId === account.id
-                ? "Switching…"
-                : community
-                  ? "Community account"
-                  : "Your profile";
-            return (
-              <SettingsRow
-                key={account.id}
-                icon={
-                  <Avatar
-                    seed={account.avatarSeed}
-                    style={account.avatarStyle}
-                    photoDataUrl={account.avatarPhotoDataUrl}
-                    name={title}
-                    size="sm"
-                  />
-                }
-                title={title}
-                sub={sub}
-                onClick={account.active ? undefined : () => void useAccount(account.id)}
-              />
-            );
-          })}
-        </SettingsGroup>
-      )}
 
       <SettingsGroup label="Account">
         <SettingsRow

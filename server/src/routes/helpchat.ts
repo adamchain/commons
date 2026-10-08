@@ -208,7 +208,6 @@ Communities are **interest-based groups** tied to a neighborhood. Found in the E
 - Joined communities appear in your Messages tab
 - Community plans can be set to "Community only" visibility — only members see them
 - To leave a community: open it → ⋯ menu → Leave
-- Organizers can make a **sub account** for a community they run (community dashboard). Switching to it in Settings posts and shows up as the community, separate from their personal profile. Switch back the same way.
 
 ---
 

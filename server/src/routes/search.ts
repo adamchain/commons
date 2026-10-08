@@ -4,7 +4,6 @@ import { isOnboardingFinished } from "../lib/onboarding.js";
 import { store, type UserRecord } from "../store.js";
 import { findUserById, findUsersByIds } from "../userRepo.js";
 import { INTEREST_LABELS, COMMUNITY_CATEGORY_LABELS, type InterestTag, type CommunityCategory } from "../types/shared.js";
-import { isCommunitySubAccount } from "../lib/subAccounts.js";
 import { planSummary, planVisibleToViewer, userToPublic } from "./plans.js";
 import { communityCategoriesOf } from "../types/shared.js";
 import type { PersonSearchResultDTO, SearchResultsDTO, CommunityCardDTO, PublicUser } from "../types/shared.js";
@@ -204,7 +203,6 @@ searchRouter.get("/discover", requireAuth, async (req, res) => {
       if (u.id === userId) return false;
       if (!u.onboardingComplete) return false;
       if (u.discoverableBySearch === false) return false;
-      if (isCommunitySubAccount(u)) return false;
       if (store.isBlockedEitherWay(userId, u.id)) return false;
       if (store.isUserEjected(u.id)) return false;
       if (viewerNetwork.has(u.id)) return false;

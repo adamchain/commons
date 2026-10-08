@@ -7,11 +7,9 @@ const UserSchema = new mongoose.Schema<UserRecord>(
     phoneNumber: { type: String, required: true },
     accountSource: {
       type: String,
-      enum: ["verify", "seed", "sub"],
+      enum: ["verify", "seed"],
       default: "verify",
     },
-    ownerUserId: { type: String, default: undefined },
-    managedCommunityId: { type: String, default: undefined },
     firstName: { type: String, default: "" },
     lastName: { type: String, default: "" },
     email: { type: String, default: null },
@@ -66,6 +64,7 @@ const UserSchema = new mongoose.Schema<UserRecord>(
     pinnedConversationIds: { type: [String], default: undefined },
     ejectedAt: { type: String, default: null },
     sessionVersion: { type: Number, default: 0 },
+    adminDashboardView: { type: mongoose.Schema.Types.Mixed, default: null },
   },
   { collection: "users" },
 );

@@ -13,7 +13,6 @@ import { PlanCard } from "../components/PlanCard";
 import { CommunityShareSheet } from "../components/ShareSheet";
 import { PlanSafetyMenu } from "../components/PlanSafetyMenu";
 import { useAuth } from "../context/AuthContext";
-import { applyAccountHandoff } from "../lib/switchAccount";
 import {
   ALL_COMMUNITY_CATEGORIES,
   COMMUNITY_CATEGORY_LABELS,
@@ -2176,19 +2175,14 @@ function OrganizerExitControls({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { setUser } = useAuth();
   async function transferTo(member: CommunityMemberDTO) {
     setBusy(true);
     setError(null);
     try {
-      const result = await api<{ token?: string; switchedTo?: MeDTO }>(
-        `/api/communities/${community.id}/transfer-organizer`,
-        {
-          method: "POST",
-          body: JSON.stringify({ newOrganizerId: member.user.id }),
-        },
-      );
-      if (result.switchedTo) await applyAccountHandoff(result, setUser);
+      await api(`/api/communities/${community.id}/transfer-organizer`, {
+        method: "POST",
+        body: JSON.stringify({ newOrganizerId: member.user.id }),
+      });
       onLeft();
     } catch (e) {
       setError(cleanError(e));
@@ -2201,11 +2195,7 @@ function OrganizerExitControls({
     setBusy(true);
     setError(null);
     try {
-      const result = await api<{ token?: string; switchedTo?: MeDTO }>(
-        `/api/communities/${community.id}`,
-        { method: "DELETE" },
-      );
-      if (result.switchedTo) await applyAccountHandoff(result, setUser);
+      await api(`/api/communities/${community.id}`, { method: "DELETE" });
       onDeleted();
     } catch (e) {
       setError(cleanError(e));

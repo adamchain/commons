@@ -5,10 +5,16 @@ import { isAdminPhone } from "../lib/adminPhones.js";
 import { isGcsConfigured, listDefaultCatalog, parseDataUrl, uploadCoverImage } from "../lib/gcs.js";
 import { HELP_TICKET_SECTION_LABELS, store, type CommunityRecord, type HelpTicketRecord } from "../store.js";
 import { emit } from "../lib/notify.js";
-import { listAllUsers, findUserById, deleteUser } from "../userRepo.js";
+import { listAllUsers, findUserById, deleteUser, updateUser } from "../userRepo.js";
 import { runBehaviorAgent, analyzeUserBehavior } from "../lib/behaviorAgent.js";
 import { communityCategoriesOf, normalizeCommunityCategory } from "../types/shared.js";
-import { buildAdminDashboard, buildCommunityDetail, buildGodView } from "../lib/adminDashboard.js";
+import {
+  buildAdminDashboard,
+  buildCommunityDetail,
+  buildGodView,
+  sanitizeAdminDashboardView,
+} from "../lib/adminDashboard.js";
+import type { AdminDashboardView } from "../store.js";
 import { buildCoverCatalog, invalidateCoverCatalogCache } from "../lib/coverCatalog.js";
 
 const adminRouter = Router();
@@ -92,13 +98,66 @@ function seriesLastNDays(n: number): Map<string, number> {
   return map;
 }
 
+function queryValue(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function viewFromQuery(query: Request["query"]): Partial<AdminDashboardView> | null {
+  const from = queryValue(query.from);
+  if (!from) return null;
+  const preset = queryValue(query.preset);
+  return {
+    from,
+    to: queryValue(query.to) ?? "today",
+    preset: preset === "since_launch" || preset === "last_7" || preset === "last_30" || preset === "custom" ? preset : "custom",
+    communityId: queryValue(query.communityId) || null,
+    neighborhoodId: queryValue(query.neighborhoodId) || null,
+    includeSeed: query.includeSeed === "1" || query.includeSeed === "true",
+  };
+}
+
+function nyToday(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 adminRouter.get("/dashboard", async (req, res) => {
-  const data = await buildAdminDashboard(req.userId);
+  const viewer = req.userId ? await findUserById(req.userId) : null;
+  const saved = viewer?.adminDashboardView ?? null;
+  const requested = viewFromQuery(req.query) ?? saved;
+  const data = await buildAdminDashboard(req.userId, requested, saved);
   res.json(data);
 });
 
-adminRouter.get("/map", (_req, res) => {
-  res.json(buildGodView());
+adminRouter.put("/dashboard/view", async (req, res) => {
+  if (!req.userId) {
+    res.status(400).json({ error: "Sign in to save a default view." });
+    return;
+  }
+  const view = sanitizeAdminDashboardView(req.body, nyToday());
+  const user = await updateUser(req.userId, { adminDashboardView: view });
+  if (!user) {
+    res.status(404).json({ error: "Account not found" });
+    return;
+  }
+  res.json({ view });
+});
+
+adminRouter.delete("/dashboard/view", async (req, res) => {
+  if (!req.userId) {
+    res.status(400).json({ error: "Sign in to clear the default view." });
+    return;
+  }
+  await updateUser(req.userId, { adminDashboardView: null });
+  res.json({ ok: true });
+});
+
+adminRouter.get("/map", (req, res) => {
+  res.json(buildGodView(viewFromQuery(req.query)));
 });
 
 adminRouter.get("/map/key", (_req, res) => {
@@ -110,8 +169,10 @@ adminRouter.get("/map/key", (_req, res) => {
   res.json({ key });
 });
 
-adminRouter.get("/dashboard/communities/:id", (req, res) => {
-  const detail = buildCommunityDetail(String(req.params.id));
+adminRouter.get("/dashboard/communities/:id", async (req, res) => {
+  const viewer = req.userId ? await findUserById(req.userId) : null;
+  const requested = viewFromQuery(req.query) ?? viewer?.adminDashboardView ?? null;
+  const detail = buildCommunityDetail(String(req.params.id), requested);
   if (!detail) {
     res.status(404).json({ error: "Community not found" });
     return;

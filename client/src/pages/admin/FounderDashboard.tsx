@@ -29,6 +29,23 @@ type Dashboard = {
   generatedAt: string;
   updatedLabel: string;
   seedExcluded: number;
+  view: {
+    dataStart: string;
+    today: string;
+    from: string;
+    to: string;
+    communityId: string | null;
+    neighborhoodId: string | null;
+    includeSeed: boolean;
+    preset: "since_launch" | "last_7" | "last_30" | "custom";
+    rangeLabel: string;
+    compareLabel: string;
+    saved: DashFiltersSaved | null;
+    options: {
+      communities: { id: string; name: string }[];
+      neighborhoods: { id: string; name: string }[];
+    };
+  };
   viewer: { firstName: string; lastName: string; neighborhoodName: string | null };
   overview: {
     rangeLabel: string;
@@ -52,6 +69,7 @@ type Dashboard = {
     dau: {
       days: { date: string; count: number }[];
       yesterday: number;
+      latestLabel: string;
       deltaPct: number | null;
       firstSignupDate: string | null;
     };
@@ -166,6 +184,79 @@ const PAGES: { id: PageId; label: string; icon: typeof LayoutGrid }[] = [
 
 const MARKS = ["#6f8f72", "#6d7ea0", "#b08968", "#8d6e93", "#5f8f86", "#a35d5d"];
 const SNOOZE_KEY = "commons_admin_alert_snooze";
+const FILTER_SESSION_KEY = "commons_admin_dashboard_filters";
+
+type DashPreset = "since_launch" | "last_7" | "last_30" | "custom";
+
+type DashFilters = {
+  from: string;
+  to: string;
+  communityId: string;
+  neighborhoodId: string;
+  includeSeed: boolean;
+  preset: DashPreset;
+};
+
+type DashFiltersSaved = {
+  from: string;
+  to: string;
+  preset: DashPreset;
+  communityId: string | null;
+  neighborhoodId: string | null;
+  includeSeed: boolean;
+};
+
+function filtersFromView(view: Dashboard["view"]): DashFilters {
+  return {
+    from: view.from,
+    to: view.to,
+    communityId: view.communityId ?? "",
+    neighborhoodId: view.neighborhoodId ?? "",
+    includeSeed: view.includeSeed,
+    preset: view.preset,
+  };
+}
+
+function filtersQuery(filters: DashFilters): string {
+  const q = new URLSearchParams();
+  q.set("from", filters.from);
+  q.set("to", filters.to);
+  q.set("preset", filters.preset);
+  q.set("communityId", filters.communityId);
+  q.set("neighborhoodId", filters.neighborhoodId);
+  q.set("includeSeed", filters.includeSeed ? "1" : "0");
+  return `?${q.toString()}`;
+}
+
+function readSessionFilters(): DashFilters | null {
+  try {
+    const raw = sessionStorage.getItem(FILTER_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<DashFilters>;
+    if (!parsed.from || !parsed.to || !parsed.preset) return null;
+    return {
+      from: parsed.from,
+      to: parsed.to,
+      communityId: parsed.communityId ?? "",
+      neighborhoodId: parsed.neighborhoodId ?? "",
+      includeSeed: Boolean(parsed.includeSeed),
+      preset: parsed.preset,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function matchesSaved(current: DashFilters, saved: DashFiltersSaved | null, today: string): boolean {
+  if (!saved) return false;
+  if (current.preset !== saved.preset) return false;
+  if ((current.communityId || null) !== (saved.communityId || null)) return false;
+  if ((current.neighborhoodId || null) !== (saved.neighborhoodId || null)) return false;
+  if (current.includeSeed !== saved.includeSeed) return false;
+  if (current.preset !== "custom") return true;
+  const savedTo = saved.to === "today" ? today : saved.to;
+  return current.from === saved.from && current.to === savedTo;
+}
 
 function markColor(name: string): string {
   let n = 0;
@@ -205,13 +296,13 @@ function Spark({ values }: { values: number[] }) {
   );
 }
 
-function DeltaLine({ delta, digits = false }: { delta: number | null; digits?: boolean }) {
+function DeltaLine({ delta, compare, digits = false }: { delta: number | null; compare: string; digits?: boolean }) {
   const up = delta !== null && delta > 0;
   const down = delta !== null && delta < 0;
   const shown = digits && delta !== null ? fmtDelta(Math.round(delta * 10) / 10) : fmtDelta(delta);
   return (
     <div className={`fdash-kpi-delta${up ? " is-up" : down ? " is-down" : ""}`}>
-      {shown} vs last week
+      {shown} {compare}
     </div>
   );
 }
@@ -221,12 +312,14 @@ function Kpi({
   value,
   delta,
   spark,
+  compare,
   hint,
 }: {
   label: string;
   value: string;
   delta: number | null;
   spark: number[];
+  compare: string;
   hint?: string;
 }) {
   return (
@@ -236,7 +329,7 @@ function Kpi({
         <Spark values={spark} />
       </div>
       <div className="fdash-kpi-value">{value}</div>
-      <DeltaLine delta={delta} digits={label.startsWith("Average")} />
+      <DeltaLine delta={delta} compare={compare} digits={label.startsWith("Average")} />
       {hint ? <p className="fdash-muted" style={{ marginTop: 6 }}>{hint}</p> : null}
     </article>
   );
@@ -256,38 +349,120 @@ export function AdminPage() {
   const page = (PAGES.some((p) => p.id === params.get("page")) ? params.get("page") : "overview") as PageId;
   const communityId = params.get("community");
   const [data, setData] = useState<Dashboard | null>(null);
+  const [filters, setFilters] = useState<DashFilters | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [snooze, setSnooze] = useState<Record<string, number>>(readSnooze);
+  const filtersRef = useRef<DashFilters | null>(null);
+  const reqId = useRef(0);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (next?: DashFilters) => {
+    const id = ++reqId.current;
+    if (!next) setLoading(true);
     setError(null);
     try {
-      setData(await api<Dashboard>("/api/admin/dashboard"));
+      const payload = await api<Dashboard>("/api/admin/dashboard" + (next ? filtersQuery(next) : ""));
+      if (id !== reqId.current) return;
+      const applied = filtersFromView(payload.view);
+      filtersRef.current = applied;
+      setFilters(applied);
+      setData(payload);
+      sessionStorage.setItem(FILTER_SESSION_KEY, JSON.stringify(applied));
     } catch (e) {
+      if (id !== reqId.current) return;
       const msg = e instanceof Error ? e.message : "Failed to load";
       if (msg.startsWith("401:")) setError("Sign in with an admin phone, then come back here.");
       else if (msg.startsWith("403:")) setError("This account isn't on the admin phone list.");
       else setError(msg.replace(/^\d+:\s*/, ""));
-      setData(null);
+      if (!next) setData(null);
     } finally {
-      setLoading(false);
+      if (id === reqId.current) setLoading(false);
     }
   }, []);
 
   const refresh = useCallback(async () => {
+    const next = filtersRef.current ?? undefined;
+    const id = ++reqId.current;
     try {
-      setData(await api<Dashboard>("/api/admin/dashboard"));
+      const payload = await api<Dashboard>("/api/admin/dashboard" + (next ? filtersQuery(next) : ""));
+      if (id !== reqId.current) return;
+      const applied = filtersFromView(payload.view);
+      filtersRef.current = applied;
+      setFilters(applied);
+      setData(payload);
     } catch {
       // Keep the current dashboard if a follow-up refresh fails.
     }
   }, []);
 
   useEffect(() => {
-    void load();
+    void load(readSessionFilters() ?? undefined);
   }, [load]);
+
+  function applyFilters(next: DashFilters) {
+    const floor = data?.view.dataStart;
+    const today = data?.view.today;
+    let from = next.from;
+    let to = next.to;
+    if (floor && from < floor) from = floor;
+    if (today && to > today) to = today;
+    if (floor && to < floor) to = floor;
+    if (from > to) from = to;
+    const fixed = { ...next, from, to };
+    filtersRef.current = fixed;
+    setFilters(fixed);
+    setSaveState("idle");
+    setSaveError(null);
+    void load(fixed);
+  }
+
+  async function saveDefault() {
+    const current = filtersRef.current;
+    if (!current) return;
+    setSaveState("saving");
+    setSaveError(null);
+    try {
+      await api("/api/admin/dashboard/view", {
+        method: "PUT",
+        body: JSON.stringify({
+          from: current.from,
+          to: current.preset === "custom" ? current.to : "today",
+          preset: current.preset,
+          communityId: current.communityId || null,
+          neighborhoodId: current.neighborhoodId || null,
+          includeSeed: current.includeSeed,
+        }),
+      });
+      setSaveState("idle");
+      await load(current);
+    } catch (e) {
+      setSaveState("error");
+      setSaveError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Couldn't save the default view");
+    }
+  }
+
+  async function clearSaved() {
+    setSaveError(null);
+    try {
+      await api("/api/admin/dashboard/view", { method: "DELETE" });
+      const floor = data?.view.dataStart ?? filters?.from ?? "";
+      const today = data?.view.today ?? filters?.to ?? "";
+      applyFilters({
+        from: floor,
+        to: today,
+        preset: "since_launch",
+        communityId: "",
+        neighborhoodId: "",
+        includeSeed: false,
+      });
+    } catch (e) {
+      setSaveState("error");
+      setSaveError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Couldn't clear the saved view");
+    }
+  }
 
   function go(next: PageId, community?: string | null) {
     const q = new URLSearchParams();
@@ -342,8 +517,25 @@ export function AdminPage() {
           </div>
         ) : loading && !data ? (
           <p className="fdash-muted">Loading the week…</p>
-        ) : data ? (
+        ) : data && filters ? (
           <>
+            <FilterBar
+              filters={filters}
+              view={data.view}
+              saving={saveState === "saving"}
+              saveError={saveError}
+              onChange={applyFilters}
+              onSave={() => void saveDefault()}
+              onClearSaved={() => void clearSaved()}
+              onReset={() => applyFilters({
+                from: data.view.dataStart,
+                to: data.view.today,
+                preset: "since_launch",
+                communityId: "",
+                neighborhoodId: "",
+                includeSeed: false,
+              })}
+            />
             {page === "overview" && (
               <Overview data={data} snooze={snooze} onSnooze={(id) => {
                 const next = { ...snooze, [id]: Date.now() + 7 * 86400000 };
@@ -357,6 +549,7 @@ export function AdminPage() {
               <Communities
                 data={data}
                 communityId={communityId}
+                filterQuery={filtersQuery(filters)}
                 onOpen={(id) => go("communities", id)}
                 onBack={() => go("communities")}
                 onChanged={() => void refresh()}
@@ -365,7 +558,7 @@ export function AdminPage() {
             {page === "users" && (
               <UsersPage data={data} onSelectUser={setSelectedUserId} onChanged={() => void refresh()} />
             )}
-            {page === "map" && <GodView onSelectUser={setSelectedUserId} />}
+            {page === "map" && <GodView filters={filters} onSelectUser={setSelectedUserId} />}
             {page === "operations" && (
               <Operations data={data} onSelectUser={setSelectedUserId} onChanged={() => void refresh()} />
             )}
@@ -383,6 +576,121 @@ export function AdminPage() {
         />
       ) : null}
     </div>
+  );
+}
+
+function FilterBar({
+  filters,
+  view,
+  saving,
+  saveError,
+  onChange,
+  onSave,
+  onClearSaved,
+  onReset,
+}: {
+  filters: DashFilters;
+  view: Dashboard["view"];
+  saving: boolean;
+  saveError: string | null;
+  onChange: (next: DashFilters) => void;
+  onSave: () => void;
+  onClearSaved: () => void;
+  onReset: () => void;
+}) {
+  const saved = matchesSaved(filters, view.saved, view.today);
+  const presets: { id: DashPreset; label: string }[] = [
+    { id: "since_launch", label: "Since Oct 1" },
+    { id: "last_7", label: "Last 7 days" },
+    { id: "last_30", label: "Last 30 days" },
+  ];
+  return (
+    <section className="fdash-filters" aria-label="Dashboard filters">
+      <div className="fdash-filter-presets">
+        {presets.map((preset) => (
+          <button
+            key={preset.id}
+            type="button"
+            className={filters.preset === preset.id ? "is-on" : ""}
+            onClick={() => onChange({ ...filters, preset: preset.id })}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+      <label>
+        From
+        <input
+          type="date"
+          min={view.dataStart}
+          max={filters.to || view.today}
+          value={filters.from}
+          onChange={(e) => {
+            if (!e.target.value) return;
+            onChange({ ...filters, from: e.target.value, preset: "custom" });
+          }}
+        />
+      </label>
+      <label>
+        To
+        <input
+          type="date"
+          min={filters.from || view.dataStart}
+          max={view.today}
+          value={filters.to}
+          onChange={(e) => {
+            if (!e.target.value) return;
+            onChange({ ...filters, to: e.target.value, preset: "custom" });
+          }}
+        />
+      </label>
+      <label>
+        Community
+        <select
+          value={filters.communityId}
+          onChange={(e) => onChange({ ...filters, communityId: e.target.value })}
+        >
+          <option value="">All communities</option>
+          {view.options.communities.map((community) => (
+            <option key={community.id} value={community.id}>{community.name}</option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Neighborhood
+        <select
+          value={filters.neighborhoodId}
+          onChange={(e) => onChange({ ...filters, neighborhoodId: e.target.value })}
+        >
+          <option value="">All neighborhoods</option>
+          {view.options.neighborhoods.map((hood) => (
+            <option key={hood.id} value={hood.id}>{hood.name}</option>
+          ))}
+        </select>
+      </label>
+      <label className="fdash-check fdash-filter-check">
+        <input
+          type="checkbox"
+          checked={filters.includeSeed}
+          onChange={(e) => onChange({ ...filters, includeSeed: e.target.checked })}
+        />
+        Include demo accounts
+      </label>
+      <div className="fdash-filter-actions">
+        <button type="button" className="fdash-btn" disabled={saving || saved} onClick={onSave}>
+          {saving ? "Saving…" : saved ? "Saved as default" : "Save as default"}
+        </button>
+        <button type="button" className="fdash-btn fdash-btn--ghost" onClick={onReset}>Reset</button>
+        {view.saved ? (
+          <button type="button" className="fdash-linkish" onClick={onClearSaved}>Clear saved</button>
+        ) : null}
+      </div>
+      <p className="fdash-filter-note">
+        Counts start October 1, 2026. Anything earlier is left out.
+        {filters.preset === "custom" ? " A custom end date stays fixed." : " Last 7 days, last 30 days, and Since Oct 1 stay current when saved."}
+        {saveError ? ` ${saveError}` : ""}
+      </p>
+    </section>
   );
 }
 
@@ -433,17 +741,17 @@ function Overview({
         updated={data.updatedLabel}
       />
       <section className="fdash-kpis">
-        <Kpi label="Plans completed this week" value={fmt(o.plansCompleted.value)} delta={o.plansCompleted.delta} spark={o.plansCompleted.spark} />
-        <Kpi label="Average people per plan" value={fmt(o.avgPeople.value, 1)} delta={o.avgPeople.delta} spark={o.avgPeople.spark} />
-        <Kpi label="Plans with zero joins" value={fmt(o.zeroJoins.value)} delta={o.zeroJoins.delta} spark={o.zeroJoins.spark} />
-        <Kpi label="Weekly active users" value={fmt(o.wau.value)} delta={o.wau.delta} spark={o.wau.spark} />
+        <Kpi label="Plans completed" value={fmt(o.plansCompleted.value)} delta={o.plansCompleted.delta} spark={o.plansCompleted.spark} compare={data.view.compareLabel} />
+        <Kpi label="Average people per plan" value={fmt(o.avgPeople.value, 1)} delta={o.avgPeople.delta} spark={o.avgPeople.spark} compare={data.view.compareLabel} />
+        <Kpi label="Plans with zero joins" value={fmt(o.zeroJoins.value)} delta={o.zeroJoins.delta} spark={o.zeroJoins.spark} compare={data.view.compareLabel} />
+        <Kpi label="Active users" value={fmt(o.wau.value)} delta={o.wau.delta} spark={o.wau.spark} compare={data.view.compareLabel} />
       </section>
 
       <section className="fdash-row">
         <article className="fdash-card">
           <div className="fdash-card-head">
             <h2>Plan funnel</h2>
-            <span className="fdash-card-sub">Plans posted this week</span>
+            <span className="fdash-card-sub">Plans posted in this range</span>
           </div>
           <div className="fdash-funnel">
             <FunnelStep label="Posted" value={o.funnel.posted} pct={null} width={o.funnel.posted ? 100 : 0} />
@@ -487,14 +795,14 @@ function Overview({
           <div className="fdash-card-head">
             <div>
               <h2>Daily active users</h2>
-              <p className="fdash-muted">Last 30 days{launch ? ` · first signup ${pretty(launch.date)}` : ""}</p>
+              <p className="fdash-muted">{data.view.rangeLabel}{launch ? ` · first signup ${pretty(launch.date)}` : ""}</p>
             </div>
             <div className="fdash-dau-stat">
               <div className={o.dau.deltaPct !== null && o.dau.deltaPct >= 0 ? "fdash-ok" : "fdash-flag"}>
                 {o.dau.deltaPct === null ? "" : `${o.dau.deltaPct > 0 ? "+" : ""}${fmtPct(o.dau.deltaPct)}`}
               </div>
               <strong>{o.dau.yesterday}</strong>
-              <div className="fdash-muted">yesterday</div>
+              <div className="fdash-muted">{o.dau.latestLabel}</div>
             </div>
           </div>
           <div className="fdash-chart" aria-hidden="true">
@@ -516,7 +824,7 @@ function Overview({
         <article className="fdash-card">
           <div className="fdash-card-head">
             <h2>Most active communities</h2>
-            <span className="fdash-card-sub">This week</span>
+            <span className="fdash-card-sub">{data.view.rangeLabel}</span>
           </div>
           {o.activeCommunities.length === 0 ? (
             <p className="fdash-muted">No approved communities yet.</p>
@@ -578,7 +886,7 @@ function Health({ data }: { data: Dashboard }) {
   const latest = h.retention[0];
   return (
     <>
-      <PageHead title="Health" sub="Weekly check · demo accounts excluded" updated={data.updatedLabel} />
+      <PageHead title="Health" sub={`${data.view.rangeLabel} · activity before Oct 1 is excluded`} updated={data.updatedLabel} />
       <section className="fdash-metrics">
         <article className="fdash-card">
           <div className="fdash-card-label">Repeat posting rate</div>
@@ -620,7 +928,7 @@ function Health({ data }: { data: Dashboard }) {
           <div className="fdash-card-label">Interested → I'm In</div>
           <div className="fdash-metric-value">{fmtPct(h.interestedToIn.ratePct)}</div>
           <p className="fdash-muted">
-            {h.interestedToIn.converted} of {h.interestedToIn.interested} Interested taps became I'm In, from the last {h.interestedToIn.windowDays} days of activity logs.
+            {h.interestedToIn.converted} of {h.interestedToIn.interested} Interested taps became I'm In in this date range.
           </p>
         </article>
         <article className="fdash-card">
@@ -715,7 +1023,7 @@ function Acquisition({ data }: { data: Dashboard }) {
     <>
       <PageHead
         title="Acquisition"
-        sub={`All time · ${a.signupCount} signups. App Store downloads aren't attributed to codes.`}
+        sub={`${data.view.rangeLabel} · ${a.signupCount} signups. App Store downloads aren't attributed to codes.`}
         updated={data.updatedLabel}
       />
       <section className="fdash-split">
@@ -800,20 +1108,22 @@ function Acquisition({ data }: { data: Dashboard }) {
 function Communities({
   data,
   communityId,
+  filterQuery,
   onOpen,
   onBack,
   onChanged,
 }: {
   data: Dashboard;
   communityId: string | null;
+  filterQuery: string;
   onOpen: (id: string) => void;
   onBack: () => void;
   onChanged: () => void;
 }) {
-  if (communityId) return <CommunityDetail id={communityId} onBack={onBack} onChanged={onChanged} />;
+  if (communityId) return <CommunityDetail id={communityId} filterQuery={filterQuery} onBack={onBack} onChanged={onChanged} />;
   return (
     <>
-      <PageHead title="Communities" sub="Pending review, then approved communities · plans are all-time, active members are this week" updated={data.updatedLabel} />
+      <PageHead title="Communities" sub={`Pending review, then approved communities · counts are for ${data.view.rangeLabel}`} updated={data.updatedLabel} />
       <CommunitiesReview pendingOnly onChanged={onChanged} />
       <article className="fdash-card">
         <p className="fdash-muted" style={{ marginTop: 0 }}>
@@ -829,7 +1139,7 @@ function Communities({
                 <th className="is-num">Members</th>
                 <th className="is-num">Plans</th>
                 <th className="is-num">Bulletin</th>
-                <th className="is-num">Active this week</th>
+                  <th className="is-num">Active</th>
                 <th className="is-num">Last activity</th>
                 <th> </th>
               </tr>
@@ -872,16 +1182,16 @@ function Communities({
   );
 }
 
-function CommunityDetail({ id, onBack, onChanged }: { id: string; onBack: () => void; onChanged: () => void }) {
+function CommunityDetail({ id, filterQuery, onBack, onChanged }: { id: string; filterQuery: string; onBack: () => void; onChanged: () => void }) {
   const [detail, setDetail] = useState<CommunityDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
-    api<CommunityDetail>(`/api/admin/dashboard/communities/${id}`)
+    api<CommunityDetail>(`/api/admin/dashboard/communities/${id}${filterQuery}`)
       .then((d) => live && setDetail(d))
       .catch((e) => live && setError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Failed to load"));
     return () => { live = false; };
-  }, [id]);
+  }, [id, filterQuery]);
   const maxPlans = Math.max(1, ...(detail?.weeks.map((w) => w.plans) ?? [1]));
   return (
     <>
@@ -965,10 +1275,9 @@ function UsersPage({
   onChanged: () => void;
 }) {
   const [query, setQuery] = useState("");
-  const [includeSeed, setIncludeSeed] = useState(false);
   const [deletingTests, setDeletingTests] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const seedCount = data.operations.users.filter((u) => u.seed).length;
+  const seedCount = data.operations.users.filter((u) => u.seed).length || data.seedExcluded;
 
   async function deleteTestAccounts() {
     if (seedCount === 0) return;
@@ -987,19 +1296,18 @@ function UsersPage({
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return data.operations.users
-      .filter((u) => includeSeed || !u.seed)
       .filter((u) => {
         if (!q) return true;
         return `${u.firstName} ${u.lastName} ${u.phoneTail} ${u.neighborhoodName ?? ""}`.toLowerCase().includes(q);
       })
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }, [data.operations.users, includeSeed, query]);
+  }, [data.operations.users, query]);
 
   return (
     <>
       <PageHead
         title="Users"
-        sub={`${rows.length} ${includeSeed ? "accounts" : "members"} · last 4 of the phone only`}
+        sub={`${rows.length} signed up ${data.view.rangeLabel} · last 4 of the phone only`}
         updated={data.updatedLabel}
       />
       <article className="fdash-card">
@@ -1010,10 +1318,6 @@ function UsersPage({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <label className="fdash-check">
-            <input type="checkbox" checked={includeSeed} onChange={(e) => setIncludeSeed(e.target.checked)} />
-            Include demo accounts
-          </label>
           {seedCount > 0 && (
             <button type="button" className="fdash-linkish" disabled={deletingTests} onClick={() => void deleteTestAccounts()}>
               {deletingTests ? "Deleting…" : `Delete ${seedCount} test account${seedCount === 1 ? "" : "s"}`}
@@ -1077,21 +1381,26 @@ type GodViewData = {
 
 const HEAT_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-function GodView({ onSelectUser }: { onSelectUser: (id: string) => void }) {
+function GodView({ filters, onSelectUser }: { filters: DashFilters; onSelectUser: (id: string) => void }) {
   const [data, setData] = useState<GodViewData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showSeed, setShowSeed] = useState(false);
+  const [showSeed, setShowSeed] = useState(filters.includeSeed);
   const [showPlans, setShowPlans] = useState(true);
   const [mapError, setMapError] = useState<string | null>(null);
   const mapRef = useRef<HTMLDivElement | null>(null);
+  const query = filtersQuery(filters);
+
+  useEffect(() => {
+    setShowSeed(filters.includeSeed);
+  }, [filters.includeSeed]);
 
   useEffect(() => {
     let live = true;
-    api<GodViewData>("/api/admin/map")
+    api<GodViewData>(`/api/admin/map${query}`)
       .then((d) => live && setData(d))
       .catch((e) => live && setError(e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : "Failed to load"));
     return () => { live = false; };
-  }, []);
+  }, [query]);
 
   const people = data?.people.filter((p) => showSeed || !p.seed) ?? [];
 

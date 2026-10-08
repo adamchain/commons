@@ -508,22 +508,6 @@ export interface MeDTO {
   location?: { lat: number; lng: number } | null;
   /** Set once they share location or continue without it during onboarding. */
   locationPromptAnsweredAt?: string | null;
-  /** personal = the phone login. community = a sub account for a community they run. */
-  accountKind?: "personal" | "community";
-  /** Set when this profile is a community sub account. */
-  managedCommunityId?: string | null;
-}
-
-export interface LinkedAccountDTO {
-  id: string;
-  firstName: string;
-  avatarPhotoDataUrl?: string;
-  avatarSeed: string;
-  avatarStyle: AvatarStyle;
-  kind: "personal" | "community";
-  communityId?: string;
-  communityName?: string;
-  active: boolean;
 }
 
 export interface NetworkPromptDTO {
@@ -821,8 +805,6 @@ export interface CommunityDashboardDTO {
   screeningQuestion?: string | null;
   screeningLog?: { user: PublicUser; answer: string; at: string }[];
   memberList: CommunityMemberDTO[];
-  /** Community persona the organizer can switch into. Null until they make one. */
-  subAccount: { id: string; firstName: string; avatarPhotoDataUrl?: string } | null;
   /** Recent joins and interested marks on plans posted in this community. */
   planActivity?: {
     id: string;

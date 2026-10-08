@@ -158,6 +158,18 @@ if (isProduction) {
   });
 }
 
+/** Drop leftover community personas. They have no login of their own. */
+function removeCommunitySubAccounts(): void {
+  const leftovers = store.listUsers().filter((user) => {
+    const source = user.accountSource as string | undefined;
+    return source === "sub" || user.phoneNumber.startsWith("sub:");
+  });
+  for (const user of leftovers) store.deleteUserCascade(user.id);
+  if (leftovers.length > 0) {
+    console.log(`[boot] removed ${leftovers.length} community sub account(s)`);
+  }
+}
+
 async function bootstrap(): Promise<void> {
   await connectMongo();
   // Mongo is the source of truth. After connecting, pull everything into the
@@ -165,6 +177,7 @@ async function bootstrap(): Promise<void> {
   // container start. If Mongo isn't connected (no MONGODB_URI), the snapshot
   // keeps whatever it loaded from data.json (local dev).
   await hydrateSnapshotFromMongo();
+  removeCommunitySubAccounts();
   // Idempotent — fills any missing InterestTag forum rows after hydrate (or
   // when Mongo is offline and the snapshot came from data.json).
   store.ensureForumsForInterests();

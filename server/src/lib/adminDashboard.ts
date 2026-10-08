@@ -8,11 +8,28 @@ import { isMongoConnected } from "./db.js";
 import { planPoint } from "./geo.js";
 import { planStartTimestamp } from "./planTime.js";
 import { LogModel } from "../models/index.js";
-import { store, type PlanRecord, type UserRecord } from "../store.js";
+import { store, type AdminDashboardView, type PlanRecord, type UserRecord } from "../store.js";
 import { AGE_RANGE_LABELS, type AgeRange } from "../types/shared.js";
 import { findUserById, listAllUsers } from "../userRepo.js";
 
 const TZ = "America/New_York";
+/** Launch day. Dashboard counts ignore anything earlier than this New York date. */
+export const ADMIN_DATA_START = "2026-10-01";
+
+export type { AdminDashboardView };
+
+export interface ResolvedDashboardView {
+  from: string;
+  to: string;
+  communityId: string | null;
+  neighborhoodId: string | null;
+  includeSeed: boolean;
+  preset: AdminDashboardView["preset"];
+  rangeDays: string[];
+  prevDays: string[];
+  compareLabel: string;
+  today: string;
+}
 const BETA_FORM =
   "https://docs.google.com/forms/u/0/d/e/1FAIpQLSfiQUov1e2K9wUlgvIR26Qxnm9MPhQ88MHgophxKS4AClZwZQ/viewform";
 const WAITLIST_FORM = "https://forms.gle/GxVDLYj74rvXtGYb9";
@@ -28,6 +45,23 @@ export interface AdminDashboard {
   generatedAt: string;
   updatedLabel: string;
   seedExcluded: number;
+  view: {
+    dataStart: string;
+    today: string;
+    from: string;
+    to: string;
+    communityId: string | null;
+    neighborhoodId: string | null;
+    includeSeed: boolean;
+    preset: "since_launch" | "last_7" | "last_30" | "custom";
+    rangeLabel: string;
+    compareLabel: string;
+    saved: AdminDashboardView | null;
+    options: {
+      communities: { id: string; name: string }[];
+      neighborhoods: { id: string; name: string }[];
+    };
+  };
   viewer: { firstName: string; lastName: string; neighborhoodName: string | null };
   overview: {
     rangeLabel: string;
@@ -51,6 +85,7 @@ export interface AdminDashboard {
     dau: {
       days: { date: string; count: number }[];
       yesterday: number;
+      latestLabel: string;
       deltaPct: number | null;
       firstSignupDate: string | null;
     };
@@ -221,6 +256,101 @@ function prettyRange(start: string, end: string): string {
   return `${prettyDay(start)} – ${prettyDay(end)}`;
 }
 
+function isDay(value: string | null | undefined): value is string {
+  return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+export function defaultAdminDashboardView(): AdminDashboardView {
+  return {
+    from: ADMIN_DATA_START,
+    to: "today",
+    preset: "since_launch",
+    communityId: null,
+    neighborhoodId: null,
+    includeSeed: false,
+  };
+}
+
+export function resolveAdminDashboardView(
+  input: Partial<AdminDashboardView> | null | undefined,
+  today: string,
+): ResolvedDashboardView {
+  const base = { ...defaultAdminDashboardView(), ...(input ?? {}) };
+  const preset = input?.preset ?? (input?.from || input?.to ? "custom" : base.preset);
+  let from = isDay(base.from) ? base.from : ADMIN_DATA_START;
+  let to = base.to === "today" || !isDay(base.to) ? today : base.to;
+  if (preset === "since_launch") {
+    from = ADMIN_DATA_START;
+    to = today;
+  } else if (preset === "last_7") {
+    from = addDays(today, -6);
+    to = today;
+  } else if (preset === "last_30") {
+    from = addDays(today, -29);
+    to = today;
+  }
+  if (from < ADMIN_DATA_START) from = ADMIN_DATA_START;
+  if (to < ADMIN_DATA_START) to = ADMIN_DATA_START;
+  if (to > today) to = today;
+  if (from > to) from = to;
+  const rangeDays = daysBetween(from, to);
+  const span = rangeDays.length;
+  const prevEnd = addDays(from, -1);
+  const prevStartRaw = addDays(from, -span);
+  const prevStart = prevStartRaw < ADMIN_DATA_START ? ADMIN_DATA_START : prevStartRaw;
+  const prevDays = prevEnd >= ADMIN_DATA_START && prevStart <= prevEnd ? daysBetween(prevStart, prevEnd) : [];
+  const compareLabel = prevDays.length === 0
+    ? "before Oct 1 isn't included"
+    : prevDays.length === 7 && span === 7
+      ? "vs prior week"
+      : `vs prior ${prevDays.length} day${prevDays.length === 1 ? "" : "s"}`;
+  return {
+    from,
+    to,
+    communityId: base.communityId || null,
+    neighborhoodId: base.neighborhoodId || null,
+    includeSeed: Boolean(base.includeSeed),
+    preset,
+    rangeDays,
+    prevDays,
+    compareLabel,
+    today,
+  };
+}
+
+export function sanitizeAdminDashboardView(body: unknown, today: string): AdminDashboardView {
+  const raw = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  const communityId = typeof raw.communityId === "string" ? raw.communityId : null;
+  const neighborhoodId = typeof raw.neighborhoodId === "string" ? raw.neighborhoodId : null;
+  const preset = raw.preset === "since_launch" || raw.preset === "last_7" || raw.preset === "last_30" || raw.preset === "custom"
+    ? raw.preset
+    : "custom";
+  const resolved = resolveAdminDashboardView(
+    {
+      from: typeof raw.from === "string" ? raw.from : ADMIN_DATA_START,
+      to: typeof raw.to === "string" ? raw.to : "today",
+      preset,
+      communityId,
+      neighborhoodId,
+      includeSeed: raw.includeSeed === true || raw.includeSeed === "1" || raw.includeSeed === "true",
+    },
+    today,
+  );
+  return {
+    from: resolved.from,
+    to: preset === "custom" ? resolved.to : "today",
+    preset,
+    communityId: resolved.communityId,
+    neighborhoodId: resolved.neighborhoodId,
+    includeSeed: resolved.includeSeed,
+  };
+}
+
+function userInNeighborhood(user: UserRecord, neighborhoodId: string): boolean {
+  if (user.neighborhoodId === neighborhoodId) return true;
+  return (user.neighborhoodIds ?? []).includes(neighborhoodId);
+}
+
 function deltaOf(value: number | null, previous: number | null, spark: number[]): DashboardDelta {
   return {
     value,
@@ -235,10 +365,17 @@ interface Activity {
   byDay: Map<string, Set<string>>;
 }
 
-function touch(activity: Activity, iso: string | null | undefined, userId: string | null | undefined, seedIds: Set<string>): void {
+function touch(
+  activity: Activity,
+  iso: string | null | undefined,
+  userId: string | null | undefined,
+  seedIds: Set<string>,
+  minDay = ADMIN_DATA_START,
+  maxDay = "9999-99-99",
+): void {
   if (!userId || seedIds.has(userId)) return;
   const day = dayKeyFromIso(iso);
-  if (!day) return;
+  if (!day || day < minDay || day > maxDay) return;
   let set = activity.byDay.get(day);
   if (!set) {
     set = new Set();
@@ -322,81 +459,163 @@ async function twilioSms(windowDays: number): Promise<AdminDashboard["operations
   }
 }
 
-export async function buildAdminDashboard(viewerId?: string): Promise<AdminDashboard> {
+export async function buildAdminDashboard(
+  viewerId?: string,
+  requested?: Partial<AdminDashboardView> | null,
+  saved: AdminDashboardView | null = null,
+): Promise<AdminDashboard> {
   const started = Date.now();
   const now = new Date();
   const today = dayKey(now);
-  const weekEnd = addDays(today, -1);
-  const weekStart = addDays(weekEnd, -6);
-  const prevEnd = addDays(weekStart, -1);
-  const prevStart = addDays(prevEnd, -6);
-  const weekDays = daysBetween(weekStart, weekEnd);
-  const prevDays = daysBetween(prevStart, prevEnd);
-  const dauStart = addDays(weekEnd, -29);
-  const dauDays = daysBetween(dauStart, weekEnd);
+  const scope = resolveAdminDashboardView(requested, today);
+  const weekStart = scope.from;
+  const weekEnd = scope.to;
+  const weekDays = scope.rangeDays;
+  const prevDays = scope.prevDays;
+  const dauDays = scope.rangeDays;
 
   const users = await listAllUsers();
-  const seedIds = new Set(users.filter((u) => isSeed(u)).map((u) => u.id));
-  const realUsers = users.filter((u) => !isSeed(u));
+  const allSeedIds = new Set(users.filter((u) => isSeed(u)).map((u) => u.id));
+  const seedIds = scope.includeSeed ? new Set<string>() : allSeedIds;
   const userById = new Map(users.map((u) => [u.id, u]));
-  const hoodName = new Map(store.listNeighborhoods().map((n) => [n.id, n.name]));
-
-  const plans = store.listPlans().filter((p) => !seedIds.has(p.creatorId));
-  const livePlans = plans.filter((p) => !p.cancelledAt);
-  const messages = store.listAllMessages();
-  const posts = store.listAllCommunityPosts();
-  const forumPosts = store.listAllForumPosts();
-  const forumReplies = store.listAllForumReplies();
-  const feedback = store.listAllFeedback();
+  const neighborhoods = store.listNeighborhoods();
+  const hoodName = new Map(neighborhoods.map((n) => [n.id, n.name]));
   const communities = store.listCommunities();
-  const conversations = store.listAllConversations();
+  if (scope.communityId && !communities.some((c) => c.id === scope.communityId)) scope.communityId = null;
+  if (scope.neighborhoodId && !neighborhoods.some((n) => n.id === scope.neighborhoodId)) scope.neighborhoodId = null;
+
+  const population = users.filter((u) => scope.includeSeed || !isSeed(u));
+  const memberIds = scope.communityId
+    ? new Set(
+        store.listCommunityMembers(scope.communityId)
+          .filter((member) => {
+            if (member.status !== "active") return false;
+            const day = dayKeyFromIso(member.joinedAt);
+            return !!day && day >= ADMIN_DATA_START && day <= scope.to;
+          })
+          .map((member) => member.userId),
+      )
+    : null;
+
+  function inCohort(user: UserRecord): boolean {
+    const day = dayKeyFromIso(user.createdAt);
+    if (!day || day < scope.from || day > scope.to) return false;
+    if (scope.neighborhoodId && !userInNeighborhood(user, scope.neighborhoodId)) return false;
+    if (memberIds && !memberIds.has(user.id)) return false;
+    return true;
+  }
+  const realUsers = population.filter(inCohort);
+
+  function actorOk(userId: string | null | undefined): boolean {
+    if (!userId || seedIds.has(userId)) return false;
+    if (!scope.neighborhoodId) return true;
+    const user = userById.get(userId);
+    return !!user && userInNeighborhood(user, scope.neighborhoodId);
+  }
+  function note(iso: string | null | undefined, userId: string | null | undefined): void {
+    if (!actorOk(userId)) return;
+    touch(activity, iso, userId, seedIds, ADMIN_DATA_START, scope.to);
+  }
+  function eventDayOk(iso: string | null | undefined, minDay = ADMIN_DATA_START): boolean {
+    const day = dayKeyFromIso(iso);
+    return !!day && day >= minDay && day <= scope.to;
+  }
+
+  const plans = store.listPlans().filter((plan) => {
+    if (!scope.includeSeed && allSeedIds.has(plan.creatorId)) return false;
+    if (scope.communityId && plan.communityId !== scope.communityId) return false;
+    if (scope.neighborhoodId && plan.neighborhoodId !== scope.neighborhoodId) return false;
+    const created = dayKeyFromIso(plan.createdAt);
+    const dated = plan.date?.slice(0, 10) ?? null;
+    const createdOk = !!created && created >= ADMIN_DATA_START && created <= scope.to;
+    const datedOk = !!dated && dated >= ADMIN_DATA_START && dated <= scope.to;
+    return createdOk || datedOk;
+  });
+  const livePlans = plans.filter((p) => !p.cancelledAt);
+  const planIds = new Set(plans.map((p) => p.id));
+  const conversations = store.listAllConversations().filter((convo) => {
+    if (!scope.communityId) return true;
+    return convo.communityId === scope.communityId;
+  });
+  const convoIds = new Set(conversations.map((c) => c.id));
+  const messages = store.listAllMessages().filter((message) => {
+    if (scope.communityId && !convoIds.has(message.conversationId)) return false;
+    return eventDayOk(message.createdAt);
+  });
+  const posts = store.listAllCommunityPosts().filter((post) => {
+    if (scope.communityId && post.communityId !== scope.communityId) return false;
+    return eventDayOk(post.createdAt);
+  });
+  const forumPosts = scope.communityId
+    ? []
+    : store.listAllForumPosts().filter((post) => eventDayOk(post.createdAt));
+  const forumReplies = scope.communityId
+    ? []
+    : store.listAllForumReplies().filter((reply) => eventDayOk(reply.createdAt));
+  const feedback = store.listAllFeedback().filter((row) => {
+    if (!eventDayOk(row.createdAt)) return false;
+    if (!scope.communityId && !scope.neighborhoodId) return true;
+    const plan = store.findPlanById(row.planId);
+    if (!plan) return false;
+    if (scope.communityId && plan.communityId !== scope.communityId) return false;
+    if (scope.neighborhoodId && plan.neighborhoodId !== scope.neighborhoodId) return false;
+    return true;
+  });
 
   const activity: Activity = { byDay: new Map() };
-  for (const plan of plans) touch(activity, plan.createdAt, plan.creatorId, seedIds);
+  for (const plan of plans) note(plan.createdAt, plan.creatorId);
   for (const part of store.listAllParticipations()) {
-    if (seedIds.has(part.userId)) continue;
-    touch(activity, part.updatedAt, part.userId, seedIds);
-    touch(activity, part.createdAt, part.userId, seedIds);
+    if (!planIds.has(part.planId)) continue;
+    note(part.updatedAt, part.userId);
+    note(part.createdAt, part.userId);
   }
   for (const message of messages) {
     if (message.kind === "system") continue;
-    touch(activity, message.createdAt, message.senderId, seedIds);
+    note(message.createdAt, message.senderId);
   }
-  for (const post of posts) touch(activity, post.createdAt, post.authorId, seedIds);
-  for (const post of forumPosts) touch(activity, post.createdAt, post.authorId, seedIds);
-  for (const reply of forumReplies) touch(activity, reply.createdAt, reply.authorId, seedIds);
-  for (const row of feedback) touch(activity, row.createdAt, row.fromUserId, seedIds);
+  for (const post of posts) note(post.createdAt, post.authorId);
+  for (const post of forumPosts) note(post.createdAt, post.authorId);
+  for (const reply of forumReplies) note(reply.createdAt, reply.authorId);
+  for (const row of feedback) note(row.createdAt, row.fromUserId);
 
-  const logSince = addDays(today, -180) + "T00:00:00.000Z";
+  const logSince = addDays(ADMIN_DATA_START, -1) + "T00:00:00.000Z";
   const logs = await loadLogs(logSince);
   const interestPairs = new Set<string>();
   const convertedPairs = new Set<string>();
   for (const log of logs) {
+    const day = dayKeyFromIso(log.createdAt);
+    if (!day || day < ADMIN_DATA_START || day > scope.to) continue;
+    const inSelected = day >= scope.from;
     if (log.event === "plan_viewed") {
-      touch(activity, log.createdAt, payloadField(log.payload, "userId"), seedIds);
+      note(log.createdAt, payloadField(log.payload, "userId"));
     } else if (log.event === "participation_changed") {
       const userId = payloadField(log.payload, "userId");
       const planId = payloadField(log.payload, "planId");
-      touch(activity, log.createdAt, userId, seedIds);
-      if (!userId || !planId || seedIds.has(userId)) continue;
-      const to = payloadField(log.payload, "to");
-      const from = payloadField(log.payload, "from");
+      note(log.createdAt, userId);
+      if (!inSelected || !userId || !planId || !actorOk(userId)) continue;
+      if ((scope.communityId || scope.neighborhoodId) && !planIds.has(planId)) continue;
+      const toState = payloadField(log.payload, "to");
+      const fromState = payloadField(log.payload, "from");
       const key = `${planId}:${userId}`;
-      if (to === "interested") interestPairs.add(key);
-      if (from === "interested" && to === "going") convertedPairs.add(key);
+      if (toState === "interested") interestPairs.add(key);
+      if (fromState === "interested" && toState === "going") convertedPairs.add(key);
     } else if (log.event === "plan_approved") {
       const userId = payloadField(log.payload, "userId");
       const planId = payloadField(log.payload, "planId");
-      if (userId && planId && !seedIds.has(userId)) convertedPairs.add(`${planId}:${userId}`);
+      if (!inSelected || !userId || !planId || !actorOk(userId)) continue;
+      if ((scope.communityId || scope.neighborhoodId) && !planIds.has(planId)) continue;
+      convertedPairs.add(`${planId}:${userId}`);
     }
   }
 
   function postedOn(days: string[]): PlanRecord[] {
+    if (days.length === 0) return [];
     const start = days[0]!;
     const end = days[days.length - 1]!;
     return livePlans.filter((p) => inRange(dayKeyFromIso(p.createdAt), start, end));
   }
   function completedOn(days: string[]): PlanRecord[] {
+    if (days.length === 0) return [];
     const start = days[0]!;
     const end = days[days.length - 1]!;
     return livePlans.filter((p) => p.happenedOutcome === "yes" && inRange(p.date.slice(0, 10), start, end));
@@ -410,6 +629,7 @@ export async function buildAdminDashboard(viewerId?: string): Promise<AdminDashb
     return round1(total / rows.length);
   }
 
+  const hasPrev = prevDays.length > 0;
   const posted = postedOn(weekDays);
   const prevPosted = postedOn(prevDays);
   const completed = completedOn(weekDays);
@@ -428,7 +648,7 @@ export async function buildAdminDashboard(viewerId?: string): Promise<AdminDashb
   }
 
   const wau = usersOnDays(activity, weekDays).size;
-  const prevWau = usersOnDays(activity, prevDays).size;
+  const prevWau = hasPrev ? usersOnDays(activity, prevDays).size : null;
   const peopleSpark = weekDays.map((day) => meanPeople(completedOn([day])) ?? 0);
   const completedSpark = weekDays.map((day) => completedOn([day]).length);
   const zeroSpark = weekDays.map((day) => zeroJoinCount(postedOn([day])));
@@ -438,30 +658,61 @@ export async function buildAdminDashboard(viewerId?: string): Promise<AdminDashb
   const yesterday = dauSeries[dauSeries.length - 1]?.count ?? 0;
   const dayBefore = dauSeries[dauSeries.length - 2]?.count ?? 0;
 
-  const firstSignup = realUsers
-    .map((u) => dayKeyFromIso(u.createdAt))
-    .filter((d): d is string => Boolean(d))
+  const firstSignup = population
+    .filter((user) => {
+      const day = dayKeyFromIso(user.createdAt);
+      if (!day || day < ADMIN_DATA_START) return false;
+      if (scope.neighborhoodId && !userInNeighborhood(user, scope.neighborhoodId)) return false;
+      if (memberIds && !memberIds.has(user.id)) return false;
+      return true;
+    })
+    .map((user) => dayKeyFromIso(user.createdAt))
+    .filter((day): day is string => Boolean(day))
     .sort()[0] ?? null;
 
-  const communityActivity = communityActivityIndex(communities.map((c) => c.id), posts, livePlans, conversations, messages);
+  function membersJoined(communityId: string): number {
+    let count = 0;
+    for (const member of store.listCommunityMembers(communityId)) {
+      if (member.status !== "active") continue;
+      const day = dayKeyFromIso(member.joinedAt);
+      if (!day || day < scope.from || day > scope.to) continue;
+      const user = userById.get(member.userId);
+      if (!user || !actorOk(member.userId)) continue;
+      count += 1;
+    }
+    return count;
+  }
+
+  const communityActivity = communityActivityIndex(
+    communities.map((c) => c.id),
+    posts,
+    livePlans,
+    conversations,
+    messages,
+    { minDay: ADMIN_DATA_START, maxDay: scope.to, userOk: actorOk },
+  );
+  const quietSinceLaunch = daysBetween(ADMIN_DATA_START, scope.to).length;
   const alerts = communities
     .filter((c) => c.isFounding && c.creationStatus === "approved" && !c.hiddenAt)
+    .filter((c) => !scope.communityId || c.id === scope.communityId)
     .map((c) => {
-      const last = communityActivity.lastAt.get(c.id) ?? c.createdAt;
-      const daysInactive = Math.floor((now.getTime() - Date.parse(last)) / 86400000);
-      return { communityId: c.id, name: c.name, daysInactive, last };
+      const lastDay = dayKeyFromIso(communityActivity.lastAt.get(c.id));
+      const daysInactive = lastDay && lastDay >= ADMIN_DATA_START && lastDay <= scope.to
+        ? daysBetween(lastDay, scope.to).length - 1
+        : quietSinceLaunch;
+      return { communityId: c.id, name: c.name, daysInactive };
     })
-    .filter((c) => !Number.isFinite(c.daysInactive) || c.daysInactive >= 7)
-    .sort((a, b) => b.daysInactive - a.daysInactive)
-    .map(({ communityId, name, daysInactive }) => ({ communityId, name, daysInactive }));
+    .filter((c) => c.daysInactive >= 7)
+    .sort((a, b) => b.daysInactive - a.daysInactive);
 
   const activeCommunities = communities
     .filter((c) => c.creationStatus === "approved" && !c.hiddenAt)
+    .filter((c) => !scope.communityId || c.id === scope.communityId)
     .map((c) => ({
       id: c.id,
       name: c.name,
       initials: initials(c.name),
-      members: c.memberCount,
+      members: membersJoined(c.id),
       plans: livePlans.filter(
         (p) => p.communityId === c.id && inRange(dayKeyFromIso(p.createdAt), weekStart, weekEnd),
       ).length,
@@ -469,26 +720,44 @@ export async function buildAdminDashboard(viewerId?: string): Promise<AdminDashb
     .sort((a, b) => b.plans - a.plans || b.members - a.members)
     .slice(0, 6);
 
+  const rangePlans = livePlans.filter((p) => inRange(dayKeyFromIso(p.createdAt), weekStart, weekEnd));
+  const rangePosts = posts.filter((p) => inRange(dayKeyFromIso(p.createdAt), weekStart, weekEnd));
   const health = buildHealth({
     realUsers,
-    livePlans,
+    livePlans: rangePlans,
     activity,
-    today,
+    today: scope.to,
+    clockDay: today,
     communities,
     communityActivity,
     now,
     interestPairs,
     convertedPairs,
     seedIds,
+    from: scope.from,
+    communityId: scope.communityId,
+    neighborhoodId: scope.neighborhoodId,
+    userOk: actorOk,
+    windowDays: weekDays.length,
   });
 
-  const acquisition = buildAcquisition({ realUsers, hoodName, activity, userById });
-  const communityRows = buildCommunityRows(weekStart, weekEnd, livePlans, posts, communityActivity);
+  const acquisition = buildAcquisition({ realUsers, hoodName, activity, userById, from: scope.from, to: scope.to });
+  const communityRows = buildCommunityRows(
+    weekStart,
+    weekEnd,
+    rangePlans,
+    rangePosts,
+    communityActivity,
+    scope.communityId,
+    membersJoined,
+    scope.includeSeed,
+  );
+  const twilioDays = Math.max(1, weekDays.length);
   const twilioUsage = await Promise.race([
-    twilioSms(30),
+    twilioSms(twilioDays),
     new Promise<AdminDashboard["operations"]["system"]["twilio"]>((resolve) => {
       setTimeout(
-        () => resolve({ connected: true, messages: null, priceUsd: null, windowDays: 30, error: "Timed out reading Twilio usage" }),
+        () => resolve({ connected: true, messages: null, priceUsd: null, windowDays: twilioDays, error: "Timed out reading Twilio usage" }),
         4000,
       );
     }),
@@ -500,19 +769,40 @@ export async function buildAdminDashboard(viewerId?: string): Promise<AdminDashb
   return {
     generatedAt: now.toISOString(),
     updatedLabel: `Updated today, ${now.toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" })}`,
-    seedExcluded: seedIds.size,
+    seedExcluded: scope.includeSeed ? 0 : allSeedIds.size,
+    view: {
+      dataStart: ADMIN_DATA_START,
+      today,
+      from: scope.from,
+      to: scope.to,
+      communityId: scope.communityId,
+      neighborhoodId: scope.neighborhoodId,
+      includeSeed: scope.includeSeed,
+      preset: scope.preset,
+      rangeLabel: prettyRange(scope.from, scope.to),
+      compareLabel: scope.compareLabel,
+      saved,
+      options: {
+        communities: [...communities]
+          .map((c) => ({ id: c.id, name: c.name }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        neighborhoods: [...neighborhoods]
+          .map((n) => ({ id: n.id, name: n.name }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      },
+    },
     viewer: {
       firstName: viewer?.firstName || "Admin",
       lastName: viewer?.lastName || "",
       neighborhoodName: viewerHood,
     },
     overview: {
-      rangeLabel: `Week of ${prettyRange(weekStart, weekEnd)}`,
+      rangeLabel: prettyRange(weekStart, weekEnd),
       weekNumber: firstSignup ? Math.max(1, Math.floor((Date.parse(weekEnd) - Date.parse(firstSignup)) / (7 * 86400000)) + 1) : null,
       sinceLabel: firstSignup ? `since first signup ${prettyDay(firstSignup)}` : null,
-      plansCompleted: deltaOf(completed.length, prevCompleted.length, completedSpark),
-      avgPeople: deltaOf(meanPeople(completed), meanPeople(prevCompleted), peopleSpark),
-      zeroJoins: deltaOf(zeroJoins, zeroJoinCount(prevPosted), zeroSpark),
+      plansCompleted: deltaOf(completed.length, hasPrev ? prevCompleted.length : null, completedSpark),
+      avgPeople: deltaOf(meanPeople(completed), hasPrev ? meanPeople(prevCompleted) : null, peopleSpark),
+      zeroJoins: deltaOf(zeroJoins, hasPrev ? zeroJoinCount(prevPosted) : null, zeroSpark),
       wau: deltaOf(wau, prevWau, wauSpark),
       funnel: {
         posted: posted.length,
@@ -528,6 +818,7 @@ export async function buildAdminDashboard(viewerId?: string): Promise<AdminDashb
       dau: {
         days: dauSeries,
         yesterday,
+        latestLabel: prettyDay(dauDays[dauDays.length - 1] ?? scope.to),
         deltaPct: dayBefore > 0 ? pct(yesterday - dayBefore, dayBefore) : null,
         firstSignupDate: firstSignup,
       },
@@ -541,7 +832,7 @@ export async function buildAdminDashboard(viewerId?: string): Promise<AdminDashb
         formUrl: BETA_FORM,
         trackedInApp: false,
         hostNotes: feedback
-          .filter((f) => f.note?.trim())
+          .filter((f) => f.note?.trim() && inRange(dayKeyFromIso(f.createdAt), scope.from, scope.to))
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
           .slice(0, 20)
           .map((f) => ({
@@ -553,7 +844,6 @@ export async function buildAdminDashboard(viewerId?: string): Promise<AdminDashb
           })),
       },
       users: realUsers
-        .concat(users.filter((u) => isSeed(u)))
         .map((u) => ({
           id: u.id,
           firstName: u.firstName || "—",
@@ -593,10 +883,16 @@ function communityActivityIndex(
   plans: PlanRecord[],
   conversations: { id: string; communityId?: string | null; lastMessageAt: string }[],
   messages: { conversationId: string; senderId: string; createdAt: string; kind?: string }[],
+  bounds?: { minDay: string; maxDay: string; userOk?: (userId: string) => boolean },
 ): { lastAt: Map<string, string>; actors: Map<string, { at: string; userId: string }[]> } {
   const lastAt = new Map<string, string>();
   const actors = new Map<string, { at: string; userId: string }[]>();
   const bump = (communityId: string, at: string, userId?: string) => {
+    if (bounds) {
+      const day = dayKeyFromIso(at);
+      if (!day || day < bounds.minDay || day > bounds.maxDay) return;
+    }
+    if (userId && bounds?.userOk && !bounds.userOk(userId)) return;
     const prev = lastAt.get(communityId);
     if (!prev || at > prev) lastAt.set(communityId, at);
     if (!userId) return;
@@ -622,7 +918,8 @@ function communityActivityIndex(
   }
   for (const community of store.listCommunities()) {
     for (const member of store.listCommunityMembers(community.id)) {
-      bump(community.id, member.joinedAt);
+      if (bounds?.userOk && !bounds.userOk(member.userId)) continue;
+      bump(community.id, member.joinedAt, member.userId);
     }
   }
   return { lastAt, actors };
@@ -633,12 +930,18 @@ function buildHealth(input: {
   livePlans: PlanRecord[];
   activity: Activity;
   today: string;
+  clockDay: string;
   communities: ReturnType<typeof store.listCommunities>;
   communityActivity: ReturnType<typeof communityActivityIndex>;
   now: Date;
   interestPairs: Set<string>;
   convertedPairs: Set<string>;
   seedIds: Set<string>;
+  from: string;
+  communityId: string | null;
+  neighborhoodId: string | null;
+  userOk: (userId: string) => boolean;
+  windowDays: number;
 }): AdminDashboard["health"] {
   const plansByUser = new Map<string, string[]>();
   for (const plan of input.livePlans) {
@@ -648,7 +951,8 @@ function buildHealth(input: {
   }
   let eligible = 0;
   let converted = 0;
-  const cutoff = input.now.getTime() - 30 * 86400000;
+  const asOf = Date.parse(`${input.today}T12:00:00Z`);
+  const cutoff = asOf - 30 * 86400000;
   for (const times of plansByUser.values()) {
     times.sort();
     const first = Date.parse(times[0] ?? "");
@@ -671,7 +975,8 @@ function buildHealth(input: {
     .map(([weekStart, ids]) => {
       const windowStart = addDays(weekStart, 28);
       const windowEnd = addDays(windowStart, 6);
-      if (windowEnd >= input.today) return null;
+      if (windowEnd > input.today) return null;
+      if (windowEnd === input.today && input.today === input.clockDay) return null;
       const days = daysBetween(windowStart, windowEnd);
       const active = usersOnDays(input.activity, days);
       const retained = ids.filter((id) => active.has(id)).length;
@@ -681,11 +986,14 @@ function buildHealth(input: {
     .sort((a, b) => b.weekStart.localeCompare(a.weekStart))
     .slice(0, 6);
 
-  const approved = input.communities.filter((c) => c.creationStatus === "approved" && !c.hiddenAt);
+  const approved = input.communities.filter(
+    (c) => c.creationStatus === "approved" && !c.hiddenAt && (!input.communityId || c.id === input.communityId),
+  );
   const communityRows = approved
     .map((c) => {
       const last = input.communityActivity.lastAt.get(c.id) ?? null;
-      const daysInactive = last ? Math.floor((input.now.getTime() - Date.parse(last)) / 86400000) : null;
+      const lastDay = dayKeyFromIso(last);
+      const daysInactive = lastDay && lastDay <= input.today ? daysBetween(lastDay, input.today).length - 1 : null;
       const active = daysInactive !== null && daysInactive < 7;
       return {
         id: c.id,
@@ -703,7 +1011,9 @@ function buildHealth(input: {
   let multi = 0;
   for (const community of approved) {
     for (const member of store.listCommunityMembers(community.id)) {
-      if (member.status !== "active" || input.seedIds.has(member.userId)) continue;
+      if (member.status !== "active" || !input.userOk(member.userId)) continue;
+      const joinedDay = dayKeyFromIso(member.joinedAt);
+      if (!joinedDay || joinedDay < input.from || joinedDay > input.today) continue;
       const list = memberships.get(member.userId) ?? [];
       list.push({ communityId: member.communityId, joinedAt: member.joinedAt });
       memberships.set(member.userId, list);
@@ -717,13 +1027,17 @@ function buildHealth(input: {
   const joiners = new Set<string>();
   const outsiders = new Set<string>();
   for (const part of store.listAllParticipations()) {
-    if (input.seedIds.has(part.userId)) continue;
+    if (!input.userOk(part.userId)) continue;
     if (part.state !== "going" && part.state !== "interested") continue;
+    const when = part.createdAt ?? part.updatedAt;
+    const whenDay = dayKeyFromIso(when);
+    if (!whenDay || whenDay < input.from || whenDay > input.today) continue;
     const plan = store.findPlanById(part.planId);
     if (!plan?.communityId || plan.cancelledAt) continue;
+    if (input.communityId && plan.communityId !== input.communityId) continue;
+    if (input.neighborhoodId && plan.neighborhoodId !== input.neighborhoodId) continue;
     joiners.add(part.userId);
     const joined = (memberships.get(part.userId) ?? []).find((m) => m.communityId === plan.communityId);
-    const when = part.createdAt ?? part.updatedAt;
     if (!joined || joined.joinedAt > when) outsiders.add(part.userId);
   }
 
@@ -754,7 +1068,7 @@ function buildHealth(input: {
       ratePct: pct(convertedInterest, interested),
       interested,
       converted: convertedInterest,
-      windowDays: 180,
+      windowDays: input.windowDays,
     },
     onboarding: steps,
   };
@@ -790,6 +1104,8 @@ function buildAcquisition(input: {
   hoodName: Map<string, string>;
   activity: Activity;
   userById: Map<string, UserRecord>;
+  from: string;
+  to: string;
 }): AdminDashboard["acquisition"] {
   const ageOrder: { id: AgeRange | "unset"; label: string }[] = [
     { id: "18_24", label: AGE_RANGE_LABELS["18_24"] },
@@ -808,7 +1124,11 @@ function buildAcquisition(input: {
   }
 
   const codes = store.listAllInviteCodes()
-    .filter((c) => c.redeemedByUserId && c.redeemedAt)
+    .filter((c) => {
+      if (!c.redeemedByUserId || !c.redeemedAt) return false;
+      const day = dayKeyFromIso(c.redeemedAt);
+      return !!day && day >= input.from && day <= input.to && day >= ADMIN_DATA_START;
+    })
     .map((c) => {
       const redeemer = c.redeemedByUserId ? input.userById.get(c.redeemedByUserId) : undefined;
       const redeemDay = dayKeyFromIso(c.redeemedAt);
@@ -866,18 +1186,21 @@ function buildCommunityRows(
   plans: PlanRecord[],
   posts: { communityId: string; createdAt: string; authorId: string; parentId?: string | null }[],
   communityActivity: ReturnType<typeof communityActivityIndex>,
+  communityId: string | null,
+  membersOf: (id: string) => number,
+  includeSeed: boolean,
 ): AdminDashboard["communities"]["rows"] {
   const week = new Set(daysBetween(weekStart, weekEnd));
   return store
     .listCommunities()
-    .filter((c) => c.creationStatus === "approved")
+    .filter((c) => c.creationStatus === "approved" && (!communityId || c.id === communityId))
     .map((c) => {
       const actors = communityActivity.actors.get(c.id) ?? [];
       const active = new Set<string>();
       for (const actor of actors) {
         const day = dayKeyFromIso(actor.at);
         if (!day || !week.has(day) || !actor.userId) continue;
-        if (store.findUserById(actor.userId)?.accountSource === "seed") continue;
+        if (!includeSeed && store.findUserById(actor.userId)?.accountSource === "seed") continue;
         active.add(actor.userId);
       }
       return {
@@ -886,7 +1209,7 @@ function buildCommunityRows(
         initials: initials(c.name),
         isFounding: c.isFounding,
         hidden: Boolean(c.hiddenAt),
-        members: c.memberCount,
+        members: membersOf(c.id),
         plans: plans.filter((p) => p.communityId === c.id).length,
         bulletinPosts: posts.filter((p) => p.communityId === c.id && !p.parentId).length,
         activeMembers: active.size,
@@ -899,11 +1222,10 @@ function buildCommunityRows(
     });
 }
 
-export function buildCommunityDetail(communityId: string) {
+export function buildCommunityDetail(communityId: string, requested?: Partial<AdminDashboardView> | null) {
   const community = store.findCommunityById(communityId);
   if (!community) return null;
-  const today = dayKey(new Date());
-  const thisMonday = mondayOf(today);
+  const scope = resolveAdminDashboardView(requested, dayKey(new Date()));
   const posts = store.listAllCommunityPosts().filter((p) => p.communityId === communityId);
   const plans = store.listPlans().filter((p) => p.communityId === communityId && !p.cancelledAt);
   const members = store.listCommunityMembers(communityId);
@@ -913,10 +1235,14 @@ export function buildCommunityDetail(communityId: string) {
     : [];
 
   const weeks = [];
-  for (let i = 7; i >= 0; i--) {
-    const start = addDays(thisMonday, -7 * i);
+  const startMonday = mondayOf(scope.from);
+  const endMonday = mondayOf(scope.to);
+  for (let start = startMonday; start <= endMonday; start = addDays(start, 7)) {
     const end = addDays(start, 6);
-    const inWeek = (iso: string | null | undefined) => inRange(dayKeyFromIso(iso), start, end);
+    const inWeek = (iso: string | null | undefined) => {
+      const day = dayKeyFromIso(iso);
+      return !!day && day >= start && day <= end && day >= ADMIN_DATA_START && day >= scope.from && day <= scope.to;
+    };
     const active = new Set<string>();
     for (const post of posts) if (inWeek(post.createdAt)) active.add(post.authorId);
     for (const plan of plans) if (inWeek(plan.createdAt)) active.add(plan.creatorId);
@@ -1002,7 +1328,8 @@ function basemapFrame(bounds: { minLat: number; maxLat: number; minLng: number; 
   return { center, zoom, width: BASEMAP_WIDTH, height: BASEMAP_HEIGHT };
 }
 
-export function buildGodView() {
+export function buildGodView(requested?: Partial<AdminDashboardView> | null) {
+  const scope = resolveAdminDashboardView(requested, dayKey(new Date()));
   const hoods = store.listNeighborhoods();
   const hoodById = new Map(hoods.map((h) => [h.id, h]));
   const people: {
@@ -1016,7 +1343,18 @@ export function buildGodView() {
   }[] = [];
 
   for (const user of store.listUsers()) {
-    if (user.ownerUserId) continue;
+    if (!scope.includeSeed && user.accountSource === "seed") continue;
+    const created = dayKeyFromIso(user.createdAt);
+    if (!created || created < scope.from || created > scope.to) continue;
+    if (scope.neighborhoodId && !userInNeighborhood(user, scope.neighborhoodId)) continue;
+    if (scope.communityId) {
+      const member = store.listCommunityMembers(scope.communityId).some((row) => {
+        if (row.userId !== user.id || row.status !== "active") return false;
+        const day = dayKeyFromIso(row.joinedAt);
+        return !!day && day >= ADMIN_DATA_START && day <= scope.to;
+      });
+      if (!member) continue;
+    }
     const hoodId = user.neighborhoodIds?.[0] ?? user.neighborhoodId;
     const hood = hoodId ? hoodById.get(hoodId) : undefined;
     const precise = typeof user.locationLat === "number" && typeof user.locationLng === "number";
@@ -1043,10 +1381,20 @@ export function buildGodView() {
     });
   }
 
-  const today = dayKey(new Date());
+  const today = scope.today;
   const plans = store
     .listPlans()
-    .filter((plan) => !plan.cancelledAt)
+    .filter((plan) => {
+      if (plan.cancelledAt) return false;
+      if (!scope.includeSeed && store.findUserById(plan.creatorId)?.accountSource === "seed") return false;
+      if (scope.communityId && plan.communityId !== scope.communityId) return false;
+      if (scope.neighborhoodId && plan.neighborhoodId !== scope.neighborhoodId) return false;
+      const created = dayKeyFromIso(plan.createdAt);
+      const dated = plan.date?.slice(0, 10) ?? null;
+      const createdOk = !!created && created >= scope.from && created <= scope.to;
+      const datedOk = !!dated && dated >= scope.from && dated <= scope.to;
+      return createdOk || datedOk;
+    })
     .map((plan) => {
       const point = planPoint(plan);
       if (!point) return null;
@@ -1064,19 +1412,38 @@ export function buildGodView() {
   const matrix = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0));
   const bump = (iso: string | null | undefined) => {
     if (!iso) return;
+    const day = dayKeyFromIso(iso);
+    if (!day || day < scope.from || day > scope.to) return;
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return;
     matrix[d.getUTCDay()]![d.getUTCHours()]! += 1;
   };
   for (const user of store.listUsers()) {
-    if (user.accountSource === "seed" || user.ownerUserId) continue;
+    if (!scope.includeSeed && user.accountSource === "seed") continue;
+    if (scope.neighborhoodId && !userInNeighborhood(user, scope.neighborhoodId)) continue;
     bump(user.createdAt);
   }
-  for (const plan of store.listPlans()) bump(plan.createdAt);
+  for (const plan of plans) bump(`${plan.date}T16:00:00.000Z`);
+  const communityConvoIds = scope.communityId
+    ? new Set(store.listAllConversations().filter((c) => c.communityId === scope.communityId).map((c) => c.id))
+    : null;
   for (const message of store.listAllMessages()) {
-    if (message.kind === "user") bump(message.createdAt);
+    if (message.kind !== "user") continue;
+    if (communityConvoIds && !communityConvoIds.has(message.conversationId)) continue;
+    if (!scope.includeSeed && store.findUserById(message.senderId)?.accountSource === "seed") continue;
+    if (scope.neighborhoodId) {
+      const sender = store.findUserById(message.senderId);
+      if (!sender || !userInNeighborhood(sender, scope.neighborhoodId)) continue;
+    }
+    bump(message.createdAt);
   }
-  for (const part of store.listAllParticipations()) bump(part.updatedAt);
+  for (const part of store.listAllParticipations()) {
+    if (!scope.includeSeed && store.findUserById(part.userId)?.accountSource === "seed") continue;
+    const plan = store.findPlanById(part.planId);
+    if (scope.communityId && plan?.communityId !== scope.communityId) continue;
+    if (scope.neighborhoodId && plan?.neighborhoodId !== scope.neighborhoodId) continue;
+    bump(part.updatedAt);
+  }
 
   const hoodLats = hoods.map((h) => h.lat).filter((n): n is number => typeof n === "number");
   const hoodLngs = hoods.map((h) => h.lng).filter((n): n is number => typeof n === "number");
@@ -1108,7 +1475,7 @@ export function buildGodView() {
     heatmap: {
       matrix,
       max: Math.max(1, ...matrix.flat()),
-      label: "UTC — signups, plans, messages, RSVPs. Demo accounts are left out of signups.",
+      label: `UTC · ${prettyRange(scope.from, scope.to)}. Activity before Oct 1 is left out.`,
     },
   };
 }

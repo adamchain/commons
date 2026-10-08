@@ -16,7 +16,6 @@ import { createUser, deleteUser, findUserByPhone, findUserById, updateUser, type
 import {
   DEFAULT_NOTIFICATION_PREFS,
   type InviteCodeDTO,
-  type LinkedAccountDTO,
   type MeDTO,
   type NotificationPrefs,
 } from "../types/shared.js";
@@ -24,7 +23,6 @@ import { planHasEnded } from "../lib/planTime.js";
 import { nextNetworkPrompt, otherGoingIds, userWasGoing } from "../lib/networkPrompt.js";
 import { emit } from "../lib/notify.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
-import { accountRootId, isCommunitySubAccount } from "../lib/subAccounts.js";
 import { isLaunchAccessCode } from "../lib/accessCodes.js";
 
 const US_STATE_ABBR: Record<string, string> = {
@@ -123,7 +121,7 @@ export function meFromUser(user: UserRecord): MeDTO {
         : [];
   return {
     id: user.id,
-    phoneNumber: user.ownerUserId ? "" : user.phoneNumber,
+    phoneNumber: user.phoneNumber,
     firstName: user.firstName,
     lastName: user.lastName,
     bio: user.bio || undefined,
@@ -161,9 +159,6 @@ export function meFromUser(user: UserRecord): MeDTO {
         ? { lat: user.locationLat, lng: user.locationLng }
         : null,
     locationPromptAnsweredAt: user.locationPromptAnsweredAt ?? null,
-    /** personal = the phone login. community = a sub account for a community they run. */
-    accountKind: user.ownerUserId && user.managedCommunityId ? "community" : "personal",
-    managedCommunityId: user.managedCommunityId ?? null,
   };
 }
 
@@ -356,64 +351,6 @@ authRouter.get("/me", requireAuth, async (req, res) => {
     return;
   }
   res.json(me);
-});
-
-function toLinkedAccount(user: UserRecord, activeId: string): LinkedAccountDTO {
-  const community = user.managedCommunityId ? store.findCommunityById(user.managedCommunityId) : undefined;
-  return {
-    id: user.id,
-    firstName: user.firstName || "Account",
-    avatarPhotoDataUrl: user.avatarPhotoDataUrl,
-    avatarSeed: user.avatarSeed,
-    avatarStyle: user.avatarStyle,
-    kind: isCommunitySubAccount(user) ? "community" : "personal",
-    ...(user.managedCommunityId ? { communityId: user.managedCommunityId } : {}),
-    ...(community?.name ? { communityName: community.name } : {}),
-    active: user.id === activeId,
-  };
-}
-
-// GET /api/auth/accounts — personal login plus community sub accounts it owns.
-authRouter.get("/accounts", requireAuth, async (req, res) => {
-  const current = await findUserById(String(req.userId));
-  if (!current) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  const root = current.ownerUserId ? await findUserById(current.ownerUserId) : current;
-  if (!root) {
-    res.status(404).json({ error: "Account not found" });
-    return;
-  }
-  const subs = store.listSubAccountsForOwner(accountRootId(root));
-  res.json({ accounts: [toLinkedAccount(root, current.id), ...subs.map((u) => toLinkedAccount(u, current.id))] });
-});
-
-// POST /api/auth/switch-account { userId } — move this session onto a linked account.
-authRouter.post("/switch-account", requireAuth, async (req, res) => {
-  const current = await findUserById(String(req.userId));
-  if (!current) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  const targetId = String(req.body?.userId ?? "").trim();
-  const target = targetId ? await findUserById(targetId) : undefined;
-  if (!target) {
-    res.status(404).json({ error: "Account not found" });
-    return;
-  }
-  if (target.ejectedAt) {
-    res.status(403).json({ error: "This account was removed." });
-    return;
-  }
-  const rootId = accountRootId(current);
-  const allowed = target.id === rootId || target.ownerUserId === rootId;
-  if (!allowed) {
-    res.status(403).json({ error: "You can only switch into your own accounts." });
-    return;
-  }
-  const token = setSessionCookie(res, target.id, target.sessionVersion ?? 0);
-  res.json({ ...meFromUser(target), token });
 });
 
 authRouter.patch("/me", requireAuth, async (req, res) => {

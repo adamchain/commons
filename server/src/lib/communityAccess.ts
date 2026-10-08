@@ -5,13 +5,7 @@ export function isCommunityOrganizer(
   community: Pick<CommunityRecord, "id" | "organizerId">,
   userId: string,
 ): boolean {
-  if (community.organizerId === userId) return true;
-  const user = store.findUserById(userId);
-  return (
-    !!user &&
-    user.managedCommunityId === community.id &&
-    user.ownerUserId === community.organizerId
-  );
+  return community.organizerId === userId;
 }
 
 export function isActiveCommunityMember(communityId: string, userId: string): boolean {

@@ -6,7 +6,7 @@ import {
   type CommunityMemberRecord,
   type CommunityPostRecord,
 } from "../store.js";
-import { deleteUser, findUserById, findUsersByIds } from "../userRepo.js";
+import { findUserById, findUsersByIds } from "../userRepo.js";
 import { userToPublic, planSummary } from "./plans.js";
 import { mentionedUserIds } from "../lib/mentions.js";
 import { emit } from "../lib/notify.js";
@@ -21,13 +21,6 @@ import {
   isCommunityOrganizer,
 } from "../lib/communityAccess.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
-import {
-  ensureCommunitySubAccount,
-  isCommunitySubAccount,
-  reassignCommunitySubAccount,
-  syncCommunitySubAccount,
-} from "../lib/subAccounts.js";
-import { meFromUser, setSessionCookie } from "./auth.js";
 import { buildCommunityAnalytics } from "../lib/communityDashboard.js";
 import { communityFeedSignals, type CommunityFeedSignal } from "../lib/communityFeed.js";
 import {
@@ -396,11 +389,6 @@ function parseCoverImage(raw: unknown): string | null {
 // Stays off Explore / search until approved.
 communitiesRouter.post("/", requireAuth, async (req, res) => {
   const userId = String(req.userId);
-  const actor = await findUserById(userId);
-  if (actor && isCommunitySubAccount(actor)) {
-    res.status(403).json({ error: "Switch back to your personal account to start a community." });
-    return;
-  }
   const name = String(req.body?.name ?? "").trim().slice(0, 80);
   const description = String(req.body?.description ?? "").trim().slice(0, 2000);
   const categories = parseCommunityCategories(
@@ -611,15 +599,6 @@ communitiesRouter.get("/:id/dashboard", requireAuth, async (req, res) => {
       at: row.at,
     })),
     memberList: active.map((m) => memberDTO(m, users, community.organizerId, true, organizer)),
-    subAccount: (() => {
-      const sub = store.findUserByManagedCommunity(community.id);
-      if (!sub) return null;
-      return {
-        id: sub.id,
-        firstName: sub.firstName,
-        ...(sub.avatarPhotoDataUrl ? { avatarPhotoDataUrl: sub.avatarPhotoDataUrl } : {}),
-      };
-    })(),
     planActivity: planActivityRows.flatMap((row) => {
       const plan = planById.get(row.planId);
       if (!plan || (row.state !== "going" && row.state !== "interested")) return [];
@@ -634,31 +613,6 @@ communitiesRouter.get("/:id/dashboard", requireAuth, async (req, res) => {
     }),
   };
   res.json(body);
-});
-
-// POST /api/communities/:id/sub-account — a profile the organizer can switch into.
-communitiesRouter.post("/:id/sub-account", requireAuth, async (req, res) => {
-  const userId = String(req.userId);
-  const community = store.findCommunityById(String(req.params.id));
-  if (!community || community.hiddenAt || community.creationStatus === "rejected") {
-    res.status(404).json({ error: "Community not found" });
-    return;
-  }
-  if (community.organizerId !== userId) {
-    res.status(403).json({ error: "Only the organizer can make a sub account" });
-    return;
-  }
-  const owner = await findUserById(userId);
-  if (!owner || isCommunitySubAccount(owner)) {
-    res.status(403).json({ error: "Switch back to your personal account to make a sub account." });
-    return;
-  }
-  const sub = ensureCommunitySubAccount(community, owner);
-  res.status(201).json({
-    id: sub.id,
-    firstName: sub.firstName,
-    ...(sub.avatarPhotoDataUrl ? { avatarPhotoDataUrl: sub.avatarPhotoDataUrl } : {}),
-  });
 });
 
 // PATCH /api/communities/:id — organizer settings (name/description/cover/category,
@@ -764,7 +718,6 @@ communitiesRouter.patch("/:id", requireAuth, async (req, res) => {
     patch.submittedAt = new Date().toISOString();
   }
   const updated = store.updateCommunity(community.id, patch) ?? community;
-  syncCommunitySubAccount(updated);
   res.json(await toCommunityDTO(updated, viewerId));
 });
 
@@ -862,7 +815,6 @@ communitiesRouter.post("/:id/transfer-organizer", requireAuth, async (req, res) 
     return;
   }
   const viewerIsAdmin = await isCommonsAdmin(userId);
-  const actor = await findUserById(userId);
   if (!isCommunityOrganizer(community, userId) && !viewerIsAdmin) {
     res.status(403).json({ error: "Only the organizer can transfer this community" });
     return;
@@ -884,10 +836,7 @@ communitiesRouter.post("/:id/transfer-organizer", requireAuth, async (req, res) 
   }
 
   const previousOrganizerId = community.organizerId;
-  const actingAsSubAccount = actor?.managedCommunityId === community.id;
-  const personalId = actingAsSubAccount ? actor?.ownerUserId : undefined;
   store.transferCommunityOrganizer(community.id, newOrganizerId);
-  reassignCommunitySubAccount(community.id, newOrganizerId);
   // Outgoing organizer leaves after handoff. A COMMONS admin transferring on
   // someone else's behalf demotes the old organizer to member instead.
   if (previousOrganizerId === userId) {
@@ -913,18 +862,6 @@ communitiesRouter.post("/:id/transfer-organizer", requireAuth, async (req, res) 
   });
 
   const updated = store.findCommunityById(community.id)!;
-  const personal = personalId ? await findUserById(personalId) : undefined;
-  if (actingAsSubAccount && personal) {
-    const token = setSessionCookie(res, personal.id, personal.sessionVersion ?? 0);
-    res.json({
-      ok: true,
-      newOrganizerId,
-      community: await toCommunityDTO(updated, personal.id),
-      token,
-      switchedTo: meFromUser(personal),
-    });
-    return;
-  }
   res.json({ ok: true, newOrganizerId, community: await toCommunityDTO(updated, userId) });
 });
 
@@ -938,7 +875,6 @@ communitiesRouter.delete("/:id", requireAuth, async (req, res) => {
     return;
   }
   const viewerIsAdmin = await isCommonsAdmin(userId);
-  const actor = await findUserById(userId);
   if (!isCommunityOrganizer(community, userId) && !viewerIsAdmin) {
     res.status(403).json({ error: "Only the organizer can delete this community" });
     return;
@@ -946,9 +882,6 @@ communitiesRouter.delete("/:id", requireAuth, async (req, res) => {
 
   const name = community.name;
   const communityId = community.id;
-  const actingAsSubAccount = actor?.managedCommunityId === communityId;
-  const personalId = actingAsSubAccount ? actor?.ownerUserId : undefined;
-  const subAccount = store.findUserByManagedCommunity(communityId);
   const result = store.deleteCommunity(communityId);
   if (!result) {
     res.status(404).json({ error: "Community not found" });
@@ -983,13 +916,6 @@ communitiesRouter.delete("/:id", requireAuth, async (req, res) => {
     by: userId,
     cancelledPlans: result.cancelledPlanIds.length,
   });
-  if (subAccount) await deleteUser(subAccount.id);
-  const personal = personalId ? await findUserById(personalId) : undefined;
-  if (actingAsSubAccount && personal) {
-    const token = setSessionCookie(res, personal.id, personal.sessionVersion ?? 0);
-    res.json({ ok: true, token, switchedTo: meFromUser(personal) });
-    return;
-  }
   res.json({ ok: true });
 });
 

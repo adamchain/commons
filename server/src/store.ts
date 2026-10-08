@@ -22,18 +22,23 @@ import type {
 } from "./types/shared.js";
 import { ALL_INTERESTS, normalizeCommunityCategory, parseCommunityCategories } from "./types/shared.js";
 
+/** Founder admin filters saved as that person's default dashboard view. */
+export interface AdminDashboardView {
+  from: string;
+  /** A calendar day, or "today" so the end of the range stays current. */
+  to: string;
+  /** Rolling windows are reapplied on each load. `custom` uses `from` and `to`. */
+  preset: "since_launch" | "last_7" | "last_30" | "custom";
+  communityId: string | null;
+  neighborhoodId: string | null;
+  includeSeed: boolean;
+}
+
 export interface UserRecord {
   id: string;
   phoneNumber: string;
-  /** `verify` = signed up via Twilio Verify; `seed` = demo data; `sub` = community persona. */
-  accountSource?: "verify" | "seed" | "sub";
-  /**
-   * Set on a community sub account. The personal account that can switch into
-   * this profile. Login stays on that phone — this row has no SMS number.
-   */
-  ownerUserId?: string;
-  /** The community this profile represents. One sub account per community. */
-  managedCommunityId?: string;
+  /** `verify` = signed up via Twilio Verify; `seed` = demo data. */
+  accountSource?: "verify" | "seed";
   firstName: string;
   lastName?: string;
   /** Optional digest email. Phone is still the login. */
@@ -114,6 +119,8 @@ export interface UserRecord {
    * the token was signed before the latest logout.
    */
   sessionVersion?: number;
+  /** Founder admin filters saved as this person's default dashboard view. */
+  adminDashboardView?: AdminDashboardView | null;
 }
 
 export interface NeighborhoodRecord {
@@ -859,17 +866,9 @@ export const store = {
   findUserByPhone(phoneNumber: string): UserRecord | undefined {
     return snapshot.users.find((u) => u.phoneNumber === phoneNumber);
   },
-  findUserByManagedCommunity(communityId: string): UserRecord | undefined {
-    return snapshot.users.find((u) => u.managedCommunityId === communityId);
-  },
-  listSubAccountsForOwner(ownerUserId: string): UserRecord[] {
-    return snapshot.users
-      .filter((u) => u.ownerUserId === ownerUserId && u.managedCommunityId)
-      .sort((a, b) => a.firstName.localeCompare(b.firstName));
-  },
   createUser(
     phoneNumber: string,
-    opts?: { accountSource?: "verify" | "seed" | "sub" },
+    opts?: { accountSource?: "verify" | "seed" },
   ): UserRecord {
     const user: UserRecord = {
       id: randomUUID(),
