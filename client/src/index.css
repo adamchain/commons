@@ -1146,6 +1146,8 @@ img.avatar {
 
 .plan-detail-hero {
   position: relative;
+  z-index: 0;
+  isolation: isolate;
   width: 100%;
   max-width: 720px;
   margin-inline: auto;
@@ -1271,10 +1273,13 @@ img.avatar {
   z-index: 1;
   display: flex;
   justify-content: flex-end;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 12px 14px;
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.4));
+}
+.plan-detail-hero-cover-overlay .cover-chip {
+  flex: 0 1 auto;
 }
 .plan-detail-heading .plan-meta-card {
   margin-bottom: 0;
@@ -1321,7 +1326,7 @@ img.avatar {
 .create-plan-topbar {
   position: sticky;
   top: 0;
-  z-index: 30;
+  z-index: 40;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -8707,6 +8712,10 @@ a.action-btn--stack {
 .plan-meta-row--edit .flex-switch-col {
   align-self: center;
   margin-top: 0;
+  width: auto;
+  max-width: none;
+  position: relative;
+  z-index: 2;
 }
 .plan-meta-row--edit label.plan-meta-text {
   margin-bottom: 0;
@@ -8715,6 +8724,7 @@ a.action-btn--stack {
   position: relative;
   display: block;
   min-height: 1.25em;
+  overflow: hidden;
 }
 .flex-switch-col {
   flex: none;
@@ -8736,6 +8746,7 @@ a.action-btn--stack {
 .flex-switch {
   appearance: none;
   position: relative;
+  display: inline-block;
   width: 44px;
   height: 26px;
   flex-shrink: 0;
@@ -8749,6 +8760,7 @@ a.action-btn--stack {
   background: var(--red);
 }
 .flex-switch-knob {
+  pointer-events: none;
   position: absolute;
   top: 3px;
   left: 3px;
@@ -8911,6 +8923,42 @@ a.action-btn--stack {
   flex: 1 1 140px;
 }
 /* Celebratory join confirmation — centered card, never overlays plan-card counts. */
+.app-update-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.35);
+}
+.app-update-card {
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+  background: var(--card);
+  border-radius: 20px;
+  padding: 28px 22px 18px;
+  box-shadow: var(--shadow);
+}
+.app-update-title {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: var(--text-screen-title);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.app-update-copy {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: var(--text-body);
+  line-height: 1.4;
+}
+.app-update-later {
+  margin-top: 10px;
+}
+
 .join-confirm-backdrop {
   position: fixed;
   inset: 0;
@@ -10417,17 +10465,21 @@ a.action-btn--stack {
 }
 .edit-plan-page .form-row-flex-main {
   flex: 1 1 160px;
+  min-width: 0;
 }
-.edit-plan-page .flex-toggle-btn,
-.edit-plan-page .form-row-flex .flex-toggle-btn {
+.edit-plan-page .form-row-flex > .flex-toggle-btn,
+.edit-plan-page .form-row-flex > .flex-switch {
+  flex: 0 0 auto;
   margin-top: 0;
   margin-left: auto;
 }
-.edit-plan-page .form-row-flex-main .number-picker-scroll,
-.edit-plan-page .form-row-flex-main .number-picker-custom {
+.edit-plan-page .form-row-flex > .number-picker-scroll,
+.edit-plan-page .form-row-flex > .number-picker-custom {
+  flex: 1 1 100%;
   width: 100%;
+  min-width: 0;
   max-width: 100%;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 .edit-plan-page .plan-grabs-confirm-actions {
   flex-direction: column;
@@ -11115,7 +11167,12 @@ a.action-btn--stack {
   width: 100%;
   text-align: left;
   cursor: pointer;
+  touch-action: manipulation;
   transition: background 120ms ease;
+}
+button.settings-row:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 .settings-row:last-child {
   border-bottom: none;
@@ -14280,10 +14337,14 @@ button.xpl-photo-tile {
   pointer-events: none;
 }
 .app-shell--messages-lock {
-  height: 100dvh;
-  max-height: 100dvh;
-  /* .app-shell's 100vh min-height is taller than the visible screen on iOS,
-     which leaves a short page scroll when the inbox has nothing to scroll. */
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  /* height:100% resolves to the layout viewport, which is a few pixels taller
+     than the visible screen on iOS and leaves a short scroll on an empty inbox. */
+  width: auto;
+  height: auto;
+  max-height: none;
   min-height: 0;
   overflow: hidden;
   display: flex;
@@ -14293,10 +14354,14 @@ button.xpl-photo-tile {
 html:has(.app-shell--messages-lock),
 body:has(.app-shell--messages-lock),
 #root:has(.app-shell--messages-lock) {
-  height: 100dvh;
-  max-height: 100dvh;
-  min-height: 100dvh;
+  position: fixed;
+  inset: 0;
+  width: auto;
+  height: auto;
+  max-height: none;
+  min-height: 0;
   overflow: hidden;
+  overscroll-behavior: none;
 }
 .app-shell--messages-lock .messages-title-row,
 .app-shell--messages-lock .screen-title,
@@ -14313,6 +14378,7 @@ body:has(.app-shell--messages-lock),
 .app-shell--messages-lock .messages-scroll.messages-scroll--empty {
   overflow: hidden;
   overscroll-behavior: none;
+  touch-action: manipulation;
   display: flex;
   flex-direction: column;
 }

@@ -456,17 +456,19 @@ export function CommunityDashboardPage() {
               <ul className="cmy-dash-people">
                 {data.pendingPosts.map((post) => (
                   <li key={post.id} className="cmy-dash-person">
-                    <Avatar
-                      seed={post.author.avatarSeed}
-                      style={post.author.avatarStyle}
-                      photoDataUrl={post.author.avatarPhotoDataUrl}
-                      params={post.author.avatarParams}
-                      size="sm"
-                    />
-                    <div className="cmy-dash-person-copy">
-                      <span className="cmy-dash-person-name">{personName(post.author)}</span>
-                      <span className="cmy-dash-person-sub">{post.content || "Photo"}</span>
-                    </div>
+                    <Link to={`/profile/${post.author.id}`} state={{ from: "community", communityId: id }} className="cmy-dash-person-link">
+                      <Avatar
+                        seed={post.author.avatarSeed}
+                        style={post.author.avatarStyle}
+                        photoDataUrl={post.author.avatarPhotoDataUrl}
+                        params={post.author.avatarParams}
+                        size="sm"
+                      />
+                      <div className="cmy-dash-person-copy">
+                        <span className="cmy-dash-person-name">{personName(post.author)}</span>
+                        <span className="cmy-dash-person-sub">{post.content || "Photo"}</span>
+                      </div>
+                    </Link>
                     <div className="cmy-dash-person-actions">
                       <button
                         type="button"

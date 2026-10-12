@@ -7,6 +7,7 @@ const DeviceSchema = new mongoose.Schema<DeviceRecord>(
     userId: { type: String, required: true },
     token: { type: String, required: true },
     platform: { type: String, enum: ["ios", "android", "web"], required: true },
+    apnsEnv: { type: String, enum: ["sandbox", "production"], required: false },
     updatedAt: { type: String, required: true },
   },
   { collection: "devices" },

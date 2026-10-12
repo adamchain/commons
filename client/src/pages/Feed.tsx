@@ -10,7 +10,7 @@ import { PostSuccessSheet } from "../components/PostSuccessSheet";
 import { WeekStrip } from "../components/WeekStrip";
 import { EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
-import { FLEXIBLE_DATE_PLACEHOLDER, isIdeaPlan, planHasEnded } from "../lib/planTime";
+import { FLEXIBLE_DATE_PLACEHOLDER, isIdeaPlan, planFeedHasPassed } from "../lib/planTime";
 import { peekFeedPlans, retireFeedPlans } from "../lib/feedPrefetch";
 import { consumeFeedScroll } from "../lib/navState";
 import type { AgeRange, InterestTag, MeDTO, NetworkPromptDTO, PlanDTO } from "../types/shared";
@@ -342,8 +342,8 @@ export function FeedPage() {
       const networkIds = new Set(user?.networkUserIds ?? []);
       list = list.filter((p) => networkIds.has(p.creator.id));
     }
-    // Past plans never appear in the main feed.
-    list = list.filter((p) => !p.cancelledAt && !planHasEnded(p));
+    // A plan leaves the feed as soon as its time has passed.
+    list = list.filter((p) => !p.cancelledAt && !planFeedHasPassed(p));
 
     const dated: PlanDTO[] = [];
     const anytimeIdeas: PlanDTO[] = [];

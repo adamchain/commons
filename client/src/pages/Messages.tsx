@@ -321,11 +321,14 @@ export function MessagesPage() {
     return () => ac.abort();
   }, [composeOpen]);
 
+  const inboxEmptyRef = useRef(false);
+  inboxEmptyRef.current = ready && items.length === 0;
+
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const onStart = (e: TouchEvent) => {
-      if (refreshingRef.current) return;
+      if (refreshingRef.current || inboxEmptyRef.current) return;
       if (el.scrollTop <= 1 && e.touches.length === 1) {
         pullRef.current.startY = e.touches[0]!.clientY;
         pullRef.current.armed = true;

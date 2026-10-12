@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { App as CapApp } from "@capacitor/app";
 import { useAuth } from "./context/AuthContext";
 import { BottomNav } from "./components/BottomNav";
+import { AppUpdatePrompt } from "./components/AppUpdatePrompt";
 import { ChatCleanupPrompt } from "./components/ChatCleanupPrompt";
 import { SmsConsentPrompt } from "./components/SmsConsentPrompt";
 import { CoachMarks } from "./components/CoachMarks";
@@ -187,6 +188,7 @@ export default function App() {
   return (
     <>
       <TopBar />
+      <AppUpdatePrompt />
       <ChatCleanupPrompt />
       <SmsConsentPrompt />
       <Routes>

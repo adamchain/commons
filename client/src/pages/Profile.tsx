@@ -943,14 +943,8 @@ function ProfileActionSheet({
   );
 }
 
-const MAX_PROFILE_PHOTOS = 8;
+const MAX_PROFILE_PHOTOS = 5;
 const GALLERY_MAX_CHARS = 140_000;
-
-function photoCountLabel(count: number, canEdit: boolean): string {
-  if (count === 0 && canEdit) return "Add photos";
-  if (count === 1) return "1 photo";
-  return `${count} photos`;
-}
 
 function PhotoLightbox({
   label,
@@ -1091,18 +1085,14 @@ function ProfileGallery({
   const openPhoto = openAt != null ? photos[openAt] : null;
 
   return (
-    <section className="profile-gallery" aria-label="Photos">
-      <div className="profile-gallery-head">
-        <h3 className="profile-section-label profile-section-label--inline">Photos</h3>
-        <span className="profile-gallery-count">{photoCountLabel(photos.length, canEdit)}</span>
-      </div>
+    <section className="profile-gallery" aria-label="Gallery">
       <div className="profile-gallery-grid">
         {photos.map((src, i) => (
           <button
             key={`${i}-${src.slice(-24)}`}
             type="button"
             className="profile-gallery-thumb"
-            aria-label={`View photo ${i + 1}`}
+            aria-label={`View ${i + 1}`}
             onClick={() => setOpenAt(i)}
           >
             <img src={src} alt="" />
@@ -1112,7 +1102,7 @@ function ProfileGallery({
           <button
             type="button"
             className="profile-gallery-add"
-            aria-label="Add photos"
+            aria-label="Add"
             disabled={busy}
             onClick={() => {
               if (isNative()) void addFromFiles([]);
@@ -1140,7 +1130,7 @@ function ProfileGallery({
       {error && <p className="error-text">{error}</p>}
       {openPhoto && (
         <PhotoLightbox
-          label={`Photo ${(openAt ?? 0) + 1} of ${photos.length}`}
+          label={`${(openAt ?? 0) + 1} of ${photos.length}`}
           onClose={() => setOpenAt(null)}
           footer={
             canEdit ? (
@@ -1150,7 +1140,7 @@ function ProfileGallery({
                 disabled={busy}
                 onClick={() => void removeAt(openAt ?? 0)}
               >
-                {busy ? "Removing…" : "Remove photo"}
+                {busy ? "Removing…" : "Remove"}
               </button>
             ) : undefined
           }

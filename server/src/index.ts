@@ -114,6 +114,13 @@ app.use("/api/reports", reportsRouter);
 app.use("/api/helpchat", helpchatRouter);
 app.use("/api", chatRouter); // chat router defines its own paths under /plans/.../conversation and /conversations/...
 
+// Public. The installed app compares this to its own version on launch.
+app.get("/api/app/release", (_req, res) => {
+  const version = process.env.APP_LATEST_VERSION?.trim() || "1.7";
+  const storeUrl = process.env.APP_STORE_URL?.trim() || null;
+  res.json({ version, storeUrl: storeUrl && /^https?:\/\//.test(storeUrl) ? storeUrl : null });
+});
+
 // Public share-card image endpoint (no auth — crawlers fetch it). Reachable in
 // dev (localhost:4000) and prod alike, before the SPA catch-all.
 app.use(shareRouter);

@@ -66,7 +66,7 @@ export interface UserRecord {
   dismissedNetworkPromptPlanIds?: string[];
   /** Social links — only surfaced to viewers who share a past plan or DM. */
   socialLinks?: { instagram?: string; tiktok?: string };
-  /** Extra profile photos, newest last. Capped at 8. */
+  /** Extra profile photos, newest last. Capped at 5. */
   profilePhotos?: string[];
   /** ISO timestamp the user tapped through the community-guidelines acknowledgment. */
   guidelinesAcknowledgedAt?: string | null;
@@ -84,6 +84,7 @@ export interface UserRecord {
     planCancellation: boolean;
     weeklyFridayDigest: boolean;
     lookingForRecovery: boolean;
+    pushEnabled: boolean;
   }>;
   /** UserIds this person has blocked. Blocking is one-directional but visibility checks treat it as mutual. */
   blockedUserIds?: string[];
@@ -686,6 +687,8 @@ export interface DeviceRecord {
   userId: string;
   token: string;
   platform: "ios" | "android" | "web";
+  /** Which Apple gateway last accepted this token. Unset until the first successful send. */
+  apnsEnv?: "sandbox" | "production";
   updatedAt: string;
 }
 
@@ -3078,6 +3081,15 @@ export const store = {
     persist();
     mongoMirror.deleteDeviceByToken(token);
     return true;
+  },
+  /** Remember which Apple gateway accepted this installation so the next send doesn't guess. */
+  setDeviceApnsEnv(token: string, apnsEnv: "sandbox" | "production"): void {
+    const row = snapshot.devices.find((d) => d.token === token);
+    if (!row || row.apnsEnv === apnsEnv) return;
+    row.apnsEnv = apnsEnv;
+    row.updatedAt = new Date().toISOString();
+    persist();
+    mongoMirror.upsertDevice(row);
   },
   /** Drop a token regardless of owner — used when APNs reports it as dead (410). */
   unregisterDeviceByToken(token: string): boolean {

@@ -526,6 +526,8 @@ export interface NotificationPrefs {
   planCancellation: boolean;
   weeklyFridayDigest: boolean;
   lookingForRecovery: boolean;
+  /** Master switch for lock-screen pushes. Category toggles still gate in-app rows. */
+  pushEnabled: boolean;
 }
 
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
@@ -537,6 +539,7 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   planCancellation: true,
   weeklyFridayDigest: true,
   lookingForRecovery: true,
+  pushEnabled: true,
 };
 
 export type NotificationKind =
@@ -607,6 +610,7 @@ export const NOTIFICATION_LABELS: Record<keyof NotificationPrefs, string> = {
   planCancellation: "A plan you RSVP'd to was cancelled",
   weeklyFridayDigest: "Weekly Friday: what's happening in Philly",
   lookingForRecovery: "Reminder when a Looking For plan needs a host",
+  pushEnabled: "Push notifications",
 };
 
 // ---- Communities (V1) ----

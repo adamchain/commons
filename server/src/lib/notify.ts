@@ -88,7 +88,7 @@ export async function emit(input: {
     profileUserId: input.profileUserId,
     communityId: input.communityId,
   });
-  if (row) {
+  if (row && prefs.pushEnabled !== false) {
     const data: Record<string, string> = { kind: input.kind };
     if (input.planId) data.planId = input.planId;
     if (input.conversationId) data.conversationId = input.conversationId;

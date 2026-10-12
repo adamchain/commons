@@ -394,6 +394,67 @@ async function renderPlanCard(plan: PlanRecord): Promise<Buffer> {
   return png;
 }
 
+/** Site and invite-link preview. Landscape card, wordmark with no plate behind it. */
+function buildAppCard(): El {
+  return {
+    type: "div",
+    props: {
+      style: {
+        width: OG_WIDTH,
+        height: OG_HEIGHT,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#F0E9DF",
+      },
+      children: [
+        {
+          type: "img",
+          props: {
+            src: wordmarkSrc(),
+            width: 420,
+            height: 132,
+            style: { width: 420, height: 132, objectFit: "contain", background: "transparent" },
+          },
+        },
+        text("Real plans. Real people. Happening now.", {
+          marginTop: 36,
+          color: INK,
+          fontFamily: "Montserrat",
+          fontWeight: 800,
+          fontSize: 40,
+          letterSpacing: -0.5,
+        }),
+      ],
+    },
+  };
+}
+
+let appCardPng: Buffer | null = null;
+export async function renderAppOgPng(): Promise<Buffer> {
+  if (appCardPng) return appCardPng;
+  const svg = await satori(buildAppCard() as never, {
+    width: OG_WIDTH,
+    height: OG_HEIGHT,
+    fonts: loadFonts(),
+  });
+  appCardPng = new Resvg(svg, { fitTo: { mode: "width", value: OG_WIDTH } }).render().asPng();
+  return appCardPng;
+}
+
+shareRouter.get("/og-image.png", async (_req, res) => {
+  try {
+    const png = await renderAppOgPng();
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(png);
+  } catch (err) {
+    console.error("[og-image app]", err);
+    res.status(500).send("Could not render image");
+  }
+});
+
 shareRouter.get("/plans/:id/og-image.png", async (req, res) => {
   const plan = store.findPlanById(req.params.id);
   if (!plan) {

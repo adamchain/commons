@@ -490,8 +490,10 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
   }
   if (Array.isArray(req.body?.profilePhotos)) {
     const incoming = req.body.profilePhotos as unknown[];
-    if (incoming.length > 8) {
-      res.status(400).json({ error: "You can add up to 8 photos" });
+    const existingCount = (await findUserById(userId))?.profilePhotos?.length ?? 0;
+    // New galleries stop at 5. Someone who already has more can still remove some.
+    if (incoming.length > 5 && incoming.length > existingCount) {
+      res.status(400).json({ error: "You can add up to 5 photos" });
       return;
     }
     const photos: string[] = [];

@@ -613,16 +613,6 @@ function EditForm({
           <div className="form-row-flex" style={{ marginTop: 12 }}>
             <div className="form-row-flex-main">
               <label className="form-question">Cap the spots</label>
-              {form.capacityOn && (
-                <NumberPicker
-                  value={Number(form.capacity) || 0}
-                  onChange={(n) => {
-                    lastInstantGroup.current = "who";
-                    setForm((f) => ({ ...f, capacity: String(n) }));
-                  }}
-                  ariaLabel="Number of spots"
-                />
-              )}
             </div>
             <button
               type="button"
@@ -636,6 +626,16 @@ function EditForm({
             >
               <span>Set limit</span>
             </button>
+            {form.capacityOn && (
+              <NumberPicker
+                value={Number(form.capacity) || 0}
+                onChange={(n) => {
+                  lastInstantGroup.current = "who";
+                  setForm((f) => ({ ...f, capacity: String(n) }));
+                }}
+                ariaLabel="Number of spots"
+              />
+            )}
           </div>
           <div className="form-row-flex" style={{ marginTop: 12 }}>
             <div className="form-row-flex-main">

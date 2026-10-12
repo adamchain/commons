@@ -49,6 +49,28 @@ export function planHasEnded(plan: PlanRecord, now = new Date()): boolean {
   return planEndTimestamp(plan) < now.getTime();
 }
 
+/** Mirror of the client feed cutoff — a timed plan is off the feed once it starts, or once it ends when an end time is set. */
+export function planFeedHasPassed(plan: PlanRecord, now = new Date()): boolean {
+  if (plan.isFlexibleDate && !plan.lockedAt) return false;
+  if (plan.isThisWeek && !plan.lockedAt) {
+    const [y, m, day] = plan.date.slice(0, 10).split("-").map(Number);
+    const weekEnd = new Date(y, m - 1, day, 23, 59, 59);
+    return weekEnd.getTime() < now.getTime();
+  }
+  const day = plan.date.slice(0, 10);
+  const flexTime = plan.isFlexibleTime || !plan.time?.trim();
+  if (!flexTime && plan.endTime?.trim()) {
+    const end = new Date(`${day}T${timeToHms(plan.endTime)}`);
+    if (!Number.isNaN(end.getTime())) return end.getTime() < now.getTime();
+  }
+  if (!flexTime && plan.time?.trim()) {
+    const start = new Date(`${day}T${timeToHms(plan.time)}`);
+    if (!Number.isNaN(start.getTime())) return start.getTime() < now.getTime();
+  }
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(y, (m || 1) - 1, d || 1, 23, 59, 59).getTime() < now.getTime();
+}
+
 export function planStartTimestamp(plan: PlanRecord): number {
   const day = plan.date.slice(0, 10);
   const flexTime = plan.isFlexibleTime || !plan.time?.trim();

@@ -47,6 +47,7 @@ const UserSchema = new mongoose.Schema<UserRecord>(
         planCancellation: { type: Boolean },
         weeklyFridayDigest: { type: Boolean },
         lookingForRecovery: { type: Boolean },
+        pushEnabled: { type: Boolean },
       },
       default: undefined,
     },

@@ -31,6 +31,7 @@ import {
   type CommunityPostingPermission,
   type CommunitySocialLinks,
   type PersonSearchResultDTO,
+  type PublicUser,
   type PlanDTO,
   type SearchResultsDTO,
 } from "../types/shared";
@@ -781,6 +782,36 @@ function JoinControl({
   );
 }
 
+function BulletinAuthor({
+  author,
+  communityId,
+  size = "sm",
+  hideName = false,
+}: {
+  author: PublicUser;
+  communityId: string;
+  size?: "sm" | "xs";
+  hideName?: boolean;
+}) {
+  return (
+    <Link
+      to={`/profile/${author.id}`}
+      state={{ from: "community", communityId }}
+      className="cmy-post-author"
+      aria-label={hideName ? author.firstName : undefined}
+    >
+      <Avatar
+        seed={author.avatarSeed}
+        style={author.avatarStyle}
+        photoDataUrl={author.avatarPhotoDataUrl}
+        params={author.avatarParams}
+        size={size}
+      />
+      {!hideName && <span className="cmy-post-name">{author.firstName}</span>}
+    </Link>
+  );
+}
+
 function BulletinTab({
   community,
   canPost,
@@ -1040,8 +1071,7 @@ function BulletinTab({
             {pending.map((p) => (
               <li key={p.id} className="cmy-post cmy-post--pending">
                 <div className="cmy-post-head">
-                  <Avatar seed={p.author.avatarSeed} style={p.author.avatarStyle} photoDataUrl={p.author.avatarPhotoDataUrl} params={p.author.avatarParams} size="sm" />
-                  <span className="cmy-post-name">{p.author.firstName}</span>
+                  <BulletinAuthor author={p.author} communityId={community.id} />
                   <span className="cmy-post-time">{formatRelative(p.createdAt)}</span>
                   {editControl(p)}
                 </div>
@@ -1067,8 +1097,7 @@ function BulletinTab({
             {myPending.map((p) => (
               <li key={p.id} className="cmy-post cmy-post--pending">
                 <div className="cmy-post-head">
-                  <Avatar seed={p.author.avatarSeed} style={p.author.avatarStyle} photoDataUrl={p.author.avatarPhotoDataUrl} params={p.author.avatarParams} size="sm" />
-                  <span className="cmy-post-name">{p.author.firstName}</span>
+                  <BulletinAuthor author={p.author} communityId={community.id} />
                   <span className="cmy-pending-badge">Pending</span>
                   <span className="cmy-post-time">{formatRelative(p.createdAt)}</span>
                   <div className="cmy-post-actions">
@@ -1100,8 +1129,7 @@ function BulletinTab({
         {livePosts.map((p) => (
           <li key={p.id} className={`cmy-post ${p.pinned ? "cmy-post--pinned" : ""}`}>
             <div className="cmy-post-head">
-              <Avatar seed={p.author.avatarSeed} style={p.author.avatarStyle} photoDataUrl={p.author.avatarPhotoDataUrl} params={p.author.avatarParams} size="sm" />
-              <span className="cmy-post-name">{p.author.firstName}</span>
+              <BulletinAuthor author={p.author} communityId={community.id} />
               {p.authorIsOrganizer && <span className="cmy-org-badge">Organizer</span>}
               <span className="cmy-post-time">{formatRelative(p.createdAt)}</span>
               <div className="cmy-post-actions">
@@ -1125,10 +1153,16 @@ function BulletinTab({
               <ul className="cmy-reply-list">
                 {(p.replies ?? []).map((r) => (
                   <li key={r.id} className="cmy-reply">
-                    <Avatar seed={r.author.avatarSeed} style={r.author.avatarStyle} photoDataUrl={r.author.avatarPhotoDataUrl} params={r.author.avatarParams} size="xs" />
+                    <BulletinAuthor author={r.author} communityId={community.id} size="xs" hideName />
                     <div className="cmy-reply-body">
                       <div className="cmy-reply-top">
-                        <span className="cmy-post-name">{r.author.firstName}</span>
+                        <Link
+                          to={`/profile/${r.author.id}`}
+                          state={{ from: "community", communityId: community.id }}
+                          className="cmy-post-name cmy-post-author-name"
+                        >
+                          {r.author.firstName}
+                        </Link>
                         <span className="cmy-post-time">{formatRelative(r.createdAt)}</span>
                         {editControl(r)}
                         {postMenu(r)}

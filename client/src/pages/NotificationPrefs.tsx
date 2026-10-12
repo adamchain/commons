@@ -129,7 +129,11 @@ export function NotificationPrefsPage() {
       </Group>
 
       <Group label="How">
-        <PushSetupRow />
+        <PushSetupRow
+          on={current.pushEnabled}
+          busy={busy === "pushEnabled"}
+          onChange={(next) => void setPushEnabled(next)}
+        />
         <InfoRow
           icon="💬"
           title="SMS"
@@ -142,6 +146,37 @@ export function NotificationPrefsPage() {
       </Group>
     </main>
   );
+
+  async function setPushEnabled(next: boolean) {
+    if (!user || busy) return;
+    if (next && isNative()) {
+      setBusy("pushEnabled");
+      try {
+        await ensurePushRegistered();
+        const s = await PushNotifications.checkPermissions();
+        if (s.receive !== "granted") return;
+      } catch {
+        return;
+      } finally {
+        setBusy(null);
+      }
+    }
+    setBusy("pushEnabled");
+    const patched: NotificationPrefs = { ...current, pushEnabled: next };
+    const snapshot = user;
+    setUser({ ...snapshot, notificationPrefs: patched });
+    try {
+      const updated = await api<MeDTO>("/api/auth/me", {
+        method: "PATCH",
+        body: JSON.stringify({ notificationPrefs: patched }),
+      });
+      setUser(updated);
+    } catch {
+      setUser(snapshot);
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function toggleBoth(
     a: keyof NotificationPrefs,
@@ -190,79 +225,69 @@ function ToggleRow({
   onToggle: () => void;
 }) {
   return (
-    <div
+    <button
+      type="button"
       className="settings-row"
-      role="button"
-      tabIndex={0}
-      aria-pressed={on}
-      aria-disabled={busy}
-      onClick={busy ? undefined : onToggle}
-      onKeyDown={(e) => { if (!busy && (e.key === "Enter" || e.key === " ")) onToggle(); }}
+      role="switch"
+      aria-checked={on}
+      disabled={busy}
+      onClick={onToggle}
     >
       <div className="settings-row-body" style={{ paddingLeft: 0 }}>
         <div className="settings-row-title">{title}</div>
         <div className="settings-row-sub" style={{ whiteSpace: "normal" }}>{sub}</div>
       </div>
-      <button
-        type="button"
-        role="switch"
-        className={`flex-switch${on ? " is-on" : ""}`}
-        aria-checked={on}
-        aria-label={title}
-        disabled={busy}
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggle();
-        }}
-      >
+      <span className={`flex-switch${on ? " is-on" : ""}`} aria-hidden="true">
         <span className="flex-switch-knob" />
-      </button>
-    </div>
+      </span>
+    </button>
   );
 }
 
-function PushSetupRow() {
-  const [status, setStatus] = useState<"checking" | "granted" | "denied" | "prompt" | "web">("checking");
-  const [busy, setBusy] = useState(false);
+function PushSetupRow({
+  on,
+  busy,
+  onChange,
+}: {
+  on: boolean;
+  busy: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  const [ios, setIos] = useState<"checking" | "granted" | "denied" | "prompt" | "web">("checking");
 
   useEffect(() => {
     if (!isNative()) {
-      setStatus("web");
+      setIos("web");
       return;
     }
     void PushNotifications.checkPermissions()
       .then((s) => {
-        setStatus(s.receive === "granted" ? "granted" : s.receive === "denied" ? "denied" : "prompt");
+        setIos(s.receive === "granted" ? "granted" : s.receive === "denied" ? "denied" : "prompt");
       })
-      .catch(() => setStatus("prompt"));
-  }, []);
+      .catch(() => setIos("prompt"));
+  }, [on]);
 
-  async function enable() {
-    setBusy(true);
-    try {
-      await ensurePushRegistered();
-      const s = await PushNotifications.checkPermissions();
-      setStatus(s.receive === "granted" ? "granted" : s.receive === "denied" ? "denied" : "prompt");
-    } catch {
-      setStatus("prompt");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const sub =
-    status === "granted"
-      ? "On"
-      : status === "denied"
-        ? "Off — allow Commons in iOS Settings"
-        : status === "web"
-          ? "Turn these on in the iOS app"
-          : status === "checking"
-            ? "Checking…"
-            : "Off";
+  const blockedByIos = ios === "denied";
+  const shownOn = on && !blockedByIos;
+  const sub = blockedByIos
+    ? "Off — allow Commons in iOS Settings to turn them back on"
+    : shownOn
+      ? "On — tap to turn off"
+      : ios === "prompt"
+        ? "Set up push notifications"
+        : ios === "web"
+          ? "Off for pushes. This switch saves on your account."
+          : "Off — tap to turn on";
 
   return (
-    <div className="settings-row">
+    <button
+      type="button"
+      className="settings-row"
+      role="switch"
+      aria-checked={shownOn}
+      disabled={busy}
+      onClick={() => onChange(!shownOn)}
+    >
       <span className="settings-row-icon" aria-hidden="true">
         <span style={{ fontSize: 18 }}>🔔</span>
       </span>
@@ -270,12 +295,10 @@ function PushSetupRow() {
         <div className="settings-row-title">Push notifications</div>
         <div className="settings-row-sub" style={{ whiteSpace: "normal" }}>{sub}</div>
       </div>
-      {status === "prompt" && (
-        <button type="button" className="settings-row-action" disabled={busy} onClick={() => void enable()}>
-          {busy ? "Turning on…" : "Turn on"}
-        </button>
-      )}
-    </div>
+      <span className={`flex-switch${shownOn ? " is-on" : ""}`} aria-hidden="true">
+        <span className="flex-switch-knob" />
+      </span>
+    </button>
   );
 }
 

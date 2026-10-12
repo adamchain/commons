@@ -16,9 +16,21 @@ import http2 from "node:http2";
 import jwt from "jsonwebtoken";
 import { store } from "../store.js";
 
-const APNS_PRODUCTION = String(process.env.APNS_PRODUCTION ?? "").trim().toLowerCase() === "true";
-const APNS_HOST = APNS_PRODUCTION ? "https://api.push.apple.com" : "https://api.sandbox.push.apple.com";
+type ApnsEnv = "sandbox" | "production";
+
+const APNS_HOSTS: Record<ApnsEnv, string> = {
+  production: "https://api.push.apple.com",
+  sandbox: "https://api.sandbox.push.apple.com",
+};
 const APNS_BUNDLE_ID = process.env.APNS_BUNDLE_ID?.trim() || "com.oncommons.mvp";
+
+/** Production first when the server is the live one. A BadDeviceToken retries the other gateway. */
+function envOrder(preferred?: ApnsEnv): ApnsEnv[] {
+  const productionFirst = String(process.env.APNS_PRODUCTION ?? "").trim().toLowerCase() === "true";
+  const primary: ApnsEnv = preferred ?? (productionFirst ? "production" : "sandbox");
+  const other: ApnsEnv = primary === "production" ? "sandbox" : "production";
+  return [primary, other];
+}
 
 let warnedNotConfigured = false;
 function warnNotConfiguredOnce(): void {
@@ -81,21 +93,22 @@ function getProviderToken(): string | null {
   }
 }
 
-// A single long-lived HTTP/2 session per process, reconnected lazily if it
-// drops. APNs keeps connections open for a long time and penalizes providers
-// who reconnect per-request.
-let session: http2.ClientHttp2Session | null = null;
+// One long-lived HTTP/2 session per Apple gateway. APNs keeps connections
+// open and penalizes providers who reconnect per-request. The COMMONS key is
+// valid for sandbox (Xcode) and production (TestFlight / App Store).
+const sessions = new Map<ApnsEnv, http2.ClientHttp2Session>();
 
-function getSession(): http2.ClientHttp2Session {
-  if (session && !session.destroyed && !session.closed) return session;
-  const next = http2.connect(APNS_HOST);
+function getSession(env: ApnsEnv): http2.ClientHttp2Session {
+  const current = sessions.get(env);
+  if (current && !current.destroyed && !current.closed) return current;
+  const next = http2.connect(APNS_HOSTS[env]);
   next.on("error", (err) => {
-    console.error("[apns] session error:", err instanceof Error ? err.message : err);
+    console.error(`[apns] ${env} session error:`, err instanceof Error ? err.message : err);
   });
   next.on("close", () => {
-    if (session === next) session = null;
+    if (sessions.get(env) === next) sessions.delete(env);
   });
-  session = next;
+  sessions.set(env, next);
   return next;
 }
 
@@ -105,24 +118,29 @@ export interface PushPayload {
   data?: Record<string, string>;
 }
 
+interface ApnsResult {
+  ok: boolean;
+  status: number;
+  reason: string;
+}
+
 /**
- * Send a single push to a single device token. Returns true on APNs 200.
- * On a 410 (Unregistered) it removes the dead token from the store so future
- * sends don't waste a round trip. Never throws — failures resolve false.
+ * Send a single push to one Apple gateway. Never throws.
+ * 410 means Apple will never accept this token again.
  */
-export async function sendApns(token: string, payload: PushPayload): Promise<boolean> {
+async function sendApnsTo(env: ApnsEnv, token: string, payload: PushPayload): Promise<ApnsResult> {
   const providerToken = getProviderToken();
   if (!providerToken) {
     warnNotConfiguredOnce();
-    return false;
+    return { ok: false, status: 0, reason: "NotConfigured" };
   }
 
   let client: http2.ClientHttp2Session;
   try {
-    client = getSession();
+    client = getSession(env);
   } catch (err) {
     console.error("[apns] failed to open session:", err instanceof Error ? err.message : err);
-    return false;
+    return { ok: false, status: 0, reason: "Session" };
   }
 
   const body = JSON.stringify({
@@ -133,7 +151,7 @@ export async function sendApns(token: string, payload: PushPayload): Promise<boo
     ...(payload.data ?? {}),
   });
 
-  return new Promise<boolean>((resolve) => {
+  return new Promise<ApnsResult>((resolve) => {
     let req: http2.ClientHttp2Stream;
     try {
       req = client.request({
@@ -148,7 +166,7 @@ export async function sendApns(token: string, payload: PushPayload): Promise<boo
       });
     } catch (err) {
       console.error("[apns] failed to open request:", err instanceof Error ? err.message : err);
-      resolve(false);
+      resolve({ ok: false, status: 0, reason: "Request" });
       return;
     }
 
@@ -164,23 +182,50 @@ export async function sendApns(token: string, payload: PushPayload): Promise<boo
     });
     req.on("end", () => {
       if (status === 200) {
-        resolve(true);
+        resolve({ ok: true, status, reason: "" });
         return;
       }
-      if (status === 410) {
-        // Apple has confirmed this token will never receive push again.
-        store.unregisterDeviceByToken(token);
-      } else {
-        console.error(`[apns] push failed status=${status} body=${responseBody.slice(0, 300)}`);
+      let reason = "";
+      try {
+        reason = String(JSON.parse(responseBody).reason ?? "");
+      } catch {
+        reason = responseBody.slice(0, 120);
       }
-      resolve(false);
+      if (status !== 410 && reason !== "BadDeviceToken") {
+        console.error(`[apns] ${env} push failed status=${status} reason=${reason}`);
+      }
+      resolve({ ok: false, status, reason });
     });
     req.on("error", (err) => {
       console.error("[apns] request error:", err instanceof Error ? err.message : err);
-      resolve(false);
+      resolve({ ok: false, status: 0, reason: "Request" });
     });
     req.end(body);
   });
+}
+
+/**
+ * Send a push, trying the gateway that last worked for this token and falling
+ * back to the other one when Apple says the token doesn't belong there.
+ * A 410 removes the dead token. Never throws.
+ */
+export async function sendApns(token: string, payload: PushPayload, preferred?: ApnsEnv): Promise<boolean> {
+  const order = envOrder(preferred);
+  for (let i = 0; i < order.length; i++) {
+    const env = order[i]!;
+    const result = await sendApnsTo(env, token, payload);
+    if (result.ok) {
+      store.setDeviceApnsEnv(token, env);
+      return true;
+    }
+    if (result.status === 410) {
+      store.unregisterDeviceByToken(token);
+      return false;
+    }
+    // Wrong gateway (Xcode token vs TestFlight token). Try the other one once.
+    if (result.reason !== "BadDeviceToken") return false;
+  }
+  return false;
 }
 
 /**
@@ -195,5 +240,5 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
   }
   const devices = store.listDevicesForUser(userId).filter((d) => d.platform === "ios");
   if (devices.length === 0) return;
-  await Promise.all(devices.map((d) => sendApns(d.token, payload)));
+  await Promise.all(devices.map((d) => sendApns(d.token, payload, d.apnsEnv)));
 }
