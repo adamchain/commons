@@ -27,4 +27,70 @@ end
 
 post_install do |installer|
   assertDeploymentTarget(installer)
+
+  # .alert on UNNotificationPresentationOptions was deprecated in iOS 14.
+  # banner + list is the same foreground presentation.
+  push_handler = File.expand_path(
+    '../../node_modules/@capacitor/push-notifications/ios/Sources/PushNotificationsPlugin/PushNotificationsHandler.swift',
+    __dir__
+  )
+  if File.exist?(push_handler)
+    source = File.read(push_handler)
+    updated = source.gsub(
+      "case \"alert\":\n                    presentationOptions.insert(.alert)",
+      "case \"alert\":\n                    presentationOptions.insert(.banner)\n                    presentationOptions.insert(.list)"
+    )
+    File.write(push_handler, updated) if updated != source
+  end
+
+  installer.pods_project.targets.each do |target|
+    target.build_phases.each do |phase|
+      next unless phase.respond_to?(:name) && phase.name&.start_with?('[CP]')
+      paths = phase.respond_to?(:output_paths) ? phase.output_paths : nil
+      next unless paths && paths.empty?
+      phase.always_out_of_date = '1'
+    end
+  end
+
+  # The deprecation is diagnosed while compiling the Cordova clang module, so a
+  # pod OTHER_CFLAGS flag never reaches it. Silence it at the declarations.
+  cordova_dir = File.expand_path(
+    '../../node_modules/@capacitor/ios/CapacitorCordova/CapacitorCordova/Classes/Public',
+    __dir__
+  )
+  pool_header = File.join(cordova_dir, 'CDVWebViewProcessPoolFactory.h')
+  pool_impl = File.join(cordova_dir, 'CDVWebViewProcessPoolFactory.m')
+  if File.exist?(pool_header) && !File.read(pool_header).include?('clang diagnostic ignored "-Wdeprecated-declarations"')
+    source = File.read(pool_header)
+    source.sub!(
+      "#import <WebKit/WebKit.h>\n\n@interface CDVWebViewProcessPoolFactory : NSObject",
+      "#import <WebKit/WebKit.h>\n\n#pragma clang diagnostic push\n#pragma clang diagnostic ignored \"-Wdeprecated-declarations\"\n@interface CDVWebViewProcessPoolFactory : NSObject"
+    )
+    source.sub!("@end\n", "@end\n#pragma clang diagnostic pop\n")
+    File.write(pool_header, source)
+  end
+  if File.exist?(pool_impl) && !File.read(pool_impl).include?('clang diagnostic ignored "-Wdeprecated-declarations"')
+    source = File.read(pool_impl)
+    source.sub!(
+      "@implementation CDVWebViewProcessPoolFactory",
+      "#pragma clang diagnostic push\n#pragma clang diagnostic ignored \"-Wdeprecated-declarations\"\n@implementation CDVWebViewProcessPoolFactory"
+    )
+    source.sub!(/@end\s*\z/, "@end\n#pragma clang diagnostic pop\n")
+    File.write(pool_impl, source)
+  end
+
+  seen = {}
+  installer.aggregate_targets.each do |aggregate_target|
+    project = aggregate_target.user_project
+    next if seen[project.object_id]
+    seen[project.object_id] = true
+    project.native_targets.each do |target|
+      target.shell_script_build_phases.each do |phase|
+        next unless phase.name&.start_with?('[CP]')
+        paths = phase.output_paths
+        phase.always_out_of_date = paths && paths.empty? ? '1' : nil
+      end
+    end
+    project.save
+  end
 end

@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
-import type { CSSProperties, FormEvent, ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import wordmark from "../assets/wordmark.png";
+import appStoreBadge from "../assets/app-store-badge.png";
+import { APP_STORE_URL } from "../lib/appStore";
 
 /**
  * Public marketing landing (routed at /welcome) — a warm, editorial one-pager:
  * a type-forward hero with two floating in-app previews, a full-bleed photo
  * strip, the two-pathway pitch (mirroring the in-app "Just an idea" vs "Make a
  * plan" selector), a three-step "how it works" split, and a photo footer CTA.
- * The Commons app is iOS-only and invite-only, so the CTAs lead into onboarding
- * rather than a web sign-up.
+ * The Commons app is iOS-only. The hero and footer link to the App Store; the
+ * mid-page CTAs still open the waitlist.
  *
  * Photos live in client/public/landing and are referenced by root-absolute URL.
  * The brand mark uses the shared wordmark asset (there's no standalone C mark).
@@ -93,8 +95,8 @@ function Pill({
  * (https://forms.gle/GxVDLYj74rvXtGYb9) in an iframe so signups happen inline
  * without leaving the landing page. The Google chrome is stripped via
  * `embedded=true`; the app-styled card supplies the framing while the form's
- * own title/fields carry the content. Opened from the hero CTA and the buttons
- * under "Post a plan two ways" and "How it works".
+ * own title/fields carry the content. Opened from the buttons under
+ * "Post a plan two ways" and "How it works".
  */
 function WaitlistModal({
   open,
@@ -160,16 +162,29 @@ function Nav() {
   );
 }
 
-function Hero({ onSignupWithEmail }: { onSignupWithEmail: (email: string) => void }) {
-  const [email, setEmail] = useState("");
+function AppStoreBadge({ onDark = false }: { onDark?: boolean }) {
+  return (
+    <a
+      href={APP_STORE_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{ display: "inline-block", lineHeight: 0 }}
+    >
+      <img
+        src={appStoreBadge}
+        alt="Download on the App Store"
+        style={{
+          height: 54,
+          width: "auto",
+          display: "block",
+          filter: onDark ? "drop-shadow(0 6px 18px rgba(0,0,0,0.45))" : undefined,
+        }}
+      />
+    </a>
+  );
+}
 
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    const trimmed = email.trim();
-    if (!trimmed) return;
-    onSignupWithEmail(trimmed);
-  };
-
+function Hero() {
   return (
     <section style={{ background: BEIGE }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "96px 48px 88px", display: "grid", gridTemplateColumns: "1fr", gap: 72, alignItems: "center" }} className="hero-grid">
@@ -182,35 +197,7 @@ function Hero({ onSignupWithEmail }: { onSignupWithEmail: (email: string) => voi
           <p style={{ fontFamily: B, fontSize: 16, color: MUTED, lineHeight: 1.8, marginBottom: 44, maxWidth: 400 }}>
             COMMONS is where women actually make plans — find someone to do it with, or bring your people together. Either way, something happens.
           </p>
-          <form
-            onSubmit={submit}
-            style={{ display: "flex", alignItems: "stretch", gap: 10, flexWrap: "wrap", marginBottom: 22, maxWidth: 460 }}
-          >
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@email.com"
-              aria-label="Email address"
-              style={{
-                flex: "1 1 200px",
-                minWidth: 0,
-                boxSizing: "border-box",
-                fontFamily: B,
-                fontSize: 15,
-                color: NAVY,
-                padding: "12px 18px",
-                borderRadius: 9999,
-                border: `1.5px solid rgba(20,17,48,0.16)`,
-                background: WHITE,
-                outline: "none",
-              }}
-            />
-            <Pill type="submit" style={{ padding: "12px 26px", flexShrink: 0 }}>
-              Join the waitlist
-            </Pill>
-          </form>
+          <AppStoreBadge />
           <p style={{ fontFamily: B, fontSize: 11, color: MUTED, letterSpacing: "0.05em", marginTop: 22 }}>Invite-only · Built for iOS</p>
         </div>
       </div>
@@ -318,7 +305,8 @@ function Footer() {
         <p style={{ fontFamily: B, fontSize: 16, color: "rgba(255,255,255,0.65)", lineHeight: 1.75, maxWidth: 360, margin: "0 auto 44px" }}>
           Post what you're doing — or just float an idea. The people are already out there.
         </p>
-        <p style={{ fontFamily: B, fontSize: 11, color: "rgba(255,255,255,0.42)", letterSpacing: "0.05em", marginTop: 0 }}>Invite-only · Built for iOS</p>
+        <AppStoreBadge onDark />
+        <p style={{ fontFamily: B, fontSize: 11, color: "rgba(255,255,255,0.42)", letterSpacing: "0.05em", marginTop: 22 }}>Invite-only · Built for iOS</p>
         <div style={{ marginTop: 80, paddingTop: 28, borderTop: `1px solid rgba(255,255,255,0.12)`, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
           <img src={wordmark} alt="Commons" style={{ height: 22, width: "auto", filter: "brightness(0) invert(1)" }} />
           <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
@@ -334,19 +322,8 @@ function Footer() {
 
 export function LandingPage() {
   const [signupOpen, setSignupOpen] = useState(false);
-  const [prefillEmail, setPrefillEmail] = useState<string | undefined>();
-  const onSignup = () => {
-    setPrefillEmail(undefined);
-    setSignupOpen(true);
-  };
-  const onSignupWithEmail = (email: string) => {
-    setPrefillEmail(email);
-    setSignupOpen(true);
-  };
-  const closeSignup = () => {
-    setSignupOpen(false);
-    setPrefillEmail(undefined);
-  };
+  const onSignup = () => setSignupOpen(true);
+  const closeSignup = () => setSignupOpen(false);
   return (
     <div style={{ background: BEIGE, minHeight: "100vh" }}>
       <style>{`
@@ -371,12 +348,12 @@ export function LandingPage() {
         }
       `}</style>
       <Nav />
-      <Hero onSignupWithEmail={onSignupWithEmail} />
+      <Hero />
       <PhotoStrip />
       <TwoPathways onSignup={onSignup} />
       <HowItWorks onSignup={onSignup} />
       <Footer />
-      <WaitlistModal open={signupOpen} onClose={closeSignup} prefillEmail={prefillEmail} />
+      <WaitlistModal open={signupOpen} onClose={closeSignup} />
     </div>
   );
 }

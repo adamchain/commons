@@ -13,7 +13,11 @@ export function thisWeekAnchorDate(now: Date = new Date()): string {
   return `${y}-${m}-${day}`;
 }
 
-/** Parse `HH:mm` (24h) for ISO datetime construction. */
+/** Plans are Philly plans. The API runs in UTC, so wall-clock times are
+ *  interpreted in this zone — otherwise a 7pm plan fires at 3pm. */
+export const PLAN_TIME_ZONE = "America/New_York";
+
+/** Parse `HH:mm` (24h) for datetime construction. */
 function timeToHms(t: string): string {
   const s = t.trim();
   if (!s) return "12:00:00";
@@ -23,28 +27,71 @@ function timeToHms(t: string): string {
   return `${hh}:${mm}:00`;
 }
 
+function tzOffsetMs(instant: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: PLAN_TIME_ZONE,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(instant);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "0";
+  let hour = Number(get("hour"));
+  if (hour === 24) hour = 0;
+  const asUTC = Date.UTC(
+    Number(get("year")),
+    Number(get("month")) - 1,
+    Number(get("day")),
+    hour,
+    Number(get("minute")),
+    Number(get("second")),
+  );
+  return asUTC - instant.getTime();
+}
+
+/** Instant for a calendar day + clock time in America/New_York. */
+export function zonedTimestamp(day: string, hms: string): number {
+  const [y, m, d] = day.slice(0, 10).split("-").map(Number);
+  const [hh, mm, ss = 0] = hms.split(":").map((part) => parseInt(part, 10) || 0);
+  if (!y || !m || !d) return Number.NaN;
+  const wallAsUtc = Date.UTC(y, m - 1, d, hh, mm, ss);
+  let guess = wallAsUtc;
+  for (let i = 0; i < 3; i++) guess = wallAsUtc - tzOffsetMs(new Date(guess));
+  return guess;
+}
+
+/** YYYY-MM-DD in the plan zone. `toISOString()` flips the day after 8pm ET. */
+export function calendarDayInPlanZone(now = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: PLAN_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
 /** Approximate end instant for “past”, reminders, and sorting. */
 export function planEndTimestamp(plan: PlanRecord): number {
   const day = plan.date.slice(0, 10);
   const flexTime = plan.isFlexibleTime || !plan.time?.trim();
   const startHms = flexTime ? "12:00:00" : timeToHms(plan.time);
-  const start = new Date(`${day}T${startHms}`);
-  if (Number.isNaN(start.getTime())) {
-    return new Date(`${day}T23:59:59`).getTime();
-  }
+  const start = zonedTimestamp(day, startHms);
+  if (!Number.isFinite(start)) return zonedTimestamp(day, "23:59:59");
   if (plan.endTime?.trim()) {
-    const end = new Date(`${day}T${timeToHms(plan.endTime)}`);
-    if (!Number.isNaN(end.getTime())) return end.getTime();
+    const end = zonedTimestamp(day, timeToHms(plan.endTime));
+    if (Number.isFinite(end)) return end > start ? end : end + 24 * 60 * 60 * 1000;
   }
-  return start.getTime() + 4 * 60 * 60 * 1000;
+  return start + 4 * 60 * 60 * 1000;
 }
 
 export function planHasEnded(plan: PlanRecord, now = new Date()): boolean {
   if (plan.isFlexibleDate && !plan.lockedAt) return false;
   if (plan.isThisWeek && !plan.lockedAt) {
-    const [y, m, day] = plan.date.slice(0, 10).split("-").map(Number);
-    const weekEnd = new Date(y, m - 1, day, 23, 59, 59);
-    return weekEnd.getTime() < now.getTime();
+    const weekEnd = zonedTimestamp(plan.date.slice(0, 10), "23:59:59");
+    return weekEnd < now.getTime();
   }
   return planEndTimestamp(plan) < now.getTime();
 }
@@ -53,31 +100,29 @@ export function planHasEnded(plan: PlanRecord, now = new Date()): boolean {
 export function planFeedHasPassed(plan: PlanRecord, now = new Date()): boolean {
   if (plan.isFlexibleDate && !plan.lockedAt) return false;
   if (plan.isThisWeek && !plan.lockedAt) {
-    const [y, m, day] = plan.date.slice(0, 10).split("-").map(Number);
-    const weekEnd = new Date(y, m - 1, day, 23, 59, 59);
-    return weekEnd.getTime() < now.getTime();
+    const weekEnd = zonedTimestamp(plan.date.slice(0, 10), "23:59:59");
+    return weekEnd < now.getTime();
   }
   const day = plan.date.slice(0, 10);
   const flexTime = plan.isFlexibleTime || !plan.time?.trim();
   if (!flexTime && plan.endTime?.trim()) {
-    const end = new Date(`${day}T${timeToHms(plan.endTime)}`);
-    if (!Number.isNaN(end.getTime())) return end.getTime() < now.getTime();
+    const end = zonedTimestamp(day, timeToHms(plan.endTime));
+    if (Number.isFinite(end)) return end < now.getTime();
   }
   if (!flexTime && plan.time?.trim()) {
-    const start = new Date(`${day}T${timeToHms(plan.time)}`);
-    if (!Number.isNaN(start.getTime())) return start.getTime() < now.getTime();
+    const start = zonedTimestamp(day, timeToHms(plan.time));
+    if (Number.isFinite(start)) return start < now.getTime();
   }
-  const [y, m, d] = day.split("-").map(Number);
-  return new Date(y, (m || 1) - 1, d || 1, 23, 59, 59).getTime() < now.getTime();
+  return zonedTimestamp(day, "23:59:59") < now.getTime();
 }
 
 export function planStartTimestamp(plan: PlanRecord): number {
   const day = plan.date.slice(0, 10);
   const flexTime = plan.isFlexibleTime || !plan.time?.trim();
   const startHms = flexTime ? "12:00:00" : timeToHms(plan.time);
-  const start = new Date(`${day}T${startHms}`);
-  if (Number.isNaN(start.getTime())) return new Date(`${day}T12:00:00`).getTime();
-  return start.getTime();
+  const start = zonedTimestamp(day, startHms);
+  if (!Number.isFinite(start)) return zonedTimestamp(day, "12:00:00");
+  return start;
 }
 
 /** Two plans overlap if their [start, end] windows intersect. Flexible-time

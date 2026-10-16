@@ -307,8 +307,10 @@ export interface PlanDTO {
   capacity: number | null;
   /** How RSVPs are accepted when capacity is set. */
   joinType: JoinType;
-  /** Host marked the plan full. Join is closed even if spots remain. */
+  /** Plan is full. Join is closed, whether or not a capacity is set. */
   markedFull: boolean;
+  /** Interested people are told 48h and 24h ahead if the plan stays full. */
+  notifyInterestedWhenFull: boolean;
   isRecurring: boolean;
   /** Series anchor — null for one-offs, shared across every instance of a recurring plan. */
   seriesId: string | null;
@@ -566,6 +568,7 @@ export type NotificationKind =
   | "interestedNudge"
   | "didThisHappen"
   | "planSpotReopen"
+  | "planFullInterested"
   | "welcome"
   | "communityReview"
   | "helpReply";

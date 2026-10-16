@@ -23,6 +23,13 @@ import {
 } from "../types/shared.js";
 import { onPlanCreatedVenueNudge, notifyInterestedPlanLocked } from "../lib/nudges.js";
 import { emit } from "../lib/notify.js";
+import {
+  forgetSpotWaitlist,
+  interestedFalloffDue,
+  notifySpotOpened,
+  planIsClosed,
+  syncPlanFullness,
+} from "../lib/planFull.js";
 import { planEndTimestamp, planHasEnded, planRequiresHostApproval, plansOverlap, FLEXIBLE_DATE_PLACEHOLDER, thisWeekAnchorDate } from "../lib/planTime.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
 import { communityCreationBlockReason } from "../lib/communityAccess.js";
@@ -111,6 +118,8 @@ export function userToPublic(user: UserRecord): PublicUser {
 }
 
 export async function planSummary(plan: PlanRecord, viewerId: string | null): Promise<PlanDTO> {
+  const synced = await syncPlanFullness(plan.id);
+  if (synced) plan = synced;
   const participations = store.listParticipationsForPlan(plan.id);
   const going = participations.filter((p) => p.state === "going");
   const interested = participations.filter((p) => p.state === "interested");
@@ -185,6 +194,7 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     capacity: plan.capacity ?? null,
     joinType: plan.joinType ?? "open",
     markedFull: plan.markedFull === true,
+    notifyInterestedWhenFull: plan.notifyInterestedWhenFull === true,
     isRecurring: plan.isRecurring ?? false,
     seriesId: plan.seriesId ?? null,
     lockedAt: plan.lockedAt ?? null,
@@ -529,6 +539,7 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     communityVisibility,
     capacity,
     joinType,
+    notifyInterestedWhenFull: false,
     isRecurring,
     lockedAt: null,
     flyerDataUrl,
@@ -728,8 +739,15 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
       patch.visibilityCommunityTag = raw as InterestTag;
     }
   }
-  if (typeof req.body?.markedFull === "boolean") {
-    patch.markedFull = req.body.markedFull;
+  const wasHostClosed = plan.markedFull === true && plan.fullSource !== "capacity";
+  if (typeof req.body?.markedFull === "boolean" && req.body.markedFull !== (plan.markedFull === true)) {
+    if (req.body.markedFull) {
+      patch.markedFull = true;
+      patch.fullSource = "host";
+    } else {
+      patch.markedFull = false;
+      patch.fullSource = null;
+    }
   }
   if (req.body?.capacity !== undefined) {
     const raw = req.body.capacity;
@@ -744,6 +762,8 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
   } else if (req.body?.joinType === "approve" || req.body?.joinType === "open") {
     patch.joinType = req.body.joinType;
   }
+  // 48h/24h "still full" notes are paused. Ignore the toggle from builds that still show it.
+  patch.notifyInterestedWhenFull = false;
   if (req.body?.flyerDataUrl !== undefined) {
     const raw = req.body.flyerDataUrl;
     if (raw === null || raw === "") patch.flyerDataUrl = undefined;
@@ -776,7 +796,11 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
         patch.location.address !== plan.location?.address));
 
   store.updatePlan(planId, patch);
+  await syncPlanFullness(planId);
   const updated = store.findPlanById(planId)!;
+  if (wasHostClosed && updated.markedFull !== true) {
+    await notifySpotOpened(planId);
+  }
 
   if (venueChanged) {
     const stamp = new Date().toISOString();
@@ -1149,10 +1173,12 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
   }
   if (capacity !== undefined) patch.capacity = capacity;
   const lockedCapacity = capacity !== undefined ? capacity : plan.capacity;
-  if (!lockedCapacity) patch.joinType = "open";
-  else if (req.body?.joinType === "approve" || req.body?.joinType === "open") {
+  if (!lockedCapacity) {
+    patch.joinType = "open";
+  } else if (req.body?.joinType === "approve" || req.body?.joinType === "open") {
     patch.joinType = req.body.joinType;
   }
+  patch.notifyInterestedWhenFull = false;
   if (req.body?.neighborhoodId !== undefined) {
     const hood = store.resolveNeighborhoodId(String(req.body.neighborhoodId ?? "").trim());
     if (hood) patch.neighborhoodId = hood;
@@ -1254,23 +1280,20 @@ plansRouter.put("/:id/participation", requireAuth, async (req, res) => {
     return;
   }
   const existing = store.findParticipation(planId, userId);
-  // Enforce capacity for "going" RSVPs. Capped / approve-mode plans never let a
-  // non-host go directly — they must apply (be interested) until the host
-  // promotes them.
+  // Inside 48 hours, only people who are going stay on the plan.
+  // Before that, a full plan still blocks new Join taps. Approve-mode plans
+  // require the host to let someone in.
+  if (plan.creatorId !== userId && state === "interested" && interestedFalloffDue(plan)) {
+    res.status(409).json({ error: "This plan is close — only people who are going can stay on it." });
+    return;
+  }
+  if (plan.creatorId !== userId && state === "going" && existing?.state !== "going" && planIsClosed(plan)) {
+    res.status(409).json({ error: "This plan is full." });
+    return;
+  }
   if (state === "going" && plan.creatorId !== userId && existing?.state !== "going") {
-    if (plan.markedFull) {
-      res.status(409).json({ error: "This plan is full." });
-      return;
-    }
     if (planRequiresHostApproval(plan)) {
       res.status(403).json({ error: "This plan is invite-only — request to join instead." });
-      return;
-    }
-    const goingCount = store
-      .listParticipationsForPlan(planId)
-      .filter((p) => p.state === "going").length;
-    if (plan.capacity && goingCount >= plan.capacity) {
-      res.status(409).json({ error: "This plan is full." });
       return;
     }
   }
@@ -1298,6 +1321,7 @@ plansRouter.put("/:id/participation", requireAuth, async (req, res) => {
   // and the host notification never sends.
   const previousState = existing?.state ?? null;
   store.upsertParticipation(planId, userId, state);
+  forgetSpotWaitlist(planId, userId);
   if (state === "going" || state === "interested") {
     if (planChatOn(plan)) {
       const group = store.findGroupConversationByPlan(planId);
@@ -1354,6 +1378,7 @@ plansRouter.put("/:id/participation", requireAuth, async (req, res) => {
       );
     }
   }
+  await syncPlanFullness(planId);
   res.json({ ok: true });
 });
 
@@ -1377,16 +1402,12 @@ plansRouter.post("/:id/approve", requireAuth, async (req, res) => {
     res.status(400).json({ error: "That user hasn't applied" });
     return;
   }
-  if (plan.capacity) {
-    const goingCount = store
-      .listParticipationsForPlan(planId)
-      .filter((p) => p.state === "going").length;
-    if (goingCount >= plan.capacity) {
-      res.status(409).json({ error: "Plan is full" });
-      return;
-    }
+  if (planIsClosed(plan)) {
+    res.status(409).json({ error: "Plan is full" });
+    return;
   }
   store.upsertParticipation(planId, targetId, "going");
+  forgetSpotWaitlist(planId, targetId);
   if (planChatOn(plan)) store.ensureGroupConversation(planId, [plan.creatorId, targetId]);
   store.log("plan_approved", { planId, userId: targetId, by: userId });
   res.json(await planSummary(plan, userId));
@@ -1449,6 +1470,23 @@ plansRouter.delete("/:id/participation", requireAuth, async (req, res) => {
           dedupKey: `planSpotReopen:${plan.id}:${userId}:${Date.now()}`,
         });
       }
+    }
+  }
+  await syncPlanFullness(planId);
+  const after = store.findPlanById(planId);
+  // Still closed (the host marked it full). The seat didn't open, but the
+  // people who were interested should know someone left.
+  if (existing?.state === "going" && after && planIsClosed(after)) {
+    const stamp = Date.now();
+    for (const id of after.spotWaitlistUserIds ?? []) {
+      if (id === userId || id === after.creatorId) continue;
+      await emit({
+        userId: id,
+        kind: "planSpotReopen",
+        body: `Someone dropped out of "${after.title}". Keep an eye out in case a spot opens.`,
+        planId,
+        dedupKey: `planDropWatch:${planId}:${id}:${stamp}`,
+      });
     }
   }
   res.json({ ok: true });

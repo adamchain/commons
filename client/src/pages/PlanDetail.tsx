@@ -13,9 +13,9 @@ import { ShareSheet } from "../components/ShareSheet";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { Button } from "../components/ui/Button";
 import { useAuth } from "../context/AuthContext";
-import { isIdeaPlan, planHasEnded, planRequiresHostApproval } from "../lib/planTime";
+import { isIdeaPlan, isPlanAtCapacity, planHasEnded, planRequiresHostApproval } from "../lib/planTime";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
-import { formatPlanDate, formatPlanTime, formatPlanWhenLine, sentenceCaseTitle, firstHttpUrlInText, normalizeHttpUrl } from "../lib/format";
+import { formatPlanDate, formatPlanTime, formatPlanWhenLine, formatVenueAddressLine, formatVenueName, sentenceCaseTitle, firstHttpUrlInText, normalizeHttpUrl } from "../lib/format";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import { INTEREST_LABELS, type ConversationDTO, type MessageDTO, type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
 
@@ -76,6 +76,7 @@ export function PlanDetailPage() {
   const chatCleanupDismissed = useRef<string | null>(null);
   const [chatCleanupBusy, setChatCleanupBusy] = useState(false);
   const [chatToggleBusy, setChatToggleBusy] = useState(false);
+  const [fullToggleBusy, setFullToggleBusy] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -110,12 +111,23 @@ export function PlanDetailPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [showGuestsModal, location.hash, location.pathname, navigate, navFrom]);
 
-  // Fetch the last 2 user messages for the inline chat preview. Every plan
-  // page shows chat — join=0 so merely opening the page doesn't add the
-  // viewer to the inbox thread.
+  // Last 2 messages for people who are in the plan (going or interested) or
+  // hosting. join=0 so looking doesn't add them to the inbox thread.
   useEffect(() => {
-    if (!plan || !user || plan.chatEnabled === false) {
-      setChatPreview(plan?.chatEnabled === false ? [] : null);
+    const inChat =
+      !!plan &&
+      !!user &&
+      (plan.creator.id === user.id ||
+        (plan.coHosts?.some((h) => h.id === user.id) ?? false) ||
+        plan.myState === "going" ||
+        plan.myState === "interested");
+    if (!plan || !user) {
+      setChatPreview(null);
+      setChatConvId(null);
+      return;
+    }
+    if (plan.chatEnabled === false || !inChat) {
+      setChatPreview([]);
       setChatConvId(null);
       return;
     }
@@ -130,7 +142,7 @@ export function PlanDetailPage() {
         setChatPreview([]);
       }
     })();
-  }, [plan?.id, plan?.chatEnabled, user?.id]);
+  }, [plan?.id, plan?.chatEnabled, plan?.myState, plan?.creator.id, user?.id]);
 
   useEffect(() => {
     if (!plan || !user) return;
@@ -183,6 +195,8 @@ export function PlanDetailPage() {
   // Other interested folks coordinate via the group chat until a host
   // commits to a venue + day.
   const canLock = !plan.lockedAt && isHosting && isLookingFor && !isPast && !plan.cancelledAt;
+  const canUseChat =
+    isHosting || plan.myState === "going" || plan.myState === "interested";
 
   async function cancelPlan() {
     if (!plan) return;
@@ -329,6 +343,11 @@ export function PlanDetailPage() {
               ))}
             </div>
           )}
+          {plan.communityId && plan.communityName && (
+            <Link to={`/communities/${plan.communityId}`} className="plan-detail-community">
+              {plan.communityName}
+            </Link>
+          )}
           <div className="plan-detail-title-row">
             <h1 className="plan-detail-title">{sentenceCaseTitle(plan.title)}</h1>
             {!isHosting && (
@@ -429,7 +448,12 @@ export function PlanDetailPage() {
               <span className="plan-meta-icon" aria-hidden="true"><PinIcon /></span>
               <div className="plan-meta-text">
                 <span className="plan-meta-label">Location</span>
-                <span className="plan-meta-value">{plan.location.name}</span>
+                <span className="plan-meta-value">{formatVenueName(plan.location.name) || plan.location.name}</span>
+                {formatVenueAddressLine(plan.location.name, plan.location.address) ? (
+                  <span className="plan-meta-sub">
+                    {formatVenueAddressLine(plan.location.name, plan.location.address)}
+                  </span>
+                ) : null}
               </div>
             </a>
           )}
@@ -504,6 +528,42 @@ export function PlanDetailPage() {
           </div>
         )}
 
+        {isHosting && !isPast && !plan.cancelledAt && (
+          <div className="plan-detail-card plan-chat-toggle">
+            <div className="plan-full-toggle-copy">
+              <span className="plan-chat-toggle-label">Full</span>
+              <p className="plan-full-toggle-help">
+                {isPlanAtCapacity(plan.capacity, goingCount)
+                  ? "Every spot is taken. Anyone who isn't going comes off 48 hours before."
+                  : plan.markedFull
+                    ? "Join is closed. Anyone who isn't going comes off 48 hours before."
+                    : "Close Join anytime. Anyone who isn't going comes off 48 hours before it starts."}
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              className={`flex-switch ${plan.markedFull || isPlanAtCapacity(plan.capacity, goingCount) ? "is-on" : ""}`}
+              aria-checked={plan.markedFull || isPlanAtCapacity(plan.capacity, goingCount)}
+              aria-label="Mark plan as full"
+              disabled={fullToggleBusy || isPlanAtCapacity(plan.capacity, goingCount)}
+              onClick={() => {
+                const next = !plan.markedFull;
+                setFullToggleBusy(true);
+                void api<PlanDTO>(`/api/plans/${plan.id}`, {
+                  method: "PATCH",
+                  body: JSON.stringify({ markedFull: next }),
+                })
+                  .then((updated) => setPlan(updated))
+                  .catch(() => undefined)
+                  .finally(() => setFullToggleBusy(false));
+              }}
+            >
+              <span className="flex-switch-knob" />
+            </button>
+          </div>
+        )}
+
         {isHosting && !plan.cancelledAt && (
           <div className="plan-detail-card plan-chat-toggle">
             <span className="plan-chat-toggle-label">Group Chat</span>
@@ -531,17 +591,12 @@ export function PlanDetailPage() {
           </div>
         )}
 
-        {!plan.cancelledAt && plan.chatEnabled !== false && (
+        {!plan.cancelledAt && plan.chatEnabled !== false && canUseChat && (
           <ChatPreviewCard
             planId={plan.id}
             messages={chatPreview}
             convId={chatConvId}
-            canOpenChat={
-              isHosting ||
-              (plan.coHosts?.some((h) => h.id === user.id) ?? false) ||
-              plan.myState === "going" ||
-              plan.myState === "interested"
-            }
+            canOpenChat={canUseChat}
             peopleCount={
               new Set([
                 plan.creator.id,
@@ -620,14 +675,16 @@ export function PlanDetailPage() {
               <RepeatIcon />
               Do it again
             </button>
-            <Link
-              to={`/plans/${plan.id}/chat`}
-              state={{ from: "plan", planId: plan.id }}
-              className="btn-secondary btn-block plan-past-action-btn"
-            >
-              <ChatBubbleIcon />
-              Chat
-            </Link>
+            {canUseChat && (
+              <Link
+                to={`/plans/${plan.id}/chat`}
+                state={{ from: "plan", planId: plan.id }}
+                className="btn-secondary btn-block plan-past-action-btn"
+              >
+                <ChatBubbleIcon />
+                Chat
+              </Link>
+            )}
           </div>
         )}
 
@@ -850,7 +907,7 @@ export function PlanDetailPage() {
       {showMapsConfirm && (
         <BottomSheet onClose={() => setShowMapsConfirm(false)}>
             <div className="sheet-title">Open in Maps?</div>
-            <p className="sheet-copy">{plan.location.name}</p>
+            <p className="sheet-copy">{formatVenueName(plan.location.name) || plan.location.name}</p>
             <a
               href={mapsHref}
               target="_blank"

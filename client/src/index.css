@@ -1169,6 +1169,7 @@ img.avatar {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 42%;
   display: block;
 }
 
@@ -1187,6 +1188,8 @@ img.avatar {
 
 .plan-detail-hero-bar {
   position: absolute;
+  /* The hero is full-bleed (a later rule zeros page padding-top), so the
+     bar has to clear the status bar on its own. */
   top: calc(14px + env(safe-area-inset-top, 0px));
   left: 16px;
   right: 16px;
@@ -1379,6 +1382,19 @@ img.avatar {
 }
 .plan-detail-card--composer {
   padding: 18px 20px;
+}
+.plan-detail-community {
+  align-self: flex-start;
+  display: inline-flex;
+  max-width: 100%;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: var(--community-pink-soft);
+  border: 1px solid var(--community-pink-border);
+  color: var(--community-pink);
+  font-size: var(--text-body-small);
+  font-weight: 700;
+  line-height: 1.2;
 }
 .plan-detail-title-row {
   display: flex;
@@ -1687,6 +1703,18 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   font-size: var(--text-body);
   font-weight: 600;
   color: var(--ink);
+}
+.plan-full-toggle-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.plan-full-toggle-help {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
 }
 .plan-detail-link {
   display: flex;
@@ -4437,9 +4465,14 @@ a.action-btn--stack {
   transition: none;
 }
 .sheet-body {
+  /* flex: 1 + min-height: 0 inside an auto-height sheet collapses this box
+     in WKWebView, so the action buttons paint on top of each other. Size to
+     the content, and only scroll once the sheet is near the top of the screen. */
+  flex: none;
+  width: 100%;
+  min-height: min-content;
+  max-height: calc(92dvh - 96px - env(safe-area-inset-bottom, 0px));
   overflow-y: auto;
-  min-height: 0;
-  flex: 1 1 auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
@@ -4531,8 +4564,16 @@ a.action-btn--stack {
   color: var(--text-muted);
   margin-top: 2px;
 }
-.sheet-link {
+button.sheet-link,
+a.sheet-link {
+  -webkit-appearance: none;
+  appearance: none;
   display: block;
+  width: 100%;
+  min-height: 48px;
+  height: auto;
+  box-sizing: border-box;
+  margin: 0 0 10px;
   padding: 14px;
   background: var(--bg);
   border-radius: var(--r-control);
@@ -4543,6 +4584,7 @@ a.action-btn--stack {
   text-align: left;
   cursor: pointer;
   font-size: var(--text-body);
+  line-height: 1.3;
 }
 .sheet-cancel { margin-top: 8px; }
 .sheet-link--danger {
@@ -4792,11 +4834,9 @@ a.action-btn--stack {
   border-radius: 20px;
   box-shadow: var(--shadow-card);
 }
-.profile-hero-edit {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  z-index: 1;
+.profile-hero-main > .profile-edit-btn {
+  align-self: flex-start;
+  margin-top: 2px;
 }
 .profile-hero .social-pill {
   background: var(--bg);
@@ -4820,7 +4860,6 @@ a.action-btn--stack {
   min-width: 0;
   flex: 1;
   padding-bottom: 2px;
-  padding-right: 64px;
 }
 .profile-hero-stats-row {
   display: flex;
@@ -4837,12 +4876,23 @@ a.action-btn--stack {
   line-height: 1.1;
 }
 .profile-meta-line {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
   color: var(--accent);
   font-size: var(--text-body-small);
+  font-weight: 600;
+  line-height: 1.3;
   margin-top: 6px;
+}
+.profile-meta-line svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.profile-meta-line span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .profile-plans-empty {
   display: flex;
@@ -4871,6 +4921,7 @@ a.action-btn--stack {
   background: var(--surface);
   cursor: pointer;
   text-decoration: none;
+  line-height: 1.2;
 }
 .profile-divider {
   height: 1px;
@@ -5456,6 +5507,23 @@ a.action-btn--stack {
   background: var(--border);
   margin: 0 20px 14px;
 }
+.friend-request-err {
+  margin: 8px 0 0;
+  color: var(--signal-600, var(--red));
+  font-size: var(--text-body-small);
+  line-height: 1.3;
+}
+.profile-past-label {
+  margin-top: 16px;
+}
+.feed-past-heading {
+  margin: 22px 4px 10px;
+  font-size: var(--text-body-small);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
 /* Form `.segmented button` uses min-width: 120px + wrap so Create/Edit plan
    toggles can stack. Home Plans / Ideas share the row as two wide pills. */
 .segmented.segmented-feed-view button {
@@ -5941,6 +6009,8 @@ a.action-btn--stack {
 .profile-hero .profile-name {
   font-size: 22px;
   line-height: 1.15;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .profile-hero-avatar-edit {
   position: absolute;
@@ -7211,6 +7281,7 @@ a.action-btn--stack {
 .plan-card-poster-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 4px;
   padding-right: 0;
@@ -7243,7 +7314,7 @@ a.action-btn--stack {
   margin-left: 0;
 }
 .plan-card-poster-row:has(.plan-card-capacity) .plan-card-community-pill {
-  max-width: 30%;
+  max-width: 100%;
 }
 .plan-card-poster-row > .avatar,
 .plan-card-poster-row > .avatar-initials {
@@ -8061,6 +8132,8 @@ a.action-btn--stack {
 .number-picker-scroll {
   display: flex;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
@@ -8705,6 +8778,9 @@ a.action-btn--stack {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.plan-meta-row--edit .plan-meta-sub {
+  white-space: normal;
+}
 .plan-meta-row--edit .flex-toggle-btn {
   margin-top: 0;
   flex-shrink: 0;
@@ -8776,9 +8852,13 @@ a.action-btn--stack {
 }
 .plan-meta-card--edit .location-autocomplete {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 .plan-meta-card--edit .location-autocomplete input {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   border: none;
   background: transparent;
   padding: 2px 0;
@@ -9548,11 +9628,12 @@ a.action-btn--stack {
   display: flex;
   grid-template-columns: none;
   overflow-x: auto;
-  scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
+  /* pan-y lets a vertical swipe still move the feed when it starts on a day. */
+  touch-action: pan-x pan-y;
   scrollbar-width: none;
-  padding: 4px 0 2px;
-  gap: 0;
+  padding: 8px 0 6px;
+  gap: 2px;
   /* Don't let the 35-day row set the feed's width. */
   min-width: 0;
   width: 100%;
@@ -9563,8 +9644,8 @@ a.action-btn--stack {
 }
 .week-strip--scroll .week-strip-day {
   flex: 0 0 auto;
-  width: 44px;
-  scroll-snap-align: start;
+  width: 48px;
+  min-height: 64px;
 }
 .week-strip-month-pin {
   flex: 0 0 auto;
@@ -9855,6 +9936,7 @@ a.action-btn--stack {
   min-width: 0;
   height: 100%;
   object-fit: cover;
+  object-position: center 42%;
   display: block;
 }
 .idea-cover-fallback {
@@ -9874,6 +9956,7 @@ a.action-btn--stack {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 42%;
   display: block;
 }
 
@@ -10588,16 +10671,70 @@ a.action-btn--stack {
   line-height: 1.4;
 }
 .edit-cat-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 10px;
+}
+.edit-cat-row > .btn-link {
+  margin-top: 2px;
 }
 .edit-cat-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  flex: 1 1 auto;
   min-width: 0;
+}
+.edit-location-card .luma-row {
+  align-items: center;
+  flex-wrap: nowrap;
+}
+.edit-location-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.edit-location-name {
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.edit-location-detail {
+  font-size: var(--text-body-small);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.edit-plan-page .luma-row {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+.edit-plan-page .luma-label {
+  flex: 0 0 auto;
+}
+.edit-plan-page .luma-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+.edit-plan-page .luma-input[type="date"],
+.edit-plan-page .luma-input[type="time"] {
+  width: 0;
+  min-width: 0;
+  max-width: 100%;
+  flex: 1 1 auto;
+}
+.edit-plan-page .luma-value .flex-toggle-btn,
+.edit-location-card .flex-toggle-btn {
+  flex-shrink: 0;
+  margin-top: 0;
+  align-self: center;
 }
 .edit-cat-chip {
   display: inline-flex;
@@ -16185,16 +16322,23 @@ button.profile-other-avatar {
   margin-bottom: 4px;
 }
 .profile-other-location {
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  align-items: flex-start;
   gap: 4px;
+  min-width: 0;
   font-size: var(--text-body-small);
   font-weight: 600;
+  line-height: 1.3;
   color: var(--red);
   margin-bottom: 10px;
 }
 .profile-other-location svg {
+  flex-shrink: 0;
+  margin-top: 1px;
   color: var(--red);
+}
+.profile-other-location span {
+  min-width: 0;
 }
 .profile-other-stats {
   display: flex;

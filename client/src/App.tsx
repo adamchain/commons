@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
-import { useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { App as CapApp } from "@capacitor/app";
 import { useAuth } from "./context/AuthContext";
@@ -15,39 +15,61 @@ import { needsOnboarding } from "./lib/onboarding";
 import { getCurrentCoords } from "./lib/geolocate";
 import { api } from "./api/http";
 import { isNative } from "./lib/platform";
-import { ChatPage } from "./pages/Chat";
-import { CreatePlanPage } from "./pages/CreatePlan";
-import { FeedPage } from "./pages/Feed";
-import { NotificationsPage } from "./pages/Notifications";
-import { OnboardingPage } from "./pages/Onboarding";
-import { LandingPage } from "./pages/Landing";
-import { LegalPage } from "./pages/Legal";
-import { PlanDetailPage } from "./pages/PlanDetail";
-import { PublicEventPage } from "./pages/PublicEvent";
-import { AdminPage } from "./pages/admin/FounderDashboard";
-import { ProfilePage } from "./pages/Profile";
-import { EditProfilePage } from "./pages/EditProfile";
-import { DmChatPage } from "./pages/DmChat";
-import { NetworkPage } from "./pages/Network";
-import { InvitePage } from "./pages/Invite";
-import { SettingsPage } from "./pages/Settings";
-import { SettingsInterestsPage } from "./pages/SettingsInterests";
-import { NotificationPrefsPage } from "./pages/NotificationPrefs";
-import { MessagesPage } from "./pages/Messages";
-import { ForumPage } from "./pages/ForumPage";
-import { ForumPostPage } from "./pages/ForumPostPage";
-import { MyPlansPage } from "./pages/MyPlans";
-import { EmptyStatesPage } from "./pages/EmptyStates";
-import { SearchPage } from "./pages/Search";
-import { BlockedListPage } from "./pages/BlockedList";
-import { PrivacyPage } from "./pages/Privacy";
-import { CommunitiesPage } from "./pages/Communities";
-import { CommunityDetailPage } from "./pages/CommunityDetail";
-import { CommunityDashboardPage } from "./pages/CommunityDashboard";
-import { CommunityChatPage } from "./pages/CommunityChat";
-import { SettingsForumsPage } from "./pages/SettingsForums";
-import { CreateCommunityPage } from "./pages/CreateCommunity";
-import { HelpChatPage } from "./pages/HelpChat";
+
+const ChatPage = lazy(() => import("./pages/Chat").then(m => ({ default: m.ChatPage })));
+const CreatePlanPage = lazy(() => import("./pages/CreatePlan").then(m => ({ default: m.CreatePlanPage })));
+const FeedPage = lazy(() => import("./pages/Feed").then(m => ({ default: m.FeedPage })));
+const NotificationsPage = lazy(() => import("./pages/Notifications").then(m => ({ default: m.NotificationsPage })));
+const OnboardingPage = lazy(() => import("./pages/Onboarding").then(m => ({ default: m.OnboardingPage })));
+const LandingPage = lazy(() => import("./pages/Landing").then(m => ({ default: m.LandingPage })));
+const LegalPage = lazy(() => import("./pages/Legal").then(m => ({ default: m.LegalPage })));
+const PlanDetailPage = lazy(() => import("./pages/PlanDetail").then(m => ({ default: m.PlanDetailPage })));
+const PublicEventPage = lazy(() => import("./pages/PublicEvent").then(m => ({ default: m.PublicEventPage })));
+const AdminPage = lazy(() => import("./pages/admin/FounderDashboard").then(m => ({ default: m.AdminPage })));
+const ProfilePage = lazy(() => import("./pages/Profile").then(m => ({ default: m.ProfilePage })));
+const EditProfilePage = lazy(() => import("./pages/EditProfile").then(m => ({ default: m.EditProfilePage })));
+const DmChatPage = lazy(() => import("./pages/DmChat").then(m => ({ default: m.DmChatPage })));
+const NetworkPage = lazy(() => import("./pages/Network").then(m => ({ default: m.NetworkPage })));
+const InvitePage = lazy(() => import("./pages/Invite").then(m => ({ default: m.InvitePage })));
+const SettingsPage = lazy(() => import("./pages/Settings").then(m => ({ default: m.SettingsPage })));
+const SettingsInterestsPage = lazy(() => import("./pages/SettingsInterests").then(m => ({ default: m.SettingsInterestsPage })));
+const NotificationPrefsPage = lazy(() => import("./pages/NotificationPrefs").then(m => ({ default: m.NotificationPrefsPage })));
+const MessagesPage = lazy(() => import("./pages/Messages").then(m => ({ default: m.MessagesPage })));
+const ForumPage = lazy(() => import("./pages/ForumPage").then(m => ({ default: m.ForumPage })));
+const ForumPostPage = lazy(() => import("./pages/ForumPostPage").then(m => ({ default: m.ForumPostPage })));
+const MyPlansPage = lazy(() => import("./pages/MyPlans").then(m => ({ default: m.MyPlansPage })));
+const EmptyStatesPage = lazy(() => import("./pages/EmptyStates").then(m => ({ default: m.EmptyStatesPage })));
+const SearchPage = lazy(() => import("./pages/Search").then(m => ({ default: m.SearchPage })));
+const BlockedListPage = lazy(() => import("./pages/BlockedList").then(m => ({ default: m.BlockedListPage })));
+const PrivacyPage = lazy(() => import("./pages/Privacy").then(m => ({ default: m.PrivacyPage })));
+const CommunitiesPage = lazy(() => import("./pages/Communities").then(m => ({ default: m.CommunitiesPage })));
+const CommunityDetailPage = lazy(() => import("./pages/CommunityDetail").then(m => ({ default: m.CommunityDetailPage })));
+const CommunityDashboardPage = lazy(() => import("./pages/CommunityDashboard").then(m => ({ default: m.CommunityDashboardPage })));
+const CommunityChatPage = lazy(() => import("./pages/CommunityChat").then(m => ({ default: m.CommunityChatPage })));
+const SettingsForumsPage = lazy(() => import("./pages/SettingsForums").then(m => ({ default: m.SettingsForumsPage })));
+const CreateCommunityPage = lazy(() => import("./pages/CreateCommunity").then(m => ({ default: m.CreateCommunityPage })));
+const HelpChatPage = lazy(() => import("./pages/HelpChat").then(m => ({ default: m.HelpChatPage })));
+
+const PAGE_FALLBACK = <main className="app-shell app-shell--with-nav app-shell--with-topbar" />;
+
+function useWarmRoutes() {
+  useEffect(() => {
+    const warm = () => {
+      void import("./pages/Feed");
+      void import("./pages/Communities");
+      void import("./pages/CommunityDetail");
+      void import("./pages/Messages");
+      void import("./pages/Network");
+      void import("./pages/Profile");
+      void import("./pages/PlanDetail");
+      void import("./pages/Notifications");
+      void import("./pages/MyPlans");
+      void import("./pages/Search");
+    };
+    const id = window.setTimeout(warm, 250);
+    return () => window.clearTimeout(id);
+  }, []);
+}
 
 function Protected({
   children,
@@ -185,12 +207,14 @@ export default function App() {
   usePushOpenNavigation();
   useDeepLinkNavigation();
   useLocationRefresh();
+  useWarmRoutes();
   return (
     <>
       <TopBar />
       <AppUpdatePrompt />
       <ChatCleanupPrompt />
       <SmsConsentPrompt />
+      <Suspense fallback={PAGE_FALLBACK}>
       <Routes>
         <Route path="/welcome" element={<LandingPage />} />
         <Route path="/legal/:slug" element={<LegalPage />} />
@@ -231,6 +255,7 @@ export default function App() {
         {/* Own profile is reachable mid-onboarding so people can review themselves. Other profiles wait. */}
         <Route path="/profile/:userId" element={<ProfileGate />} />
       </Routes>
+      </Suspense>
       <BottomNav />
       <CoachMarks />
     </>

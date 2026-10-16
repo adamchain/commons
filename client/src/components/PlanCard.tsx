@@ -8,7 +8,7 @@ import { IdeaCoverFallback, planPhotoUrl } from "./CoverThumb";
 import { BottomSheet } from "./ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
 import type { PlanDTO } from "../types/shared";
-import { formatPlanDate, formatPlanTime, formatPlanWhenWhereLine, sentenceCaseTitle } from "../lib/format";
+import { formatPlanDate, formatPlanTime, formatPlanWhenWhereLine, formatVenueName, sentenceCaseTitle } from "../lib/format";
 import { saveFeedScroll, type NavFromState } from "../lib/navState";
 import { isIdeaPlan, isPlanAtCapacity, planCapacityValue, planHasEnded, planRequiresHostApproval } from "../lib/planTime";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
@@ -51,9 +51,7 @@ export function PlanCard({
   const capacity = planCapacityValue(plan.capacity);
   const isFull = plan.markedFull || isPlanAtCapacity(capacity, goingCount);
   const capacityFill =
-    capacity !== null && !hasEnded && !isCancelled
-      ? `${Math.max(0, capacity - Math.min(goingCount, capacity))}/${capacity} spots`
-      : null;
+    capacity !== null && !hasEnded && !isCancelled ? `${goingCount}/${capacity}` : null;
 
   // Going first, then Interested — up to 3 faces so the footer stays compact.
   const facepile = [...plan.participants.going, ...plan.participants.interested].slice(0, 3);
@@ -115,6 +113,7 @@ export function PlanCard({
               <button
                 type="button"
                 className="plan-card-capacity"
+                title={`${goingCount} of ${capacity} spots taken`}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -280,7 +279,7 @@ function ideaMetaLine(plan: PlanDTO): string {
   const dateUnset =
     !plan.isThisWeek && (plan.isFlexibleDate || plan.date.startsWith("2099-12-31"));
   const timeUnset = plan.isFlexibleTime || !plan.time?.trim() || plan.time === "Flexible";
-  const locationName = plan.location?.name?.trim() ?? "";
+  const locationName = formatVenueName(plan.location?.name);
   const locUnset = plan.isFlexibleLocation || !locationName;
   if (plan.isThisWeek) {
     parts.push("This week");
@@ -410,7 +409,7 @@ function QuickJoin({
           >
               <div id="plan-card-rsvp-title" className="sheet-title">{goingActive ? "Joined" : "Interested"}</div>
               <div className="sheet-actions">
-                {goingActive && (
+                {goingActive && !isFull && (
                   <button type="button" className="sheet-link" onClick={() => void setState("interested")}>
                     Switch to Interested
                   </button>

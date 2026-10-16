@@ -11,7 +11,8 @@ import { fileToResizedDataUrl } from "../lib/imageResize";
 import { interestVisual } from "../lib/interestIcons";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
-import { formatPlanDate, formatPlanTime, normalizeHttpUrl } from "../lib/format";
+import { formatPlanDate, formatPlanTime, formatVenueAddressLine, formatVenueName, normalizeHttpUrl } from "../lib/format";
+import { isPlanAtCapacity } from "../lib/planTime";
 import {
   INTEREST_LABELS,
   VIBE_OPTIONS,
@@ -222,6 +223,9 @@ function EditForm({
     flashTimer.current = setTimeout(() => setSavedFlash(null), 1800);
   }
 
+  const atCapacity =
+    form.capacityOn && isPlanAtCapacity(Number(form.capacity), plan.participants.going.length);
+
   async function saveInstant(): Promise<void> {
     if (!form.title.trim()) return;
     const capacityNum = form.capacityOn ? Number(form.capacity) : null;
@@ -237,12 +241,13 @@ function EditForm({
           isFlexibleLocation: form.isFlexibleLocation,
           capacity: capacityNum,
           joinType: capacityNum !== null && form.joinType === "approve" ? "approve" : "open",
-          markedFull: form.markedFull,
+          markedFull: atCapacity || form.markedFull,
           visibility: form.visibility,
           chatEnabled: form.chatEnabled,
         }),
       });
       setPlan(updated);
+      setForm((f) => (f.markedFull === updated.markedFull ? f : { ...f, markedFull: updated.markedFull }));
       flashSaved(lastInstantGroup.current);
       setSubmitErr(null);
     } catch (err) {
@@ -464,17 +469,38 @@ function EditForm({
               <option key={n.id} value={n.id}>{n.name}</option>
             ))}
           </select>
-          <label className="flex-toggle" style={{ marginTop: 8 }}>
-            <input
-              type="checkbox"
-              checked={form.isFlexibleLocation}
-              onChange={(e) => {
-                lastInstantGroup.current = "where";
-                setForm((f) => ({ ...f, isFlexibleLocation: e.target.checked }));
-              }}
-            />
-            Flexible location
-          </label>
+          <div className="luma-card edit-location-card">
+            <div className="luma-row">
+              <div className="edit-location-copy">
+                <span className="luma-label">Location</span>
+                {form.isFlexibleLocation ? (
+                  <span className="luma-flex-text">Flexible</span>
+                ) : (
+                  <>
+                    <span className="edit-location-name">
+                      {formatVenueName(plan.location.name) || "No place yet"}
+                    </span>
+                    {formatVenueAddressLine(plan.location.name, plan.location.address) ? (
+                      <span className="edit-location-detail">
+                        {formatVenueAddressLine(plan.location.name, plan.location.address)}
+                      </span>
+                    ) : null}
+                  </>
+                )}
+              </div>
+              <button
+                type="button"
+                className={`flex-toggle-btn ${form.isFlexibleLocation ? "is-active" : ""}`}
+                aria-pressed={form.isFlexibleLocation}
+                onClick={() => {
+                  lastInstantGroup.current = "where";
+                  setForm((f) => ({ ...f, isFlexibleLocation: !f.isFlexibleLocation }));
+                }}
+              >
+                Flexible
+              </button>
+            </div>
+          </div>
 
           <div className="edit-proposal">
             <p className="edit-proposal-note">
@@ -641,16 +667,22 @@ function EditForm({
             <div className="form-row-flex-main">
               <label className="form-question">Full</label>
               <p className="form-help">
-                {form.markedFull ? "Join is closed. People can still mark Interested." : "Turn this on when there are no spots left."}
+                {atCapacity
+                  ? "Every spot is taken. Anyone who isn't going comes off 48 hours before."
+                  : form.markedFull
+                    ? "Join is closed. Anyone who isn't going comes off 48 hours before."
+                    : "Close Join anytime. Anyone who isn't going comes off 48 hours before it starts."}
               </p>
             </div>
             <button
               type="button"
               role="switch"
-              className={`flex-switch ${form.markedFull ? "is-on" : ""}`}
-              aria-checked={form.markedFull}
+              className={`flex-switch ${atCapacity || form.markedFull ? "is-on" : ""}`}
+              aria-checked={atCapacity || form.markedFull}
               aria-label="Mark plan as full"
+              disabled={atCapacity}
               onClick={() => {
+                if (atCapacity) return;
                 lastInstantGroup.current = "who";
                 setForm((f) => ({ ...f, markedFull: !f.markedFull }));
               }}

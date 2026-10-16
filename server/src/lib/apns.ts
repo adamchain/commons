@@ -24,9 +24,13 @@ const APNS_HOSTS: Record<ApnsEnv, string> = {
 };
 const APNS_BUNDLE_ID = process.env.APNS_BUNDLE_ID?.trim() || "com.oncommons.mvp";
 
-/** Production first when the server is the live one. A BadDeviceToken retries the other gateway. */
+/** Production first on the live server. TestFlight and App Store tokens are
+ *  production; a sandbox-first guess was failing those phones when the first
+ *  gateway returned anything other than BadDeviceToken. */
 function envOrder(preferred?: ApnsEnv): ApnsEnv[] {
-  const productionFirst = String(process.env.APNS_PRODUCTION ?? "").trim().toLowerCase() === "true";
+  const productionFirst =
+    String(process.env.APNS_PRODUCTION ?? "").trim().toLowerCase() === "true" ||
+    process.env.NODE_ENV === "production";
   const primary: ApnsEnv = preferred ?? (productionFirst ? "production" : "sandbox");
   const other: ApnsEnv = primary === "production" ? "sandbox" : "production";
   return [primary, other];
@@ -218,12 +222,13 @@ export async function sendApns(token: string, payload: PushPayload, preferred?: 
       store.setDeviceApnsEnv(token, env);
       return true;
     }
-    if (result.status === 410) {
+    const wrongGateway = result.reason === "BadDeviceToken" || result.status === 410;
+    if (!wrongGateway) return false;
+    // 410 from the wrong gateway used to delete a still-valid token.
+    if (result.status === 410 && i === order.length - 1) {
       store.unregisterDeviceByToken(token);
       return false;
     }
-    // Wrong gateway (Xcode token vs TestFlight token). Try the other one once.
-    if (result.reason !== "BadDeviceToken") return false;
   }
   return false;
 }

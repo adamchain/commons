@@ -46,6 +46,7 @@ const PREF_KEY: Record<NotificationKind, keyof NotificationPrefs> = {
   communityPlanPosted: "someoneJoinedYourPlan",
   planDayOf: "planTomorrow",
   interestedNudge: "planTomorrow",
+  planFullInterested: "planTomorrow",
   didThisHappen: "postPlanNetworkNudge",
   planSpotReopen: "someoneJoinedYourPlan",
   // F.9 — one-time welcome ping on signup; rides the same toggle as other

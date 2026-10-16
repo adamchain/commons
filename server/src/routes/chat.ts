@@ -14,7 +14,7 @@ import {
 } from "../lib/communityAccess.js";
 import { isGcsConfigured, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
-import { planVisibleToViewer } from "../lib/feedScope.js";
+import { interestedFalloffDue } from "../lib/planFull.js";
 import { planHasEnded } from "../lib/planTime.js";
 import type { ConversationDTO, ConversationSummaryDTO, MessageDTO, PollDTO } from "../types/shared.js";
 
@@ -265,9 +265,12 @@ function planGroupChatOpen(planId: string): boolean {
 function canAccessPlanGroupChat(planId: string, userId: string): boolean {
   const plan = store.findPlanById(planId);
   if (!plan || plan.chatEnabled === false) return false;
-  const me = store.findUserById(userId);
-  if (!me) return false;
-  return planVisibleToViewer(plan, me);
+  if (plan.creatorId === userId || (plan.coHostIds ?? []).includes(userId)) return true;
+  const part = store.findParticipation(planId, userId);
+  if (!part) return false;
+  if (part.state === "going") return true;
+  // Interested people share the thread until 48 hours before the start.
+  return part.state === "interested" && !interestedFalloffDue(plan);
 }
 
 function canReadConversation(conv: ConversationRecord, userId: string): boolean {
@@ -275,9 +278,11 @@ function canReadConversation(conv: ConversationRecord, userId: string): boolean 
     const community = store.findCommunityById(conv.communityId);
     if (!community || community.hiddenAt) return false;
   }
-  if (conv.type === "group" && conv.planId && !planGroupChatOpen(conv.planId)) return false;
+  if (conv.type === "group" && conv.planId) {
+    if (!planGroupChatOpen(conv.planId)) return false;
+    return canAccessPlanGroupChat(conv.planId, userId);
+  }
   if (conv.participantIds.includes(userId)) return true;
-  if (conv.planId) return canAccessPlanGroupChat(conv.planId, userId);
   return false;
 }
 

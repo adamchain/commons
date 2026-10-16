@@ -10,7 +10,7 @@ import {
   type CommunityDashboardDTO,
   type PublicUser,
 } from "../types/shared";
-import { formatRelative } from "../lib/format";
+import { formatAreaLabel, formatRelative } from "../lib/format";
 import "./Communities.css";
 
 type Section = "analytics" | "requests" | "bulletin" | "members";
@@ -178,7 +178,7 @@ export function CommunityDashboardPage() {
 
   const requestCount = data.requests.length;
   const bulletinCount = data.pendingPosts.length;
-  const place = data.city?.trim() || "Philadelphia";
+  const place = formatAreaLabel(data.city) || "Philadelphia";
   const meta = [place, COMMUNITY_CATEGORY_LABELS[data.category], visibilityLabel(data.visibility)].join(" · ");
   const members = data.memberList.filter((m) => {
     const q = memberQuery.trim().toLowerCase();

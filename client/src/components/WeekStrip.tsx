@@ -17,7 +17,10 @@ function addDays(d: Date, n: number): Date {
 }
 
 function isoDay(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function prefersReducedMotion(): boolean {
@@ -60,6 +63,8 @@ export function WeekStrip({
   const byDay = useMemo(() => {
     const map = new Map<string, number>();
     for (const p of plans) {
+      if (p.cancelledAt) continue;
+      if (p.isFlexibleDate || p.date.startsWith("2099-12-31")) continue;
       const key = p.date.slice(0, 10);
       map.set(key, (map.get(key) ?? 0) + 1);
     }

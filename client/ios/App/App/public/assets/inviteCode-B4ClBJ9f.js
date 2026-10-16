@@ -1,0 +1,1 @@
+import{D as e}from"./index-CvU6XW2l.js";async function t(){try{let{codes:t}=await e(`/api/auth/invite-codes`);return t.find(e=>e.redeemedAt===null)?.code??null}catch{return null}}export{t};

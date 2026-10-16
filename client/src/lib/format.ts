@@ -93,7 +93,7 @@ export function formatPlanWhenWhereLine(plan: {
     }),
   ];
   const timeOpen = timeIsOpen(plan.time, plan.isFlexibleTime);
-  const locName = plan.location?.name?.trim() ?? "";
+  const locName = formatVenueName(plan.location?.name);
   const locOpen = Boolean(plan.isFlexibleLocation || !locName);
   if (!timeOpen && plan.time) parts.push(formatPlanTime(plan.time, false));
   else if (timeOpen && !locOpen) parts.push("Flexible");
@@ -116,35 +116,159 @@ export function formatPlanWhenLine(
 }
 
 /**
- * Trim city/state/county/zip/country tails off a Google Places or Nominatim
- * address so cards show the meaningful part. "114 S 13th St, Philadelphia,
- * PA 19107, USA" → "114 S 13th St". The full string is still passed to maps
+ * Trim state/county/zip/country tails off a Google Places or Nominatim
+ * address. Keep the city: "114 S 13th St, Philadelphia, PA 19107, USA" →
+ * "114 S 13th St, Philadelphia". The full string is still passed to maps
  * deep-links so routing isn't affected.
  */
 const ADDRESS_DROP_TOKENS = new Set([
-  "philadelphia",
-  "philadelphia county",
   "pennsylvania",
-  "pa",
   "united states",
   "united states of america",
   "usa",
   "us",
 ]);
 
-export function formatPlaceAddress(raw: string | undefined | null): string {
-  if (!raw) return "";
+const US_STATE_ABBR: Record<string, string> = {
+  Alabama: "AL", Alaska: "AK", Arizona: "AZ", Arkansas: "AR", California: "CA",
+  Colorado: "CO", Connecticut: "CT", Delaware: "DE", "District of Columbia": "DC",
+  Florida: "FL", Georgia: "GA", Hawaii: "HI", Idaho: "ID", Illinois: "IL", Indiana: "IN",
+  Iowa: "IA", Kansas: "KS", Kentucky: "KY", Louisiana: "LA", Maine: "ME", Maryland: "MD",
+  Massachusetts: "MA", Michigan: "MI", Minnesota: "MN", Mississippi: "MS", Missouri: "MO",
+  Montana: "MT", Nebraska: "NE", Nevada: "NV", "New Hampshire": "NH", "New Jersey": "NJ",
+  "New Mexico": "NM", "New York": "NY", "North Carolina": "NC", "North Dakota": "ND",
+  Ohio: "OH", Oklahoma: "OK", Oregon: "OR", Pennsylvania: "PA", "Rhode Island": "RI",
+  "South Carolina": "SC", "South Dakota": "SD", Tennessee: "TN", Texas: "TX", Utah: "UT",
+  Vermont: "VT", Virginia: "VA", Washington: "WA", "West Virginia": "WV", Wisconsin: "WI",
+  Wyoming: "WY",
+};
+
+const STATE_ABBRS = new Set(Object.values(US_STATE_ABBR));
+
+const STREET_WORD =
+  /\b(st|street|ave|avenue|rd|road|blvd|boulevard|dr|drive|ln|lane|way|pike|pl|place|ct|court|ter|terrace|hwy|highway|pkwy|parkway|cir|circle|sq|square|trl|trail|aly|alley)\b/i;
+
+function titleCasePlace(part: string): string {
+  return part.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\bOf\b/g, "of");
+}
+
+function stateAbbr(part: string): string | null {
+  if (/^[A-Za-z]{2}$/.test(part) && STATE_ABBRS.has(part.toUpperCase())) return part.toUpperCase();
+  const titled = titleCasePlace(part);
+  return US_STATE_ABBR[part] ?? US_STATE_ABBR[titled] ?? null;
+}
+
+function isHouseNumber(part: string): boolean {
+  return /^\d{1,5}[A-Za-z]?$/.test(part);
+}
+
+function isStreetPart(part: string): boolean {
+  return STREET_WORD.test(part) || /^(n|s|e|w|ne|nw|se|sw|north|south|east|west)\b/i.test(part);
+}
+
+/** Country, county, ZIP, "PA 19107", or a bare state code. Cities stay, including ones that share a state name. */
+function isAdminPart(part: string): boolean {
+  const lc = part.toLowerCase();
+  if (ADDRESS_DROP_TOKENS.has(lc) || /county$/i.test(part)) return true;
+  if (/^\d{5}(-\d{4})?$/.test(part)) return true;
+  if (/^[A-Za-z]{2}\s+\d{5}(-\d{4})?$/.test(part)) return true;
+  if (/^[A-Za-z]{2}$/.test(part) && STATE_ABBRS.has(part.toUpperCase())) return true;
+  return false;
+}
+
+function splitPlaceParts(raw: string): string[] {
   const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
-  const kept = parts.filter((part) => {
-    const lc = part.toLowerCase();
-    if (ADDRESS_DROP_TOKENS.has(lc)) return false;
-    // Bare ZIP / ZIP+4
-    if (/^\d{5}(-\d{4})?$/.test(part)) return false;
-    // "PA 19107" or "PA 19107-1234"
-    if (/^[A-Za-z]{2}\s+\d{5}(-\d{4})?$/.test(part)) return false;
-    return true;
-  });
+  const out: string[] = [];
+  for (let i = 0; i < parts.length; i++) {
+    const next = parts[i + 1];
+    // Nominatim splits the house number off the street: "130, South 19th Street"
+    // or "1136, Market Street" — including when a venue name comes first.
+    // Don't glue a ZIP onto the city ("19103, Philadelphia").
+    if (next && isHouseNumber(parts[i]) && isStreetPart(next)) {
+      out.push(`${parts[i]} ${next}`);
+      i++;
+      continue;
+    }
+    out.push(parts[i]);
+  }
+  return out;
+}
+
+/**
+ * Street line under a venue. Keeps the city, drops state / ZIP / country / county.
+ * Pass `omitLeading` (the venue name) so "La Colombe, 130 S 19th St, Philadelphia, PA"
+ * doesn't repeat the name.
+ */
+export function formatPlaceAddress(
+  raw: string | undefined | null,
+  opts?: { omitLeading?: string },
+): string {
+  if (!raw) return "";
+  let parts = splitPlaceParts(raw);
+  const omit = opts?.omitLeading?.trim().toLowerCase();
+  const omitFirst = omit ? splitPlaceParts(opts?.omitLeading ?? "")[0]?.trim().toLowerCase() : "";
+  if (omit && (parts[0]?.toLowerCase() === omit || (omitFirst && parts[0]?.toLowerCase() === omitFirst))) {
+    parts = parts.slice(1);
+  }
+  const kept = parts.filter((part) => !isAdminPart(part));
   return kept.join(", ");
+}
+
+/**
+ * Venue title. A pasted street address collapses to street + city.
+ * "La Colombe, 130 S 19th St, Philadelphia, PA" stays "La Colombe".
+ */
+export function formatVenueName(name: string | undefined | null): string {
+  const t = name?.trim() ?? "";
+  if (!t.includes(",")) return t;
+  const parts = splitPlaceParts(t);
+  const first = parts[0] ?? t;
+  if (/^\d/.test(first)) return formatPlaceAddress(t) || first;
+  const restRaw = parts.slice(1).join(", ");
+  const rest = formatPlaceAddress(restRaw);
+  if (rest && (rest.length < restRaw.trim().length || /^\d/.test(rest))) return first;
+  return formatPlaceAddress(t) || t;
+}
+
+/** Address line under a venue title. Empty when it would repeat the title. */
+export function formatVenueAddressLine(
+  name: string | undefined | null,
+  address: string | undefined | null,
+): string {
+  const line = formatPlaceAddress(address, { omitLeading: name ?? undefined });
+  const title = formatVenueName(name);
+  if (!line) return "";
+  const lineLc = line.toLowerCase();
+  const titleLc = title.trim().toLowerCase();
+  if (!titleLc) return line;
+  if (lineLc === titleLc || titleLc.includes(lineLc)) return "";
+  return line;
+}
+
+/** Profile / community place: keep the city, abbreviate the state, drop country and county. */
+export function formatAreaLabel(raw: string | undefined | null): string {
+  if (!raw) return "";
+  const drop = new Set(["united states", "united states of america", "usa", "us"]);
+  const parts = splitPlaceParts(raw)
+    .filter((part) => {
+      const lc = part.toLowerCase();
+      if (drop.has(lc) || /county$/i.test(part)) return false;
+      if (/^\d{5}(-\d{4})?$/.test(part)) return false;
+      return true;
+    })
+    .map((part) => {
+      const zipState = part.match(/^([A-Za-z]{2})\s+\d{5}(-\d{4})?$/);
+      return zipState ? zipState[1].toUpperCase() : part;
+    });
+  if (parts.length === 0) return "";
+  if (parts.length === 1) {
+    const abbr = stateAbbr(parts[0]);
+    if (abbr && abbr !== parts[0] && !STATE_ABBRS.has(parts[0].toUpperCase())) return abbr;
+    return parts[0];
+  }
+  const lastAbbr = stateAbbr(parts[parts.length - 1]);
+  if (lastAbbr) parts[parts.length - 1] = lastAbbr;
+  return parts.join(", ");
 }
 
 export function formatRelative(iso: string): string {

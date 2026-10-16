@@ -186,8 +186,23 @@ export interface PlanRecord {
   capacity?: number | null;
   /** How RSVPs are accepted; defaults to "open" if absent. */
   joinType?: JoinType;
-  /** Host closed the plan. New people can't tap Join even if spots remain. */
+  /** Host closed the plan, or it filled because every spot was taken. */
   markedFull?: boolean;
+  /**
+   * "host" stays closed until the host reopens it.
+   * "capacity" clears itself when a Going seat frees up.
+   * Absent on older rows that the host marked full by hand.
+   */
+  fullSource?: "host" | "capacity" | null;
+  /** People removed when the plan filled, so they can hear if a spot opens. */
+  spotWaitlistUserIds?: string[];
+  /** Stamp of the last time a spot opened, used to notify the waitlist once. */
+  spotOpenedAt?: string | null;
+  /**
+   * When the plan is still at capacity, Interested people get a note 48h and
+   * 24h before start that no spots opened up.
+   */
+  notifyInterestedWhenFull?: boolean;
   isRecurring?: boolean;
   /**
    * Series lineage for recurring plans. When `isRecurring` is true on the first
@@ -588,6 +603,7 @@ export interface NotificationRecord {
     | "interestedNudge"
     | "didThisHappen"
     | "planSpotReopen"
+    | "planFullInterested"
     | "welcome"
     | "communityReview"
     | "helpReply";

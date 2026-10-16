@@ -27,10 +27,10 @@ import { LinkedText } from "../components/LinkedText";
 import { ReportModal } from "../components/PlanSafetyMenu";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
-import { formatPlanDate, formatPlanWhenLine } from "../lib/format";
+import { formatAreaLabel, formatPlanDate, formatPlanWhenLine } from "../lib/format";
 import { fileToResizedDataUrl, shrinkDataUrl } from "../lib/imageResize";
 import { resolvePhotoDataUrl } from "../lib/photoPicker";
-import { isNative } from "../lib/platform";
+import { getPublicWebOrigin, isNative } from "../lib/platform";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isIdeaPlan } from "../lib/planTime";
 import { hrefForBack, type NavFromState } from "../lib/navState";
@@ -246,10 +246,11 @@ export function ProfilePage() {
     communityFilter === "running" ? communities.filter((c) => c.myRole === "organizer") : communities;
   const networkCount = network?.length ?? user?.networkUserIds?.length ?? 0;
   const firstName = profile.user.firstName || "them";
-  const locationLabel = profile.locationLabel ?? profile.neighborhood?.name ?? null;
+  const locationLabel =
+    formatAreaLabel(profile.locationLabel) || profile.neighborhood?.name || null;
 
   async function shareProfile() {
-    const url = `${window.location.origin}/profile/${userId}`;
+    const url = `${getPublicWebOrigin()}/profile/${userId}`;
     try {
       if (navigator.share) {
         await navigator.share({ title: displayName, url });
@@ -352,7 +353,7 @@ export function ProfilePage() {
               {locationLabel && (
                 <div className="profile-other-location">
                   <MapPin size={12} strokeWidth={2.2} fill="currentColor" aria-hidden="true" />
-                  {locationLabel}
+                  <span>{locationLabel}</span>
                 </div>
               )}
               <div className="profile-other-stats" aria-label="Profile stats">
@@ -518,9 +519,6 @@ export function ProfilePage() {
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar profile-shell">
       <section className="profile-hero">
-        <Link to={`/profile/${userId}/edit`} className="profile-edit-btn profile-hero-edit">
-          Edit
-        </Link>
         <div className="profile-hero-main">
           <button
             type="button"
@@ -558,11 +556,14 @@ export function ProfilePage() {
             <div className="profile-name">{displayName}</div>
             {locationLabel && (
               <div className="profile-meta-line">
-                <MapPin size={11} strokeWidth={1.8} aria-hidden="true" />
-                {locationLabel}
+                <MapPin size={12} strokeWidth={2.2} fill="currentColor" aria-hidden="true" />
+                <span>{locationLabel}</span>
               </div>
             )}
           </div>
+          <Link to={`/profile/${userId}/edit`} className="profile-edit-btn">
+            Edit
+          </Link>
         </div>
         {profile.user.bio && (
           <p className="profile-bio">
@@ -1246,6 +1247,7 @@ function FriendButton({
   variant?: "default" | "other";
 }) {
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const { setUser } = useAuth();
   const inNet = profile.network.inMyNetwork;
   const requestSent = profile.network.requestSent ?? false;
@@ -1254,6 +1256,7 @@ function FriendButton({
 
   async function call(path: string) {
     setBusy(true);
+    setErr(null);
     try {
       const r = await api<{ me: MeDTO }>(path, {
         method: "POST",
@@ -1261,8 +1264,8 @@ function FriendButton({
       });
       setUser(r.me);
       onUpdated();
-    } catch {
-      /* swallow */
+    } catch (e) {
+      setErr(parseApiError(e));
     } finally {
       setBusy(false);
     }
@@ -1348,28 +1351,34 @@ function FriendButton({
   // No relationship yet — send a request.
   if (other) {
     return (
-      <button
-        type="button"
-        className="profile-other-cta profile-other-cta--primary"
-        onClick={() => void call("/api/auth/friend-add")}
-        disabled={busy}
-      >
-        <UserPlus size={13} strokeWidth={2} aria-hidden="true" />
-        {busy ? "…" : "Add to Network"}
-      </button>
+      <>
+        <button
+          type="button"
+          className="profile-other-cta profile-other-cta--primary"
+          onClick={() => void call("/api/auth/friend-add")}
+          disabled={busy}
+        >
+          <UserPlus size={13} strokeWidth={2} aria-hidden="true" />
+          {busy ? "…" : "Add to Network"}
+        </button>
+        {err && <p className="friend-request-err">{err}</p>}
+      </>
     );
   }
 
   return (
-    <button
-      type="button"
-      className="btn-secondary"
-      onClick={() => void call("/api/auth/friend-add")}
-      disabled={busy}
-      style={{ marginTop: 10 }}
-    >
-      {busy ? "…" : "Add to network"}
-    </button>
+    <>
+      <button
+        type="button"
+        className="btn-secondary"
+        onClick={() => void call("/api/auth/friend-add")}
+        disabled={busy}
+        style={{ marginTop: 10 }}
+      >
+        {busy ? "…" : "Add to network"}
+      </button>
+      {err && <p className="friend-request-err">{err}</p>}
+    </>
   );
 }
 
@@ -1554,6 +1563,31 @@ function YourPlansBlock({
             <p className="empty-state" style={{ marginTop: 8 }}>
               Quiet over here.
             </p>
+          )}
+
+          {past.length > 0 && (
+            <>
+              <h4 className="profile-section-label profile-past-label">Past</h4>
+              <div className="profile-photo-row">
+                {past.slice(0, 12).map((p) => (
+                  <Link
+                    key={p.id}
+                    to={`/plans/${p.id}`}
+                    state={profileBack}
+                    className="profile-photo-card"
+                  >
+                    <PlanCoverThumb
+                      planId={p.id}
+                      flyerDataUrl={p.flyerDataUrl || p.flyerLinkPreview?.image || null}
+                      isIdea={isIdeaPlan(p)}
+                      className="profile-photo-card-media"
+                    />
+                    <span className="profile-photo-card-title">{p.title}</span>
+                    <span className="profile-photo-card-meta">{formatPlanDate(p.date)}</span>
+                  </Link>
+                ))}
+              </div>
+            </>
           )}
 
           {isSelf && (upcoming.length > 0 || past.length > 0) && (

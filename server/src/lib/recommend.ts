@@ -3,6 +3,7 @@
 
 import { store, type PlanRecord, type UserRecord } from "../store.js";
 import { NEARBY_MILES, distanceMiles } from "./geo.js";
+import { calendarDayInPlanZone } from "./planTime.js";
 
 interface ScoredPlan {
   plan: PlanRecord;
@@ -102,11 +103,22 @@ function declinePenalty(user: UserRecord, plan: PlanRecord): number {
   return max;
 }
 
+function shiftCalendarDay(day: string, deltaDays: number): string {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(Date.UTC(y, (m || 1) - 1, (d || 1) + deltaDays, 12)).toISOString().slice(0, 10);
+}
+
 export function rankPlansForUser(user: UserRecord, candidates: PlanRecord[]): PlanRecord[] {
-  // First: drop plans that have already happened (today or future only).
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const fresh = candidates.filter((p) => new Date(p.date).getTime() >= today.getTime());
+  // Keep today, upcoming, and the last four months. `new Date("YYYY-MM-DD")`
+  // is UTC midnight, which in US timezones is still "yesterday" and was
+  // dropping every plan dated today before the feed ever saw it.
+  const today = calendarDayInPlanZone();
+  const cutoff = shiftCalendarDay(today, -120);
+  const fresh = candidates.filter((p) => {
+    if (p.isFlexibleDate) return true;
+    const day = String(p.date).slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(day) && day >= cutoff;
+  });
 
   // Score everything
   const scored: ScoredPlan[] = fresh.map((plan) => {

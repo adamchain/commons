@@ -4,7 +4,7 @@ import { Capacitor } from "@capacitor/core";
 import { isNative } from "./platform";
 import { api } from "../api/http";
 
-let listenersReady = false;
+let listenersPromise: Promise<void> | null = null;
 let registering: Promise<void> | null = null;
 
 /** Mirrors the priority order `hrefFor` in Notifications.tsx uses for in-app rows. */
@@ -38,27 +38,34 @@ function pathForPushData(data: unknown): string | null {
 // background) — independent of registration state, so it's wired up on every
 // native launch. App.tsx listens for the resulting `commons:push-open`
 // CustomEvent once the router is mounted and navigates to the deep link.
-function ensurePushActionListener(): void {
-  if (!isNative() || listenersReady) return;
-  listenersReady = true;
-  PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
-    const path = pathForPushData(action.notification.data);
-    if (path) {
-      window.dispatchEvent(new CustomEvent("commons:push-open", { detail: { path } }));
-    }
-  });
-  PushNotifications.addListener("pushNotificationReceived", () => {
-    window.dispatchEvent(new CustomEvent("commons:notifications-changed"));
-  });
-  PushNotifications.addListener("registration", (t) => {
-    void api("/api/devices/register", {
-      method: "POST",
-      body: JSON.stringify({ token: t.value, platform: Capacitor.getPlatform() }),
-    }).catch(() => undefined);
-  });
-  void App.addListener("appStateChange", ({ isActive }) => {
-    if (isActive) void registerForPush();
-  });
+function ensurePushActionListener(): Promise<void> {
+  if (!isNative()) return Promise.resolve();
+  if (!listenersPromise) {
+    // addListener resolves only once the native side is listening. Calling
+    // register() before that drops the token, which is why some phones never
+    // got pushes.
+    listenersPromise = Promise.all([
+      PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
+        const path = pathForPushData(action.notification.data);
+        if (path) {
+          window.dispatchEvent(new CustomEvent("commons:push-open", { detail: { path } }));
+        }
+      }),
+      PushNotifications.addListener("pushNotificationReceived", () => {
+        window.dispatchEvent(new CustomEvent("commons:notifications-changed"));
+      }),
+      PushNotifications.addListener("registration", (t) => {
+        void api("/api/devices/register", {
+          method: "POST",
+          body: JSON.stringify({ token: t.value, platform: Capacitor.getPlatform() }),
+        }).catch(() => undefined);
+      }),
+      App.addListener("appStateChange", ({ isActive }) => {
+        if (isActive) void registerForPush();
+      }),
+    ]).then(() => undefined);
+  }
+  return listenersPromise;
 }
 
 async function registerForPush(): Promise<void> {
@@ -81,7 +88,7 @@ async function registerForPush(): Promise<void> {
 // device token to the server so we can target the user later. No-ops on web
 // (browser push lives behind service workers and a separate flow).
 export async function ensurePushRegistered(): Promise<void> {
-  ensurePushActionListener();
+  await ensurePushActionListener();
   if (!isNative()) return;
   try {
     await registerForPush();

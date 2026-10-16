@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, parseApiError } from "../api/http";
-import { formatPhoneInput, formatPlanWhenLine, isValidPhoneInput } from "../lib/format";
+import { formatPhoneInput, formatPlanWhenLine, formatVenueName, isValidPhoneInput } from "../lib/format";
 import { INTEREST_EMOJI, INTEREST_LABELS, type PublicPlanDTO } from "../types/shared";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { IdeaCoverFallback } from "../components/CoverThumb";
@@ -10,14 +10,12 @@ import wordmark from "../assets/wordmark.png";
 // Public, unauthenticated landing for a shared plan link. This is what someone
 // who doesn't have the app sees when they tap a Commons event link. It shows the
 // real event (matching the social share card they clicked) and converts them:
-// number → onboarding (gate bypassed as an event referral) → download the app.
+// number → onboarding → download the app.
 export function PublicEventPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  // Credits the sharer's invite code when this visitor signs up (see
-  // requirement 5.1/5.5) — carried through onboarding as `?invite=CODE`.
-  const inviteCode = searchParams.get("invite");
+  void searchParams; // retained for future query params
 
   const [plan, setPlan] = useState<PublicPlanDTO | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -48,8 +46,6 @@ export function PublicEventPage() {
         "/api/auth/request-code",
         { method: "POST", body: JSON.stringify({ phoneNumber }) },
       );
-      // Hand off to onboarding pre-advanced to the code step, gate bypassed, and
-      // set to return to this event once setup completes.
       navigate("/onboarding", {
         state: {
           eventRef: true,
@@ -57,7 +53,6 @@ export function PublicEventPage() {
           phoneNumber: result.phoneNumber,
           authMode: result.authMode ?? (result.smsConfigured ? "verify" : "dev"),
           smsConfigured: result.smsConfigured,
-          inviteCode: inviteCode ?? undefined,
         },
       });
     } catch (e) {
@@ -119,7 +114,7 @@ export function PublicEventPage() {
           <h1 className="public-event-title">{plan.title}</h1>
           <div className="public-event-meta">{dateLine}</div>
           {!plan.isFlexibleLocation && plan.locationName ? (
-            <div className="public-event-meta">📍 {plan.locationName}</div>
+            <div className="public-event-meta">📍 {formatVenueName(plan.locationName)}</div>
           ) : plan.isFlexibleLocation ? (
             <div className="public-event-meta">📍 Flexible</div>
           ) : null}

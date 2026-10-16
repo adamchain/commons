@@ -1,9 +1,11 @@
 import { sendTransactionalSms } from "./sms.js";
-import { planEndTimestamp, planHasEnded, planStartTimestamp } from "./planTime.js";
+import { calendarDayInPlanZone, planEndTimestamp, planHasEnded, planStartTimestamp, zonedTimestamp } from "./planTime.js";
 import { store, type PlanRecord } from "../store.js";
 import { findUserById, findUsersByIds } from "../userRepo.js";
 import { emit } from "./notify.js";
 import { DEFAULT_NOTIFICATION_PREFS, type NotificationPrefs } from "../types/shared.js";
+import { publicWebOrigin } from "./publicOrigin.js";
+import { releaseInterestedBeforeStart } from "./planFull.js";
 
 function smsAllowed(
   user: { notificationPrefs?: Partial<NotificationPrefs> } | undefined,
@@ -18,7 +20,7 @@ const REVIEW_SENT = new Set<string>();
 let lastWeekendNudgeDay: string | null = null;
 
 function appOrigin(): string {
-  return (process.env.APP_URL ?? "http://localhost:5173").replace(/\/$/, "");
+  return publicWebOrigin();
 }
 
 /** Notify users who previously joined plans at the same venue label (normalized name). */
@@ -257,14 +259,12 @@ export async function runDayOfReminders(): Promise<void> {
     if (planHasEnded(plan)) continue;
     const start = planStartTimestamp(plan);
     const hoursUntil = (start - now) / (60 * 60 * 1000);
-    // Fire in a ~20-min window around either 3h-before OR morning-of (8am local).
+    // Fire in a ~20-min window around either 3h-before OR morning-of (8am Philly).
     const threeHourHit = hoursUntil >= 2.85 && hoursUntil <= 3.15;
-    const startDate = new Date(start);
-    const morning = new Date(startDate);
-    morning.setHours(8, 0, 0, 0);
+    const morning = zonedTimestamp(plan.date.slice(0, 10), "08:00:00");
     const morningHit =
-      startDate.toDateString() === new Date(now).toDateString() &&
-      Math.abs(now - morning.getTime()) < 15 * 60 * 1000 &&
+      plan.date.slice(0, 10) === calendarDayInPlanZone(new Date(now)) &&
+      Math.abs(now - morning) < 15 * 60 * 1000 &&
       hoursUntil > 3.2;
     if (!threeHourHit && !morningHit) continue;
 
@@ -337,6 +337,56 @@ export async function runInterestedNudges(): Promise<void> {
         dedupKey: `interestedNudge:${plan.id}:${row.userId}`,
       });
       if (created) INTERESTED_NUDGE_SENT.add(key);
+    }
+  }
+}
+
+/**
+ * Host opted in: if the plan is still at capacity, Interested people hear
+ * 48h and 24h before start that no spot opened up.
+ */
+const FULL_INTERESTED_BODY =
+  "Unfortunately, no spots opened up for this one! Keep an eye out on the feed for the next plan!";
+
+function planIsFull(plan: PlanRecord): boolean {
+  const cap = plan.capacity;
+  if (cap == null || !Number.isFinite(cap) || cap < 1) return false;
+  const going = store.listParticipationsForPlan(plan.id).filter((p) => p.state === "going").length;
+  return going >= cap;
+}
+
+export async function runFullInterestedNotices(): Promise<void> {
+  const now = Date.now();
+  const windows = [
+    { label: "48", hours: 48 },
+    { label: "24", hours: 24 },
+  ] as const;
+
+  for (const plan of store.listPlans()) {
+    if (!plan.notifyInterestedWhenFull) continue;
+    if (plan.cancelledAt) continue;
+    if (plan.isFlexibleDate || plan.isThisWeek) continue;
+    if (plan.isFlexibleTime || !plan.time?.trim()) continue;
+    if (planHasEnded(plan)) continue;
+    if (!planIsFull(plan)) continue;
+
+    const start = planStartTimestamp(plan);
+    const hoursUntil = (start - now) / (60 * 60 * 1000);
+    const hit = windows.find((w) => hoursUntil >= w.hours - 0.5 && hoursUntil <= w.hours + 0.5);
+    if (!hit) continue;
+
+    const interested = store
+      .listParticipationsForPlan(plan.id)
+      .filter((p) => p.state === "interested" && p.userId !== plan.creatorId);
+
+    for (const row of interested) {
+      await emit({
+        userId: row.userId,
+        kind: "planFullInterested",
+        body: FULL_INTERESTED_BODY,
+        planId: plan.id,
+        dedupKey: `planFullInterested:${hit.label}:${plan.id}:${row.userId}`,
+      });
     }
   }
 }
@@ -441,6 +491,8 @@ export function startNudgeSchedulers(): void {
     void runPlanTomorrowReminders().catch((e) => console.error(e));
     void runDayOfReminders().catch((e) => console.error(e));
     void runInterestedNudges().catch((e) => console.error(e));
+    void releaseInterestedBeforeStart().catch((e) => console.error(e));
+    // 48h/24h "still full" notes are paused. runFullInterestedNotices stays off.
     void runDidThisHappenPrompts().catch((e) => console.error(e));
     void runWeekendNudgeIfWeekendEve().catch((e) => console.error(e));
     void runPostPlanReviewPrompts().catch((e) => console.error(e));

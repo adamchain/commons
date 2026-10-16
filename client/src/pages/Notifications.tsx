@@ -394,6 +394,8 @@ function iconFor(kind: NotificationKind): ReactNode {
       return <AlarmClock {...props} />;
     case "interestedNudge":
       return <Lightbulb {...props} />;
+    case "planFullInterested":
+      return <Calendar {...props} />;
     case "didThisHappen":
       return <CheckCircle2 {...props} />;
     case "planSpotReopen":

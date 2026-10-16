@@ -10,7 +10,7 @@ import { PostSuccessSheet } from "../components/PostSuccessSheet";
 import { WeekStrip } from "../components/WeekStrip";
 import { EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
-import { FLEXIBLE_DATE_PLACEHOLDER, isIdeaPlan, planFeedHasPassed } from "../lib/planTime";
+import { FLEXIBLE_DATE_PLACEHOLDER, isIdeaPlan, planHasEnded } from "../lib/planTime";
 import { peekFeedPlans, retireFeedPlans } from "../lib/feedPrefetch";
 import { consumeFeedScroll } from "../lib/navState";
 import type { AgeRange, InterestTag, MeDTO, NetworkPromptDTO, PlanDTO } from "../types/shared";
@@ -211,7 +211,7 @@ export function FeedPage() {
       // that sheet. Arming pull-to-refresh here steals the gesture and rubber-
       // bands the feed behind the overlay.
       const target = e.target;
-      if (target instanceof Element && target.closest(".sheet-backdrop")) {
+      if (target instanceof Element && target.closest(".sheet-backdrop, .week-strip-wrap")) {
         pullRef.current.armed = false;
         if (pullRef.current.distance > 0) resetPullVisual();
         return;
@@ -342,8 +342,17 @@ export function FeedPage() {
       const networkIds = new Set(user?.networkUserIds ?? []);
       list = list.filter((p) => networkIds.has(p.creator.id));
     }
-    // A plan leaves the feed as soon as its time has passed.
-    list = list.filter((p) => !p.cancelledAt && !planFeedHasPassed(p));
+    // Cancelled plans stay off the feed. A plan stays with the live list until
+    // it has actually ended, then moves into Past instead of disappearing.
+    const ended: PlanDTO[] = [];
+    list = list.filter((p) => {
+      if (p.cancelledAt) return false;
+      if (planHasEnded(p)) {
+        ended.push(p);
+        return false;
+      }
+      return true;
+    });
 
     const dated: PlanDTO[] = [];
     const anytimeIdeas: PlanDTO[] = [];
@@ -392,10 +401,14 @@ export function FeedPage() {
         if (pinned) active.unshift(pinned);
       }
     }
-    return active;
+    const past = (view === "ideas" ? ended.filter(isIdeaPlan) : ended).sort((a, b) =>
+      `${b.date}T${b.time || "00:00"}`.localeCompare(`${a.date}T${a.time || "00:00"}`),
+    );
+    return { upcoming: active, past };
   }, [plans, view, selectedTag, nearbyOnly, selectedAgeRange, selectedDayIso, hideCancelled, networkOnly, user?.id, user?.location, user?.networkUserIds, justPostedId]);
 
-  const filteredPlans = activePlans;
+  const filteredPlans = activePlans.upcoming;
+  const pastPlans = activePlans.past;
 
 
   const activeFilterCount =
@@ -431,7 +444,7 @@ export function FeedPage() {
 
       <div ref={contentRef} className="feed-pull-content">
         <WeekStrip
-          plans={plans}
+          plans={plans.filter((p) => !p.cancelledAt && (view === "plans" || isIdeaPlan(p)))}
           selectedDayIso={selectedDayIso}
           onSelectDay={setSelectedDayIso}
         />
@@ -478,7 +491,7 @@ export function FeedPage() {
         )}
 
         <div id="feed-plans">
-          {filteredPlans.length === 0 ? (
+          {filteredPlans.length === 0 && pastPlans.length === 0 ? (
             <FeedEmptyState
               view={view}
               hasAnyPlans={(plans?.length ?? 0) > 0}
@@ -492,24 +505,38 @@ export function FeedPage() {
               }}
             />
           ) : (
-            <div className="plan-grid">
-              {filteredPlans.map((plan, index) => {
-                const farther =
-                  Boolean(user?.location) &&
-                  !(plan.distanceMiles != null && plan.distanceMiles <= NEARBY_MILES);
-                const prev = index > 0 ? filteredPlans[index - 1] : null;
-                const prevNear =
-                  prev != null &&
-                  prev.distanceMiles != null &&
-                  prev.distanceMiles <= NEARBY_MILES;
-                const showFartherLabel = farther && (index === 0 || prevNear);
-                return (
-                  <div key={plan.id} className={showFartherLabel ? "plan-grid-farther" : undefined}>
-                    <PlanCard plan={plan} onPlanRefresh={refreshPlans} />
+            <>
+              {filteredPlans.length > 0 && (
+                <div className="plan-grid">
+                  {filteredPlans.map((plan, index) => {
+                    const farther =
+                      Boolean(user?.location) &&
+                      !(plan.distanceMiles != null && plan.distanceMiles <= NEARBY_MILES);
+                    const prev = index > 0 ? filteredPlans[index - 1] : null;
+                    const prevNear =
+                      prev != null &&
+                      prev.distanceMiles != null &&
+                      prev.distanceMiles <= NEARBY_MILES;
+                    const showFartherLabel = farther && (index === 0 || prevNear);
+                    return (
+                      <div key={plan.id} className={showFartherLabel ? "plan-grid-farther" : undefined}>
+                        <PlanCard plan={plan} onPlanRefresh={refreshPlans} />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {pastPlans.length > 0 && (
+                <>
+                  <h2 className="feed-past-heading">Past</h2>
+                  <div className="plan-grid">
+                    {pastPlans.map((plan) => (
+                      <PlanCard key={plan.id} plan={plan} onPlanRefresh={refreshPlans} />
+                    ))}
                   </div>
-                );
-              })}
-            </div>
+                </>
+              )}
+            </>
           )}
         </div>
       </div>

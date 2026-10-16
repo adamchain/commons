@@ -176,18 +176,20 @@ export function ParticipationButtons({
   const goingActive = state === "going";
   const interestedActive = state === "interested";
   const loose = planKind === "looking_for";
-  const isFull = !isHosting && (markedFull || isPlanAtCapacity(capacity, goingCount)) && !goingActive;
-  const isApproveOnly = !isHosting && joinType === "approve" && !goingActive;
-  // Approval means Interested until the host lets you in. A full plan does too.
+  const planClosed = markedFull || isPlanAtCapacity(capacity, goingCount);
+  const isFull = !isHosting && planClosed && !goingActive;
+  const isApproveOnly = !isHosting && joinType === "approve" && !goingActive && !planClosed;
+  // Approval means Interested until the host lets you in.
   // An open plan with room offers Join, even when it has a capacity.
-  const interestedOnly = (isFull || isApproveOnly) && !goingActive;
+  // A full plan doesn't take Interested — those people are removed.
+  const interestedOnly = isApproveOnly && !goingActive;
 
   return (
     <div className={`participation ${loose ? "participation--loose" : ""}`}>
       {!loose && (isApproveOnly || isFull || capacity !== null) && (
         <p className="participation-hint">
           {isFull
-            ? "This one's full — tap Interested in case a spot opens."
+            ? "This one's full."
             : isApproveOnly
               ? capacity !== null
                 ? `${goingCount}/${capacity} spots — let the host know you're interested.`
@@ -203,6 +205,10 @@ export function ParticipationButtons({
           disabled={pending}
         >
           Drop out
+        </button>
+      ) : isFull ? (
+        <button type="button" className="btn-going" disabled>
+          Full
         </button>
       ) : interestedOnly ? (
         <button
@@ -249,9 +255,11 @@ export function ParticipationButtons({
         <BottomSheet onClose={() => setShowGoingSheet(false)} labelledBy="rsvp-going-title">
             <div id="rsvp-going-title" className="sheet-title">Joined</div>
             <div className="sheet-actions">
-              <button type="button" className="sheet-link" onClick={() => void switchToInterested()}>
-                Switch to Interested
-              </button>
+              {!planClosed && (
+                <button type="button" className="sheet-link" onClick={() => void switchToInterested()}>
+                  Switch to Interested
+                </button>
+              )}
               <button type="button" className="sheet-link sheet-link--danger" disabled={pending} onClick={() => void dropOutFromGoing()}>
                 Drop out
               </button>

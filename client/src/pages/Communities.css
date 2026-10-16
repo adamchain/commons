@@ -15,6 +15,10 @@
 .app-shell.app-shell--with-topbar.cmy-list {
   padding-top: calc(var(--topbar-height, 56px) + 18px + env(safe-area-inset-top, 0px));
 }
+.app-shell.cmy,
+.app-shell.cmy-list {
+  padding-bottom: calc(var(--nav-height, 72px) + 72px + env(safe-area-inset-bottom, 0px));
+}
 
 .cmy-muted {
   color: var(--text-muted);
@@ -324,6 +328,7 @@
   padding: 2px 0 6px;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  touch-action: pan-x pan-y;
 }
 .cmy-cat-pills::-webkit-scrollbar { display: none; }
 .cmy-cat-pill {
@@ -1084,6 +1089,9 @@ button.cmy-joined-pill {
   padding: 2px 2px 4px;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+  /* A horizontal scroller was eating the vertical swipe, so the page couldn't
+     reach Reply or the rest of the communities list. */
+  touch-action: pan-x pan-y;
 }
 .cmy-tabs::-webkit-scrollbar { display: none; }
 .cmy-tab {
@@ -1179,15 +1187,13 @@ button.cmy-joined-pill {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  flex: 1 1 auto;
-  min-width: 44px;
-  max-width: 100%;
-  position: relative;
-  z-index: 2;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
   color: inherit;
   text-decoration: none;
   cursor: pointer;
-  touch-action: manipulation;
+  touch-action: pan-y;
 }
 .cmy-post-author-name {
   color: inherit;
@@ -1203,15 +1209,18 @@ button.cmy-joined-pill {
   white-space: nowrap;
 }
 a.cmy-post-author-name {
-  position: relative;
-  z-index: 2;
   cursor: pointer;
-  touch-action: manipulation;
+  touch-action: pan-y;
 }
-.cmy-post-time { color: var(--text-subtle); font-size: var(--type-caption); margin-left: auto; white-space: nowrap; }
+.cmy-post-time { color: var(--text-subtle); font-size: var(--type-caption); white-space: nowrap; flex-shrink: 0; }
 .cmy-post-body { color: var(--ink-700); font-size: var(--type-body); line-height: 1.5; margin: 0; white-space: pre-wrap; }
 .cmy-post-image { width: 100%; border-radius: var(--r-md); }
-.cmy-post-actions { display: flex; gap: var(--s-1); align-items: center; }
+.cmy-post-actions { display: flex; gap: var(--s-1); align-items: center; flex-shrink: 0; }
+.cmy-post-head > .cmy-icon-btn,
+.cmy-reply-top > .cmy-icon-btn,
+.cmy-reply-top > .plan-safety-menu {
+  flex-shrink: 0;
+}
 .cmy-post-actions .plan-safety-menu,
 .cmy-reply-top .plan-safety-menu { margin-top: 0; }
 .cmy-org-badge {
@@ -1335,11 +1344,17 @@ a.cmy-post-author-name {
   align-items: flex-start;
   gap: 8px;
 }
-.cmy-reply-body { min-width: 0; flex: 1; }
+.cmy-reply .cmy-post-author { flex: 0 0 auto; }
+.cmy-reply-body { min-width: 0; flex: 1; overflow-wrap: break-word; }
 .cmy-reply-top {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+}
+.cmy-reply-top > .cmy-post-name {
+  flex: 1 1 0;
+  min-width: 0;
 }
 .cmy-reply-composer {
   display: flex;

@@ -752,8 +752,10 @@ export async function ensureConnectRequest(
     await emit({
       userId: targetId,
       kind: "networkRequest",
-      body: `${viewer.firstName || "Someone"} added you to their network. Accept to connect.`,
-      dedupKey: `networkRequest:${userId}:${targetId}`,
+      body: `${viewer.firstName || "Someone"} wants to join your network. Accept to connect.`,
+      // A declined request used to keep the old dedup key forever, so asking
+      // again saved the request and never told the other person.
+      dedupKey: `networkRequest:${userId}:${targetId}:${Date.now()}`,
       profileUserId: userId,
     });
   }

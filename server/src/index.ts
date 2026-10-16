@@ -36,10 +36,12 @@ import { helpchatRouter } from "./routes/helpchat.js";
 import { store } from "./store.js";
 import { readFileSync } from "node:fs";
 import { startNudgeSchedulers } from "./lib/nudges.js";
+import { publicWebOrigin } from "./lib/publicOrigin.js";
 import { seedIfEmpty } from "./seed.js";
 import { ensureLaunchAccessCodes } from "./lib/accessCodes.js";
 
 const app = express();
+app.disable("x-powered-by");
 // Railway (and most hosts) terminate TLS and set X-Forwarded-For. One hop
 // so login rate limits see the client, not the proxy.
 app.set("trust proxy", 1);
@@ -128,8 +130,7 @@ app.use(shareRouter);
 // Absolute public base for og:* URLs: prefer the configured origin, else derive
 // from the request so previews work on any deploy/preview host.
 function publicOrigin(req: express.Request): string {
-  const env = process.env.APP_URL?.trim();
-  if (env && /^https?:\/\//.test(env)) return env.replace(/\/$/, "");
+  if (isProduction) return publicWebOrigin();
   const proto = (req.headers["x-forwarded-proto"] as string)?.split(",")[0] || req.protocol;
   return `${proto}://${req.get("host")}`;
 }

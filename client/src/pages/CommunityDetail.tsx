@@ -36,7 +36,7 @@ import {
   type SearchResultsDTO,
 } from "../types/shared";
 import { EmptyCard } from "../components/ui";
-import { formatRelative } from "../lib/format";
+import { formatAreaLabel, formatRelative } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { planHasEnded } from "../lib/planTime";
 import { pickPhotoNative } from "../lib/photoPicker";
@@ -142,7 +142,7 @@ export function CommunityDetailPage() {
   }
 
   const catLabels = communityCategoriesOf(community).map((tag) => COMMUNITY_CATEGORY_LABELS[tag]);
-  const placeLabel = community.city?.trim() || "Philadelphia";
+  const placeLabel = formatAreaLabel(community.city) || "Philadelphia";
   const isActiveMember = community.myMembership?.status === "active";
   // isOrganizer is the real community organizer only (never a COMMONS admin).
   const showChatTab = community.chatEnabled && (isActiveMember || community.isOrganizer);
@@ -1205,6 +1205,12 @@ function BulletinTab({
                         setReplyTo(p.id);
                         setReplyDraft("");
                         setPostErr(null);
+                        window.setTimeout(() => {
+                          document.getElementById(`cmy-reply-${p.id}`)?.scrollIntoView({
+                            block: "center",
+                            behavior: "smooth",
+                          });
+                        }, 50);
                       }}
                     >
                       Reply
@@ -1214,7 +1220,7 @@ function BulletinTab({
               </div>
             )}
             {canReply && replyTo === p.id && (
-              <div className="cmy-reply-composer">
+              <div className="cmy-reply-composer" id={`cmy-reply-${p.id}`}>
                 <ComposerField
                   className="cmy-composer-input"
                   placeholder={`Reply to ${p.author.firstName}…`}

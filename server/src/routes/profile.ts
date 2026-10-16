@@ -3,6 +3,7 @@ import { requireAuth } from "../middleware/requireAuth.js";
 import { store } from "../store.js";
 import { findUserById } from "../userRepo.js";
 import { communityCardsForUser } from "./communities.js";
+import { calendarDayInPlanZone, planHasEnded } from "../lib/planTime.js";
 import { planSummary, userToPublic } from "./plans.js";
 
 export const profileRouter = Router();
@@ -27,15 +28,24 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
   }
   const resolvedHoodId = store.resolveNeighborhoodId(target.neighborhoodId);
   const neighborhood = resolvedHoodId ? store.findNeighborhoodById(resolvedHoodId) : null;
-  // Plans authored (all-time, for stats + past accordion).
+  // Plans authored (all-time, for stats + past accordion) plus ones they
+  // joined. Past used to be "hosted only, last 5", so joined plans never showed.
   const allPlans = store.listPlansByCreator(targetId);
+  const attended = new Map(allPlans.map((p) => [p.id, p]));
+  for (const part of store.listParticipationsForUser(targetId)) {
+    if (part.state !== "going") continue;
+    const plan = store.findPlanById(part.planId);
+    if (plan) attended.set(plan.id, plan);
+  }
   // Compare YYYY-MM-DD strings — never `new Date("YYYY-MM-DD")` (UTC midnight
   // shifts the calendar day in US timezones and drops "today" from upcoming).
   const todayIso = localIsoDate();
-  const past = allPlans.filter((p) => p.date < todayIso);
+  const past = [...attended.values()]
+    .filter((p) => planHasEnded(p) || (!p.isFlexibleDate && p.date.slice(0, 10) < todayIso))
+    .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
 
   // Upcoming = hosting + I'm In or Interested (two-state participation).
-  const upcomingHosted = allPlans.filter((p) => !p.cancelledAt && p.date >= todayIso);
+  const upcomingHosted = allPlans.filter((p) => !p.cancelledAt && !planHasEnded(p) && p.date >= todayIso);
   const upcomingJoined = store
     .listParticipationsForUser(targetId)
     .filter((p) => p.state === "going" || p.state === "interested")
@@ -43,7 +53,7 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
     .filter((p): p is NonNullable<typeof p> => {
       if (!p || p.cancelledAt) return false;
       if (p.creatorId === targetId) return false;
-      return p.date >= todayIso;
+      return !planHasEnded(p) && p.date >= todayIso;
     });
   const upcomingById = new Map<string, (typeof upcomingHosted)[number]>();
   for (const p of [...upcomingHosted, ...upcomingJoined]) upcomingById.set(p.id, p);
@@ -107,10 +117,7 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
       ? await Promise.all(upcoming.map((p) => planSummary(p, viewerId)))
       : await Promise.all(sharedUpcoming.map((p) => planSummary(p, viewerId))),
     past: plansOpen
-      ? past
-          .slice(-5)
-          .reverse()
-          .map((p) => ({
+      ? past.slice(0, 40).map((p) => ({
             id: p.id,
             title: p.title,
             date: p.date,
@@ -139,12 +146,9 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
   });
 });
 
-/** Local calendar YYYY-MM-DD — `toISOString().slice(0, 10)` is UTC and flips after ~8pm ET. */
+/** Philly calendar day. Server local time is UTC and flips the day at 8pm ET. */
 function localIsoDate(d = new Date()): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return calendarDayInPlanZone(d);
 }
 
 /** True only after a shared plan's calendar day has passed — not merely because you joined an upcoming one. */

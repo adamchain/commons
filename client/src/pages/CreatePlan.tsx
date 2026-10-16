@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { FLEXIBLE_DATE_PLACEHOLDER, thisWeekAnchorDate } from "../lib/planTime";
-import { formatPlaceAddress, formatPlanDate, formatPlanTime, normalizeHttpUrl } from "../lib/format";
+import { formatPlanDate, formatPlanTime, formatVenueAddressLine, normalizeHttpUrl } from "../lib/format";
 import { Avatar } from "../components/Avatar";
 import { AvatarCropModal } from "../components/AvatarCropModal";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
@@ -1324,8 +1324,10 @@ export function CreatePlanPage() {
                         }));
                       }}
                     />
-                    {form.locationAddress && form.locationAddress !== form.locationName ? (
-                      <span className="plan-meta-sub">{formatPlaceAddress(form.locationAddress)}</span>
+                    {formatVenueAddressLine(form.locationName, form.locationAddress) ? (
+                      <span className="plan-meta-sub">
+                        {formatVenueAddressLine(form.locationName, form.locationAddress)}
+                      </span>
                     ) : null}
                   </>
                 )}
@@ -1637,8 +1639,8 @@ export function CreatePlanPage() {
                     <label className="form-question">Mark as full</label>
                     <p className="form-help">
                       {form.markedFull
-                        ? "Plan shows as Full. New joins are blocked."
-                        : "Turn on to show this plan as full."}
+                        ? "Join is closed. Anyone who isn't going comes off 48 hours before."
+                        : "Close Join anytime. Anyone who isn't going comes off 48 hours before it starts."}
                     </p>
                   </div>
                   <FlexToggle
@@ -2311,8 +2313,10 @@ function IdeaForm({
                             }));
                           }}
                         />
-                        {form.locationAddress && form.locationAddress !== form.locationName ? (
-                          <span className="plan-meta-sub">{formatPlaceAddress(form.locationAddress)}</span>
+                        {formatVenueAddressLine(form.locationName, form.locationAddress) ? (
+                          <span className="plan-meta-sub">
+                            {formatVenueAddressLine(form.locationName, form.locationAddress)}
+                          </span>
                         ) : null}
                       </>
                     )}

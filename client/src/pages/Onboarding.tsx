@@ -49,22 +49,9 @@ function markWelcomeSeen(userId: string): void {
   if (typeof window !== "undefined") localStorage.setItem(welcomeSeenKey(userId), "1");
 }
 
-// TEMP launch gate: after verifying their phone, every (non-admin) member must
-// enter an access code. The valid codes live in Mongo (see server accessCodes)
-// and are checked by POST /api/auth/redeem-code. This device remembers a pass
-// so the prompt is not shown again. Remove the "gate" Step, its render block,
-// and the gate branch in pickInitial when the invite-only launch period ends.
-const GATE_STORAGE_KEY = "commons_gate_ok";
-
-function isGatePassed(): boolean {
-  if (typeof window === "undefined") return false;
-  return localStorage.getItem(GATE_STORAGE_KEY) === "1";
-}
-
 type Step =
   | "phone"
   | "code"
-  | "gate"
   | "admin_choice"
   | "location"
   | "interests"
@@ -76,9 +63,8 @@ type Step =
 /**
  * Handoff from the public event page (PublicEventPage). When a logged-out
  * visitor enters their number on a shared plan link, we request the code there
- * and route into onboarding pre-advanced to the code step — with the gate
- * bypassed (event referral counts as the invite) and a redirect back to the
- * event once setup finishes.
+ * and route into onboarding pre-advanced to the code step with a redirect back
+ * to the event once setup finishes.
  */
 interface OnboardingNavState {
   eventRef?: boolean;
@@ -86,9 +72,6 @@ interface OnboardingNavState {
   phoneNumber?: string;
   authMode?: "verify" | "dev";
   smsConfigured?: boolean;
-  /** Invite code carried over from a shared plan link (`?invite=CODE`) or a
-   *  deep link into `/plans/:id`, prefilled on the launch-gate step. */
-  inviteCode?: string;
 }
 
 export function OnboardingPage() {
@@ -98,13 +81,9 @@ export function OnboardingPage() {
   const nav = (location.state ?? null) as OnboardingNavState | null;
   // Event-referred signups bypass the invite-only launch gate and, on finish,
   // route back to the event they came from instead of the home feed.
-  const eventRef = Boolean(nav?.eventRef);
   const redirectTo = safePostAuthPath(
     nav?.redirect && nav.redirect.startsWith("/") ? nav.redirect : "/",
   );
-  // TEMP launch gate: whether this device has already cleared the access-code
-  // step. Read once so a refresh mid-onboarding doesn't re-prompt or bypass it.
-  const [gatePassed, setGatePassed] = useState<boolean>(() => isGatePassed() || eventRef);
   const [phoneNumber, setPhoneNumber] = useState(nav?.phoneNumber ?? "");
   const [countryCode, setCountryCode] = useState("1");
   /** E.164 number the code was actually sent to. The field stays the national number. */
@@ -114,7 +93,7 @@ export function OnboardingPage() {
   const [authMode, setAuthMode] = useState<"verify" | "dev" | null>(nav?.authMode ?? null);
   // Start on the code step when the public event page already sent the SMS.
   const [step, setStep] = useState<Step>(() =>
-    nav?.phoneNumber ? "code" : pickInitial(user, isGatePassed() || eventRef),
+    nav?.phoneNumber ? "code" : pickInitial(user),
   );
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -130,16 +109,6 @@ export function OnboardingPage() {
   const codeFilledAt = useRef(0);
   const hasSentCode = useRef(Boolean(nav?.phoneNumber));
   const armedInitial = useRef(false);
-  // Access code for the launch gate. Accepts the shared exclusive code OR a
-  // personal invite code from an existing member. Prefilled from ?invite= on a
-  // share link, or from location.state.inviteCode when handed off from the
-  // public event page / a plan deep link, so invite-link users just tap
-  // Continue.
-  const [accessCode, setAccessCode] = useState<string>(() => {
-    if (nav?.inviteCode) return nav.inviteCode;
-    if (typeof window === "undefined") return "";
-    return new URLSearchParams(window.location.search).get("invite") ?? "";
-  });
 
   // If a logged-in, already-onboarded user lands here, move them on (to the
   // event they came from, or home). Skip on the "welcome" step — that's the
@@ -156,8 +125,8 @@ export function OnboardingPage() {
       setStep("admin_choice");
       return;
     }
-    setStep(pickInitial(user, gatePassed));
-  }, [user, step, gatePassed]);
+    setStep(pickInitial(user));
+  }, [user, step]);
 
   useEffect(() => {
     if (countryCode !== "1") return;
@@ -265,9 +234,7 @@ export function OnboardingPage() {
         sessionStorage.setItem("commons_pending_admin_choice", "1");
         setStep("admin_choice");
       } else {
-        // Non-admins hit the launch gate next (unless already cleared on this
-        // device) — pickInitial routes them to "gate" when !gatePassed.
-        setStep(pickInitial(me, gatePassed));
+        setStep(pickInitial(me));
       }
     } catch (e) {
       if (!verified.current) setError(formatError(e));
@@ -275,33 +242,6 @@ export function OnboardingPage() {
       verifyInFlight.current = false;
       setBusy(false);
     }
-  }
-
-  // TEMP launch gate: shared access codes and personal invite codes are both
-  // checked on the server. Either one clears the gate for this device.
-  async function submitGate() {
-    const entered = accessCode.trim();
-    if (!entered) return;
-    setError(null);
-    setBusy(true);
-    try {
-      await api("/api/auth/redeem-code", {
-        method: "POST",
-        body: JSON.stringify({ code: entered }),
-      });
-      passGate();
-    } catch {
-      setError("That code isn't valid. Enter your access code, or an invite code from a member.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function passGate() {
-    if (typeof window !== "undefined") localStorage.setItem(GATE_STORAGE_KEY, "1");
-    setGatePassed(true);
-    setError(null);
-    setStep(pickInitial(user, true));
   }
 
   async function patchMe(
@@ -437,39 +377,6 @@ export function OnboardingPage() {
       </OnboardingShell>
     );
   }
-  if (step === "gate") {
-    return (
-      <OnboardingShell
-        title="One last step."
-        subtitle="Commons is invite-only for now. Enter your access code, or an invite code from a member, to finish setting up your account."
-      >
-        <input
-          className="onboarding-input"
-          type="text"
-          inputMode="text"
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          maxLength={32}
-          placeholder="Access code"
-          value={accessCode}
-          onChange={(e) => setAccessCode(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void submitGate();
-          }}
-          autoFocus
-        />
-        {error && <div className="onboarding-error">{error}</div>}
-        <button
-          className="btn-primary btn-block"
-          disabled={busy || !accessCode.trim()}
-          onClick={() => void submitGate()}
-        >
-          {busy ? "Checking…" : "Continue"}
-        </button>
-      </OnboardingShell>
-    );
-  }
   if (step === "admin_choice" && user?.canAccessAdmin) {
     return (
       <OnboardingShell title="Admin access" subtitle="You signed in with a number that can open the Commons admin dashboard.">
@@ -481,7 +388,7 @@ export function OnboardingPage() {
           type="button"
           onClick={() => {
             sessionStorage.removeItem("commons_pending_admin_choice");
-            setStep(pickInitial(user, gatePassed));
+            setStep(pickInitial(user));
           }}
         >
           Continue as member
@@ -515,10 +422,6 @@ export function OnboardingPage() {
             /* Interests can still load if the location save is slow or fails. */
           }
         }}
-        // Location is the first step after the access-code gate, so "back" has
-        // nowhere else sensible to land — re-showing the gate (already passed,
-        // just re-confirms) beats no back button at all.
-        onBack={() => setStep("gate")}
       />
     );
   }
@@ -688,13 +591,9 @@ function WelcomeStep({
   );
 }
 
-function pickInitial(user: MeDTO | null, gatePassed: boolean): Step {
+function pickInitial(user: MeDTO | null): Step {
   if (!user) return "phone";
   if (!needsOnboarding(user)) return "phone";
-  // TEMP launch gate: members must clear the access-code step before any of the
-  // profile-setup steps. Admins are exempt so the operator can't lock themselves
-  // out. Drop this check when the invite-only launch period ends.
-  if (!gatePassed && !user.canAccessAdmin) return "gate";
   const answeredLocation = Boolean(user.locationPromptAnsweredAt) || Boolean(user.location);
   const hoods =
     user.neighborhoodIds?.length ? user.neighborhoodIds : user.neighborhoodId ? [user.neighborhoodId] : [];

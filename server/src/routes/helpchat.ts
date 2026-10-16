@@ -86,7 +86,7 @@ Shows full info about a plan:
 - **Join** — marks you as Going. After you tap it, the button reads **Joined**
 - **Interested** — softer opt-in. After you tap it, the button reads **Interested ✓**
 - The host gets a notification either way: "Alex joined your plan…" or "Alex is interested in your plan…". The plan chat also gets a short line.
-- Ideas and plans with a capacity only start with **Interested**
+- A plan with a cap still uses **Join** until every spot is taken. The host can also mark any plan full, with or without a cap. People who are only Interested stay until 48 hours before it starts, then they're taken off and notified.
 
 **Participants section:**
 - Going (bigger avatars, listed first)
@@ -99,7 +99,7 @@ Shows full info about a plan:
 
 **Chat row:**
 - Opens the plan's group thread
-- Only visible/accessible once you've tapped "Join" or "Interested"
+- Open to anyone who tapped **Join** or **Interested**, until 48 hours before the plan starts
 
 **Action buttons:**
 - **Share** — share the plan in-app (search contacts) or via SMS link
