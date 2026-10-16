@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import { useState } from "react";
+import type { CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import wordmark from "../assets/wordmark.png";
 import appStoreBadge from "../assets/app-store-badge.png";
@@ -10,8 +10,7 @@ import { APP_STORE_URL } from "../lib/appStore";
  * a type-forward hero with two floating in-app previews, a full-bleed photo
  * strip, the two-pathway pitch (mirroring the in-app "Just an idea" vs "Make a
  * plan" selector), a three-step "how it works" split, and a photo footer CTA.
- * The Commons app is iOS-only. The hero and footer link to the App Store; the
- * mid-page CTAs still open the waitlist.
+ * The Commons app is iOS-only, so every download CTA links to the App Store.
  *
  * Photos live in client/public/landing and are referenced by root-absolute URL.
  * The brand mark uses the shared wordmark asset (there's no standalone C mark).
@@ -25,132 +24,10 @@ const MUTED = "rgba(20,17,48,0.46)";
 const D = "'Plus Jakarta Sans', sans-serif";
 const B = "'Poppins', sans-serif";
 
-// Google Form waitlist. Short link: https://forms.gle/GxVDLYj74rvXtGYb9
-// Field entry IDs (from the form HTML) let us pre-fill answers via URL params.
-const WAITLIST_FORM_BASE =
-  "https://docs.google.com/forms/d/e/1FAIpQLSc8S_DMmQz7WaS1wZUn9GKHbIK1XELSnx81Kbjj1EMnLiOKVg/viewform";
-const WAITLIST_EMAIL_ENTRY = "entry.1045781291";
-
-function waitlistFormUrl(prefillEmail?: string): string {
-  const params = new URLSearchParams({ embedded: "true" });
-  if (prefillEmail) params.set(WAITLIST_EMAIL_ENTRY, prefillEmail);
-  return `${WAITLIST_FORM_BASE}?${params.toString()}`;
-}
-
 // Served from client/public — referenced by root-absolute URL, not imported.
 const shadowsImg = "/landing/photo-shadows.jpg";
 const sunsetImg = "/landing/photo-sunset.jpg";
 const picnicImg = "/landing/photo-picnic.jpg";
-
-function Pill({
-  children,
-  variant = "dark",
-  style: x,
-  onClick,
-  type = "button",
-}: {
-  children: ReactNode;
-  variant?: "dark" | "red" | "white" | "ghost";
-  style?: CSSProperties;
-  onClick?: () => void;
-  type?: "button" | "submit";
-}) {
-  const map: Record<string, CSSProperties> = {
-    dark: { background: NAVY, color: WHITE },
-    red: { background: RED, color: WHITE },
-    white: { background: WHITE, color: NAVY },
-    ghost: { background: "transparent", color: NAVY, border: `1.5px solid rgba(20,17,48,0.22)` },
-  };
-  return (
-    <button
-      type={type}
-      onClick={onClick}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        borderRadius: 9999,
-        fontFamily: B,
-        fontWeight: 500,
-        fontSize: 14,
-        cursor: "pointer",
-        border: "none",
-        transition: "opacity 0.15s",
-        padding: "12px 26px",
-        letterSpacing: "-0.01em",
-        whiteSpace: "nowrap",
-        ...map[variant],
-        ...x,
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.78")}
-      onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-    >
-      {children}
-    </button>
-  );
-}
-
-/**
- * Branded waitlist popup. Embeds the full COMMONS Google Form
- * (https://forms.gle/GxVDLYj74rvXtGYb9) in an iframe so signups happen inline
- * without leaving the landing page. The Google chrome is stripped via
- * `embedded=true`; the app-styled card supplies the framing while the form's
- * own title/fields carry the content. Opened from the buttons under
- * "Post a plan two ways" and "How it works".
- */
-function WaitlistModal({
-  open,
-  onClose,
-  prefillEmail,
-}: {
-  open: boolean;
-  onClose: () => void;
-  prefillEmail?: string;
-}) {
-  const [loaded, setLoaded] = useState(false);
-  const formUrl = waitlistFormUrl(prefillEmail);
-
-  useEffect(() => {
-    if (open) setLoaded(false);
-  }, [open, formUrl]);
-
-  if (!open) return null;
-
-  return (
-    <div
-      onClick={onClose}
-      style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(20,17,48,0.55)", backdropFilter: "blur(3px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{ position: "relative", background: WHITE, borderRadius: 20, width: "100%", maxWidth: 640, height: "96vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 24px 80px rgba(20,17,48,0.32)" }}
-      >
-        <button
-          onClick={onClose}
-          aria-label="Close"
-          style={{ position: "absolute", top: 14, right: 14, zIndex: 2, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", background: WHITE, borderRadius: 9999, border: "none", fontSize: 22, lineHeight: 1, color: MUTED, cursor: "pointer", boxShadow: "0 2px 10px rgba(20,17,48,0.14)" }}
-        >
-          ×
-        </button>
-        <div style={{ position: "relative", flex: 1, minHeight: 0, overflow: "hidden" }}>
-          {!loaded && (
-            <p style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: B, fontSize: 14, color: MUTED }}>
-              Loading form…
-            </p>
-          )}
-          <iframe
-            title="COMMONS waitlist form"
-            src={formUrl}
-            onLoad={() => setLoaded(true)}
-            style={{ width: "100%", height: "100%", border: "none", display: "block", opacity: loaded ? 1 : 0, transition: "opacity 0.2s" }}
-          >
-            Loading…
-          </iframe>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function Nav() {
   return (
@@ -219,7 +96,7 @@ function PhotoStrip() {
   );
 }
 
-function TwoPathways({ onSignup }: { onSignup: () => void }) {
+function TwoPathways() {
   const [sel, setSel] = useState<"casual" | "committed">("casual");
   const cards = [
     { id: "casual" as const, label: "Casual", title: "Just an idea.", body: "Something's on your mind but you're not sure yet. Toss it out — see who's around and interested before you commit to anything.", cta: "Share the vibe →", ctaStyle: { background: RED, color: WHITE } as CSSProperties },
@@ -247,14 +124,14 @@ function TwoPathways({ onSignup }: { onSignup: () => void }) {
           ))}
         </div>
         <div style={{ display: "flex", justifyContent: "center", marginTop: 44 }}>
-          <Pill onClick={onSignup} style={{ padding: "14px 32px", fontSize: 15 }}>Join the waitlist</Pill>
+          <AppStoreBadge />
         </div>
       </div>
     </section>
   );
 }
 
-function HowItWorks({ onSignup }: { onSignup: () => void }) {
+function HowItWorks() {
   const steps = [
     { n: "01", title: "Post the plan", body: "Float a casual idea or lock in the details — a time, a place, a vibe. No endless back-and-forth just to get something on the calendar." },
     { n: "02", title: "Find your people", body: "Discover women nearby doing the same thing, or share the plan with your existing network. Either way, the right people show up." },
@@ -280,7 +157,7 @@ function HowItWorks({ onSignup }: { onSignup: () => void }) {
             ))}
           </div>
           <div style={{ marginTop: 32 }}>
-            <Pill onClick={onSignup} style={{ padding: "14px 32px", fontSize: 15 }}>Join the waitlist</Pill>
+            <AppStoreBadge />
           </div>
         </div>
         <div style={{ position: "sticky", top: 96, marginTop: 48, borderRadius: 18, overflow: "hidden", height: 500 }}>
@@ -321,9 +198,6 @@ function Footer() {
 }
 
 export function LandingPage() {
-  const [signupOpen, setSignupOpen] = useState(false);
-  const onSignup = () => setSignupOpen(true);
-  const closeSignup = () => setSignupOpen(false);
   return (
     <div style={{ background: BEIGE, minHeight: "100vh" }}>
       <style>{`
@@ -350,10 +224,9 @@ export function LandingPage() {
       <Nav />
       <Hero />
       <PhotoStrip />
-      <TwoPathways onSignup={onSignup} />
-      <HowItWorks onSignup={onSignup} />
+      <TwoPathways />
+      <HowItWorks />
       <Footer />
-      <WaitlistModal open={signupOpen} onClose={closeSignup} />
     </div>
   );
 }
