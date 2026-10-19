@@ -1,1 +1,0 @@
-var e=`https://apps.apple.com/us/app/commons-create-and-join-plans/id6785627674`;export{e as t};

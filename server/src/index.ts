@@ -7,6 +7,7 @@ import express from "express";
 import { connectMongo } from "./lib/db.js";
 import { hydrateSnapshotFromMongo } from "./hydrate.js";
 import { warmCoverCatalog } from "./lib/coverCatalog.js";
+import { adminAuthRouter } from "./routes/adminAuth.js";
 import { adminRouter } from "./routes/admin.js";
 import { authRouter } from "./routes/auth.js";
 import { cardImagesRouter } from "./routes/cardImages.js";
@@ -96,6 +97,7 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+app.use("/api/admin/auth", adminAuthRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/card-images", cardImagesRouter);

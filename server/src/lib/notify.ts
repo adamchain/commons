@@ -44,6 +44,7 @@ const PREF_KEY: Record<NotificationKind, keyof NotificationPrefs> = {
   communityRequestApproved: "someoneJoinedYourPlan",
   communityRequestDeclined: "someoneJoinedYourPlan",
   communityPlanPosted: "someoneJoinedYourPlan",
+  communityBulletinPosted: "someoneJoinedYourPlan",
   planDayOf: "planTomorrow",
   interestedNudge: "planTomorrow",
   planFullInterested: "planTomorrow",
@@ -73,7 +74,13 @@ export async function emit(input: {
     ...DEFAULT_NOTIFICATION_PREFS,
     ...(user.notificationPrefs ?? {}),
   };
-  if (input.kind !== "communityReview" && prefs[PREF_KEY[input.kind]] === false) return null;
+  // A connect request is not the "after a plan, add them" nudge. Gating it on
+  // that toggle stored the request and never told the other person.
+  const alwaysDeliver =
+    input.kind === "communityReview" ||
+    input.kind === "networkRequest" ||
+    input.kind === "networkAccepted";
+  if (!alwaysDeliver && prefs[PREF_KEY[input.kind]] === false) return null;
   // Muted chats stay quiet — the conversation itself still works, it just
   // doesn't ping. Only applies to notifications tied to a specific thread.
   if (input.conversationId && (user.mutedConversationIds ?? []).includes(input.conversationId)) {

@@ -8,6 +8,7 @@ import { CommunityStatusPill } from "../components/CommunityStatusPill";
 import { JoinConfirmPopup } from "../components/JoinConfirmPopup";
 import { EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
+import { readScreen, writeScreen } from "../lib/screenCache";
 import {
   ALL_COMMUNITY_CATEGORIES,
   COMMUNITY_CATEGORY_LABELS,
@@ -71,8 +72,8 @@ export function CommunitiesPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const directory = searchParams.get("view") === "all";
-  const [all, setAll] = useState<CommunityCardDTO[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [all, setAll] = useState<CommunityCardDTO[]>(() => readScreen<CommunityCardDTO[]>("communities") ?? []);
+  const [loaded, setLoaded] = useState(() => readScreen<CommunityCardDTO[]>("communities") != null);
   const [category, setCategory] = useState<CommunityCategory | "all">(() =>
     readCategory(searchParams.get("category")),
   );
@@ -86,6 +87,7 @@ export function CommunitiesPage() {
       try {
         const a = await api<{ communities: CommunityCardDTO[] }>("/api/communities");
         if (!live) return;
+        writeScreen("communities", a.communities);
         setAll(a.communities);
       } finally {
         if (live) setLoaded(true);
@@ -188,7 +190,7 @@ export function CommunitiesPage() {
           ×
         </button>
       </div>
-      <div className="cmy-cat-pills">
+      <div className="cmy-cat-pills" data-axis-scroll="">
         {user && (
           <Link
             to={`/profile/${user.id}#communities`}

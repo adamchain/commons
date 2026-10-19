@@ -1146,6 +1146,37 @@ communitiesRouter.get("/:id/posts", requireAuth, async (req, res) => {
   });
 });
 
+/** Members hear when a bulletin post goes live. Replies stay in the thread. */
+async function notifyBulletinPosted(
+  community: { id: string; name: string; organizerId: string },
+  authorId: string,
+  content: string,
+  postId: string,
+  skipUserIds: string[] = [],
+) {
+  const author = await findUserById(authorId);
+  const authorName = author?.firstName || "Someone";
+  const preview = content.trim().replace(/\s+/g, " ").slice(0, 80);
+  const body = preview
+    ? `${authorName} posted in "${community.name}": ${preview}`
+    : `${authorName} posted a photo in "${community.name}"`;
+  const ids = new Set(store.listActiveCommunityMembers(community.id).map((m) => m.userId));
+  ids.add(community.organizerId);
+  const skip = new Set([authorId, ...skipUserIds]);
+  for (const userId of ids) {
+    if (skip.has(userId)) continue;
+    if (store.isBlockedEitherWay(authorId, userId)) continue;
+    await emit({
+      userId,
+      kind: "communityBulletinPosted",
+      body,
+      communityId: community.id,
+      profileUserId: authorId,
+      dedupKey: `communityBulletinPosted:${postId}:${userId}`,
+    });
+  }
+}
+
 /** A live bulletin post tells each tagged member they were mentioned. */
 async function notifyBulletinMentions(
   community: { id: string; name: string; organizerId: string },
@@ -1238,6 +1269,7 @@ communitiesRouter.post("/:id/posts", requireAuth, async (req, res) => {
   if (!needsApproval) {
     try {
       await notifyBulletinMentions(community, viewerId, content, post.id);
+      if (!parentId) await notifyBulletinPosted(community, viewerId, content, post.id);
     } catch (err) {
       console.error("[communities] mention notify failed", err instanceof Error ? err.message : err);
     }
@@ -1291,6 +1323,9 @@ communitiesRouter.post("/:id/posts/:postId/approve", requireAuth, async (req, re
   store.log("community_post_approved", { communityId: community.id, postId: post.id });
   try {
     await notifyBulletinMentions(community, post.authorId, post.content, post.id);
+    if (!post.parentId) {
+      await notifyBulletinPosted(community, post.authorId, post.content, post.id, [viewerId]);
+    }
   } catch (err) {
     console.error("[communities] mention notify failed", err instanceof Error ? err.message : err);
   }

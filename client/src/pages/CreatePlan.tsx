@@ -1639,8 +1639,8 @@ export function CreatePlanPage() {
                     <label className="form-question">Mark as full</label>
                     <p className="form-help">
                       {form.markedFull
-                        ? "Join is closed. Anyone who isn't going comes off 48 hours before."
-                        : "Close Join anytime. Anyone who isn't going comes off 48 hours before it starts."}
+                        ? "Join is closed. Anyone who isn't going comes off now."
+                        : "Close Join anytime. Anyone who isn't going comes off right away."}
                     </p>
                   </div>
                   <FlexToggle

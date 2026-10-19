@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronRight, ExternalLink, Hand, Pencil, Send, UserPlus, X } from "lucide-react";
@@ -87,8 +87,18 @@ export function PlanDetailPage() {
     setPlan(data);
   };
 
+  useLayoutEffect(() => {
+    const snap = () => {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+    snap();
+    const frame = requestAnimationFrame(snap);
+    return () => cancelAnimationFrame(frame);
+  }, [id]);
+
   useEffect(() => {
-    window.scrollTo(0, 0);
     void load();
   }, [id]);
 
@@ -534,10 +544,10 @@ export function PlanDetailPage() {
               <span className="plan-chat-toggle-label">Full</span>
               <p className="plan-full-toggle-help">
                 {isPlanAtCapacity(plan.capacity, goingCount)
-                  ? "Every spot is taken. Anyone who isn't going comes off 48 hours before."
+                  ? "Every spot is taken. Anyone who isn't going comes off now."
                   : plan.markedFull
-                    ? "Join is closed. Anyone who isn't going comes off 48 hours before."
-                    : "Close Join anytime. Anyone who isn't going comes off 48 hours before it starts."}
+                    ? "Join is closed. Anyone who isn't going comes off now."
+                    : "Close Join anytime. Anyone who isn't going comes off right away."}
               </p>
             </div>
             <button

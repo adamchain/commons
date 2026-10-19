@@ -66,7 +66,7 @@ function useWarmRoutes() {
       void import("./pages/MyPlans");
       void import("./pages/Search");
     };
-    const id = window.setTimeout(warm, 250);
+    const id = window.setTimeout(warm, 0);
     return () => window.clearTimeout(id);
   }, []);
 }

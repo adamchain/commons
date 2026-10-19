@@ -11,6 +11,14 @@ import type { ConversationSummaryDTO } from "../types/shared";
  * Height 58px, bg card, borderTop border. Active = red; inactive = faint.
  * Plus: 44×44 circle, red, icon 20 white.
  */
+function warmNav(to: string) {
+  if (to === "/") void import("../pages/Feed");
+  else if (to === "/communities") void import("../pages/Communities");
+  else if (to === "/messages") void import("../pages/Messages");
+  else if (to === "/network") void import("../pages/Network");
+  else if (to === "/plans/new") void import("../pages/CreatePlan");
+}
+
 export function BottomNav() {
   const { pathname } = useLocation();
   const { user } = useAuth();
@@ -71,6 +79,7 @@ export function BottomNav() {
         end
         className={({ isActive }) => `bottom-nav-item ${isActive ? "is-active" : ""}`}
         aria-label="Home"
+        onPointerDown={() => warmNav("/")}
         onClick={(e) => {
           if (pathname === "/") {
             e.preventDefault();
@@ -89,6 +98,7 @@ export function BottomNav() {
         end
         className={({ isActive }) => `bottom-nav-item ${isActive ? "is-active" : ""}`}
         aria-label="Communities"
+        onPointerDown={() => warmNav("/communities")}
       >
         <span className="bottom-nav-icon-wrap">
           <Users size={22} strokeWidth={1.6} />
@@ -96,7 +106,7 @@ export function BottomNav() {
         <span className="bottom-nav-label">Communities</span>
       </NavLink>
 
-      <NavLink to="/plans/new" className="bottom-nav-cta" aria-label="Make a plan">
+      <NavLink to="/plans/new" className="bottom-nav-cta" aria-label="Make a plan" onPointerDown={() => warmNav("/plans/new")}>
         <Plus size={28} strokeWidth={2.2} color="white" />
       </NavLink>
 
@@ -104,6 +114,7 @@ export function BottomNav() {
         to="/messages"
         className={({ isActive }) => `bottom-nav-item ${isActive ? "is-active" : ""}`}
         aria-label={unreadMessages > 0 ? `Messages, ${unreadMessages} unread` : "Messages"}
+        onPointerDown={() => warmNav("/messages")}
       >
         <span className="bottom-nav-icon-wrap">
           <MessageCircle size={22} strokeWidth={1.6} />
@@ -118,6 +129,7 @@ export function BottomNav() {
         to="/network"
         className={({ isActive }) => `bottom-nav-item ${isActive ? "is-active" : ""}`}
         aria-label="Network"
+        onPointerDown={() => warmNav("/network")}
       >
         <span className="bottom-nav-icon-wrap">
           <UserRound size={22} strokeWidth={1.6} />

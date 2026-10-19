@@ -1,11 +1,11 @@
 import { sendTransactionalSms } from "./sms.js";
-import { calendarDayInPlanZone, planEndTimestamp, planHasEnded, planStartTimestamp, zonedTimestamp } from "./planTime.js";
+import { planEndTimestamp, planHasEnded, planStartTimestamp } from "./planTime.js";
 import { store, type PlanRecord } from "../store.js";
 import { findUserById, findUsersByIds } from "../userRepo.js";
 import { emit } from "./notify.js";
 import { DEFAULT_NOTIFICATION_PREFS, type NotificationPrefs } from "../types/shared.js";
 import { publicWebOrigin } from "./publicOrigin.js";
-import { releaseInterestedBeforeStart } from "./planFull.js";
+import { evictInterestedFromClosedPlans } from "./planFull.js";
 
 function smsAllowed(
   user: { notificationPrefs?: Partial<NotificationPrefs> } | undefined,
@@ -247,8 +247,8 @@ export async function runPostPlanReviewPrompts(): Promise<void> {
 }
 
 /**
- * Day-of reminder (6.1) — morning of the plan (6–10am local window) OR ~3 hours
- * before start if the plan is later that day. Everyone Going + host.
+ * Day-of reminder — about 3 hours before the real start. Everyone Going + host.
+ * An 8am ping used to fire for evening plans and read like the plan was soon.
  */
 const DAY_OF_SENT = new Set<string>();
 export async function runDayOfReminders(): Promise<void> {
@@ -259,14 +259,7 @@ export async function runDayOfReminders(): Promise<void> {
     if (planHasEnded(plan)) continue;
     const start = planStartTimestamp(plan);
     const hoursUntil = (start - now) / (60 * 60 * 1000);
-    // Fire in a ~20-min window around either 3h-before OR morning-of (8am Philly).
-    const threeHourHit = hoursUntil >= 2.85 && hoursUntil <= 3.15;
-    const morning = zonedTimestamp(plan.date.slice(0, 10), "08:00:00");
-    const morningHit =
-      plan.date.slice(0, 10) === calendarDayInPlanZone(new Date(now)) &&
-      Math.abs(now - morning) < 15 * 60 * 1000 &&
-      hoursUntil > 3.2;
-    if (!threeHourHit && !morningHit) continue;
+    if (hoursUntil < 2.85 || hoursUntil > 3.15) continue;
 
     const going = store
       .listParticipationsForPlan(plan.id)
@@ -392,7 +385,8 @@ export async function runFullInterestedNotices(): Promise<void> {
 }
 
 /**
- * "Did this happen?" (6.4) — ~2h after start, host gets Yes / No / Rescheduled.
+ * "Did this happen?" — after the plan has ended, not a couple hours after it
+ * starts. Tied to the start, this was arriving while the plan was still ahead.
  */
 const DID_HAPPEN_SENT = new Set<string>();
 export async function runDidThisHappenPrompts(): Promise<void> {
@@ -401,9 +395,9 @@ export async function runDidThisHappenPrompts(): Promise<void> {
     if (plan.cancelledAt) continue;
     if (plan.happenedOutcome) continue;
     if (plan.isFlexibleTime && !plan.time) continue;
-    const start = planStartTimestamp(plan);
-    const elapsed = now - start;
-    if (elapsed < 1.9 * 60 * 60 * 1000 || elapsed > 3 * 60 * 60 * 1000) continue;
+    if (!planHasEnded(plan)) continue;
+    const elapsed = now - planEndTimestamp(plan);
+    if (elapsed < 0 || elapsed > 2 * 60 * 60 * 1000) continue;
 
     const key = plan.id;
     if (DID_HAPPEN_SENT.has(key)) continue;
@@ -491,8 +485,8 @@ export function startNudgeSchedulers(): void {
     void runPlanTomorrowReminders().catch((e) => console.error(e));
     void runDayOfReminders().catch((e) => console.error(e));
     void runInterestedNudges().catch((e) => console.error(e));
-    void releaseInterestedBeforeStart().catch((e) => console.error(e));
-    // 48h/24h "still full" notes are paused. runFullInterestedNotices stays off.
+    void evictInterestedFromClosedPlans().catch((e) => console.error(e));
+    // The old 48h/24h "still full" notes stay off. Fullness removes people immediately.
     void runDidThisHappenPrompts().catch((e) => console.error(e));
     void runWeekendNudgeIfWeekendEve().catch((e) => console.error(e));
     void runPostPlanReviewPrompts().catch((e) => console.error(e));

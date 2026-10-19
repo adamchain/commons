@@ -133,6 +133,7 @@ export function WeekStrip({
         id="week-strip-days"
         ref={stripRef}
         className="week-strip week-strip--scroll"
+        data-axis-scroll=""
         aria-label="Calendar — scroll for more days"
       >
         {week.days.map(({ iso, label, date, monthLabel }) => {

@@ -8,7 +8,8 @@ import { EmptyCard, Label, ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { formatPlanWhenWhereLine, sentenceCaseTitle } from "../lib/format";
 import { hrefForBack } from "../lib/navState";
-import { isIdeaPlan, planHasEnded } from "../lib/planTime";
+import { cachedFeedPlans, rememberFeedPlans } from "../lib/feedPrefetch";
+import { isIdeaPlan, planBelongsInPast } from "../lib/planTime";
 import type { NavFromState } from "../lib/navState";
 import type { PlanDTO } from "../types/shared";
 
@@ -20,10 +21,11 @@ export function MyPlansPage() {
   const location = useLocation();
   const navFrom = (location.state as NavFromState | null) ?? null;
   const backHref = hrefForBack(navFrom);
-  const [plans, setPlans] = useState<PlanDTO[] | null>(null);
+  const [plans, setPlans] = useState<PlanDTO[] | null>(() => cachedFeedPlans());
 
   async function load() {
-    const feed = await api<PlanDTO[]>("/api/plans").catch(() => [] as PlanDTO[]);
+    const feed = await api<PlanDTO[]>("/api/plans").catch(() => cachedFeedPlans() ?? ([] as PlanDTO[]));
+    rememberFeedPlans(feed);
     setPlans(feed);
   }
 
@@ -43,7 +45,7 @@ export function MyPlansPage() {
     );
   }
 
-  const isUpcoming = (p: PlanDTO) => !p.cancelledAt && !planHasEnded(p);
+  const isUpcoming = (p: PlanDTO) => !p.cancelledAt && !planBelongsInPast(p);
   const upcoming = plans
     .filter(
       (p) =>
@@ -55,7 +57,7 @@ export function MyPlansPage() {
     .filter((p) => p.creator.id !== user.id && p.myState === "interested" && isUpcoming(p))
     .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
   const past = plans
-    .filter((p) => (p.creator.id === user.id || p.myState === "going") && (planHasEnded(p) || p.cancelledAt))
+    .filter((p) => (p.creator.id === user.id || p.myState === "going") && (planBelongsInPast(p) || p.cancelledAt))
     .sort((a, b) => b.date.localeCompare(a.date));
 
   const empty = upcoming.length === 0 && interested.length === 0 && past.length === 0;

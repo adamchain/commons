@@ -655,6 +655,69 @@
 
 .fdash-sys a:hover { text-decoration: underline; }
 
+.fdash--gate {
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.fdash-gate {
+  width: min(420px, 100%);
+  background: var(--card);
+  border-radius: 18px;
+  padding: 28px 24px 24px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fdash-gate-kicker {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  font-weight: 750;
+}
+
+.fdash-gate h1 {
+  margin: 0;
+  font-family: Georgia, serif;
+  font-weight: 560;
+  font-size: 32px;
+  letter-spacing: -0.03em;
+}
+
+.fdash-gate .fdash-search {
+  margin: 4px 0 0;
+}
+
+.fdash-gate .fdash-btn {
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.fdash-gate .fdash-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.fdash-gate-error {
+  margin: 0;
+  color: var(--red);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.fdash-gate-links {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fdash-gate-links .fdash-back {
+  margin: 0;
+}
+
 .fdash-error {
   background: var(--card);
   border-radius: 18px;

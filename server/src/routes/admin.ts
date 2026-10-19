@@ -30,6 +30,18 @@ function tokenFromRequest(req: Request): string | undefined {
   return bearer || header || undefined;
 }
 
+async function userFromSessionToken(token: string | undefined) {
+  if (!token) return null;
+  try {
+    const payload = verifySessionToken(token);
+    const user = await findUserById(payload.sub);
+    if (!user || !sessionVersionMatches(user.sessionVersion, payload.sv)) return null;
+    return user;
+  } catch {
+    return null;
+  }
+}
+
 async function requireAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
   const expected = adminApiToken();
   const got = tokenFromRequest(req);
@@ -38,31 +50,23 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction): Pr
     return;
   }
 
-  const sessionCookie = req.cookies?.session as string | undefined;
-  if (!sessionCookie) {
-    res.status(401).json({ error: "Sign in with an admin phone (Twilio Verify), or provide ADMIN_API_TOKEN." });
+  // Admin sign-in on the web sets `admin_session` only, so it never becomes
+  // an app login. A normal app session still works when that phone is an admin.
+  const adminUser = await userFromSessionToken(req.cookies?.admin_session as string | undefined);
+  const sessionUser = adminUser
+    ? null
+    : await userFromSessionToken(req.cookies?.session as string | undefined);
+  const user = adminUser ?? sessionUser;
+  if (!user) {
+    res.status(401).json({ error: "Sign in with an admin phone." });
     return;
   }
-  try {
-    const payload = verifySessionToken(sessionCookie);
-    const user = await findUserById(payload.sub);
-    if (!user) {
-      res.status(401).json({ error: "Session invalid" });
-      return;
-    }
-    if (!sessionVersionMatches(user.sessionVersion, payload.sv)) {
-      res.status(401).json({ error: "Session invalid" });
-      return;
-    }
-    if (!isAdminPhone(user.phoneNumber)) {
-      res.status(403).json({ error: "This account is not authorized for admin." });
-      return;
-    }
-    req.userId = user.id;
-    next();
-  } catch {
-    res.status(401).json({ error: "Session invalid" });
+  if (!isAdminPhone(user.phoneNumber)) {
+    res.status(403).json({ error: "This account is not authorized for admin." });
+    return;
   }
+  req.userId = user.id;
+  next();
 }
 
 adminRouter.use(requireAdmin);

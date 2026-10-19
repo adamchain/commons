@@ -1169,7 +1169,7 @@ img.avatar {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 42%;
+  object-position: center top;
   display: block;
 }
 
@@ -9629,8 +9629,8 @@ a.sheet-link {
   grid-template-columns: none;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  /* pan-y lets a vertical swipe still move the feed when it starts on a day. */
-  touch-action: pan-x pan-y;
+  /* Vertical swipes scroll the feed. Sideways drags are handled in axisScroll. */
+  touch-action: pan-y;
   scrollbar-width: none;
   padding: 8px 0 6px;
   gap: 2px;
@@ -9936,7 +9936,7 @@ a.sheet-link {
   min-width: 0;
   height: 100%;
   object-fit: cover;
-  object-position: center 42%;
+  object-position: center top;
   display: block;
 }
 .idea-cover-fallback {
@@ -9956,7 +9956,7 @@ a.sheet-link {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 42%;
+  object-position: center top;
   display: block;
 }
 

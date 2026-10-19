@@ -63,12 +63,17 @@ export function formatPlanDate(
 
 export function formatPlanTime(time: string, isFlexible: boolean): string {
   if (isFlexible || time === "Flexible" || !time) return "Flexible";
-  const [hStr, mStr = "00"] = time.split(":");
-  const h = Number(hStr);
-  if (Number.isNaN(h)) return time;
+  const match = time.trim().match(/^(\d{1,2})(?::(\d{2}))?(?::\d{2})?\s*([ap]m)?$/i);
+  if (!match) return time;
+  let h = parseInt(match[1], 10);
+  const minute = match[2] ?? "00";
+  const mer = match[3]?.toLowerCase();
+  if (!Number.isFinite(h) || h > 23) return time;
+  if (mer === "pm" && h < 12) h += 12;
+  if (mer === "am" && h === 12) h = 0;
   const ampm = h >= 12 ? "PM" : "AM";
   const hour12 = h % 12 === 0 ? 12 : h % 12;
-  return `${hour12}:${mStr.padStart(2, "0")} ${ampm}`;
+  return `${hour12}:${minute.padStart(2, "0")} ${ampm}`;
 }
 
 function timeIsOpen(time?: string | null, isFlexibleTime?: boolean): boolean {

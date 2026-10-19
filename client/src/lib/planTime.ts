@@ -20,13 +20,18 @@ export function thisWeekAnchorDate(now: Date = new Date()): string {
  *  phone is set somewhere else. */
 const PLAN_TIME_ZONE = "America/New_York";
 
+/** Clock time as `HH:mm:ss`. Accepts `19:00` and `7:00 PM`. */
 function timeToHms(t: string): string {
-  const s = t.trim();
-  if (!s) return "12:00:00";
-  const [h, m = "00"] = s.split(":");
-  const hh = String(Math.min(23, Math.max(0, parseInt(h, 10) || 12))).padStart(2, "0");
-  const mm = String(Math.min(59, parseInt(m, 10) || 0)).padStart(2, "0");
-  return `${hh}:${mm}:00`;
+  const match = t.trim().match(/^(\d{1,2})(?::(\d{2}))?(?::\d{2})?\s*([ap]m)?$/i);
+  if (!match) return "12:00:00";
+  let hour = parseInt(match[1], 10);
+  const minute = parseInt(match[2] ?? "0", 10);
+  const mer = match[3]?.toLowerCase();
+  if (!Number.isFinite(hour) || !Number.isFinite(minute) || minute > 59 || hour > 23) return "12:00:00";
+  if (mer === "pm" && hour < 12) hour += 12;
+  if (mer === "am" && hour === 12) hour = 0;
+  if (hour > 23) return "12:00:00";
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`;
 }
 
 function tzOffsetMs(instant: Date): number {
@@ -84,6 +89,27 @@ export function planHasEnded(plan: PlanDTO, now: Date = new Date()): boolean {
     return weekEnd < now.getTime();
   }
   return planEndTimestamp(plan) < now.getTime();
+}
+
+/** Calendar day in Philadelphia, `YYYY-MM-DD`. */
+export function planZoneToday(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: PLAN_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+/** A plan stays live until it ends. Once its calendar day is over it belongs
+ *  in Past, even if the end clock never landed. Anytime and unlocked
+ *  this-week ideas stay live until their own window closes. */
+export function planBelongsInPast(plan: PlanDTO, now: Date = new Date()): boolean {
+  if (plan.isFlexibleDate && !plan.lockedAt) return false;
+  if (planHasEnded(plan, now)) return true;
+  if (plan.isThisWeek && !plan.lockedAt) return false;
+  const day = plan.date.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) && day < planZoneToday(now);
 }
 
 /**

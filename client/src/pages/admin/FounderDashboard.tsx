@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import {
   Activity,
   LayoutGrid,
@@ -19,6 +19,7 @@ import {
   ReportsReview,
   ReviewInbox,
 } from "../Admin";
+import { AdminSignIn } from "./AdminSignIn";
 import "./FounderDashboard.css";
 
 type PageId = "overview" | "health" | "acquisition" | "communities" | "users" | "map" | "operations";
@@ -351,6 +352,7 @@ export function AdminPage() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [filters, setFilters] = useState<DashFilters | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [needsSignIn, setNeedsSignIn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -370,14 +372,24 @@ export function AdminPage() {
       filtersRef.current = applied;
       setFilters(applied);
       setData(payload);
+      setNeedsSignIn(false);
       sessionStorage.setItem(FILTER_SESSION_KEY, JSON.stringify(applied));
     } catch (e) {
       if (id !== reqId.current) return;
       const msg = e instanceof Error ? e.message : "Failed to load";
-      if (msg.startsWith("401:")) setError("Sign in with an admin phone, then come back here.");
-      else if (msg.startsWith("403:")) setError("This account isn't on the admin phone list.");
-      else setError(msg.replace(/^\d+:\s*/, ""));
-      if (!next) setData(null);
+      if (msg.startsWith("401:")) {
+        setNeedsSignIn(true);
+        setError(null);
+        setData(null);
+      } else if (msg.startsWith("403:")) {
+        setNeedsSignIn(true);
+        setError("This browser is signed into an account that isn't an admin. Use an admin phone number.");
+        setData(null);
+      } else {
+        setNeedsSignIn(false);
+        setError(msg.replace(/^\d+:\s*/, ""));
+        if (!next) setData(null);
+      }
     } finally {
       if (id === reqId.current) setLoading(false);
     }
@@ -474,6 +486,34 @@ export function AdminPage() {
   const viewer = data?.viewer;
   const initial = `${(viewer?.firstName?.[0] ?? "A")}${(viewer?.lastName?.[0] ?? "")}`.toUpperCase();
 
+  if (!data) {
+    return (
+      <div className="fdash fdash--gate">
+        {needsSignIn ? (
+          <AdminSignIn
+            notice={error}
+            onSignedIn={() => {
+              setNeedsSignIn(false);
+              setError(null);
+              void load(readSessionFilters() ?? undefined);
+            }}
+          />
+        ) : loading ? (
+          <p className="fdash-muted">Loading…</p>
+        ) : (
+          <div className="fdash-gate">
+            <p className="fdash-gate-kicker">COMMONS</p>
+            <h1>Admin</h1>
+            <p className="fdash-muted">{error ?? "Couldn't load the dashboard."}</p>
+            <button className="fdash-btn" type="button" onClick={() => void load(readSessionFilters() ?? undefined)}>
+              Try again
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="fdash">
       <aside className="fdash-side">
@@ -511,12 +551,7 @@ export function AdminPage() {
           <div className="fdash-error">
             <h1 style={{ fontFamily: "Georgia, serif", fontWeight: 560, marginTop: 0 }}>Commons admin</h1>
             <p className="fdash-muted">{error}</p>
-            <p style={{ marginTop: 14 }}>
-              <Link to="/onboarding" className="fdash-btn">Sign in</Link>
-            </p>
           </div>
-        ) : loading && !data ? (
-          <p className="fdash-muted">Loading the week…</p>
         ) : data && filters ? (
           <>
             <FilterBar

@@ -198,10 +198,7 @@ export interface PlanRecord {
   spotWaitlistUserIds?: string[];
   /** Stamp of the last time a spot opened, used to notify the waitlist once. */
   spotOpenedAt?: string | null;
-  /**
-   * When the plan is still at capacity, Interested people get a note 48h and
-   * 24h before start that no spots opened up.
-   */
+  /** Unused. Full plans remove Interested people immediately instead of a timed note. */
   notifyInterestedWhenFull?: boolean;
   isRecurring?: boolean;
   /**
@@ -599,6 +596,7 @@ export interface NotificationRecord {
     | "communityRequestApproved"
     | "communityRequestDeclined"
     | "communityPlanPosted"
+    | "communityBulletinPosted"
     | "planDayOf"
     | "interestedNudge"
     | "didThisHappen"

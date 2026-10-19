@@ -114,8 +114,16 @@ export function rankPlansForUser(user: UserRecord, candidates: PlanRecord[]): Pl
   // dropping every plan dated today before the feed ever saw it.
   const today = calendarDayInPlanZone();
   const cutoff = shiftCalendarDay(today, -120);
+  // Discovery drops plans older than four months. Plans this person hosts or
+  // joined stay, so Past on the feed, profile, and My Plans can still list them.
+  const mine = new Set(
+    store
+      .listParticipationsForUser(user.id)
+      .filter((part) => part.state === "going" || part.state === "interested")
+      .map((part) => part.planId),
+  );
   const fresh = candidates.filter((p) => {
-    if (p.isFlexibleDate) return true;
+    if (p.creatorId === user.id || mine.has(p.id) || p.isFlexibleDate) return true;
     const day = String(p.date).slice(0, 10);
     return /^\d{4}-\d{2}-\d{2}$/.test(day) && day >= cutoff;
   });

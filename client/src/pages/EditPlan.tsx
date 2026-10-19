@@ -668,10 +668,10 @@ function EditForm({
               <label className="form-question">Full</label>
               <p className="form-help">
                 {atCapacity
-                  ? "Every spot is taken. Anyone who isn't going comes off 48 hours before."
+                  ? "Every spot is taken. Anyone who isn't going comes off now."
                   : form.markedFull
-                    ? "Join is closed. Anyone who isn't going comes off 48 hours before."
-                    : "Close Join anytime. Anyone who isn't going comes off 48 hours before it starts."}
+                    ? "Join is closed. Anyone who isn't going comes off now."
+                    : "Close Join anytime. Anyone who isn't going comes off right away."}
               </p>
             </div>
             <button

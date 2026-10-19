@@ -1,0 +1,1 @@
+var e=`https://apps.apple.com/us/app/commons-plans-communities/id6785627674#productRatings`;export{e as t};

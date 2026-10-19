@@ -461,6 +461,7 @@ export type NotificationKind =
   | "communityRequestApproved"
   | "communityRequestDeclined"
   | "communityPlanPosted"
+  | "communityBulletinPosted"
   | "planDayOf"
   | "interestedNudge"
   | "didThisHappen"

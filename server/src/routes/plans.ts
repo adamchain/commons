@@ -25,12 +25,11 @@ import { onPlanCreatedVenueNudge, notifyInterestedPlanLocked } from "../lib/nudg
 import { emit } from "../lib/notify.js";
 import {
   forgetSpotWaitlist,
-  interestedFalloffDue,
   notifySpotOpened,
   planIsClosed,
   syncPlanFullness,
 } from "../lib/planFull.js";
-import { planEndTimestamp, planHasEnded, planRequiresHostApproval, plansOverlap, FLEXIBLE_DATE_PLACEHOLDER, thisWeekAnchorDate } from "../lib/planTime.js";
+import { canonicalPlanTime, planEndTimestamp, planHasEnded, planRequiresHostApproval, plansOverlap, FLEXIBLE_DATE_PLACEHOLDER, thisWeekAnchorDate } from "../lib/planTime.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
 import { communityCreationBlockReason } from "../lib/communityAccess.js";
 import { unfurlLink } from "./linkPreview.js";
@@ -346,7 +345,8 @@ plansRouter.post("/", requireAuth, async (req, res) => {
       ? location.placeId.trim().slice(0, 256)
       : undefined;
   const dateInput = String(req.body?.date ?? "").trim();
-  const time = String(req.body?.time ?? "").trim();
+  const timeRaw = String(req.body?.time ?? "").trim();
+  const time = canonicalPlanTime(timeRaw) ?? timeRaw;
   const isFlexibleTime = Boolean(req.body?.isFlexibleTime);
   const isFlexibleDate = Boolean(req.body?.isFlexibleDate);
   const isThisWeek = Boolean(req.body?.isThisWeek) && !isFlexibleDate;
@@ -842,7 +842,8 @@ plansRouter.post("/:id/propose-time", requireAuth, async (req, res) => {
     return;
   }
   const date = String(req.body?.date ?? "").trim();
-  const time = String(req.body?.time ?? "").trim();
+  const timeRaw = String(req.body?.time ?? "").trim();
+  const time = canonicalPlanTime(timeRaw) ?? timeRaw;
   const isFlexibleTime = Boolean(req.body?.isFlexibleTime);
   if (!date) {
     res.status(400).json({ error: "Date required" });
@@ -1064,7 +1065,8 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
       ? location.placeId.trim().slice(0, 256)
       : undefined;
   const dateInput = String(req.body?.date ?? "").trim();
-  const time = String(req.body?.time ?? "").trim();
+  const timeRaw = String(req.body?.time ?? "").trim();
+  const time = canonicalPlanTime(timeRaw) ?? timeRaw;
   const isFlexibleTime = Boolean(req.body?.isFlexibleTime);
   const title = String(req.body?.title ?? "").trim();
   const description = req.body?.description !== undefined
@@ -1280,11 +1282,15 @@ plansRouter.put("/:id/participation", requireAuth, async (req, res) => {
     return;
   }
   const existing = store.findParticipation(planId, userId);
-  // Inside 48 hours, only people who are going stay on the plan.
-  // Before that, a full plan still blocks new Join taps. Approve-mode plans
+  // A full plan blocks new Join and Interested taps. Approve-mode plans
   // require the host to let someone in.
-  if (plan.creatorId !== userId && state === "interested" && interestedFalloffDue(plan)) {
-    res.status(409).json({ error: "This plan is close — only people who are going can stay on it." });
+  if (
+    plan.creatorId !== userId &&
+    state === "interested" &&
+    existing?.state !== "going" &&
+    planIsClosed(plan)
+  ) {
+    res.status(409).json({ error: "This plan is full." });
     return;
   }
   if (plan.creatorId !== userId && state === "going" && existing?.state !== "going" && planIsClosed(plan)) {
@@ -1425,6 +1431,8 @@ plansRouter.delete("/:id/participation", requireAuth, async (req, res) => {
     .filter((p) => p.state === "going").length;
   const wasFull =
     Boolean(plan?.capacity) && goingBefore >= (plan?.capacity as number);
+  const wasCapacityClosed = plan?.markedFull === true && plan.fullSource === "capacity";
+  const waitlistBefore = new Set(plan?.spotWaitlistUserIds ?? []);
 
   store.deleteParticipation(planId, userId);
   // A removal counts as a soft "decline" for the recommendation algo, and
@@ -1474,12 +1482,25 @@ plansRouter.delete("/:id/participation", requireAuth, async (req, res) => {
   }
   await syncPlanFullness(planId);
   const after = store.findPlanById(planId);
-  // Still closed (the host marked it full). The seat didn't open, but the
-  // people who were interested should know someone left.
+  // A capacity plan that hadn't been flagged full yet still opened a seat.
+  // Flagged ones already notified inside the fullness sync.
+  if (
+    existing?.state === "going" &&
+    after &&
+    wasFull &&
+    !wasCapacityClosed &&
+    !planIsClosed(after)
+  ) {
+    await notifySpotOpened(planId);
+  }
+  // Still closed (the host marked it full). The seat didn't open, but people
+  // already waiting should know someone left. Anyone just taken off got that
+  // note from the fullness sync, so they aren't pinged twice.
   if (existing?.state === "going" && after && planIsClosed(after)) {
     const stamp = Date.now();
-    for (const id of after.spotWaitlistUserIds ?? []) {
-      if (id === userId || id === after.creatorId) continue;
+    const skip = new Set([userId, after.creatorId, ...(after.coHostIds ?? [])]);
+    for (const id of waitlistBefore) {
+      if (skip.has(id)) continue;
       await emit({
         userId: id,
         kind: "planSpotReopen",

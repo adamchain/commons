@@ -17,14 +17,33 @@ export function thisWeekAnchorDate(now: Date = new Date()): string {
  *  interpreted in this zone — otherwise a 7pm plan fires at 3pm. */
 export const PLAN_TIME_ZONE = "America/New_York";
 
-/** Parse `HH:mm` (24h) for datetime construction. */
+/**
+ * Clock time as `HH:mm:ss`. Accepts `19:00` and `7:00 PM`.
+ * A bare split on `:` used to read `7:00 PM` as 7:00 AM, so an evening plan
+ * pinged in the morning.
+ */
 function timeToHms(t: string): string {
-  const s = t.trim();
-  if (!s) return "12:00:00";
-  const [h, m = "00"] = s.split(":");
-  const hh = String(Math.min(23, Math.max(0, parseInt(h, 10) || 12))).padStart(2, "0");
-  const mm = String(Math.min(59, parseInt(m, 10) || 0)).padStart(2, "0");
-  return `${hh}:${mm}:00`;
+  const parsed = parsePlanClock(t);
+  if (!parsed) return "12:00:00";
+  return `${parsed}:00`;
+}
+
+/** `HH:mm` in 24h, or null when the string isn't a clock time. */
+export function canonicalPlanTime(raw: string): string | null {
+  return parsePlanClock(raw);
+}
+
+function parsePlanClock(raw: string): string | null {
+  const match = raw.trim().match(/^(\d{1,2})(?::(\d{2}))?(?::\d{2})?\s*([ap]m)?$/i);
+  if (!match) return null;
+  let hour = parseInt(match[1], 10);
+  const minute = parseInt(match[2] ?? "0", 10);
+  const mer = match[3]?.toLowerCase();
+  if (!Number.isFinite(hour) || !Number.isFinite(minute) || minute > 59 || hour > 23) return null;
+  if (mer === "pm" && hour < 12) hour += 12;
+  if (mer === "am" && hour === 12) hour = 0;
+  if (hour > 23) return null;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
 function tzOffsetMs(instant: Date): number {

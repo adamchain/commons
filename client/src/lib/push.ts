@@ -7,6 +7,33 @@ import { api } from "../api/http";
 let listenersPromise: Promise<void> | null = null;
 let registering: Promise<void> | null = null;
 
+const PUSH_TOKEN_KEY = "commons.pushToken";
+
+function rememberedPushToken(): string | null {
+  try {
+    return localStorage.getItem(PUSH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function rememberPushToken(token: string): void {
+  try {
+    localStorage.setItem(PUSH_TOKEN_KEY, token);
+  } catch {
+    /* private mode */
+  }
+}
+
+/** Apple often emits the token once. A failed POST used to drop it forever. */
+async function postPushToken(token: string): Promise<void> {
+  rememberPushToken(token);
+  await api("/api/devices/register", {
+    method: "POST",
+    body: JSON.stringify({ token, platform: Capacitor.getPlatform() }),
+  });
+}
+
 /** Mirrors the priority order `hrefFor` in Notifications.tsx uses for in-app rows. */
 function pathForPushData(data: unknown): string | null {
   if (!data || typeof data !== "object") return null;
@@ -18,6 +45,9 @@ function pathForPushData(data: unknown): string | null {
   }
   if (d.kind === "communityPostPending" && d.communityId) {
     return `/communities/${d.communityId}/dashboard?section=bulletin`;
+  }
+  if (d.kind === "communityBulletinPosted" && d.communityId) {
+    return `/communities/${d.communityId}?tab=bulletin`;
   }
   if (d.kind === "newGroupChatMessage" && d.profileUserId && !d.planId) return `/dm/${d.profileUserId}`;
   if (d.conversationId && d.planId) return `/plans/${d.planId}/chat`;
@@ -55,10 +85,7 @@ function ensurePushActionListener(): Promise<void> {
         window.dispatchEvent(new CustomEvent("commons:notifications-changed"));
       }),
       PushNotifications.addListener("registration", (t) => {
-        void api("/api/devices/register", {
-          method: "POST",
-          body: JSON.stringify({ token: t.value, platform: Capacitor.getPlatform() }),
-        }).catch(() => undefined);
+        void postPushToken(t.value).catch(() => undefined);
       }),
       App.addListener("appStateChange", ({ isActive }) => {
         if (isActive) void registerForPush();
@@ -90,6 +117,14 @@ async function registerForPush(): Promise<void> {
 export async function ensurePushRegistered(): Promise<void> {
   await ensurePushActionListener();
   if (!isNative()) return;
+  const cached = rememberedPushToken();
+  if (cached) {
+    try {
+      await postPushToken(cached);
+    } catch {
+      /* next resume will try again */
+    }
+  }
   try {
     await registerForPush();
   } catch {

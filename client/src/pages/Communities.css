@@ -328,7 +328,7 @@
   padding: 2px 0 6px;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  touch-action: pan-x pan-y;
+  touch-action: pan-y;
 }
 .cmy-cat-pills::-webkit-scrollbar { display: none; }
 .cmy-cat-pill {
@@ -1089,9 +1089,8 @@ button.cmy-joined-pill {
   padding: 2px 2px 4px;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
-  /* A horizontal scroller was eating the vertical swipe, so the page couldn't
-     reach Reply or the rest of the communities list. */
-  touch-action: pan-x pan-y;
+  /* Vertical swipes scroll the page so Reply and the rest of the list stay reachable. */
+  touch-action: pan-y;
 }
 .cmy-tabs::-webkit-scrollbar { display: none; }
 .cmy-tab {

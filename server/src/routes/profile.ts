@@ -33,7 +33,7 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
   const allPlans = store.listPlansByCreator(targetId);
   const attended = new Map(allPlans.map((p) => [p.id, p]));
   for (const part of store.listParticipationsForUser(targetId)) {
-    if (part.state !== "going") continue;
+    if (part.state !== "going" && part.state !== "interested") continue;
     const plan = store.findPlanById(part.planId);
     if (plan) attended.set(plan.id, plan);
   }
@@ -117,7 +117,7 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
       ? await Promise.all(upcoming.map((p) => planSummary(p, viewerId)))
       : await Promise.all(sharedUpcoming.map((p) => planSummary(p, viewerId))),
     past: plansOpen
-      ? past.slice(0, 40).map((p) => ({
+      ? past.slice(0, 200).map((p) => ({
             id: p.id,
             title: p.title,
             date: p.date,

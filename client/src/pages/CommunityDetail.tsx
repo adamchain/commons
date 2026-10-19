@@ -356,7 +356,7 @@ export function CommunityDetailPage() {
       </header>
 
       {/* Tabs */}
-      <nav className="cmy-tabs" role="tablist">
+      <nav className="cmy-tabs" role="tablist" data-axis-scroll="">
         {community.bulletinEnabled && (
           <TabButton id="bulletin" tab={tab} setTab={setTab} badge={community.pendingBulletinCount || undefined}>
             Bulletin

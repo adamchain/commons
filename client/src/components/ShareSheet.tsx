@@ -6,6 +6,13 @@ import { getActiveInviteCode } from "../lib/inviteCode";
 import { BottomSheet } from "./ui/BottomSheet";
 import { API_BASE } from "../api/http";
 
+/** Card images use the public site. The API host is a Railway URL, and that
+ *  host is what iMessage has been previewing. */
+function sharePreviewOrigin(): string {
+  const origin = getPublicWebOrigin();
+  return origin.includes("oncommons.co") ? origin : API_BASE;
+}
+
 // Share sheet with a live social-card preview. The card image and the injected
 // link metadata are rendered server-side (see server/src/routes/share.ts), so
 // whatever a friend sees on Facebook / iMessage / X matches the thumbnail here —
@@ -38,7 +45,7 @@ export function ShareSheet({ plan, isOwn = false, onClose }: { plan: PlanDTO; is
   }, [plan.id, inviteCode]);
   // Live preview image, served by the API host. Count query keeps it fresh.
   const previewSrc = useMemo(
-    () => `${API_BASE}/plans/${plan.id}/og-image.png?c=${going}&i=${interested}`,
+    () => `${sharePreviewOrigin()}/plans/${plan.id}/og-image.png?c=${going}&i=${interested}`,
     [plan.id, going, interested],
   );
 
@@ -210,7 +217,7 @@ export function CommunityShareSheet({
     return inviteCode ? `${base}?invite=${encodeURIComponent(inviteCode)}` : base;
   }, [communityId, inviteCode]);
   const previewSrc = useMemo(
-    () => `${API_BASE}/communities/${communityId}/og-image.png?m=${memberCount}`,
+    () => `${sharePreviewOrigin()}/communities/${communityId}/og-image.png?m=${memberCount}`,
     [communityId, memberCount],
   );
   const shareText = `Join ${name} on COMMONS`;

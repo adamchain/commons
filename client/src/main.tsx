@@ -10,7 +10,10 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { installAxisScroll } from "./lib/axisScroll";
 import "./index.css";
+
+installAxisScroll();
 
 // Prevent the browser from auto-restoring scroll on navigation — the app
 // manages scroll positions manually (feed saves/restores via sessionStorage).

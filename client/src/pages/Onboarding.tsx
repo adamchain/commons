@@ -1110,6 +1110,7 @@ function ProfileStep({
   const [photo, setPhoto] = useState<string | null>(me.avatarPhotoDataUrl ?? null);
   const [avatarParams, setAvatarParams] = useState<string | null>(me.avatarParams ?? null);
   const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Raw, uncropped image waiting on the crop+confirm step. Nothing is committed
   // to `photo` until the user confirms the crop.
@@ -1204,8 +1205,11 @@ function ProfileStep({
         disabled={busy || !canContinue}
         onClick={async () => {
           setBusy(true);
+          setSaveError(null);
           try {
             await onSave(firstName.trim(), lastName.trim(), me.avatarSeed, me.avatarStyle, photo, avatarParams);
+          } catch (e) {
+            setSaveError(formatError(e));
           } finally {
             setBusy(false);
           }
@@ -1213,6 +1217,7 @@ function ProfileStep({
       >
         {busy ? "Saving…" : "Finish"}
       </button>
+      {saveError && <p className="error-text">{saveError}</p>}
       {!canContinue && (
         <p className="onboarding-fineprint">
           {!firstName.trim() || !lastName.trim()

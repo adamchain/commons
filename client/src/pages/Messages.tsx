@@ -9,6 +9,7 @@ import { EmptyCard, ScreenTitle } from "../components/ui";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { Button } from "../components/ui/Button";
 import { sentenceCaseTitle } from "../lib/format";
+import { readScreen, writeScreen } from "../lib/screenCache";
 import { type ConversationSummaryDTO, type PublicUser } from "../types/shared";
 
 const PULL_THRESHOLD = 52;
@@ -224,10 +225,12 @@ function SwipeRemoveRow({
 
 export function MessagesPage() {
   const navigate = useNavigate();
-  const [items, setItems] = useState<ConversationSummaryDTO[]>([]);
+  const [items, setItems] = useState<ConversationSummaryDTO[]>(
+    () => readScreen<ConversationSummaryDTO[]>("inbox") ?? [],
+  );
   const [composeOpen, setComposeOpen] = useState(false);
   const [composePeople, setComposePeople] = useState<PublicUser[] | null>(null);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(() => readScreen<ConversationSummaryDTO[]>("inbox") != null);
   const [dismissTarget, setDismissTarget] = useState<ConversationSummaryDTO | null>(null);
   const [dismissBusy, setDismissBusy] = useState(false);
   const [dismissErr, setDismissErr] = useState<string | null>(null);
@@ -286,7 +289,9 @@ export function MessagesPage() {
     }
     try {
       const rows = await api<ConversationSummaryDTO[]>("/api/conversations");
-      setItems(sortInbox(rows));
+      const sorted = sortInbox(rows);
+      writeScreen("inbox", sorted);
+      setItems(sorted);
       setReady(true);
       if (showPull) window.dispatchEvent(new CustomEvent("commons:notifications-changed"));
     } catch {

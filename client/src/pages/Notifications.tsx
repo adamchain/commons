@@ -330,6 +330,9 @@ function hrefFor(n: NotificationDTO): string | null {
   if (n.kind === "communityPostPending" && n.communityId) {
     return `/communities/${n.communityId}/dashboard?section=bulletin`;
   }
+  if (n.kind === "communityBulletinPosted" && n.communityId) {
+    return `/communities/${n.communityId}?tab=bulletin`;
+  }
   if (
     n.communityId &&
     (n.kind === "communityRequestApproved" ||
@@ -432,6 +435,8 @@ function iconFor(kind: NotificationKind): ReactNode {
       return <Frown {...props} />;
     case "communityPlanPosted":
       return <Pin {...props} />;
+    case "communityBulletinPosted":
+      return <MessageCircle {...props} />;
     case "welcome":
       return <Users {...props} />;
     case "communityReview":

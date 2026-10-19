@@ -749,16 +749,16 @@ export async function ensureConnectRequest(
   if (!targetIncoming.has(userId)) {
     targetIncoming.add(userId);
     await updateUser(targetId, { incomingNetworkRequests: [...targetIncoming] });
-    await emit({
-      userId: targetId,
-      kind: "networkRequest",
-      body: `${viewer.firstName || "Someone"} wants to join your network. Accept to connect.`,
-      // A declined request used to keep the old dedup key forever, so asking
-      // again saved the request and never told the other person.
-      dedupKey: `networkRequest:${userId}:${targetId}:${Date.now()}`,
-      profileUserId: userId,
-    });
   }
+  // Already on their request list used to return quietly. If the first
+  // notification never landed, asking again has to tell them again.
+  await emit({
+    userId: targetId,
+    kind: "networkRequest",
+    body: `${viewer.firstName || "Someone"} wants to join your network. Accept to connect.`,
+    dedupKey: `networkRequest:${userId}:${targetId}:${Date.now()}`,
+    profileUserId: userId,
+  });
   return "requested";
 }
 

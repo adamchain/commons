@@ -14,7 +14,6 @@ import {
 } from "../lib/communityAccess.js";
 import { isGcsConfigured, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
-import { interestedFalloffDue } from "../lib/planFull.js";
 import { planHasEnded } from "../lib/planTime.js";
 import type { ConversationDTO, ConversationSummaryDTO, MessageDTO, PollDTO } from "../types/shared.js";
 
@@ -262,6 +261,17 @@ function planGroupChatOpen(planId: string): boolean {
   return !!plan && plan.chatEnabled !== false;
 }
 
+/** Hosts, co-hosts, and people who are Going or Interested. Opening a plan does not count. */
+function planChatMemberIds(planId: string): Set<string> | null {
+  const plan = store.findPlanById(planId);
+  if (!plan) return null;
+  const ids = new Set<string>([plan.creatorId, ...(plan.coHostIds ?? [])]);
+  for (const row of store.listParticipationsForPlan(plan.id)) {
+    if (row.state === "going" || row.state === "interested") ids.add(row.userId);
+  }
+  return ids;
+}
+
 function canAccessPlanGroupChat(planId: string, userId: string): boolean {
   const plan = store.findPlanById(planId);
   if (!plan || plan.chatEnabled === false) return false;
@@ -269,8 +279,8 @@ function canAccessPlanGroupChat(planId: string, userId: string): boolean {
   const part = store.findParticipation(planId, userId);
   if (!part) return false;
   if (part.state === "going") return true;
-  // Interested people share the thread until 48 hours before the start.
-  return part.state === "interested" && !interestedFalloffDue(plan);
+  // Interested people share the thread until the plan is marked full.
+  return part.state === "interested";
 }
 
 function canReadConversation(conv: ConversationRecord, userId: string): boolean {
@@ -478,8 +488,14 @@ chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => 
     const mentioned = mentionedUserIds(storedBody, participants);
     // Dedup per (conversation, recipient) — one "new message" until the user
     // reads. A tagged person gets a mention instead of the generic ping.
-    for (const recipientId of conv.participantIds) {
+    // Plan threads only ping people actually on the plan. participantIds still
+    // holds people who only opened the plan.
+    const recipients = conv.planId
+      ? [...(planChatMemberIds(conv.planId) ?? [])]
+      : conv.participantIds;
+    for (const recipientId of recipients) {
       if (recipientId === userId) continue;
+      if (store.hasLeftConversation(recipientId, conv.id)) continue;
       if (store.isBlockedEitherWay(userId, recipientId)) continue;
       const tagged = mentioned.has(recipientId);
       await emit({
@@ -563,8 +579,12 @@ chatRouter.post("/conversations/:id/polls", requireAuth, async (req, res) => {
     const senderName = sender?.firstName || "Someone";
     const plan = store.findPlanById(conv.planId);
     const planTitle = plan?.title ?? "your plan";
-    for (const recipientId of conv.participantIds) {
+    const recipients = conv.planId
+      ? [...(planChatMemberIds(conv.planId) ?? [])]
+      : conv.participantIds;
+    for (const recipientId of recipients) {
       if (recipientId === userId) continue;
+      if (store.hasLeftConversation(recipientId, conv.id)) continue;
       if (store.isBlockedEitherWay(userId, recipientId)) continue;
       await emit({
         userId: recipientId,
