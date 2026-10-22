@@ -27,6 +27,7 @@ export function ComposerField({
   className,
   disabled,
   autoFocus,
+  focusToken,
   onEscape,
 }: {
   value: string;
@@ -37,10 +38,17 @@ export function ComposerField({
   className?: string;
   disabled?: boolean;
   autoFocus?: boolean;
+  /** Changes when the field should take focus, such as starting a reply. */
+  focusToken?: string | null;
   onEscape?: () => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [caret, setCaret] = useState(value.length);
+
+  useEffect(() => {
+    if (!focusToken) return;
+    ref.current?.focus();
+  }, [focusToken]);
 
   useEffect(() => {
     const el = ref.current;

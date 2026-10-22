@@ -318,6 +318,8 @@ export interface MessageRecord {
   poll?: PollData;
   /** Optional image attached to a user message (data URL or https). */
   imageUrl?: string | null;
+  /** Id of the message this one quotes, in the same conversation. */
+  replyToId?: string;
 }
 
 export interface PlanSuggestionRecord {
@@ -1808,6 +1810,7 @@ export const store = {
     senderId: string,
     body: string,
     imageUrl?: string | null,
+    replyToId?: string,
   ): MessageRecord {
     const message: MessageRecord = {
       id: randomUUID(),
@@ -1818,6 +1821,7 @@ export const store = {
       readBy: [senderId],
       kind: "user",
       ...(imageUrl ? { imageUrl } : {}),
+      ...(replyToId ? { replyToId } : {}),
     };
     snapshot.messages.push(message);
     const conv = snapshot.conversations.find((c) => c.id === conversationId);

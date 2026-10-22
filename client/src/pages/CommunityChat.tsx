@@ -4,6 +4,7 @@ import { ArrowLeft, BarChart2 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { ComposerField, MentionText } from "../components/ComposerField";
+import { ChatReplyButton, ChatReplyDraft, ChatReplyQuote, replyTarget } from "../components/ChatReply";
 import { ChatPersonLink } from "../components/ChatPersonLink";
 import { HoldToDelete } from "../components/HoldToDelete";
 import { CommunityCoverThumb } from "../components/CoverThumb";
@@ -18,7 +19,7 @@ import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
 import type { NavFromState } from "../lib/navState";
 import { useStickToBottom } from "../lib/useStickToBottom";
-import type { CommunityCategory, MessageDTO, PublicUser } from "../types/shared";
+import type { CommunityCategory, MessageDTO, MessageReplyDTO, PublicUser } from "../types/shared";
 
 const CHAT_IMAGE_MAX_PX = 1024;
 const CHAT_IMAGE_QUALITY = 0.85;
@@ -60,6 +61,7 @@ export function CommunityChatPage() {
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<MessageReplyDTO | null>(null);
   const [attachingImage, setAttachingImage] = useState(false);
   const [pollModalOpen, setPollModalOpen] = useState(false);
   const [creatingPoll, setCreatingPoll] = useState(false);
@@ -215,12 +217,14 @@ export function CommunityChatPage() {
         body: JSON.stringify({
           ...(trimmed ? { body: trimmed } : {}),
           ...(pendingImage ? { imageUrl: pendingImage } : {}),
+          ...(replyTo ? { replyToId: replyTo.id } : {}),
         }),
       });
       stickOnSend();
       setMessages((prev) => [...prev, msg]);
       setBody("");
       setPendingImage(null);
+      setReplyTo(null);
     } catch (e) {
       window.alert(parseApiError(e) || "Couldn't send that message.");
     } finally {
@@ -580,7 +584,7 @@ export function CommunityChatPage() {
                 const msg = entry.message;
                 if (!msg.poll || !msg.sender) return null;
                 return (
-                  <div key={entry.id} className="chat-poll-row">
+                  <div key={entry.id} id={`chat-msg-${entry.id}`} className="chat-poll-row">
                     <PollCard
                       poll={msg.poll}
                       author={msg.sender}
@@ -593,6 +597,9 @@ export function CommunityChatPage() {
                       onDelete={msg.sender.id === user.id ? () => void deleteOwnMessage(msg.id) : undefined}
                       busy={busyPollId === msg.id || deletingMessageId === msg.id}
                     />
+                    <div className="chat-bubble-actions">
+                      <ChatReplyButton onClick={() => setReplyTo(replyTarget(msg))} />
+                    </div>
                   </div>
                 );
               }
@@ -605,7 +612,7 @@ export function CommunityChatPage() {
                 .filter(Boolean)
                 .join(" ");
               return (
-                <div key={entry.id} className={rowCls}>
+                <div key={entry.id} id={`chat-msg-${entry.id}`} className={rowCls}>
                   {!mine && (
                     <span className="chat-bubble-avatar-slot">
                       {entry.showAvatar ? (
@@ -641,6 +648,7 @@ export function CommunityChatPage() {
                         {entry.sender.firstName}
                       </ChatPersonLink>
                     )}
+                    {entry.replyTo && <ChatReplyQuote reply={entry.replyTo} />}
                     {entry.imageUrl && (
                       <a
                         href={entry.imageUrl}
@@ -659,6 +667,12 @@ export function CommunityChatPage() {
                     <div className="chat-bubble-time">{formatTimeOnly(entry.createdAt)}</div>
                   </HoldToDelete>
                   <div className="chat-bubble-actions">
+                    <ChatReplyButton
+                      onClick={() => {
+                        const target = messages.find((m) => m.id === entry.id);
+                        if (target) setReplyTo(replyTarget(target));
+                      }}
+                    />
                     {(() => {
                       const hearts = entry.reactions["❤️"] ?? [];
                       const iReacted = hearts.includes(user.id);
@@ -691,6 +705,7 @@ export function CommunityChatPage() {
             void send();
           }}
         >
+          {replyTo && <ChatReplyDraft reply={replyTo} onClear={() => setReplyTo(null)} />}
           {pendingImage && (
             <div className="chat-composer-attach">
               <div className="chat-composer-attach-thumb">
@@ -766,6 +781,8 @@ export function CommunityChatPage() {
               onChange={setBody}
               people={conv.participants}
               disabled={sending}
+              focusToken={replyTo?.id}
+              onEscape={() => setReplyTo(null)}
               onSubmit={() => {
                 if (sending || (!body.trim() && !pendingImage)) return;
                 void send();
@@ -865,6 +882,7 @@ type GroupedEntry =
       showAvatar: boolean;
       reactions: Record<string, string[]>;
       imageUrl?: string | null;
+      replyTo?: MessageReplyDTO;
     };
 
 function groupMessages(msgs: MessageDTO[]): GroupedEntry[] {
@@ -906,6 +924,7 @@ function groupMessages(msgs: MessageDTO[]): GroupedEntry[] {
       showAvatar: !cont,
       reactions: m.reactions ?? {},
       imageUrl: m.imageUrl,
+      replyTo: m.replyTo,
     });
     lastUserSenderId = sender.id;
     lastUserAt = date.getTime();

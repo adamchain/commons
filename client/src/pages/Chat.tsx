@@ -12,6 +12,7 @@ import {
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { ComposerField, MentionText } from "../components/ComposerField";
+import { ChatReplyButton, ChatReplyDraft, ChatReplyQuote, replyTarget } from "../components/ChatReply";
 import { ChatPersonLink } from "../components/ChatPersonLink";
 import { HoldToDelete } from "../components/HoldToDelete";
 import { BlockConfirmModal, ReportModal } from "../components/PlanSafetyMenu";
@@ -28,7 +29,7 @@ import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
 import { planHasEnded, isIdeaPlan } from "../lib/planTime";
 import { useStickToBottom } from "../lib/useStickToBottom";
-import type { ConversationDTO, MessageDTO, PlanDTO, PublicUser } from "../types/shared";
+import type { ConversationDTO, MessageDTO, MessageReplyDTO, PlanDTO, PublicUser } from "../types/shared";
 
 const POLL_MS = 4000;
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
@@ -66,6 +67,7 @@ export function ChatPage() {
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<MessageReplyDTO | null>(null);
   const [attachingImage, setAttachingImage] = useState(false);
   const [pollModalOpen, setPollModalOpen] = useState(false);
   const [creatingPoll, setCreatingPoll] = useState(false);
@@ -180,12 +182,14 @@ export function ChatPage() {
         body: JSON.stringify({
           ...(trimmed ? { body: trimmed } : {}),
           ...(pendingImage ? { imageUrl: pendingImage } : {}),
+          ...(replyTo ? { replyToId: replyTo.id } : {}),
         }),
       });
       stickOnSend();
       setMessages((prev) => [...prev, msg]);
       setBody("");
       setPendingImage(null);
+      setReplyTo(null);
     } catch (e) {
       window.alert(parseApiError(e) || "Couldn't send that message.");
     } finally {
@@ -561,7 +565,7 @@ export function ChatPage() {
                 const msg = entry.message;
                 if (!msg.poll || !msg.sender) return null;
                 return (
-                  <div key={entry.id} className="chat-poll-row">
+                  <div key={entry.id} id={`chat-msg-${entry.id}`} className="chat-poll-row">
                     <PollCard
                       poll={msg.poll}
                       author={msg.sender}
@@ -574,6 +578,9 @@ export function ChatPage() {
                       onDelete={msg.sender.id === user.id ? () => void deleteOwnMessage(msg.id) : undefined}
                       busy={busyPollId === msg.id || deletingMessageId === msg.id}
                     />
+                    <div className="chat-bubble-actions">
+                      <ChatReplyButton onClick={() => setReplyTo(replyTarget(msg))} />
+                    </div>
                   </div>
                 );
               }
@@ -586,7 +593,7 @@ export function ChatPage() {
                 .filter(Boolean)
                 .join(" ");
               return (
-                <div key={entry.id} className={rowCls}>
+                <div key={entry.id} id={`chat-msg-${entry.id}`} className={rowCls}>
                   {!mine && (
                     <span className="chat-bubble-avatar-slot">
                       {entry.showAvatar ? (
@@ -622,6 +629,7 @@ export function ChatPage() {
                         {entry.sender.firstName}
                       </ChatPersonLink>
                     )}
+                    {entry.replyTo && <ChatReplyQuote reply={entry.replyTo} />}
                     {entry.imageUrl && (
                       <a
                         href={entry.imageUrl}
@@ -640,6 +648,12 @@ export function ChatPage() {
                     <div className="chat-bubble-time">{formatTimeOnly(entry.createdAt)}</div>
                   </HoldToDelete>
                   <div className="chat-bubble-actions">
+                    <ChatReplyButton
+                      onClick={() => {
+                        const target = messages.find((m) => m.id === entry.id);
+                        if (target) setReplyTo(replyTarget(target));
+                      }}
+                    />
                     {(() => {
                       const hearts = entry.reactions["❤️"] ?? [];
                       const iReacted = hearts.includes(user.id);
@@ -672,6 +686,7 @@ export function ChatPage() {
             void send();
           }}
         >
+          {replyTo && <ChatReplyDraft reply={replyTo} onClear={() => setReplyTo(null)} />}
           {pendingImage && (
             <div className="chat-composer-attach">
               <div className="chat-composer-attach-thumb">
@@ -747,6 +762,8 @@ export function ChatPage() {
               onChange={setBody}
               people={conv.participants}
               disabled={sending}
+              focusToken={replyTo?.id}
+              onEscape={() => setReplyTo(null)}
               onSubmit={() => {
                 if (sending || (!body.trim() && !pendingImage)) return;
                 void send();
@@ -841,6 +858,7 @@ type GroupedEntry =
       showAvatar: boolean;
       reactions: Record<string, string[]>;
       imageUrl?: string | null;
+      replyTo?: MessageReplyDTO;
     };
 
 function groupMessages(msgs: MessageDTO[]): GroupedEntry[] {
@@ -882,6 +900,7 @@ function groupMessages(msgs: MessageDTO[]): GroupedEntry[] {
       showAvatar: !cont,
       reactions: m.reactions ?? {},
       imageUrl: m.imageUrl,
+      replyTo: m.replyTo,
     });
     lastUserSenderId = sender.id;
     lastUserAt = date.getTime();

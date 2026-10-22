@@ -4,6 +4,7 @@ import { ArrowLeft, MessageCircle, MoreVertical, Plus } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { ComposerField, MentionText } from "../components/ComposerField";
+import { ChatReplyButton, ChatReplyDraft, ChatReplyQuote, replyTarget } from "../components/ChatReply";
 import { ChatPersonLink } from "../components/ChatPersonLink";
 import { HoldToDelete } from "../components/HoldToDelete";
 import { PollCard } from "../components/PollCard";
@@ -17,7 +18,7 @@ import type { NavFromState } from "../lib/navState";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
 import { useStickToBottom } from "../lib/useStickToBottom";
-import type { ConversationDTO, MeDTO, MessageDTO, PublicUser } from "../types/shared";
+import type { ConversationDTO, MeDTO, MessageDTO, MessageReplyDTO, PublicUser } from "../types/shared";
 
 const POLL_MS = 4000;
 const CHAT_IMAGE_MAX_PX = 1024;
@@ -39,6 +40,7 @@ export function DmChatPage() {
   const [messages, setMessages] = useState<MessageDTO[]>([]);
   const [body, setBody] = useState("");
   const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<MessageReplyDTO | null>(null);
   const [attachingImage, setAttachingImage] = useState(false);
   const [sending, setSending] = useState(false);
   const [composerMenuOpen, setComposerMenuOpen] = useState(false);
@@ -196,13 +198,16 @@ export function DmChatPage() {
     setSending(true);
     setBody("");
     const image = pendingImage;
+    const reply = replyTo;
     setPendingImage(null);
+    setReplyTo(null);
     try {
       const msg = await api<MessageDTO>(`/api/conversations/${conv.id}/messages`, {
         method: "POST",
         body: JSON.stringify({
           ...(text ? { body: text } : {}),
           ...(image ? { imageUrl: image } : {}),
+          ...(reply ? { replyToId: reply.id } : {}),
         }),
       });
       setMessages((prev) => [...prev, msg]);
@@ -217,6 +222,7 @@ export function DmChatPage() {
     } catch (e) {
       setBody(text);
       setPendingImage(image);
+      setReplyTo(reply);
       setError(parseApiError(e) || "Couldn't send that.");
     } finally {
       setSending(false);
@@ -505,7 +511,7 @@ export function DmChatPage() {
             }
             if (m.kind === "poll" && m.poll && m.sender && conv) {
               return (
-                <div key={m.id} className="chat-poll-row">
+                <div key={m.id} id={`chat-msg-${m.id}`} className="chat-poll-row">
                   <PollCard
                     poll={m.poll}
                     author={m.sender}
@@ -517,12 +523,15 @@ export function DmChatPage() {
                     onDelete={m.sender.id === user?.id ? () => void deleteOwnMessage(m.id) : undefined}
                     busy={busyPollId === m.id || deletingMessageId === m.id}
                   />
+                  <div className="chat-bubble-actions">
+                    <ChatReplyButton onClick={() => setReplyTo(replyTarget(m))} />
+                  </div>
                 </div>
               );
             }
             const mine = m.sender?.id === user?.id;
             return (
-              <div key={m.id} className={`chat-bubble-row${mine ? " is-mine" : ""}`}>
+              <div key={m.id} id={`chat-msg-${m.id}`} className={`chat-bubble-row${mine ? " is-mine" : ""}`}>
                 {!mine && m.sender && (
                   <span className="chat-bubble-avatar-slot">
                     <ChatPersonLink userId={m.sender.id} name={m.sender.firstName} state={personProfileFrom}>
@@ -542,6 +551,7 @@ export function DmChatPage() {
                     enabled={Boolean(mine && user && deletingMessageId !== m.id)}
                     onDelete={() => void deleteOwnMessage(m.id)}
                   >
+                    {m.replyTo && <ChatReplyQuote reply={m.replyTo} />}
                     {m.imageUrl && (
                       <a href={m.imageUrl} target="_blank" rel="noopener noreferrer" className="chat-bubble-image-link">
                         <img src={m.imageUrl} alt="" className="chat-bubble-image" />
@@ -558,6 +568,7 @@ export function DmChatPage() {
                   </HoldToDelete>
                   {user && (
                     <div className="chat-bubble-actions">
+                      <ChatReplyButton onClick={() => setReplyTo(replyTarget(m))} />
                       {(() => {
                         const hearts = m.reactions?.["❤️"] ?? [];
                         const iReacted = hearts.includes(user.id);
@@ -593,6 +604,7 @@ export function DmChatPage() {
               void send();
             }}
           >
+            {replyTo && <ChatReplyDraft reply={replyTo} onClear={() => setReplyTo(null)} />}
             {pendingImage && (
               <div className="chat-composer-attach">
                 <div className="chat-composer-attach-thumb">
@@ -670,6 +682,8 @@ export function DmChatPage() {
                 onChange={setBody}
                 people={other ? [other] : []}
                 disabled={sending}
+                focusToken={replyTo?.id}
+                onEscape={() => setReplyTo(null)}
                 onSubmit={() => {
                   if (sending || (!body.trim() && !pendingImage)) return;
                   void send();

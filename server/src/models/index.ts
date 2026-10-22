@@ -191,6 +191,7 @@ const MessageSchema = new Schema<MessageRecord>(
     // Present only on poll messages: { question, options, votes, closed }.
     poll: { type: Schema.Types.Mixed, default: undefined },
     imageUrl: { type: String, default: null },
+    replyToId: { type: String },
   },
   { collection: "messages" },
 );

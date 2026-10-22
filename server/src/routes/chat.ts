@@ -15,7 +15,7 @@ import {
 import { isGcsConfigured, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
 import { planHasEnded } from "../lib/planTime.js";
-import type { ConversationDTO, ConversationSummaryDTO, MessageDTO, PollDTO } from "../types/shared.js";
+import type { ConversationDTO, ConversationSummaryDTO, MessageDTO, MessageReplyDTO, PollDTO } from "../types/shared.js";
 
 const MAX_CHAT_IMAGE_CHARS = 1_600_000;
 
@@ -456,6 +456,16 @@ chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => 
   // Image-only messages get a placeholder body so inbox previews + notifications
   // stay readable without poll/image-specific branching everywhere.
   const storedBody = body || (imageUrl ? "📷 Photo" : "");
+  const rawReply = typeof req.body?.replyToId === "string" ? req.body.replyToId.trim() : "";
+  let replyToId: string | undefined;
+  if (rawReply) {
+    const target = store.findMessageById(rawReply);
+    if (!target || target.conversationId !== convId || target.kind === "system") {
+      res.status(400).json({ error: "That message isn't available to reply to." });
+      return;
+    }
+    replyToId = target.id;
+  }
   if (conv.type === "dm" && !conv.planId && !conv.communityId) {
     const otherId = conv.participantIds.find((id) => id !== userId);
     const senderUser = otherId ? await findUserById(userId) : undefined;
@@ -471,7 +481,7 @@ chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => 
       }
     }
   }
-  const message = store.createMessage(convId, userId, storedBody, imageUrl);
+  const message = store.createMessage(convId, userId, storedBody, imageUrl, replyToId);
   // Group chats ping every other participant. A network DM pings the other
   // person, brings the thread back if they had left it, and stays quiet when
   // they've muted this chat (emit checks mutedConversationIds). A held DM
@@ -1008,6 +1018,7 @@ async function toMessageDto(
   viewerId = "",
   hostId = "",
 ): Promise<MessageDTO> {
+  const replyTo = await replyQuote(m);
   if (m.kind === "system") {
     return {
       id: m.id,
@@ -1031,6 +1042,7 @@ async function toMessageDto(
       body: m.body,
       createdAt: m.createdAt,
       poll: pollToDto(m.poll, m.senderId, viewerId, hostId),
+      ...(replyTo ? { replyTo } : {}),
     };
   }
 
@@ -1043,6 +1055,29 @@ async function toMessageDto(
     createdAt: m.createdAt,
     reactions: m.reactions ?? {},
     ...(m.imageUrl ? { imageUrl: m.imageUrl } : {}),
+    ...(replyTo ? { replyTo } : {}),
+  };
+}
+
+function replyPreviewText(m: { kind?: string; body: string; imageUrl?: string | null; poll?: { question: string } }): string {
+  if (m.kind === "poll") return m.poll?.question || m.body || "Poll";
+  if (m.imageUrl && (!m.body.trim() || m.body.trim() === "📷 Photo")) return "Photo";
+  const text = m.body.trim();
+  if (!text) return "Message";
+  return text.length > 140 ? `${text.slice(0, 137)}…` : text;
+}
+
+async function replyQuote(m: { replyToId?: string; conversationId: string }): Promise<MessageReplyDTO | undefined> {
+  if (!m.replyToId) return undefined;
+  const target = store.findMessageById(m.replyToId);
+  if (!target || target.conversationId !== m.conversationId) {
+    return { id: m.replyToId, senderName: "", preview: "Message unavailable" };
+  }
+  const sender = target.kind === "system" ? undefined : await findUserById(target.senderId);
+  return {
+    id: target.id,
+    senderName: sender?.firstName || "Someone",
+    preview: replyPreviewText(target),
   };
 }
 

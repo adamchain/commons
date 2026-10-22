@@ -425,6 +425,13 @@ export interface PollDTO {
   canClose: boolean;
 }
 
+/** Short quote of the message a chat line is answering. */
+export interface MessageReplyDTO {
+  id: string;
+  senderName: string;
+  preview: string;
+}
+
 export interface MessageDTO {
   id: string;
   conversationId: string;
@@ -438,6 +445,8 @@ export interface MessageDTO {
   poll?: PollDTO;
   /** Optional image on a user message (data URL or https). */
   imageUrl?: string | null;
+  /** The earlier message this one quotes. */
+  replyTo?: MessageReplyDTO;
 }
 
 export interface FeedbackDTO {
