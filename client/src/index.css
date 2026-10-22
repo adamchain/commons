@@ -14074,8 +14074,26 @@ button.xpl-photo-tile {
   background: var(--surface);
   text-align: left;
 }
+/* The terms/privacy sheet has to be a fixed-height column. Otherwise
+   .sheet-body's min-height: min-content wins over its max-height, the
+   document expands the sheet, and overflow: hidden clips the "I've read
+   this" button with nothing left to scroll — signup stops here on web. */
 .sheet:has(.legal-modal-panel) {
   overflow: hidden;
+  height: 92dvh;
+  max-height: 92dvh;
+}
+.sheet:has(.legal-modal-panel) .sheet-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+}
+.sheet:has(.legal-modal-panel) .legal-modal-header,
+.sheet:has(.legal-modal-panel) .sheet-actions {
+  flex-shrink: 0;
 }
 
 /* --- Onboarding consent gate --- */
