@@ -1,0 +1,173 @@
+import { Router } from "express";
+import { requireAuth } from "../middleware/requireAuth.js";
+import { store } from "../store.js";
+import { findUserById } from "../userRepo.js";
+import { communityCardsForUser } from "./communities.js";
+import { calendarDayInPlanZone, planHasEnded } from "../lib/planTime.js";
+import { planSummary, userToPublic } from "./plans.js";
+export const profileRouter = Router();
+// GET /api/profile/:userId — public-facing host profile
+profileRouter.get("/:userId", requireAuth, async (req, res) => {
+    const targetId = String(req.params.userId);
+    const viewerId = String(req.userId);
+    const target = await findUserById(targetId);
+    if (!target) {
+        res.status(404).json({ error: "User not found" });
+        return;
+    }
+    // Blocking hides the profile both ways — don't reveal which side blocked.
+    if (targetId !== viewerId && store.isBlockedEitherWay(viewerId, targetId)) {
+        res.status(404).json({ error: "User not found" });
+        return;
+    }
+    if (targetId !== viewerId && store.isUserEjected(targetId)) {
+        res.status(404).json({ error: "User not found" });
+        return;
+    }
+    const resolvedHoodId = store.resolveNeighborhoodId(target.neighborhoodId);
+    const neighborhood = resolvedHoodId ? store.findNeighborhoodById(resolvedHoodId) : null;
+    // Plans authored (all-time, for stats + past accordion) plus ones they
+    // joined. Past used to be "hosted only, last 5", so joined plans never showed.
+    const allPlans = store.listPlansByCreator(targetId);
+    const attended = new Map(allPlans.map((p) => [p.id, p]));
+    for (const part of store.listParticipationsForUser(targetId)) {
+        if (part.state !== "going" && part.state !== "interested")
+            continue;
+        const plan = store.findPlanById(part.planId);
+        if (plan)
+            attended.set(plan.id, plan);
+    }
+    // Compare YYYY-MM-DD strings — never `new Date("YYYY-MM-DD")` (UTC midnight
+    // shifts the calendar day in US timezones and drops "today" from upcoming).
+    const todayIso = localIsoDate();
+    const past = [...attended.values()]
+        .filter((p) => planHasEnded(p) || (!p.isFlexibleDate && p.date.slice(0, 10) < todayIso))
+        .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
+    // Upcoming = hosting + I'm In or Interested (two-state participation).
+    const upcomingHosted = allPlans.filter((p) => !p.cancelledAt && !planHasEnded(p) && p.date >= todayIso);
+    const upcomingJoined = store
+        .listParticipationsForUser(targetId)
+        .filter((p) => p.state === "going" || p.state === "interested")
+        .map((p) => store.findPlanById(p.planId))
+        .filter((p) => {
+        if (!p || p.cancelledAt)
+            return false;
+        if (p.creatorId === targetId)
+            return false;
+        return !planHasEnded(p) && p.date >= todayIso;
+    });
+    const upcomingById = new Map();
+    for (const p of [...upcomingHosted, ...upcomingJoined])
+        upcomingById.set(p.id, p);
+    const upcoming = [...upcomingById.values()].sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+    // "Message in current plan" CTA appears only when viewer + target share a current plan as participants.
+    const sharedPlanId = findSharedActivePlan(targetId, viewerId, todayIso);
+    // Plans joined as a non-creator (rough "joined" count for the stat strip).
+    const joinedCount = store
+        .listParticipationsForUser(targetId)
+        .filter((p) => p.state === "going")
+        .filter((p) => {
+        const plan = store.findPlanById(p.planId);
+        return plan && plan.creatorId !== targetId;
+    }).length;
+    const isSelf = viewerId === targetId;
+    const viewer = await findUserById(viewerId);
+    const viewerNetwork = new Set(viewer?.networkIds ?? []);
+    const targetNetwork = new Set(target.networkIds ?? []);
+    const inMyNetwork = viewerNetwork.has(targetId);
+    // Pending-request state for the connect button: did I request them, or did
+    // they request me (so I can Accept)?
+    const requestSent = (target.incomingNetworkRequests ?? []).includes(viewerId);
+    const requestReceived = (viewer?.incomingNetworkRequests ?? []).includes(targetId);
+    // Mutual = users that are in BOTH the viewer's and the target's network.
+    const mutualIds = [...viewerNetwork].filter((id) => targetNetwork.has(id));
+    const mutuals = mutualIds
+        .map((id) => store.findUserById(id))
+        .filter((u) => !!u)
+        .slice(0, 3)
+        .map((u) => userToPublic(u));
+    // Face + interests stay public. Plans and communities stay in-network unless
+    // this person has made the account public and left that section on.
+    const inEitherNetwork = inMyNetwork || targetNetwork.has(viewerId);
+    const sharedCompleted = hasSharedCompletedPlan(targetId, viewerId, todayIso);
+    // Accounts are private unless the person opts in. Network still sees
+    // everything. Public only opens the pieces they left on in Settings.
+    const connected = isSelf || inEitherNetwork;
+    const plansOpen = connected || (target.profilePublic === true && target.showPlansPublicly === true);
+    const communitiesOpen = connected || (target.profilePublic === true && target.showCommunitiesPublicly === true);
+    // Social links stay on the older rule: connected, or you've already hung out.
+    const socialLinks = isSelf || inEitherNetwork || sharedCompleted ? (target.socialLinks ?? null) : null;
+    const sharedUpcoming = sharedPlanId ? upcoming.filter((p) => p.id === sharedPlanId) : [];
+    res.json({
+        user: userToPublic(target),
+        interests: target.interests ?? [],
+        neighborhood: neighborhood ? { id: neighborhood.id, name: neighborhood.name, metro: neighborhood.metro } : null,
+        locationLabel: target.locationLabel ?? null,
+        stats: {
+            hosted: allPlans.length,
+            joined: joinedCount,
+        },
+        upcoming: plansOpen
+            ? await Promise.all(upcoming.map((p) => planSummary(p, viewerId)))
+            : await Promise.all(sharedUpcoming.map((p) => planSummary(p, viewerId))),
+        past: plansOpen
+            ? past.slice(0, 200).map((p) => ({
+                id: p.id,
+                title: p.title,
+                date: p.date,
+                wentCount: store.listParticipationsForPlan(p.id).filter((q) => q.state === "going").length,
+                flyerDataUrl: p.flyerDataUrl,
+                flyerLinkPreview: p.flyerLinkPreview,
+                planKind: p.planKind ?? "standard",
+                lockedAt: p.lockedAt ?? null,
+            }))
+            : [],
+        sharedPlanId,
+        socialLinks,
+        profilePhotos: target.profilePhotos ?? [],
+        plansGated: !plansOpen && !isSelf,
+        profilePrivate: !isSelf && !plansOpen && !communitiesOpen,
+        network: {
+            inMyNetwork,
+            requestSent,
+            requestReceived,
+            mutualCount: mutualIds.length,
+            mutuals,
+        },
+        // Someone in your network: their communities, from their point of view
+        // so an Organizer tag means they run it.
+        communities: communitiesOpen ? await communityCardsForUser(targetId) : [],
+    });
+});
+/** Philly calendar day. Server local time is UTC and flips the day at 8pm ET. */
+function localIsoDate(d = new Date()) {
+    return calendarDayInPlanZone(d);
+}
+/** True only after a shared plan's calendar day has passed — not merely because you joined an upcoming one. */
+function hasSharedCompletedPlan(a, b, todayIso) {
+    for (const p of store.listPlans()) {
+        const day = String(p.date).slice(0, 10);
+        // Ignore malformed dates so they can't compare as "in the past" and unlock the calendar.
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day >= todayIso)
+            continue;
+        const aWent = store.findParticipation(p.id, a)?.state === "going" || p.creatorId === a;
+        const bWent = store.findParticipation(p.id, b)?.state === "going" || p.creatorId === b;
+        if (aWent && bWent)
+            return true;
+    }
+    return false;
+}
+function findSharedActivePlan(a, b, todayIso) {
+    for (const p of store.listPlans()) {
+        if (p.cancelledAt)
+            continue;
+        const day = String(p.date).slice(0, 10);
+        if (day < todayIso)
+            continue;
+        const aIn = p.creatorId === a || store.findParticipation(p.id, a)?.state === "going";
+        const bIn = p.creatorId === b || store.findParticipation(p.id, b)?.state === "going";
+        if (aIn && bIn)
+            return p.id;
+    }
+    return null;
+}

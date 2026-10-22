@@ -1,0 +1,922 @@
+import { Router } from "express";
+import { isAdminPhone } from "../lib/adminPhones.js";
+import { sessionVersionMatches, signSessionToken, verifySessionToken } from "../lib/jwt.js";
+import { normalizePhone } from "../lib/phone.js";
+import { checkPhoneVerification, isTwilioVerifyConfigured, startPhoneVerification, verificationStillOpen, } from "../lib/verify.js";
+import { rateLimit } from "../middleware/rateLimit.js";
+import { requireAuth } from "../middleware/requireAuth.js";
+import { INVITE_CODES_PER_USER, normalizeInviteCode, store } from "../store.js";
+import { createUser, deleteUser, findUserByPhone, findUserById, updateUser } from "../userRepo.js";
+import { DEFAULT_NOTIFICATION_PREFS, } from "../types/shared.js";
+import { planHasEnded } from "../lib/planTime.js";
+import { nextNetworkPrompt, otherGoingIds, userWasGoing } from "../lib/networkPrompt.js";
+import { emit } from "../lib/notify.js";
+import { textBlockedReason } from "../lib/contentFilter.js";
+import { isLaunchAccessCode } from "../lib/accessCodes.js";
+const US_STATE_ABBR = {
+    Alabama: "AL", Alaska: "AK", Arizona: "AZ", Arkansas: "AR", California: "CA",
+    Colorado: "CO", Connecticut: "CT", Delaware: "DE", "District of Columbia": "DC",
+    Florida: "FL", Georgia: "GA", Hawaii: "HI", Idaho: "ID", Illinois: "IL", Indiana: "IN",
+    Iowa: "IA", Kansas: "KS", Kentucky: "KY", Louisiana: "LA", Maine: "ME", Maryland: "MD",
+    Massachusetts: "MA", Michigan: "MI", Minnesota: "MN", Mississippi: "MS", Missouri: "MO",
+    Montana: "MT", Nebraska: "NE", Nevada: "NV", "New Hampshire": "NH", "New Jersey": "NJ",
+    "New Mexico": "NM", "New York": "NY", "North Carolina": "NC", "North Dakota": "ND",
+    Ohio: "OH", Oklahoma: "OK", Oregon: "OR", Pennsylvania: "PA", "Rhode Island": "RI",
+    "South Carolina": "SC", "South Dakota": "SD", Tennessee: "TN", Texas: "TX", Utah: "UT",
+    Vermont: "VT", Virginia: "VA", Washington: "WA", "West Virginia": "WV", Wisconsin: "WI",
+    Wyoming: "WY",
+};
+async function reverseGeocodeLabel(lat, lng) {
+    try {
+        const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=10`;
+        const res = await fetch(url, {
+            headers: { "User-Agent": "COMMONS/1.0 (commons-app)" },
+            signal: AbortSignal.timeout(4000),
+        });
+        if (!res.ok)
+            return null;
+        const data = await res.json();
+        const addr = data.address ?? {};
+        const city = addr.city || addr.town || addr.village || addr.hamlet || addr.county || null;
+        const state = addr.state ? (US_STATE_ABBR[addr.state] ?? addr.state) : null;
+        if (!city)
+            return state;
+        return state ? `${city}, ${state}` : city;
+    }
+    catch {
+        return null;
+    }
+}
+export const authRouter = Router();
+const CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+// Dev/QA-only login bypass. Lets you sign in as a fixed fake number with a
+// fixed code — no Twilio SMS required — so you can test the app as a plain
+// non-member / non-admin account.
+//
+// Never enabled in production. ALLOW_TEST_LOGIN is ignored there so a public
+// deploy cannot keep a fixed-code backdoor.
+const TEST_LOGIN_ENABLED = process.env.NODE_ENV !== "production";
+const TEST_LOGIN_ACCOUNTS = TEST_LOGIN_ENABLED
+    ? { "+19999999999": "999999" }
+    : {};
+function testLoginCodeFor(phone) {
+    return TEST_LOGIN_ACCOUNTS[phone];
+}
+function parseTwilioError(err) {
+    if (typeof err !== "object" || err === null)
+        return {};
+    const maybe = err;
+    return {
+        code: typeof maybe.code === "number" ? maybe.code : undefined,
+        status: typeof maybe.status === "number" ? maybe.status : undefined,
+        message: typeof maybe.message === "string" ? maybe.message : undefined,
+    };
+}
+export function setSessionCookie(res, userId, sessionVersion = 0) {
+    const token = signSessionToken(userId, sessionVersion);
+    res.cookie("session", token, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 1000 * 60 * 60 * 24 * 30,
+    });
+    return token;
+}
+function generateCode() {
+    return String(Math.floor(100000 + Math.random() * 900000));
+}
+export function meFromUser(user) {
+    const neighborhoodIds = user.neighborhoodIds && user.neighborhoodIds.length > 0
+        ? user.neighborhoodIds
+        : user.neighborhoodId
+            ? [user.neighborhoodId]
+            : [];
+    return {
+        id: user.id,
+        phoneNumber: user.phoneNumber,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        bio: user.bio || undefined,
+        ageRange: user.ageRange ?? null,
+        ageConfirmedAt: user.ageConfirmedAt ?? null,
+        neighborhoodId: user.neighborhoodId ?? neighborhoodIds[0] ?? null,
+        neighborhoodIds,
+        interests: user.interests,
+        avatarSeed: user.avatarSeed,
+        avatarStyle: user.avatarStyle,
+        avatarPhotoDataUrl: user.avatarPhotoDataUrl,
+        avatarParams: user.avatarParams,
+        onboardingComplete: user.onboardingComplete,
+        createdAt: user.createdAt,
+        networkUserIds: user.networkIds?.length ? user.networkIds : [],
+        // Self always sees own social links — visibility check applies only to
+        // other-viewer profile reads (see /api/profile).
+        socialLinks: user.socialLinks,
+        profilePhotos: user.profilePhotos?.length ? user.profilePhotos : [],
+        canAccessAdmin: isAdminPhone(user.phoneNumber),
+        guidelinesAcknowledgedAt: user.guidelinesAcknowledgedAt ?? null,
+        termsAcceptedAt: user.termsAcceptedAt ?? null,
+        privacyAcceptedAt: user.privacyAcceptedAt ?? null,
+        notificationPrefs: { ...DEFAULT_NOTIFICATION_PREFS, ...(user.notificationPrefs ?? {}) },
+        blockedUserIds: user.blockedUserIds?.length ? user.blockedUserIds : [],
+        discoverableBySearch: user.discoverableBySearch !== false,
+        profilePublic: user.profilePublic === true,
+        showPlansPublicly: user.showPlansPublicly === true,
+        showCommunitiesPublicly: user.showCommunitiesPublicly === true,
+        mutedConversationIds: user.mutedConversationIds?.length ? user.mutedConversationIds : [],
+        leftConversationIds: user.leftConversationIds?.length ? user.leftConversationIds : [],
+        pinnedConversationIds: user.pinnedConversationIds?.length ? user.pinnedConversationIds : [],
+        location: typeof user.locationLat === "number" && typeof user.locationLng === "number"
+            ? { lat: user.locationLat, lng: user.locationLng }
+            : null,
+        locationPromptAnsweredAt: user.locationPromptAnsweredAt ?? null,
+    };
+}
+async function userToMe(userId) {
+    const user = await findUserById(userId);
+    if (!user)
+        return null;
+    return meFromUser(user);
+}
+const TEN_MIN = 10 * 60 * 1000;
+const FIFTEEN_MIN = 15 * 60 * 1000;
+function phoneKey(prefix, req) {
+    const phone = normalizePhone(String(req.body?.phoneNumber ?? ""));
+    return phone ? `${prefix}:phone:${phone}` : null;
+}
+// Guessing a code, and asking for a new one, both get a server-side cap.
+// Twilio Verify has its own limit; this still applies when Verify is off.
+const limitRequestByPhone = rateLimit({
+    windowMs: FIFTEEN_MIN,
+    max: 5,
+    key: (req) => phoneKey("request", req),
+});
+const limitRequestByIp = rateLimit({
+    windowMs: FIFTEEN_MIN,
+    max: 20,
+    key: (req) => `request:ip:${req.ip}`,
+});
+const limitVerifyByPhone = rateLimit({
+    windowMs: TEN_MIN,
+    max: 8,
+    key: (req) => phoneKey("verify", req),
+});
+const limitVerifyByIp = rateLimit({
+    windowMs: TEN_MIN,
+    max: 30,
+    key: (req) => `verify:ip:${req.ip}`,
+});
+authRouter.post("/request-code", limitRequestByPhone, limitRequestByIp, async (req, res) => {
+    const phone = normalizePhone(String(req.body?.phoneNumber ?? ""));
+    if (!phone) {
+        res.status(400).json({ error: "A valid phone number is required" });
+        return;
+    }
+    // Dev/QA test accounts skip Twilio entirely — the code is fixed, not sent.
+    if (testLoginCodeFor(phone)) {
+        console.log(`[auth] test-login account ${phone}: use code ${testLoginCodeFor(phone)}`);
+        res.json({ ok: true, phoneNumber: phone, smsConfigured: false, authMode: "dev" });
+        return;
+    }
+    if (isTwilioVerifyConfigured()) {
+        try {
+            const started = await startPhoneVerification(phone);
+            res.json({
+                ok: true,
+                phoneNumber: phone,
+                smsConfigured: true,
+                authMode: "verify",
+                reused: started.reused,
+            });
+        }
+        catch (err) {
+            console.error("[auth] Twilio Verify send failed", err);
+            const twilio = parseTwilioError(err);
+            if (twilio.code === 21608) {
+                res.status(403).json({
+                    error: "Twilio trial account can only send to verified phone numbers. Verify this number in Twilio or upgrade the account.",
+                });
+                return;
+            }
+            res.status(502).json({ error: "Could not send verification text. Try again in a moment." });
+        }
+        return;
+    }
+    // Local dev without Verify Service: generate code, persist, log to console.
+    const code = generateCode();
+    console.log(`[sms dev] ${phone}: code = ${code}`);
+    store.saveSmsCode(phone, code, CODE_TTL_MS);
+    res.json({ ok: true, phoneNumber: phone, smsConfigured: false, authMode: "dev" });
+});
+authRouter.post("/verify-code", limitVerifyByPhone, limitVerifyByIp, async (req, res) => {
+    const phone = normalizePhone(String(req.body?.phoneNumber ?? ""));
+    const code = String(req.body?.code ?? "").trim();
+    if (!phone || !code) {
+        res.status(400).json({ error: "Phone and code are required" });
+        return;
+    }
+    const testCode = testLoginCodeFor(phone);
+    if (testCode) {
+        if (code !== testCode) {
+            res.status(401).json({ error: "Invalid or expired code" });
+            return;
+        }
+        // Valid test code — skip Twilio + sms-code checks, fall through to sign-in.
+    }
+    else if (isTwilioVerifyConfigured()) {
+        let result;
+        try {
+            result = await checkPhoneVerification(phone, code);
+        }
+        catch (err) {
+            console.error("[auth] Twilio Verify check failed", err);
+            const twilio = parseTwilioError(err);
+            if (twilio.code === 20404 || twilio.code === 60200) {
+                res.status(400).json({ error: "That code or phone number is invalid. Request a new code and try again." });
+                return;
+            }
+            if (twilio.code === 60202) {
+                res.status(429).json({ error: "Too many attempts. Request a new code and try again." });
+                return;
+            }
+            res.status(502).json({ error: "Verification failed. Try again." });
+            return;
+        }
+        if (result === "expired") {
+            // A resend cancels the text they may already have. If that text is still
+            // the live one, don't tell them to request another.
+            res.status(401).json({
+                error: verificationStillOpen(phone)
+                    ? "That code is from an older text. Use the latest one we sent."
+                    : "That code expired. Request a new one and use the latest text.",
+            });
+            return;
+        }
+        if (result !== "approved") {
+            res.status(401).json({ error: "That code doesn't match. Check the latest text and try again." });
+            return;
+        }
+    }
+    else if (!store.consumeSmsCode(phone, code)) {
+        res.status(401).json({ error: "Invalid or expired code" });
+        return;
+    }
+    let user = await findUserByPhone(phone);
+    const isNewUser = !user;
+    if (!user) {
+        try {
+            user = await createUser(phone);
+        }
+        catch (err) {
+            // If concurrent verifies race, unique phone index may win in another request.
+            const isDuplicateKey = typeof err === "object" &&
+                err !== null &&
+                "code" in err &&
+                err.code === 11000;
+            if (isDuplicateKey) {
+                user = await findUserByPhone(phone);
+            }
+            else {
+                console.error("[auth] create user failed", err);
+                res.status(500).json({ error: "Could not finish sign in. Please try again." });
+                return;
+            }
+        }
+    }
+    if (!user) {
+        res.status(500).json({ error: "Could not finish sign in. Please try again." });
+        return;
+    }
+    if (user.ejectedAt) {
+        res.status(403).json({
+            error: "This account was removed for violating the COMMONS Terms of Service.",
+        });
+        return;
+    }
+    // F.9 — every new account lands with at least one notification instead of
+    // an empty bell. Best-effort: never block sign-in on this.
+    if (isNewUser) {
+        void emit({
+            userId: user.id,
+            kind: "welcome",
+            body: "Welcome to COMMONS — pick a few interests and see what's happening near you.",
+            dedupKey: `welcome:${user.id}`,
+        }).catch((err) => {
+            console.error("[auth] welcome notification failed", err);
+        });
+    }
+    const token = setSessionCookie(res, user.id, user.sessionVersion ?? 0);
+    res.json({ ...meFromUser(user), token });
+});
+authRouter.get("/me", requireAuth, async (req, res) => {
+    const me = await userToMe(String(req.userId));
+    if (!me) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+    }
+    res.json(me);
+});
+authRouter.patch("/me", requireAuth, async (req, res) => {
+    const userId = String(req.userId);
+    const patch = {};
+    if (typeof req.body?.firstName === "string")
+        patch.firstName = req.body.firstName.trim();
+    if (typeof req.body?.lastName === "string")
+        patch.lastName = req.body.lastName.trim();
+    if (typeof req.body?.bio === "string")
+        patch.bio = req.body.bio.trim().slice(0, 160);
+    if (req.body?.bio === null || req.body?.bio === "")
+        patch.bio = "";
+    if (typeof req.body?.ageRange === "string")
+        patch.ageRange = req.body.ageRange;
+    if (req.body?.ageConfirmed === true)
+        patch.ageConfirmedAt = new Date().toISOString();
+    if (Array.isArray(req.body?.neighborhoodIds)) {
+        const raw = req.body.neighborhoodIds.map(String).filter(Boolean);
+        const resolved = [
+            ...new Set(raw
+                .map((id) => store.resolveNeighborhoodId(id))
+                .filter((id) => Boolean(id))),
+        ];
+        if (raw.length > 0 && resolved.length === 0) {
+            res.status(400).json({ error: "Unknown neighborhood" });
+            return;
+        }
+        if (resolved.length === 0) {
+            res.status(400).json({ error: "Pick at least one neighborhood" });
+            return;
+        }
+        patch.neighborhoodIds = resolved;
+        patch.neighborhoodId = resolved[0];
+    }
+    else if (typeof req.body?.neighborhoodId === "string") {
+        const raw = req.body.neighborhoodId.trim();
+        if (!raw) {
+            res.status(400).json({ error: "Pick at least one neighborhood" });
+            return;
+        }
+        const resolved = store.resolveNeighborhoodId(raw);
+        if (!resolved) {
+            res.status(400).json({ error: "Unknown neighborhood" });
+            return;
+        }
+        patch.neighborhoodId = resolved;
+        patch.neighborhoodIds = [resolved];
+    }
+    if (req.body?.location && typeof req.body.location === "object") {
+        const lat = Number(req.body.location.lat);
+        const lng = Number(req.body.location.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+            res.status(400).json({ error: "That location doesn't look right." });
+            return;
+        }
+        patch.locationLat = lat;
+        patch.locationLng = lng;
+        patch.locationPromptAnsweredAt = new Date().toISOString();
+        patch.locationLabel = await reverseGeocodeLabel(lat, lng);
+        const nearest = store.nearestNeighborhoodId(lat, lng);
+        if (nearest) {
+            patch.neighborhoodId = nearest;
+            patch.neighborhoodIds = [nearest];
+        }
+        else {
+            // Outside the Philly metro radius. If the user has no neighborhood yet,
+            // assign the globally nearest so their profile shows something after
+            // sharing location (handles developer testing from non-Philly devices).
+            const existing = store.findUserById(userId);
+            if (!existing?.neighborhoodId) {
+                const uncapped = store
+                    .listNeighborhoods()
+                    .filter((n) => typeof n.lat === "number" && typeof n.lng === "number")
+                    .reduce((best, n) => {
+                    const d = (n.lat - lat) ** 2 + (n.lng - lng) ** 2;
+                    return !best || d < best.d ? { id: n.id, d } : best;
+                }, null);
+                if (uncapped) {
+                    patch.neighborhoodId = uncapped.id;
+                    patch.neighborhoodIds = [uncapped.id];
+                }
+            }
+        }
+    }
+    else if (req.body?.location === null || req.body?.locationSharing === false) {
+        patch.locationLat = null;
+        patch.locationLng = null;
+        patch.locationLabel = null;
+        patch.locationPromptAnsweredAt = new Date().toISOString();
+    }
+    if (Array.isArray(req.body?.interests))
+        patch.interests = req.body.interests;
+    if (typeof req.body?.avatarSeed === "string")
+        patch.avatarSeed = req.body.avatarSeed;
+    if (typeof req.body?.avatarStyle === "string")
+        patch.avatarStyle = req.body.avatarStyle;
+    if (typeof req.body?.avatarPhotoDataUrl === "string")
+        patch.avatarPhotoDataUrl = req.body.avatarPhotoDataUrl;
+    if (req.body?.avatarPhotoDataUrl === null)
+        patch.avatarPhotoDataUrl = null;
+    if (typeof req.body?.avatarParams === "string")
+        patch.avatarParams = req.body.avatarParams;
+    if (req.body?.avatarParams === null)
+        patch.avatarParams = null;
+    if (typeof req.body?.onboardingComplete === "boolean") {
+        // Photo is required to finish onboarding — reject completion without one so
+        // Path B (cleared local data / partial profiles) can't skip the photo step.
+        const completing = req.body.onboardingComplete === true;
+        if (completing) {
+            const existing = await findUserById(userId);
+            const photo = typeof patch.avatarPhotoDataUrl === "string"
+                ? patch.avatarPhotoDataUrl
+                : existing?.avatarPhotoDataUrl;
+            if (!String(photo ?? "").trim()) {
+                res.status(400).json({ error: "Add a photo to finish onboarding" });
+                return;
+            }
+        }
+        patch.onboardingComplete = req.body.onboardingComplete;
+    }
+    if (req.body?.guidelinesAcknowledged === true) {
+        patch.guidelinesAcknowledgedAt = new Date().toISOString();
+    }
+    if (req.body?.termsAccepted === true) {
+        patch.termsAcceptedAt = new Date().toISOString();
+    }
+    if (req.body?.privacyAccepted === true) {
+        patch.privacyAcceptedAt = new Date().toISOString();
+    }
+    if (typeof req.body?.discoverableBySearch === "boolean") {
+        patch.discoverableBySearch = req.body.discoverableBySearch;
+    }
+    if (typeof req.body?.profilePublic === "boolean") {
+        patch.profilePublic = req.body.profilePublic;
+    }
+    if (typeof req.body?.showPlansPublicly === "boolean") {
+        patch.showPlansPublicly = req.body.showPlansPublicly;
+    }
+    if (typeof req.body?.showCommunitiesPublicly === "boolean") {
+        patch.showCommunitiesPublicly = req.body.showCommunitiesPublicly;
+    }
+    if (req.body?.socialLinks && typeof req.body.socialLinks === "object") {
+        const ig = String(req.body.socialLinks.instagram ?? "").replace(/^@/, "").trim();
+        const tt = String(req.body.socialLinks.tiktok ?? "").replace(/^@/, "").trim();
+        const links = {};
+        if (ig)
+            links.instagram = ig;
+        if (tt)
+            links.tiktok = tt;
+        patch.socialLinks = ig || tt ? links : undefined;
+    }
+    if (Array.isArray(req.body?.profilePhotos)) {
+        const incoming = req.body.profilePhotos;
+        const existingCount = (await findUserById(userId))?.profilePhotos?.length ?? 0;
+        // New galleries stop at 5. Someone who already has more can still remove some.
+        if (incoming.length > 5 && incoming.length > existingCount) {
+            res.status(400).json({ error: "You can add up to 5 photos" });
+            return;
+        }
+        const photos = [];
+        for (const item of incoming) {
+            if (typeof item !== "string" || !item.startsWith("data:image/") || item.length > 450_000) {
+                res.status(400).json({ error: "Couldn't use one of those photos. Try a smaller image." });
+                return;
+            }
+            photos.push(item);
+        }
+        patch.profilePhotos = photos;
+    }
+    if (req.body?.notificationPrefs && typeof req.body.notificationPrefs === "object") {
+        const incoming = req.body.notificationPrefs;
+        const next = {};
+        for (const key of Object.keys(DEFAULT_NOTIFICATION_PREFS)) {
+            if (typeof incoming[key] === "boolean")
+                next[key] = incoming[key];
+        }
+        const existing = (await findUserById(userId))?.notificationPrefs ?? {};
+        patch.notificationPrefs = { ...existing, ...next };
+    }
+    const blockedText = textBlockedReason(patch.firstName, patch.lastName, patch.bio);
+    if (blockedText) {
+        res.status(400).json({ error: blockedText });
+        return;
+    }
+    await updateUser(userId, patch);
+    // Auto-join the forum for each interest the user just saved (onboarding or
+    // Settings → Interests). Never auto-leaves — see syncForumMembershipsFromInterests.
+    if (patch.interests) {
+        store.syncForumMembershipsFromInterests(userId, patch.interests);
+    }
+    const me = await userToMe(userId);
+    if (!me) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+    }
+    res.json(me);
+});
+authRouter.post("/logout", async (req, res) => {
+    const header = req.headers.authorization;
+    const bearer = header && /^Bearer\s+/i.test(header) ? header.replace(/^Bearer\s+/i, "").trim() : "";
+    const token = bearer || req.cookies?.session || "";
+    if (token) {
+        try {
+            const payload = verifySessionToken(token);
+            const user = await findUserById(payload.sub);
+            const current = user?.sessionVersion ?? 0;
+            // Only the live session can revoke itself. An already-dead token must
+            // not bump the counter and kick a newer login off.
+            if (user && sessionVersionMatches(current, payload.sv)) {
+                await updateUser(user.id, { sessionVersion: current + 1 });
+            }
+        }
+        catch {
+            /* expired or forged — still clear the cookie */
+        }
+    }
+    res.clearCookie("session");
+    res.status(200).json({ ok: true });
+});
+// Hard-delete the signed-in user. Body must include `{ confirm: "DELETE" }` —
+// a belt-and-suspenders check against the client's type-to-confirm modal.
+authRouter.delete("/me", requireAuth, async (req, res) => {
+    const userId = String(req.userId);
+    const confirm = String(req.body?.confirm ?? "").trim().toUpperCase();
+    if (confirm !== "DELETE") {
+        res.status(400).json({ error: "Confirmation required" });
+        return;
+    }
+    const ok = await deleteUser(userId);
+    if (!ok) {
+        res.status(404).json({ error: "User not found" });
+        return;
+    }
+    res.clearCookie("session");
+    res.status(200).json({ ok: true });
+});
+authRouter.get("/invite-codes", requireAuth, (req, res) => {
+    const userId = String(req.userId);
+    // Backfill on first read so users that pre-date the launch mechanic still
+    // get their three codes the first time they open the share screen.
+    let codes = store.listInviteCodesForOwner(userId);
+    if (codes.length < INVITE_CODES_PER_USER) {
+        store.createInviteCodesForUser(userId, INVITE_CODES_PER_USER - codes.length);
+        codes = store.listInviteCodesForOwner(userId);
+    }
+    const dtos = codes
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+        .map((c) => ({
+        code: c.code,
+        redeemedAt: c.redeemedAt,
+        redeemedByFirstName: c.redeemedByUserId !== null
+            ? store.findUserById(c.redeemedByUserId)?.firstName ?? null
+            : null,
+    }));
+    res.json({ codes: dtos });
+});
+authRouter.post("/redeem-code", requireAuth, async (req, res) => {
+    const userId = String(req.userId);
+    const raw = String(req.body?.code ?? "");
+    if (!raw.trim()) {
+        res.status(400).json({ error: "Code required" });
+        return;
+    }
+    const code = normalizeInviteCode(raw);
+    // Shared launch codes live in Mongo and can be used by anyone. The App Store
+    // build already posts unknown codes here, so a new code works without an update.
+    if (await isLaunchAccessCode(code)) {
+        res.json({ ok: true });
+        return;
+    }
+    const row = store.findInviteCodeByCode(code);
+    if (!row) {
+        res.status(404).json({ error: "Code not found" });
+        return;
+    }
+    if (row.ownerUserId === userId) {
+        res.status(400).json({ error: "Can't redeem your own code" });
+        return;
+    }
+    if (row.redeemedByUserId && row.redeemedByUserId !== userId) {
+        res.status(409).json({ error: "Code already redeemed" });
+        return;
+    }
+    store.redeemInviteCode(code, userId);
+    // 2.9 — both people get a nudge to add each other to their networks.
+    const owner = store.findUserById(row.ownerUserId);
+    const redeemer = store.findUserById(userId);
+    const ownerName = owner?.firstName?.trim() || "Someone";
+    const redeemerName = redeemer?.firstName?.trim() || "Someone";
+    await Promise.all([
+        emit({
+            userId: row.ownerUserId,
+            kind: "networkRequest",
+            body: `${redeemerName} joined COMMONS with your invite — add them to your network?`,
+            dedupKey: `invite-network:${row.code}:${row.ownerUserId}`,
+            profileUserId: userId,
+        }),
+        emit({
+            userId,
+            kind: "networkRequest",
+            body: `You joined via ${ownerName}'s invite — add them to your network?`,
+            dedupKey: `invite-network:${row.code}:${userId}`,
+            profileUserId: row.ownerUserId,
+        }),
+    ]);
+    res.json({ ok: true });
+});
+authRouter.get("/network-prompt", requireAuth, async (req, res) => {
+    const userId = String(req.userId);
+    const prompt = await nextNetworkPrompt(userId);
+    // Persist the nudge as a notification too, so the user has a record of it
+    // even after the modal closes. Dedup'd per (user, plan) so dismissing the
+    // modal doesn't keep producing new entries.
+    if (prompt) {
+        const otherNames = prompt.others
+            .map((o) => o.firstName)
+            .slice(0, 3)
+            .join(", ");
+        await emit({
+            userId,
+            kind: "postPlanNetworkNudge",
+            body: `You went to "${prompt.planTitle}" with ${prompt.others.length} ${prompt.others.length === 1 ? "person" : "people"}${otherNames ? ` (${otherNames})` : ""} — add them to your network?`,
+            planId: prompt.planId,
+            dedupKey: `postPlanNetworkNudge:${prompt.planId}:${userId}`,
+        });
+    }
+    res.json({ prompt });
+});
+authRouter.post("/network-add", requireAuth, async (req, res) => {
+    const userId = String(req.userId);
+    const planId = String(req.body?.planId ?? "");
+    const userIds = Array.isArray(req.body?.userIds) ? req.body.userIds.map(String) : [];
+    if (!planId || userIds.length === 0) {
+        res.status(400).json({ error: "planId and userIds required" });
+        return;
+    }
+    const plan = store.findPlanById(planId);
+    if (!plan || !planHasEnded(plan)) {
+        res.status(400).json({ error: "This plan isn’t ready for network adds yet" });
+        return;
+    }
+    if (!userWasGoing(planId, userId)) {
+        res.status(403).json({ error: "You weren’t on this plan" });
+        return;
+    }
+    const allowed = new Set(otherGoingIds(planId));
+    const viewer = await findUserById(userId);
+    if (!viewer) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+    }
+    const next = new Set(viewer.networkIds ?? []);
+    const newlyAdded = [];
+    for (const id of userIds) {
+        if (id === userId)
+            continue;
+        if (!allowed.has(id))
+            continue;
+        if (store.isBlockedEitherWay(userId, id))
+            continue;
+        if (!next.has(id))
+            newlyAdded.push(id);
+        next.add(id);
+    }
+    await updateUser(userId, { networkIds: [...next] });
+    // Mirror to the relationships table — foundation for V2 Communities.
+    for (const id of newlyAdded) {
+        store.upsertRelationship({
+            userId,
+            targetId: id,
+            kind: "network",
+            source: "post_plan_modal",
+        });
+    }
+    const me = await userToMe(userId);
+    res.json({ ok: true, me });
+});
+/**
+ * "Add to network" from a profile — now a request the other person must
+ * accept. The target gets a `networkRequest` notification and must confirm via
+ * `/network-accept`. If the target had ALREADY requested the viewer, this
+ * second tap auto-accepts (mutual intent) and connects both immediately.
+ */
+/** Send a connect request, or connect immediately if they already asked. */
+export async function ensureConnectRequest(userId, targetId) {
+    const viewer = await findUserById(userId);
+    const target = await findUserById(targetId);
+    if (!viewer || !target)
+        throw new Error("User not found");
+    if (store.isBlockedEitherWay(userId, targetId))
+        throw new Error("You can't connect with this person");
+    if ((viewer.networkIds ?? []).includes(targetId))
+        return "connected";
+    if ((viewer.incomingNetworkRequests ?? []).includes(targetId)) {
+        await connectNetwork(userId, targetId);
+        await emit({
+            userId: targetId,
+            kind: "networkAccepted",
+            body: `${viewer.firstName || "Someone"} connected with you on COMMONS`,
+            dedupKey: `networkAccepted:${userId}:${targetId}`,
+            profileUserId: userId,
+        });
+        return "connected";
+    }
+    const targetIncoming = new Set(target.incomingNetworkRequests ?? []);
+    if (!targetIncoming.has(userId)) {
+        targetIncoming.add(userId);
+        await updateUser(targetId, { incomingNetworkRequests: [...targetIncoming] });
+    }
+    // Already on their request list used to return quietly. If the first
+    // notification never landed, asking again has to tell them again.
+    await emit({
+        userId: targetId,
+        kind: "networkRequest",
+        body: `${viewer.firstName || "Someone"} wants to join your network. Accept to connect.`,
+        dedupKey: `networkRequest:${userId}:${targetId}:${Date.now()}`,
+        profileUserId: userId,
+    });
+    return "requested";
+}
+authRouter.post("/friend-add", requireAuth, async (req, res) => {
+    const userId = String(req.userId);
+    const targetId = String(req.body?.userId ?? "");
+    if (!targetId || targetId === userId) {
+        res.status(400).json({ error: "userId required" });
+        return;
+    }
+    try {
+        const status = await ensureConnectRequest(userId, targetId);
+        res.json({ ok: true, status, me: await userToMe(userId) });
+    }
+    catch (err) {
+        const message = err instanceof Error ? err.message : "Couldn't send that request";
+        const status = message === "User not found" ? 404 : 403;
+        res.status(status).json({ error: message });
+    }
+});
+/** Accept a pending network request from `userId` — connects both directions. */
+authRouter.post("/network-accept", requireAuth, async (req, res) => {
+    const userId = String(req.userId);
+    const requesterId = String(req.body?.userId ?? "");
+    if (!requesterId || requesterId === userId) {
+        res.status(400).json({ error: "userId required" });
+        return;
+    }
+    const me = await findUserById(userId);
+    if (!me) {
+        res.status(404).json({ error: "User not found" });
+        return;
+    }
+    if (!(me.incomingNetworkRequests ?? []).includes(requesterId)) {
+        res.status(400).json({ error: "No pending request from that person" });
+        return;
+    }
+    if (store.isBlockedEitherWay(userId, requesterId)) {
+        res.status(403).json({ error: "You can't connect with this person" });
+        return;
+    }
+    await connectNetwork(userId, requesterId);
+    await emit({
+        userId: requesterId,
+        kind: "networkAccepted",
+        body: `${me.firstName || "Someone"} accepted your network request`,
+        dedupKey: `networkAccepted:${userId}:${requesterId}`,
+        profileUserId: userId,
+    });
+    res.json({ ok: true, me: await userToMe(userId) });
+});
+/** Decline (or cancel) a pending request from `userId`. */
+authRouter.post("/network-decline", requireAuth, async (req, res) => {
+    const userId = String(req.userId);
+    const requesterId = String(req.body?.userId ?? "");
+    const me = await findUserById(userId);
+    if (!me) {
+        res.status(404).json({ error: "User not found" });
+        return;
+    }
+    const incoming = new Set(me.incomingNetworkRequests ?? []);
+    incoming.delete(requesterId);
+    await updateUser(userId, { incomingNetworkRequests: [...incoming] });
+    res.json({ ok: true, me: await userToMe(userId) });
+});
+/**
+ * Connect two users mutually: each lands in the other's networkIds, the
+ * pending request is cleared, and relationship rows are mirrored both ways.
+ */
+async function connectNetwork(aId, bId) {
+    const a = await findUserById(aId);
+    const b = await findUserById(bId);
+    if (!a || !b)
+        return;
+    const aNet = new Set(a.networkIds ?? []);
+    aNet.add(bId);
+    const aIncoming = new Set(a.incomingNetworkRequests ?? []);
+    aIncoming.delete(bId);
+    await updateUser(aId, { networkIds: [...aNet], incomingNetworkRequests: [...aIncoming] });
+    const bNet = new Set(b.networkIds ?? []);
+    bNet.add(aId);
+    const bIncoming = new Set(b.incomingNetworkRequests ?? []);
+    bIncoming.delete(aId);
+    await updateUser(bId, { networkIds: [...bNet], incomingNetworkRequests: [...bIncoming] });
+    store.upsertRelationship({ userId: aId, targetId: bId, kind: "network", source: "profile_friend_add" });
+    store.upsertRelationship({ userId: bId, targetId: aId, kind: "network", source: "profile_friend_add" });
+    const released = store.releaseHeldDmBetween(aId, bId);
+    if (!released)
+        return;
+    const sender = await findUserById(released.senderId);
+    const senderName = sender?.firstName || "Someone";
+    for (const recipientId of released.revealedTo) {
+        if (recipientId === released.senderId)
+            continue;
+        await emit({
+            userId: recipientId,
+            kind: "newGroupChatMessage",
+            body: `${senderName}: ${released.preview}`,
+            conversationId: released.conversationId,
+            profileUserId: released.senderId,
+            dedupKey: `heldDmReveal:${released.conversationId}:${recipientId}`,
+        });
+    }
+}
+authRouter.post("/friend-remove", requireAuth, async (req, res) => {
+    const userId = String(req.userId);
+    const targetId = String(req.body?.userId ?? "");
+    if (!targetId || targetId === userId) {
+        res.status(400).json({ error: "userId required" });
+        return;
+    }
+    const viewer = await findUserById(userId);
+    if (!viewer) {
+        res.status(404).json({ error: "User not found" });
+        return;
+    }
+    // Connect is mutual, so leaving has to drop both sides. Otherwise they
+    // still see you as added after you remove them.
+    const myNet = new Set(viewer.networkIds ?? []);
+    myNet.delete(targetId);
+    const myIncoming = new Set(viewer.incomingNetworkRequests ?? []);
+    myIncoming.delete(targetId);
+    await updateUser(userId, { networkIds: [...myNet], incomingNetworkRequests: [...myIncoming] });
+    const target = await findUserById(targetId);
+    if (target) {
+        const theirNet = new Set(target.networkIds ?? []);
+        const theirHadMe = theirNet.delete(userId);
+        const theirIncoming = new Set(target.incomingNetworkRequests ?? []);
+        const clearedRequest = theirIncoming.delete(userId);
+        if (theirHadMe || clearedRequest) {
+            await updateUser(targetId, {
+                networkIds: [...theirNet],
+                incomingNetworkRequests: [...theirIncoming],
+            });
+        }
+    }
+    store.deleteRelationship(userId, targetId, "network");
+    store.deleteRelationship(targetId, userId, "network");
+    const me = await userToMe(userId);
+    res.json({ ok: true, me });
+});
+/** Resolve the viewer's network into PublicUser records for the invite picker. */
+authRouter.get("/network", requireAuth, async (req, res) => {
+    const userId = String(req.userId);
+    const viewer = await findUserById(userId);
+    if (!viewer) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+    }
+    const ids = viewer.networkIds ?? [];
+    const viewerNetwork = new Set(ids);
+    const users = ids
+        .map((id) => store.findUserById(id))
+        .filter((u) => !!u)
+        .filter((u) => !store.isBlockedEitherWay(userId, u.id))
+        .map((u) => {
+        const hoodId = u.neighborhoodId ?? u.neighborhoodIds?.[0] ?? null;
+        return {
+            id: u.id,
+            firstName: u.firstName,
+            lastName: u.lastName,
+            neighborhoodId: u.neighborhoodId ?? null,
+            avatarSeed: u.avatarSeed,
+            avatarStyle: u.avatarStyle,
+            avatarPhotoDataUrl: u.avatarPhotoDataUrl,
+            avatarParams: u.avatarParams,
+            neighborhoodName: hoodId ? (store.findNeighborhoodById(hoodId)?.name ?? null) : null,
+            mutualCount: (u.networkIds ?? []).filter((id) => viewerNetwork.has(id)).length,
+        };
+    });
+    res.json({ users });
+});
+authRouter.post("/network-dismiss", requireAuth, async (req, res) => {
+    const userId = String(req.userId);
+    const planId = String(req.body?.planId ?? "");
+    if (!planId) {
+        res.status(400).json({ error: "planId required" });
+        return;
+    }
+    const viewer = await findUserById(userId);
+    if (!viewer) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+    }
+    const dismiss = [...new Set([...(viewer.dismissedNetworkPromptPlanIds ?? []), planId])];
+    await updateUser(userId, { dismissedNetworkPromptPlanIds: dismiss });
+    res.json({ ok: true });
+});

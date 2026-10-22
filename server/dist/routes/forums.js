@@ -1,0 +1,286 @@
+import { Router } from "express";
+import { isAdminPhone } from "../lib/adminPhones.js";
+import { requireAuth } from "../middleware/requireAuth.js";
+import { FORUM_INTERESTS, store } from "../store.js";
+import { findUserById, findUsersByIds } from "../userRepo.js";
+import { userToPublic } from "./plans.js";
+import { INTEREST_EMOJI, INTEREST_LABELS, } from "../types/shared.js";
+import { textBlockedReason } from "../lib/contentFilter.js";
+import { isGcsConfigured, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
+export const forumsRouter = Router();
+const MAX_POST_LENGTH = 4000;
+const MAX_REPLY_LENGTH = 2000;
+const PREVIEW_LENGTH = 140;
+const MAX_FORUM_IMAGE_CHARS = 1_600_000;
+async function resolveForumImageUrl(raw) {
+    if (raw.startsWith("http://") || raw.startsWith("https://")) {
+        return raw.slice(0, 2048);
+    }
+    if (!raw.startsWith("data:image/") || raw.length >= MAX_FORUM_IMAGE_CHARS)
+        return null;
+    if (isGcsConfigured()) {
+        const parsed = parseDataUrl(raw);
+        if (parsed) {
+            try {
+                return await uploadCardImage(parsed.buffer, parsed.contentType, "forum-images");
+            }
+            catch (err) {
+                console.error("[forums] image GCS upload failed; storing inline", err);
+            }
+        }
+    }
+    return raw;
+}
+// 2.6 — only the highest-density interests have a live forum; the rest are
+// feed filters only. `ALL_INTERESTS` still backs "Join more forums" on the
+// client, but the forum endpoints themselves only ever serve FORUM_INTERESTS.
+function isInterestTag(value) {
+    return FORUM_INTERESTS.includes(value);
+}
+async function isCommonsAdmin(userId) {
+    const u = await findUserById(userId);
+    return !!u && isAdminPhone(u.phoneNumber);
+}
+function publicFor(uid, users) {
+    const u = users.get(uid);
+    return u
+        ? userToPublic(u)
+        : { id: uid, firstName: "Former member", neighborhoodId: null, avatarSeed: uid, avatarStyle: "avataaars" };
+}
+function postDTO(post, users, viewerId, viewerIsAdmin) {
+    return {
+        id: post.id,
+        interestTag: post.interestTag,
+        author: publicFor(post.authorId, users),
+        content: post.content,
+        imageUrl: post.imageUrl ?? null,
+        isSponsored: post.isSponsored,
+        sponsorName: post.sponsorName ?? null,
+        createdAt: post.createdAt,
+        replyCount: post.replyCount,
+        likeCount: post.likeCount,
+        likedByMe: store.hasLikedPost(post.id, viewerId),
+        canDelete: viewerIsAdmin || post.authorId === viewerId,
+    };
+}
+function replyDTO(reply, users) {
+    return {
+        id: reply.id,
+        postId: reply.postId,
+        author: publicFor(reply.authorId, users),
+        content: reply.content,
+        imageUrl: reply.imageUrl ?? null,
+        createdAt: reply.createdAt,
+    };
+}
+function parseSort(raw) {
+    return raw === "popular" ? "popular" : "recent";
+}
+// GET /api/forums — forums the viewer has joined, most recently joined first.
+forumsRouter.get("/", requireAuth, async (req, res) => {
+    const viewerId = String(req.userId);
+    store.ensureForumsForInterests();
+    const forums = store.listForumsForUser(viewerId);
+    const authorIds = forums.map((f) => f.latestPost?.authorId).filter((id) => !!id);
+    const users = await findUsersByIds(authorIds);
+    const dtos = forums.map((f) => ({
+        interestTag: f.interestTag,
+        label: INTEREST_LABELS[f.interestTag],
+        emoji: INTEREST_EMOJI[f.interestTag],
+        latestPost: f.latestPost
+            ? {
+                authorName: users.get(f.latestPost.authorId)?.firstName || "Someone",
+                preview: f.latestPost.content.slice(0, PREVIEW_LENGTH),
+                createdAt: f.latestPost.createdAt,
+            }
+            : null,
+        hasUnread: false,
+    }));
+    res.json({ forums: dtos });
+});
+// POST /api/forums/:tag/join
+forumsRouter.post("/:tag/join", requireAuth, (req, res) => {
+    const viewerId = String(req.userId);
+    const tag = String(req.params.tag);
+    if (!isInterestTag(tag)) {
+        res.status(400).json({ error: "Unknown interest" });
+        return;
+    }
+    store.ensureForumsForInterests();
+    store.joinForum(viewerId, tag);
+    res.json({ ok: true });
+});
+// POST /api/forums/:tag/leave — does not remove the interest from the profile.
+forumsRouter.post("/:tag/leave", requireAuth, (req, res) => {
+    const viewerId = String(req.userId);
+    const tag = String(req.params.tag);
+    if (!isInterestTag(tag)) {
+        res.status(400).json({ error: "Unknown interest" });
+        return;
+    }
+    store.leaveForum(viewerId, tag);
+    res.json({ ok: true });
+});
+// GET /api/forums/:tag/posts?sort=recent|popular
+forumsRouter.get("/:tag/posts", requireAuth, async (req, res) => {
+    const viewerId = String(req.userId);
+    const tag = String(req.params.tag);
+    if (!isInterestTag(tag)) {
+        res.status(400).json({ error: "Unknown interest" });
+        return;
+    }
+    const sort = parseSort(req.query.sort);
+    const posts = store.listPosts(tag, sort);
+    const users = await findUsersByIds(posts.map((p) => p.authorId));
+    const viewerIsAdmin = await isCommonsAdmin(viewerId);
+    const visible = posts.filter((p) => {
+        if (p.authorId === viewerId)
+            return true;
+        if (store.isUserEjected(p.authorId))
+            return false;
+        if (store.isBlockedEitherWay(viewerId, p.authorId))
+            return false;
+        if (store.viewerReportedContent(viewerId, "forum_post", p.id))
+            return false;
+        return true;
+    });
+    res.json({
+        interestTag: tag,
+        label: INTEREST_LABELS[tag],
+        emoji: INTEREST_EMOJI[tag],
+        posts: visible.map((p) => postDTO(p, users, viewerId, viewerIsAdmin)),
+    });
+});
+// POST /api/forums/:tag/posts — { content, imageUrl? }
+forumsRouter.post("/:tag/posts", requireAuth, async (req, res) => {
+    const viewerId = String(req.userId);
+    const tag = String(req.params.tag);
+    if (!isInterestTag(tag)) {
+        res.status(400).json({ error: "Unknown interest" });
+        return;
+    }
+    const content = String(req.body?.content ?? "").trim().slice(0, MAX_POST_LENGTH);
+    const rawImage = typeof req.body?.imageUrl === "string" ? req.body.imageUrl : "";
+    const imageUrl = rawImage ? await resolveForumImageUrl(rawImage) : null;
+    if (rawImage && !imageUrl) {
+        res.status(400).json({ error: "Couldn't attach that image" });
+        return;
+    }
+    if (!content && !imageUrl) {
+        res.status(400).json({ error: "Write something to post" });
+        return;
+    }
+    const filtered = textBlockedReason(content);
+    if (filtered) {
+        res.status(400).json({ error: filtered });
+        return;
+    }
+    // Sponsored posting is a V1 stub — no client UI submits it yet, but the
+    // field is wired through so a future host-tools surface can flip it on.
+    const isSponsored = Boolean(req.body?.isSponsored);
+    const sponsorName = isSponsored && typeof req.body?.sponsorName === "string"
+        ? req.body.sponsorName.trim().slice(0, 120) || null
+        : null;
+    store.ensureForumsForInterests();
+    store.joinForum(viewerId, tag); // posting to a forum implicitly joins it
+    const post = store.createPost({
+        interestTag: tag,
+        authorId: viewerId,
+        content,
+        imageUrl,
+        isSponsored,
+        sponsorName,
+    });
+    const users = await findUsersByIds([post.authorId]);
+    store.log("forum_post_created", { interestTag: tag, postId: post.id });
+    res.status(201).json(postDTO(post, users, viewerId, await isCommonsAdmin(viewerId)));
+});
+// GET /api/forums/posts/:postId — post + flat replies
+forumsRouter.get("/posts/:postId", requireAuth, async (req, res) => {
+    const viewerId = String(req.userId);
+    const post = store.findForumPostById(String(req.params.postId));
+    if (!post || post.approvalStatus !== "approved") {
+        res.status(404).json({ error: "Post not found" });
+        return;
+    }
+    if (post.authorId !== viewerId &&
+        (store.isUserEjected(post.authorId) ||
+            store.isBlockedEitherWay(viewerId, post.authorId) ||
+            store.viewerReportedContent(viewerId, "forum_post", post.id))) {
+        res.status(404).json({ error: "Post not found" });
+        return;
+    }
+    const replies = store.listReplies(post.id);
+    const userIds = [post.authorId, ...replies.map((r) => r.authorId)];
+    const users = await findUsersByIds(userIds);
+    const viewerIsAdmin = await isCommonsAdmin(viewerId);
+    res.json({
+        post: postDTO(post, users, viewerId, viewerIsAdmin),
+        replies: replies.map((r) => replyDTO(r, users)),
+    });
+});
+// POST /api/forums/posts/:postId/replies — { content, imageUrl? }
+forumsRouter.post("/posts/:postId/replies", requireAuth, async (req, res) => {
+    const viewerId = String(req.userId);
+    const post = store.findForumPostById(String(req.params.postId));
+    if (!post || post.approvalStatus !== "approved") {
+        res.status(404).json({ error: "Post not found" });
+        return;
+    }
+    const content = String(req.body?.content ?? "").trim().slice(0, MAX_REPLY_LENGTH);
+    const rawImage = typeof req.body?.imageUrl === "string" ? req.body.imageUrl : "";
+    const imageUrl = rawImage ? await resolveForumImageUrl(rawImage) : null;
+    if (rawImage && !imageUrl) {
+        res.status(400).json({ error: "Couldn't attach that image" });
+        return;
+    }
+    if (!content && !imageUrl) {
+        res.status(400).json({ error: "Write a reply" });
+        return;
+    }
+    const filtered = textBlockedReason(content);
+    if (filtered) {
+        res.status(400).json({ error: filtered });
+        return;
+    }
+    const reply = store.createReply(post.id, viewerId, content, imageUrl);
+    if (!reply) {
+        res.status(404).json({ error: "Post not found" });
+        return;
+    }
+    const users = await findUsersByIds([reply.authorId]);
+    res.status(201).json(replyDTO(reply, users));
+});
+// POST /api/forums/posts/:postId/like — toggle
+forumsRouter.post("/posts/:postId/like", requireAuth, async (req, res) => {
+    const viewerId = String(req.userId);
+    const postId = String(req.params.postId);
+    const post = store.findForumPostById(postId);
+    if (!post || post.approvalStatus !== "approved") {
+        res.status(404).json({ error: "Post not found" });
+        return;
+    }
+    const updated = store.toggleLike(postId, viewerId);
+    if (!updated) {
+        res.status(404).json({ error: "Post not found" });
+        return;
+    }
+    const users = await findUsersByIds([updated.authorId]);
+    res.json(postDTO(updated, users, viewerId, await isCommonsAdmin(viewerId)));
+});
+// DELETE /api/forums/posts/:postId — author or COMMONS admin only.
+forumsRouter.delete("/posts/:postId", requireAuth, async (req, res) => {
+    const viewerId = String(req.userId);
+    const post = store.findForumPostById(String(req.params.postId));
+    if (!post) {
+        res.status(404).json({ error: "Post not found" });
+        return;
+    }
+    const viewerIsAdmin = await isCommonsAdmin(viewerId);
+    if (!viewerIsAdmin && post.authorId !== viewerId) {
+        res.status(403).json({ error: "You can only delete your own posts" });
+        return;
+    }
+    store.deleteForumPost(post.id);
+    res.json({ ok: true });
+});

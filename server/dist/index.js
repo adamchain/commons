@@ -1,0 +1,186 @@
+import "dotenv/config";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import cookieParser from "cookie-parser";
+import cors from "cors";
+import express from "express";
+import { connectMongo } from "./lib/db.js";
+import { hydrateSnapshotFromMongo } from "./hydrate.js";
+import { warmCoverCatalog } from "./lib/coverCatalog.js";
+import { adminAuthRouter } from "./routes/adminAuth.js";
+import { adminRouter } from "./routes/admin.js";
+import { authRouter } from "./routes/auth.js";
+import { cardImagesRouter } from "./routes/cardImages.js";
+import { chatRouter } from "./routes/chat.js";
+import { communitiesRouter } from "./routes/communities.js";
+import { devicesRouter } from "./routes/devices.js";
+import { feedbackRouter } from "./routes/feedback.js";
+import { forumsRouter } from "./routes/forums.js";
+import { neighborhoodsRouter } from "./routes/neighborhoods.js";
+import { notificationsRouter } from "./routes/notifications.js";
+import { plansRouter } from "./routes/plans.js";
+import { profileRouter } from "./routes/profile.js";
+import { placesRouter } from "./routes/places.js";
+import { venuesRouter } from "./routes/venues.js";
+import { linkPreviewRouter } from "./routes/linkPreview.js";
+import { searchRouter } from "./routes/search.js";
+import { usersRouter } from "./routes/users.js";
+import { reportsRouter } from "./routes/reports.js";
+import { shareRouter, injectPlanMeta, planIdFromDetailPath, injectCommunityMeta, communityIdFromDetailPath, } from "./routes/share.js";
+import { helpchatRouter } from "./routes/helpchat.js";
+import { store } from "./store.js";
+import { readFileSync } from "node:fs";
+import { startNudgeSchedulers } from "./lib/nudges.js";
+import { publicWebOrigin } from "./lib/publicOrigin.js";
+import { seedIfEmpty } from "./seed.js";
+import { ensureLaunchAccessCodes } from "./lib/accessCodes.js";
+const app = express();
+app.disable("x-powered-by");
+// Railway (and most hosts) terminate TLS and set X-Forwarded-For. One hop
+// so login rate limits see the client, not the proxy.
+app.set("trust proxy", 1);
+const port = Number(process.env.PORT ?? 4000);
+const clientUrl = process.env.APP_URL ?? "http://localhost:5173";
+const isProduction = process.env.NODE_ENV === "production";
+// Web build uses cookie auth with credentials; Capacitor builds use Bearer
+// tokens from capacitor://localhost (iOS) or http://localhost (Android).
+const NATIVE_ORIGINS = new Set([
+    "capacitor://localhost",
+    "ionic://localhost",
+    "http://localhost",
+]);
+function isLocalDevOrigin(origin) {
+    if (isProduction)
+        return false;
+    try {
+        const u = new URL(origin);
+        return ((u.protocol === "http:" || u.protocol === "https:") &&
+            (u.hostname === "localhost" || u.hostname === "127.0.0.1"));
+    }
+    catch {
+        return false;
+    }
+}
+app.use(cors({
+    origin: (origin, cb) => {
+        if (!origin ||
+            origin === clientUrl ||
+            NATIVE_ORIGINS.has(origin) ||
+            isLocalDevOrigin(origin)) {
+            cb(null, true);
+            return;
+        }
+        cb(null, false);
+    },
+    credentials: true,
+}));
+// Lift the default 100KB cap so resized avatar data URLs and richer plan
+// payloads fit; resized 512px JPEGs are usually < 100KB but headroom matters.
+app.use(express.json({ limit: "2mb" }));
+app.use(cookieParser());
+app.get("/api/health", (_req, res) => {
+    res.json({ ok: true });
+});
+app.use("/api/admin/auth", adminAuthRouter);
+app.use("/api/admin", adminRouter);
+app.use("/api/auth", authRouter);
+app.use("/api/card-images", cardImagesRouter);
+app.use("/api/communities", communitiesRouter);
+app.use("/api/devices", devicesRouter);
+app.use("/api/plans", plansRouter);
+app.use("/api/places", placesRouter);
+app.use("/api/venues", venuesRouter);
+app.use("/api/neighborhoods", neighborhoodsRouter);
+app.use("/api/feedback", feedbackRouter);
+app.use("/api/forums", forumsRouter);
+app.use("/api/profile", profileRouter);
+app.use("/api/notifications", notificationsRouter);
+app.use("/api/link-preview", linkPreviewRouter);
+app.use("/api/search", searchRouter);
+app.use("/api/users", usersRouter);
+app.use("/api/reports", reportsRouter);
+app.use("/api/helpchat", helpchatRouter);
+app.use("/api", chatRouter); // chat router defines its own paths under /plans/.../conversation and /conversations/...
+// Public. The installed app compares this to its own version on launch.
+app.get("/api/app/release", (_req, res) => {
+    const version = process.env.APP_LATEST_VERSION?.trim() || "1.7";
+    const storeUrl = process.env.APP_STORE_URL?.trim() || null;
+    res.json({ version, storeUrl: storeUrl && /^https?:\/\//.test(storeUrl) ? storeUrl : null });
+});
+// Public share-card image endpoint (no auth — crawlers fetch it). Reachable in
+// dev (localhost:4000) and prod alike, before the SPA catch-all.
+app.use(shareRouter);
+// Absolute public base for og:* URLs: prefer the configured origin, else derive
+// from the request so previews work on any deploy/preview host.
+function publicOrigin(req) {
+    if (isProduction)
+        return publicWebOrigin();
+    const proto = req.headers["x-forwarded-proto"]?.split(",")[0] || req.protocol;
+    return `${proto}://${req.get("host")}`;
+}
+if (isProduction) {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const clientDist = path.resolve(here, "../../client/dist");
+    const indexHtml = readFileSync(path.join(clientDist, "index.html"), "utf8");
+    app.use(express.static(clientDist));
+    app.use((req, res, next) => {
+        if (req.path.startsWith("/api"))
+            return next();
+        // Give plan-detail links (/plans/:id) their own social preview by injecting
+        // plan-specific OG/Twitter tags; the SPA still boots on top for real users.
+        const planId = planIdFromDetailPath(req.path);
+        if (planId) {
+            const plan = store.findPlanById(planId);
+            if (plan) {
+                res.setHeader("Cache-Control", "public, max-age=120");
+                res.type("html").send(injectPlanMeta(indexHtml, plan, publicOrigin(req)));
+                return;
+            }
+        }
+        const communityId = communityIdFromDetailPath(req.path);
+        if (communityId) {
+            const community = store.findCommunityById(communityId);
+            if (community) {
+                res.setHeader("Cache-Control", "public, max-age=120");
+                res.type("html").send(injectCommunityMeta(indexHtml, community, publicOrigin(req)));
+                return;
+            }
+        }
+        res.sendFile(path.join(clientDist, "index.html"));
+    });
+}
+/** Drop leftover community personas. They have no login of their own. */
+function removeCommunitySubAccounts() {
+    const leftovers = store.listUsers().filter((user) => {
+        const source = user.accountSource;
+        return source === "sub" || user.phoneNumber.startsWith("sub:");
+    });
+    for (const user of leftovers)
+        store.deleteUserCascade(user.id);
+    if (leftovers.length > 0) {
+        console.log(`[boot] removed ${leftovers.length} community sub account(s)`);
+    }
+}
+async function bootstrap() {
+    await connectMongo();
+    // Mongo is the source of truth. After connecting, pull everything into the
+    // in-memory snapshot so sync reads in `store` see prod data on a cold
+    // container start. If Mongo isn't connected (no MONGODB_URI), the snapshot
+    // keeps whatever it loaded from data.json (local dev).
+    await hydrateSnapshotFromMongo();
+    removeCommunitySubAccounts();
+    // Idempotent — fills any missing InterestTag forum rows after hydrate (or
+    // when Mongo is offline and the snapshot came from data.json).
+    store.ensureForumsForInterests();
+    await ensureLaunchAccessCodes();
+    await seedIfEmpty();
+    startNudgeSchedulers();
+    warmCoverCatalog();
+    app.listen(port, () => {
+        console.log(`Commons API listening on http://localhost:${port}`);
+    });
+}
+bootstrap().catch((err) => {
+    console.error("[boot]", err);
+    process.exit(1);
+});

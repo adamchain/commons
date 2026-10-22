@@ -43,19 +43,6 @@ function lastSenderName(msg: { senderId: string; kind?: string } | null): string
   return name || null;
 }
 
-/** One pass over every message. The inbox used to rescan the whole log per thread. */
-function messagesByConversation() {
-  const byConv = new Map<string, ReturnType<typeof store.listAllMessages>>();
-  for (const message of store.listAllMessages()) {
-    const bucket = byConv.get(message.conversationId);
-    if (bucket) bucket.push(message);
-    else byConv.set(message.conversationId, [message]);
-  }
-  for (const bucket of byConv.values()) {
-    bucket.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  }
-  return byConv;
-}
 
 /** Inbox rows can't carry uploaded photos — a few data-URLs stall the whole screen. */
 function inboxCover(url: string | null | undefined): string | null {
@@ -155,8 +142,7 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
   }
 
   const pinRank = new Map(store.pinnedConversationIds(userId).map((id, i) => [id, i]));
-  const messagesByConv = messagesByConversation();
-  const threadMessages = (id: string | null | undefined) => (id ? messagesByConv.get(id) ?? [] : []);
+  const threadMessages = (id: string | null | undefined) => (id ? store.listMessagesForConversation(id) : []);
   const summaries: ConversationSummaryDTO[] = [];
   for (const [planId, myRole] of roleByPlan) {
     const plan = store.findPlanById(planId);
@@ -387,12 +373,14 @@ chatRouter.get("/conversations/:id/messages", requireAuth, async (req, res) => {
     return;
   }
   const peek = String(req.query.peek ?? "") === "1";
+  const since = typeof req.query.since === "string" ? req.query.since : "";
   if (!peek) {
     store.markConversationRead(convId, userId);
     store.markMessageNotificationsRead(userId, convId);
   }
   const hostId = conversationHostId(conv);
   const raw = store.listMessagesForConversation(convId).filter((m) => {
+    if (since && m.createdAt <= since) return false;
     if (m.kind === "system") return true;
     if (m.senderId === userId) return true;
     if (store.isUserEjected(m.senderId)) return false;

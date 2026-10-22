@@ -109,13 +109,25 @@ export function ChatPage() {
     })();
   }, [planId]);
 
-  // Poll for new messages.
+  // Poll for new messages — only fetch messages newer than the last one we have.
   useEffect(() => {
     if (!conv) return;
     const interval = setInterval(async () => {
       try {
-        const msgs = await api<MessageDTO[]>(`/api/conversations/${conv.id}/messages`);
-        setMessages(visibleMessages(msgs, deletedIdsRef.current));
+        setMessages((prev) => {
+          const since = prev[prev.length - 1]?.createdAt ?? "";
+          void api<MessageDTO[]>(
+            `/api/conversations/${conv.id}/messages${since ? `?since=${encodeURIComponent(since)}` : ""}`,
+          ).then((incoming) => {
+            if (!incoming.length) return;
+            setMessages((cur) => {
+              const ids = new Set(cur.map((m) => m.id));
+              const fresh = incoming.filter((m) => !ids.has(m.id) && !deletedIdsRef.current.has(m.id));
+              return fresh.length ? [...cur, ...fresh].sort((a, b) => a.createdAt.localeCompare(b.createdAt)) : cur;
+            });
+          }).catch(() => { /* swallow */ });
+          return prev;
+        });
       } catch { /* swallow */ }
     }, POLL_MS);
     return () => clearInterval(interval);

@@ -1,0 +1,1077 @@
+import { Router } from "express";
+import { requireAuth } from "../middleware/requireAuth.js";
+import { store } from "../store.js";
+import { findUserById, findUsersByIds } from "../userRepo.js";
+import { userToPublic } from "./plans.js";
+import { mentionedUserIds } from "../lib/mentions.js";
+import { emit } from "../lib/notify.js";
+import { ensureConnectRequest } from "./auth.js";
+import { communityCreationBlockReason, communityMembershipBlockReason, isCommunityOrganizer, } from "../lib/communityAccess.js";
+import { isGcsConfigured, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
+import { textBlockedReason } from "../lib/contentFilter.js";
+import { planHasEnded } from "../lib/planTime.js";
+const MAX_CHAT_IMAGE_CHARS = 1_600_000;
+/** Real messages from other people. System lines don't light the inbox badge. */
+function humanUnread(msgs, userId) {
+    return msgs.filter((m) => m.kind !== "system" && m.senderId !== userId && !m.readBy.includes(userId)).length;
+}
+function messagePreview(msg) {
+    if (msg.kind === "poll")
+        return `📊 ${truncate(msg.body, 78)}`;
+    if (msg.imageUrl) {
+        const caption = msg.body.trim();
+        if (!caption || caption === "📷 Photo")
+            return "📷 Photo";
+        return `📷 ${truncate(caption, 78)}`;
+    }
+    return truncate(msg.body, 80);
+}
+function lastSenderName(msg) {
+    if (!msg || msg.kind === "system")
+        return null;
+    const name = store.findUserById(msg.senderId)?.firstName?.trim();
+    return name || null;
+}
+/** Inbox rows can't carry uploaded photos — a few data-URLs stall the whole screen. */
+function inboxCover(url) {
+    if (!url || url.startsWith("data:"))
+        return null;
+    return url;
+}
+async function resolveChatImageUrl(raw) {
+    if (raw.startsWith("http://") || raw.startsWith("https://")) {
+        return raw.slice(0, 2048);
+    }
+    if (!raw.startsWith("data:image/") || raw.length >= MAX_CHAT_IMAGE_CHARS)
+        return null;
+    if (isGcsConfigured()) {
+        const parsed = parseDataUrl(raw);
+        if (parsed) {
+            try {
+                return await uploadCardImage(parsed.buffer, parsed.contentType, "chat-images");
+            }
+            catch (err) {
+                console.error("[chat] image GCS upload failed; storing inline", err);
+            }
+        }
+    }
+    return raw;
+}
+export const chatRouter = Router();
+// For community group chats, being present in `participantIds` is not enough to
+// keep writing — a user can be in the roster yet no longer be an active member
+// (pending, removed, or a drift between roster and membership). Also apply the
+// same pending-review gate as bulletin: organizers may write while pending;
+// other members cannot. Plan chats have no community and pass straight through.
+// Returns a 403 message when blocked, else null.
+function communityPostBlockReason(conv, userId) {
+    if (!conv.communityId)
+        return null;
+    const community = store.findCommunityById(conv.communityId);
+    const creationBlocked = communityCreationBlockReason(community, userId);
+    if (creationBlocked)
+        return creationBlocked;
+    return communityMembershipBlockReason(community, userId);
+}
+// POST /api/dm { userId } — open or create a direct chat with someone in your network.
+chatRouter.post("/dm", requireAuth, async (req, res) => {
+    const userId = String(req.userId);
+    const otherId = String(req.body?.userId ?? "").trim();
+    if (!otherId || otherId === userId) {
+        res.status(400).json({ error: "Pick someone else to message." });
+        return;
+    }
+    const [me, other] = await Promise.all([findUserById(userId), findUserById(otherId)]);
+    if (!me || !other) {
+        res.status(404).json({ error: "Couldn't find that person." });
+        return;
+    }
+    if (store.isBlockedEitherWay(userId, otherId)) {
+        res.status(403).json({ error: "You can't message this person." });
+        return;
+    }
+    const connected = (me.networkIds ?? []).includes(otherId);
+    const preexisting = store.findDirectDm(userId, otherId);
+    const conv = store.ensureDirectDm(userId, otherId);
+    // Opening always reveals the thread to the opener. A previous hold could
+    // leave them in hiddenFromUserIds, and the message fetch then 403s with
+    // "This chat isn't available yet."
+    store.setDmHiddenFrom(conv.id, userId, false);
+    if (connected) {
+        store.setDmHiddenFrom(conv.id, otherId, false);
+    }
+    else if (!preexisting && !(me.incomingNetworkRequests ?? []).includes(otherId)) {
+        // First open is the request: they can't see it until they accept.
+        // Later opens must not hide the other person — that locked the sender
+        // out of a thread they had already started.
+        store.setDmHiddenFrom(conv.id, otherId, true);
+    }
+    res.json(await toConversationDto(conv, userId));
+});
+// GET /api/conversations — unified inbox: plan chats, community chats, and
+// network DMs. Upcoming plans always show; past plans only show once there's
+// been real (non-system) chatter.
+chatRouter.get("/conversations", requireAuth, async (req, res) => {
+    const userId = String(req.userId);
+    const todayIso = new Date().toISOString().slice(0, 10);
+    // role per accessible plan — hosting wins over participation.
+    const roleByPlan = new Map();
+    for (const plan of store.listPlans()) {
+        if (plan.creatorId === userId && !plan.cancelledAt)
+            roleByPlan.set(plan.id, "hosting");
+    }
+    for (const part of store.listParticipationsForUser(userId)) {
+        if (roleByPlan.has(part.planId))
+            continue;
+        if (part.state !== "going" && part.state !== "interested")
+            continue;
+        const plan = store.findPlanById(part.planId);
+        if (plan && !plan.cancelledAt)
+            roleByPlan.set(part.planId, part.state);
+    }
+    const pinRank = new Map(store.pinnedConversationIds(userId).map((id, i) => [id, i]));
+    const threadMessages = (id) => (id ? store.listMessagesForConversation(id) : []);
+    const summaries = [];
+    for (const [planId, myRole] of roleByPlan) {
+        const plan = store.findPlanById(planId);
+        if (!plan)
+            continue;
+        if (plan.chatEnabled === false)
+            continue;
+        if (plan.creatorId !== userId && store.isBlockedEitherWay(userId, plan.creatorId))
+            continue;
+        const groups = store.listGroupConversationsByPlan(planId);
+        const conv = groups[0];
+        if (groups.some((c) => store.hasLeftConversation(userId, c.id)))
+            continue;
+        const msgs = threadMessages(conv?.id);
+        const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
+        const hasRealChatter = msgs.some((m) => m.kind !== "system");
+        const isUpcoming = (plan.date ?? "") >= todayIso;
+        if (!isUpcoming && !hasRealChatter)
+            continue;
+        const participantCount = store
+            .listParticipationsForPlan(planId)
+            .filter((p) => (p.state === "going" || p.state === "interested") && p.userId !== plan.creatorId)
+            .length + 1;
+        summaries.push({
+            planId,
+            planTitle: plan.title,
+            hostEmoji: plan.hostEmoji,
+            planDate: plan.date,
+            conversationId: conv?.id ?? null,
+            lastMessageAt: conv && msgs.length ? conv.lastMessageAt : null,
+            lastMessagePreview: lastMsg ? messagePreview(lastMsg) : null,
+            lastMessageSender: lastSenderName(lastMsg),
+            unreadCount: conv ? humanUnread(msgs, userId) : 0,
+            participantCount,
+            myRole,
+            coverImage: inboxCover(plan.flyerDataUrl ?? plan.flyerLinkPreview?.image),
+            isIdea: plan.planKind === "looking_for" && !plan.lockedAt,
+            pinned: conv ? pinRank.has(conv.id) : false,
+            muted: conv ? store.isConversationMuted(userId, conv.id) : false,
+        });
+    }
+    // Community group chats — one persistent thread per community the user is an
+    // active member of (and chat is enabled). They ride the same inbox as plan
+    // chats but link to the community page.
+    for (const membership of store.listCommunityMembershipsForUser(userId)) {
+        if (membership.status !== "active")
+            continue;
+        const community = store.findCommunityById(membership.communityId);
+        if (!community || community.hiddenAt || !community.chatEnabled || community.creationStatus !== "approved")
+            continue;
+        const groups = store.listCommunityConversations(community.id);
+        const conv = groups[0] ?? store.findCommunityConversation(community.id);
+        if (groups.some((c) => store.hasLeftConversation(userId, c.id)))
+            continue;
+        const msgs = threadMessages(conv?.id);
+        const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
+        summaries.push({
+            planId: "",
+            planTitle: community.name,
+            hostEmoji: "🏙️",
+            planDate: community.createdAt.slice(0, 10),
+            conversationId: conv?.id ?? null,
+            lastMessageAt: conv && msgs.length ? conv.lastMessageAt : null,
+            lastMessagePreview: lastMsg ? messagePreview(lastMsg) : null,
+            lastMessageSender: lastSenderName(lastMsg),
+            unreadCount: conv ? humanUnread(msgs, userId) : 0,
+            participantCount: community.memberCount,
+            myRole: community.organizerId === userId ? "hosting" : "going",
+            communityId: community.id,
+            communityName: community.name,
+            coverImage: inboxCover(community.coverImage),
+            pinned: conv ? pinRank.has(conv.id) : false,
+            muted: conv ? store.isConversationMuted(userId, conv.id) : false,
+        });
+    }
+    for (const conv of store.listDirectDms(userId)) {
+        if (store.hasLeftConversation(userId, conv.id))
+            continue;
+        if (!conv.participantIds.includes(userId))
+            continue;
+        if ((conv.hiddenFromUserIds ?? []).includes(userId))
+            continue;
+        const otherId = conv.participantIds.find((id) => id !== userId);
+        if (!otherId || store.isBlockedEitherWay(userId, otherId))
+            continue;
+        const other = await findUserById(otherId);
+        const msgs = threadMessages(conv.id);
+        // The other person stays hidden until they accept. The sender still sees
+        // the thread they just opened, even before the first message.
+        const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
+        const name = [other?.firstName, other?.lastName].filter(Boolean).join(" ") || "Message";
+        summaries.push({
+            planId: "",
+            planTitle: name,
+            hostEmoji: "💬",
+            planDate: conv.createdAt.slice(0, 10),
+            conversationId: conv.id,
+            lastMessageAt: msgs.length ? conv.lastMessageAt : null,
+            lastMessagePreview: lastMsg ? messagePreview(lastMsg) : null,
+            lastMessageSender: lastSenderName(lastMsg),
+            unreadCount: humanUnread(msgs, userId),
+            participantCount: 2,
+            myRole: "going",
+            dmUserId: otherId,
+            coverImage: inboxCover(other?.avatarPhotoDataUrl),
+            pinned: pinRank.has(conv.id),
+            muted: store.isConversationMuted(userId, conv.id),
+        });
+    }
+    // Pinned threads stay at the top (most recently pinned first). Everything
+    // else is most recent chatter, then upcoming-but-quiet plans by date.
+    summaries.sort((a, b) => {
+        const aPin = a.conversationId != null ? pinRank.get(a.conversationId) : undefined;
+        const bPin = b.conversationId != null ? pinRank.get(b.conversationId) : undefined;
+        const aPinned = aPin !== undefined;
+        const bPinned = bPin !== undefined;
+        if (aPinned !== bPinned)
+            return aPinned ? -1 : 1;
+        if (aPinned && bPinned && aPin !== bPin)
+            return aPin - bPin;
+        if (a.lastMessageAt && b.lastMessageAt)
+            return a.lastMessageAt < b.lastMessageAt ? 1 : -1;
+        if (a.lastMessageAt)
+            return -1;
+        if (b.lastMessageAt)
+            return 1;
+        return a.planDate < b.planDate ? -1 : 1;
+    });
+    res.json(summaries);
+});
+function planGroupChatOpen(planId) {
+    const plan = store.findPlanById(planId);
+    return !!plan && plan.chatEnabled !== false;
+}
+/** Hosts, co-hosts, and people who are Going or Interested. Opening a plan does not count. */
+function planChatMemberIds(planId) {
+    const plan = store.findPlanById(planId);
+    if (!plan)
+        return null;
+    const ids = new Set([plan.creatorId, ...(plan.coHostIds ?? [])]);
+    for (const row of store.listParticipationsForPlan(plan.id)) {
+        if (row.state === "going" || row.state === "interested")
+            ids.add(row.userId);
+    }
+    return ids;
+}
+function canAccessPlanGroupChat(planId, userId) {
+    const plan = store.findPlanById(planId);
+    if (!plan || plan.chatEnabled === false)
+        return false;
+    if (plan.creatorId === userId || (plan.coHostIds ?? []).includes(userId))
+        return true;
+    const part = store.findParticipation(planId, userId);
+    if (!part)
+        return false;
+    if (part.state === "going")
+        return true;
+    // Interested people share the thread until the plan is marked full.
+    return part.state === "interested";
+}
+function canReadConversation(conv, userId) {
+    if (conv.communityId) {
+        const community = store.findCommunityById(conv.communityId);
+        if (!community || community.hiddenAt)
+            return false;
+    }
+    if (conv.type === "group" && conv.planId) {
+        if (!planGroupChatOpen(conv.planId))
+            return false;
+        return canAccessPlanGroupChat(conv.planId, userId);
+    }
+    if (conv.participantIds.includes(userId))
+        return true;
+    return false;
+}
+// GET /api/plans/:planId/conversation — group thread for the plan (no DMs in v1)
+chatRouter.get("/plans/:planId/conversation", requireAuth, async (req, res) => {
+    const planId = String(req.params.planId);
+    const userId = String(req.userId);
+    const plan = store.findPlanById(planId);
+    if (!plan) {
+        res.status(404).json({ error: "Plan not found" });
+        return;
+    }
+    if (plan.chatEnabled === false) {
+        res.status(404).json({ error: "Chat is off for this plan" });
+        return;
+    }
+    if (!canAccessPlanGroupChat(planId, userId)) {
+        res.status(403).json({ error: "Join the plan to access chat" });
+        return;
+    }
+    // Plan-detail preview uses ?join=0 so just looking at a plan doesn't dump
+    // the viewer into the inbox. Opening the full thread (default) still joins.
+    const join = String(req.query.join ?? "1") !== "0";
+    const existed = store.findGroupConversationByPlan(planId);
+    const alreadyHadUser = existed?.participantIds.includes(userId) ?? false;
+    if (!join) {
+        const conv = store.ensureGroupConversation(planId, [plan.creatorId]);
+        res.json(await toConversationDto(conv, userId));
+        return;
+    }
+    // Opening chat intentionally rejoins after an inbox leave.
+    if (existed)
+        store.setConversationLeft(userId, existed.id, false);
+    const conv = store.ensureGroupConversation(planId, [plan.creatorId, userId], {
+        rejoinIds: [userId],
+    });
+    // First non-creator joiner: drop a one-time welcome so the thread feels alive.
+    if (!alreadyHadUser && userId !== plan.creatorId) {
+        const hasUserMsgs = store.listMessagesForConversation(conv.id).some((m) => m.kind === "user");
+        if (!hasUserMsgs) {
+            const host = await findUserById(plan.creatorId);
+            const hostName = host?.firstName || "the host";
+            const joiner = await findUserById(userId);
+            const joinerName = joiner?.firstName || "Someone";
+            store.createSystemMessage(conv.id, `${joinerName} joined — say hi to the group. ${hostName} is here too.`);
+        }
+    }
+    res.json(await toConversationDto(conv, userId));
+});
+// GET /api/conversations/:id/messages
+chatRouter.get("/conversations/:id/messages", requireAuth, async (req, res) => {
+    const convId = String(req.params.id);
+    const userId = String(req.userId);
+    const conv = store.findConversationById(convId);
+    if (!conv) {
+        res.status(404).json({ error: "Conversation not found" });
+        return;
+    }
+    if (!canReadConversation(conv, userId)) {
+        res.status(403).json({ error: "Not a participant" });
+        return;
+    }
+    if ((conv.hiddenFromUserIds ?? []).includes(userId)) {
+        res.status(403).json({ error: "This chat isn't available yet." });
+        return;
+    }
+    const peek = String(req.query.peek ?? "") === "1";
+    const since = typeof req.query.since === "string" ? req.query.since : "";
+    if (!peek) {
+        store.markConversationRead(convId, userId);
+        store.markMessageNotificationsRead(userId, convId);
+    }
+    const hostId = conversationHostId(conv);
+    const raw = store.listMessagesForConversation(convId).filter((m) => {
+        if (since && m.createdAt <= since)
+            return false;
+        if (m.kind === "system")
+            return true;
+        if (m.senderId === userId)
+            return true;
+        if (store.isUserEjected(m.senderId))
+            return false;
+        if (store.isBlockedEitherWay(userId, m.senderId))
+            return false;
+        if (store.viewerReportedContent(userId, "message", m.id))
+            return false;
+        return true;
+    });
+    const messages = await Promise.all(raw.map((m) => toMessageDto(m, userId, hostId)));
+    res.json(messages);
+});
+// POST /api/conversations/:id/messages { body?, imageUrl? }
+chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => {
+    const convId = String(req.params.id);
+    const userId = String(req.userId);
+    const body = String(req.body?.body ?? "").trim().slice(0, 2000);
+    const rawImage = typeof req.body?.imageUrl === "string" ? req.body.imageUrl : "";
+    const imageUrl = rawImage ? await resolveChatImageUrl(rawImage) : null;
+    if (rawImage && !imageUrl) {
+        res.status(400).json({ error: "Couldn't use that image. Try a smaller photo." });
+        return;
+    }
+    if (!body && !imageUrl) {
+        res.status(400).json({ error: "Message body required" });
+        return;
+    }
+    const filtered = textBlockedReason(body);
+    if (filtered) {
+        res.status(400).json({ error: filtered });
+        return;
+    }
+    const conv = store.findConversationById(convId);
+    if (!conv) {
+        res.status(404).json({ error: "Conversation not found" });
+        return;
+    }
+    if (conv.type === "group" && conv.planId && !planGroupChatOpen(conv.planId)) {
+        res.status(403).json({ error: "Chat is off for this plan" });
+        return;
+    }
+    if (!conv.participantIds.includes(userId)) {
+        if (conv.planId && canAccessPlanGroupChat(conv.planId, userId)) {
+            store.ensureGroupConversation(conv.planId, [userId], { rejoinIds: [userId] });
+        }
+        else {
+            res.status(403).json({ error: "Not a participant" });
+            return;
+        }
+    }
+    if (conv.type === "dm") {
+        const otherId = conv.participantIds.find((id) => id !== userId);
+        if (otherId && store.isBlockedEitherWay(userId, otherId)) {
+            res.status(403).json({ error: "You can't message this person" });
+            return;
+        }
+    }
+    const blocked = communityPostBlockReason(conv, userId);
+    if (blocked) {
+        res.status(403).json({ error: blocked });
+        return;
+    }
+    // Image-only messages get a placeholder body so inbox previews + notifications
+    // stay readable without poll/image-specific branching everywhere.
+    const storedBody = body || (imageUrl ? "📷 Photo" : "");
+    const rawReply = typeof req.body?.replyToId === "string" ? req.body.replyToId.trim() : "";
+    let replyToId;
+    if (rawReply) {
+        const target = store.findMessageById(rawReply);
+        if (!target || target.conversationId !== convId || target.kind === "system") {
+            res.status(400).json({ error: "That message isn't available to reply to." });
+            return;
+        }
+        replyToId = target.id;
+    }
+    if (conv.type === "dm" && !conv.planId && !conv.communityId) {
+        const otherId = conv.participantIds.find((id) => id !== userId);
+        const senderUser = otherId ? await findUserById(userId) : undefined;
+        const notConnected = !!otherId && !(senderUser?.networkIds ?? []).includes(otherId);
+        if (otherId && notConnected) {
+            try {
+                const status = await ensureConnectRequest(userId, otherId);
+                if (status === "connected")
+                    store.releaseHeldDmBetween(userId, otherId);
+            }
+            catch (err) {
+                const message = err instanceof Error ? err.message : "You can't message this person.";
+                res.status(403).json({ error: message });
+                return;
+            }
+        }
+    }
+    const message = store.createMessage(convId, userId, storedBody, imageUrl, replyToId);
+    // Group chats ping every other participant. A network DM pings the other
+    // person, brings the thread back if they had left it, and stays quiet when
+    // they've muted this chat (emit checks mutedConversationIds). A held DM
+    // stays quiet until they accept the request to connect.
+    if (conv.type === "dm" && !conv.planId && !conv.communityId) {
+        const otherId = conv.participantIds.find((id) => id !== userId);
+        const stillHidden = !!otherId && (conv.hiddenFromUserIds ?? []).includes(otherId);
+        if (otherId && !stillHidden && !store.isBlockedEitherWay(userId, otherId)) {
+            if (store.hasLeftConversation(otherId, convId)) {
+                store.setConversationLeft(otherId, convId, false);
+            }
+            const sender = await findUserById(userId);
+            const senderName = sender?.firstName || "Someone";
+            const other = await findUserById(otherId);
+            const tagged = other ? mentionedUserIds(storedBody, [other]).has(otherId) : false;
+            await emit({
+                userId: otherId,
+                kind: "newGroupChatMessage",
+                body: tagged ? `${senderName} mentioned you` : `${senderName}: ${messagePreview(message)}`,
+                conversationId: convId,
+                profileUserId: userId,
+                dedupKey: tagged
+                    ? `mention:${message.id}:${otherId}`
+                    : `newDirectMessage:${message.id}:${otherId}`,
+            });
+        }
+    }
+    else if (conv.type === "group") {
+        const sender = await findUserById(userId);
+        const senderName = sender?.firstName || "Someone";
+        const plan = store.findPlanById(conv.planId);
+        const community = conv.communityId ? store.findCommunityById(conv.communityId) : undefined;
+        const place = community?.name ?? plan?.title ?? "your plan";
+        const participants = storedBody.includes("@")
+            ? [...(await findUsersByIds(conv.participantIds)).values()]
+            : [];
+        const mentioned = mentionedUserIds(storedBody, participants);
+        // Dedup per (conversation, recipient) — one "new message" until the user
+        // reads. A tagged person gets a mention instead of the generic ping.
+        // Plan threads only ping people actually on the plan. participantIds still
+        // holds people who only opened the plan.
+        const recipients = conv.planId
+            ? [...(planChatMemberIds(conv.planId) ?? [])]
+            : conv.participantIds;
+        for (const recipientId of recipients) {
+            if (recipientId === userId)
+                continue;
+            if (store.hasLeftConversation(recipientId, conv.id))
+                continue;
+            if (store.isBlockedEitherWay(userId, recipientId))
+                continue;
+            const tagged = mentioned.has(recipientId);
+            await emit({
+                userId: recipientId,
+                kind: "newGroupChatMessage",
+                body: tagged
+                    ? `${senderName} mentioned you in "${place}"`
+                    : `${senderName} in "${place}": ${messagePreview(message)}`,
+                planId: conv.planId,
+                communityId: conv.communityId ?? undefined,
+                conversationId: convId,
+                dedupKey: tagged
+                    ? `mention:${message.id}:${recipientId}`
+                    : `newGroupChatMessage:${message.id}:${recipientId}`,
+            });
+        }
+    }
+    res.status(201).json(await toMessageDto(message, userId));
+});
+// POST /api/conversations/:id/polls { question, options: string[] }
+// Any participant can post a poll. The question doubles as the message body so
+// it flows through inbox previews + notifications like a normal message.
+chatRouter.post("/conversations/:id/polls", requireAuth, async (req, res) => {
+    const convId = String(req.params.id);
+    const userId = String(req.userId);
+    const question = String(req.body?.question ?? "").trim();
+    const rawOptions = Array.isArray(req.body?.options) ? req.body.options : [];
+    const options = rawOptions
+        .map((o) => String(o ?? "").trim())
+        .filter((o) => o.length > 0)
+        .slice(0, 6);
+    if (!question) {
+        res.status(400).json({ error: "Poll question required" });
+        return;
+    }
+    if (options.length < 2) {
+        res.status(400).json({ error: "Add at least two options" });
+        return;
+    }
+    const filtered = textBlockedReason(question, ...options);
+    if (filtered) {
+        res.status(400).json({ error: filtered });
+        return;
+    }
+    const conv = store.findConversationById(convId);
+    if (!conv) {
+        res.status(404).json({ error: "Conversation not found" });
+        return;
+    }
+    if (!conv.participantIds.includes(userId)) {
+        res.status(403).json({ error: "Not a participant" });
+        return;
+    }
+    const blocked = communityPostBlockReason(conv, userId);
+    if (blocked) {
+        res.status(403).json({ error: blocked });
+        return;
+    }
+    const message = store.createPollMessage(convId, userId, question, options);
+    if (conv.type === "dm" && !conv.planId && !conv.communityId) {
+        const otherId = conv.participantIds.find((id) => id !== userId);
+        const stillHidden = !!otherId && (conv.hiddenFromUserIds ?? []).includes(otherId);
+        if (otherId && !stillHidden && !store.isBlockedEitherWay(userId, otherId)) {
+            if (store.hasLeftConversation(otherId, convId)) {
+                store.setConversationLeft(otherId, convId, false);
+            }
+            const sender = await findUserById(userId);
+            const senderName = sender?.firstName || "Someone";
+            await emit({
+                userId: otherId,
+                kind: "newGroupChatMessage",
+                body: `${senderName}: ${truncate(question, 70)}`,
+                conversationId: convId,
+                profileUserId: userId,
+                dedupKey: `newDirectMessage:${message.id}:${otherId}`,
+            });
+        }
+    }
+    else if (conv.type === "group") {
+        const sender = await findUserById(userId);
+        const senderName = sender?.firstName || "Someone";
+        const plan = store.findPlanById(conv.planId);
+        const planTitle = plan?.title ?? "your plan";
+        const recipients = conv.planId
+            ? [...(planChatMemberIds(conv.planId) ?? [])]
+            : conv.participantIds;
+        for (const recipientId of recipients) {
+            if (recipientId === userId)
+                continue;
+            if (store.hasLeftConversation(recipientId, conv.id))
+                continue;
+            if (store.isBlockedEitherWay(userId, recipientId))
+                continue;
+            await emit({
+                userId: recipientId,
+                kind: "newGroupChatMessage",
+                body: `${senderName} posted a poll in "${planTitle}": ${truncate(question, 70)}`,
+                planId: conv.planId,
+                conversationId: convId,
+                dedupKey: `newGroupChatMessage:${message.id}:${recipientId}`,
+            });
+        }
+    }
+    const hostId = conversationHostId(conv);
+    res.status(201).json(await toMessageDto(message, userId, hostId));
+});
+// POST /api/conversations/:id/messages/:msgId/vote { optionId }
+chatRouter.post("/conversations/:id/messages/:msgId/vote", requireAuth, async (req, res) => {
+    const convId = String(req.params.id);
+    const msgId = String(req.params.msgId);
+    const userId = String(req.userId);
+    const optionId = String(req.body?.optionId ?? "");
+    const conv = store.findConversationById(convId);
+    if (!conv) {
+        res.status(404).json({ error: "Conversation not found" });
+        return;
+    }
+    if (!conv.participantIds.includes(userId)) {
+        res.status(403).json({ error: "Not a participant" });
+        return;
+    }
+    const blocked = communityPostBlockReason(conv, userId);
+    if (blocked) {
+        res.status(403).json({ error: blocked });
+        return;
+    }
+    const updated = store.votePoll(msgId, userId, optionId);
+    if (!updated || updated.conversationId !== convId) {
+        res.status(404).json({ error: "Poll not found" });
+        return;
+    }
+    const hostId = conversationHostId(conv);
+    res.json(await toMessageDto(updated, userId, hostId));
+});
+// POST /api/conversations/:id/messages/:msgId/close-poll
+// Only the poll's author or the plan host / community organizer can freeze results.
+chatRouter.post("/conversations/:id/messages/:msgId/close-poll", requireAuth, async (req, res) => {
+    const convId = String(req.params.id);
+    const msgId = String(req.params.msgId);
+    const userId = String(req.userId);
+    const conv = store.findConversationById(convId);
+    if (!conv) {
+        res.status(404).json({ error: "Conversation not found" });
+        return;
+    }
+    if (!conv.participantIds.includes(userId)) {
+        res.status(403).json({ error: "Not a participant" });
+        return;
+    }
+    const existing = store.findMessageById(msgId);
+    if (!existing || existing.conversationId !== convId || existing.kind !== "poll") {
+        res.status(404).json({ error: "Poll not found" });
+        return;
+    }
+    const hostId = conversationHostId(conv);
+    if (userId !== existing.senderId && userId !== hostId) {
+        res.status(403).json({ error: "Only the poll's author or the host can close it" });
+        return;
+    }
+    const updated = store.closePoll(msgId);
+    if (!updated) {
+        res.status(404).json({ error: "Poll not found" });
+        return;
+    }
+    res.json(await toMessageDto(updated, userId, hostId));
+});
+// POST /api/conversations/:id/messages/:msgId/reopen-poll
+// Mirror of close-poll: only the poll's author or the plan host / community organizer can re-open it.
+chatRouter.post("/conversations/:id/messages/:msgId/reopen-poll", requireAuth, async (req, res) => {
+    const convId = String(req.params.id);
+    const msgId = String(req.params.msgId);
+    const userId = String(req.userId);
+    const conv = store.findConversationById(convId);
+    if (!conv) {
+        res.status(404).json({ error: "Conversation not found" });
+        return;
+    }
+    if (!conv.participantIds.includes(userId)) {
+        res.status(403).json({ error: "Not a participant" });
+        return;
+    }
+    const existing = store.findMessageById(msgId);
+    if (!existing || existing.conversationId !== convId || existing.kind !== "poll") {
+        res.status(404).json({ error: "Poll not found" });
+        return;
+    }
+    const hostId = conversationHostId(conv);
+    if (userId !== existing.senderId && userId !== hostId) {
+        res.status(403).json({ error: "Only the poll's author or the host can re-open it" });
+        return;
+    }
+    const updated = store.reopenPoll(msgId);
+    if (!updated) {
+        res.status(404).json({ error: "Poll not found" });
+        return;
+    }
+    res.json(await toMessageDto(updated, userId, hostId));
+});
+// POST /api/conversations/:id/clear — wipe a thread for everyone.
+// Community group chats: the organizer, any time.
+// Plan chats: the host, or that plan's community organizer, only after the plan.
+chatRouter.post("/conversations/:id/clear", requireAuth, (req, res) => {
+    const convId = String(req.params.id);
+    const userId = String(req.userId);
+    const conv = store.findConversationById(convId);
+    if (!conv) {
+        res.status(404).json({ error: "Conversation not found" });
+        return;
+    }
+    if (conv.communityId) {
+        const community = store.findCommunityById(conv.communityId);
+        if (!community || !isCommunityOrganizer(community, userId)) {
+            res.status(403).json({ error: "Only the organizer can delete this chat for everyone" });
+            return;
+        }
+        store.clearConversationMessages(convId);
+        store.createSystemMessage(convId, "The organizer cleared this chat for everyone.");
+        res.json({ ok: true });
+        return;
+    }
+    const plan = conv.planId ? store.findPlanById(conv.planId) : undefined;
+    if (!plan) {
+        res.status(404).json({ error: "Conversation not found" });
+        return;
+    }
+    if (!plan.cancelledAt && !planHasEnded(plan)) {
+        res.status(403).json({ error: "You can delete this chat for everyone after the plan" });
+        return;
+    }
+    const planCommunity = plan.communityId ? store.findCommunityById(plan.communityId) : undefined;
+    const allowed = plan.creatorId === userId ||
+        (planCommunity ? isCommunityOrganizer(planCommunity, userId) : false);
+    if (!allowed) {
+        res.status(403).json({ error: "Only the host can delete this chat for everyone" });
+        return;
+    }
+    store.clearConversationMessages(convId);
+    store.createSystemMessage(convId, "The host cleared this chat for everyone.");
+    res.json({ ok: true });
+});
+// POST /api/inbox/hide — drop a thread that has no conversation yet
+// (an upcoming plan or community that never opened chat) from this inbox.
+chatRouter.post("/inbox/hide", requireAuth, (req, res) => {
+    const userId = String(req.userId);
+    const planId = String(req.body?.planId ?? "");
+    const communityId = String(req.body?.communityId ?? "");
+    let convId = "";
+    if (communityId) {
+        const community = store.findCommunityById(communityId);
+        if (!community) {
+            res.status(404).json({ error: "Not found" });
+            return;
+        }
+        const existing = store.listCommunityConversations(communityId);
+        convId = (existing[0] ?? store.ensureCommunityConversation(communityId, [])).id;
+        for (const c of store.listCommunityConversations(communityId)) {
+            store.setConversationLeft(userId, c.id, true);
+        }
+    }
+    else if (planId) {
+        const plan = store.findPlanById(planId);
+        if (!plan) {
+            res.status(404).json({ error: "Not found" });
+            return;
+        }
+        const existing = store.listGroupConversationsByPlan(planId);
+        convId = (existing[0] ?? store.ensureGroupConversation(planId, [plan.creatorId])).id;
+        for (const c of store.listGroupConversationsByPlan(planId)) {
+            store.setConversationLeft(userId, c.id, true);
+        }
+    }
+    else {
+        res.status(400).json({ error: "Nothing to remove" });
+        return;
+    }
+    store.setConversationLeft(userId, convId, true);
+    res.json({ ok: true });
+});
+// POST /api/conversations/:id/leave — hide this thread from your inbox.
+// A direct message stays intact for the other person; opening it again (or a
+// new message from them) brings it back. A group chat also drops you from the
+// participant list. You stay on the plan either way.
+chatRouter.post("/conversations/:id/leave", requireAuth, (req, res) => {
+    const convId = String(req.params.id);
+    const userId = String(req.userId);
+    const conv = store.findConversationById(convId);
+    if (!conv) {
+        res.status(404).json({ error: "Conversation not found" });
+        return;
+    }
+    if (conv.type === "dm") {
+        store.setConversationLeft(userId, convId, true);
+        if (!conv.planId && !conv.communityId)
+            store.setDmHiddenFrom(convId, userId, true);
+        res.json({ ok: true });
+        return;
+    }
+    const related = conv.communityId
+        ? store.listCommunityConversations(conv.communityId)
+        : conv.planId
+            ? store.listGroupConversationsByPlan(conv.planId)
+            : [conv];
+    for (const c of related.length > 0 ? related : [conv]) {
+        store.removeConversationParticipant(c.id, userId);
+    }
+    res.json({ ok: true });
+});
+// POST /api/conversations/:id/pin { pinned: boolean } — keep this thread at the
+// top of the viewer's inbox. Toggle-only; body is optional (defaults to
+// flipping the current state). Most recently pinned lands first.
+chatRouter.post("/conversations/:id/pin", requireAuth, (req, res) => {
+    const convId = String(req.params.id);
+    const userId = String(req.userId);
+    const conv = store.findConversationById(convId);
+    if (!conv) {
+        res.status(404).json({ error: "Conversation not found" });
+        return;
+    }
+    if (!conv.participantIds.includes(userId)) {
+        res.status(403).json({ error: "Not a participant" });
+        return;
+    }
+    const next = typeof req.body?.pinned === "boolean" ? req.body.pinned : !store.isConversationPinned(userId, convId);
+    store.setConversationPinned(userId, convId, next);
+    res.json({ ok: true, pinned: next });
+});
+// POST /api/conversations/:id/mute { muted: boolean } — quiets notifications
+// for this thread without leaving it. Toggle-only; body is optional (defaults
+// to flipping the current state).
+chatRouter.post("/conversations/:id/mute", requireAuth, (req, res) => {
+    const convId = String(req.params.id);
+    const userId = String(req.userId);
+    const conv = store.findConversationById(convId);
+    if (!conv) {
+        res.status(404).json({ error: "Conversation not found" });
+        return;
+    }
+    if (!conv.participantIds.includes(userId)) {
+        res.status(403).json({ error: "Not a participant" });
+        return;
+    }
+    const next = typeof req.body?.muted === "boolean" ? req.body.muted : !store.isConversationMuted(userId, convId);
+    store.setConversationMuted(userId, convId, next);
+    res.json({ ok: true, muted: next });
+});
+// DELETE /api/conversations/:id/messages/:msgId — sender removes their own message for everyone.
+chatRouter.delete("/conversations/:id/messages/:msgId", requireAuth, (req, res) => {
+    const convId = String(req.params.id);
+    const msgId = String(req.params.msgId);
+    const userId = String(req.userId);
+    const conv = store.findConversationById(convId);
+    if (!conv) {
+        res.status(404).json({ error: "Conversation not found" });
+        return;
+    }
+    if (!canReadConversation(conv, userId)) {
+        res.status(403).json({ error: "Not a participant" });
+        return;
+    }
+    if ((conv.hiddenFromUserIds ?? []).includes(userId)) {
+        res.status(403).json({ error: "This chat isn't available yet." });
+        return;
+    }
+    const existing = store.findMessageById(msgId);
+    if (!existing || existing.conversationId !== convId) {
+        res.status(404).json({ error: "Message not found" });
+        return;
+    }
+    if (existing.kind === "system" || existing.senderId !== userId) {
+        res.status(403).json({ error: "You can only delete your own messages" });
+        return;
+    }
+    store.deleteMessage(msgId);
+    res.json({ ok: true });
+});
+// POST /api/conversations/:id/messages/:msgId/react { emoji }
+// Toggle the caller's reaction on a message. Only ❤️ is offered today, but the
+// store handles any emoji so the UI can grow.
+chatRouter.post("/conversations/:id/messages/:msgId/react", requireAuth, async (req, res) => {
+    const convId = String(req.params.id);
+    const msgId = String(req.params.msgId);
+    const userId = String(req.userId);
+    const emoji = String(req.body?.emoji ?? "❤️").slice(0, 8) || "❤️";
+    const conv = store.findConversationById(convId);
+    if (!conv) {
+        res.status(404).json({ error: "Conversation not found" });
+        return;
+    }
+    if (!conv.participantIds.includes(userId)) {
+        res.status(403).json({ error: "Not a participant" });
+        return;
+    }
+    const blocked = communityPostBlockReason(conv, userId);
+    if (blocked) {
+        res.status(403).json({ error: blocked });
+        return;
+    }
+    const updated = store.toggleReaction(msgId, userId, emoji);
+    if (!updated || updated.conversationId !== convId) {
+        res.status(404).json({ error: "Message not found" });
+        return;
+    }
+    res.json(await toMessageDto(updated));
+});
+function truncate(s, n) {
+    return s.length <= n ? s : s.slice(0, n - 1) + "…";
+}
+function viewerCanClearConversation(conv, viewerId) {
+    if (conv.communityId) {
+        const community = store.findCommunityById(conv.communityId);
+        return !!community && isCommunityOrganizer(community, viewerId);
+    }
+    const plan = conv.planId ? store.findPlanById(conv.planId) : undefined;
+    if (!plan || (!plan.cancelledAt && !planHasEnded(plan)))
+        return false;
+    if (plan.creatorId === viewerId)
+        return true;
+    const planCommunity = plan.communityId ? store.findCommunityById(plan.communityId) : undefined;
+    return !!planCommunity && isCommunityOrganizer(planCommunity, viewerId);
+}
+function conversationHostId(conv) {
+    if (conv.communityId) {
+        return store.findCommunityById(conv.communityId)?.organizerId ?? "";
+    }
+    return store.findPlanById(conv.planId)?.creatorId ?? "";
+}
+async function dmHoldFields(conv, viewerId) {
+    if (conv.type !== "dm" || conv.planId || conv.communityId)
+        return {};
+    const otherId = conv.participantIds.find((id) => id !== viewerId);
+    if (!otherId)
+        return {};
+    const me = await findUserById(viewerId);
+    if ((me?.networkIds ?? []).includes(otherId))
+        return {};
+    const otherHidden = (conv.hiddenFromUserIds ?? []).includes(otherId);
+    const incoming = (me?.incomingNetworkRequests ?? []).includes(otherId);
+    if (!otherHidden && !incoming)
+        return {};
+    return {
+        awaitingAccept: otherHidden,
+        incomingRequest: incoming,
+    };
+}
+async function toConversationDto(conv, _viewerId) {
+    const messages = store.listMessagesForConversation(conv.id);
+    const users = await findUsersByIds(conv.participantIds);
+    const hostId = conversationHostId(conv);
+    return {
+        id: conv.id,
+        planId: conv.planId,
+        type: conv.type,
+        participants: conv.participantIds.map((id) => {
+            const u = users.get(id);
+            return u
+                ? userToPublic(u)
+                : { id, firstName: "Former member", neighborhoodId: null, avatarSeed: id, avatarStyle: "avataaars" };
+        }),
+        lastMessageAt: conv.lastMessageAt,
+        unreadCount: messages.filter((m) => !m.readBy.includes(_viewerId)).length,
+        muted: store.isConversationMuted(_viewerId, conv.id),
+        ...(await dmHoldFields(conv, _viewerId)),
+        isHost: hostId === _viewerId,
+        hostId,
+        canClearForEveryone: viewerCanClearConversation(conv, _viewerId),
+    };
+}
+async function toMessageDto(m, viewerId = "", hostId = "") {
+    const replyTo = await replyQuote(m);
+    if (m.kind === "system") {
+        return {
+            id: m.id,
+            conversationId: m.conversationId,
+            kind: "system",
+            body: m.body,
+            createdAt: m.createdAt,
+        };
+    }
+    const sender = await findUserById(m.senderId);
+    const senderPublic = sender
+        ? userToPublic(sender)
+        : { id: m.senderId, firstName: "Former member", neighborhoodId: null, avatarSeed: m.senderId, avatarStyle: "avataaars" };
+    if (m.kind === "poll" && m.poll) {
+        return {
+            id: m.id,
+            conversationId: m.conversationId,
+            kind: "poll",
+            sender: senderPublic,
+            body: m.body,
+            createdAt: m.createdAt,
+            poll: pollToDto(m.poll, m.senderId, viewerId, hostId),
+            ...(replyTo ? { replyTo } : {}),
+        };
+    }
+    return {
+        id: m.id,
+        conversationId: m.conversationId,
+        kind: "user",
+        sender: senderPublic,
+        body: m.body,
+        createdAt: m.createdAt,
+        reactions: m.reactions ?? {},
+        ...(m.imageUrl ? { imageUrl: m.imageUrl } : {}),
+        ...(replyTo ? { replyTo } : {}),
+    };
+}
+function replyPreviewText(m) {
+    if (m.kind === "poll")
+        return m.poll?.question || m.body || "Poll";
+    if (m.imageUrl && (!m.body.trim() || m.body.trim() === "📷 Photo"))
+        return "Photo";
+    const text = m.body.trim();
+    if (!text)
+        return "Message";
+    return text.length > 140 ? `${text.slice(0, 137)}…` : text;
+}
+async function replyQuote(m) {
+    if (!m.replyToId)
+        return undefined;
+    const target = store.findMessageById(m.replyToId);
+    if (!target || target.conversationId !== m.conversationId) {
+        return { id: m.replyToId, senderName: "", preview: "Message unavailable" };
+    }
+    const sender = target.kind === "system" ? undefined : await findUserById(target.senderId);
+    return {
+        id: target.id,
+        senderName: sender?.firstName || "Someone",
+        preview: replyPreviewText(target),
+    };
+}
+function pollToDto(poll, authorId, viewerId, hostId) {
+    const voters = new Set();
+    let myVote = null;
+    const options = poll.options.map((o) => {
+        const voterIds = poll.votes[o.id] ?? [];
+        for (const v of voterIds)
+            voters.add(v);
+        if (voterIds.includes(viewerId))
+            myVote = o.id;
+        return { id: o.id, text: o.text, voterIds };
+    });
+    return {
+        question: poll.question,
+        options,
+        closed: poll.closed,
+        totalVotes: voters.size,
+        myVote,
+        canClose: viewerId === authorId || viewerId === hostId,
+    };
+}

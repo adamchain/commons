@@ -844,6 +844,28 @@ function load(): Snapshot {
 
 let snapshot: Snapshot = load();
 
+// O(1) indexes — rebuilt on load and maintained on every write.
+let userIndex = new Map<string, UserRecord>();
+let messagesByConvIndex = new Map<string, MessageRecord[]>();
+let messageIndex = new Map<string, MessageRecord>();
+
+function rebuildIndexes(): void {
+  userIndex = new Map(snapshot.users.map((u) => [u.id, u]));
+  messagesByConvIndex = new Map();
+  messageIndex = new Map();
+  for (const m of snapshot.messages) {
+    messageIndex.set(m.id, m);
+    const bucket = messagesByConvIndex.get(m.conversationId);
+    if (bucket) bucket.push(m);
+    else messagesByConvIndex.set(m.conversationId, [m]);
+  }
+  for (const bucket of messagesByConvIndex.values()) {
+    bucket.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+}
+
+rebuildIndexes();
+
 function persist(): void {
   mkdirSync(dirname(DATA_PATH), { recursive: true });
   writeFileSync(DATA_PATH, JSON.stringify(snapshot, null, 2));
@@ -857,6 +879,7 @@ export const store = {
    */
   resetLocalOnly(next: Snapshot): void {
     snapshot = next;
+    rebuildIndexes();
   },
 
   /**
@@ -880,7 +903,7 @@ export const store = {
     return [...snapshot.users];
   },
   findUserById(id: string): UserRecord | undefined {
-    return snapshot.users.find((u) => u.id === id);
+    return userIndex.get(id);
   },
   findUserByPhone(phoneNumber: string): UserRecord | undefined {
     return snapshot.users.find((u) => u.phoneNumber === phoneNumber);
@@ -906,6 +929,7 @@ export const store = {
       dismissedNetworkPromptPlanIds: [],
     };
     snapshot.users.push(user);
+    userIndex.set(user.id, user);
     persist();
     mongoMirror.upsertUser(user);
     return user;
@@ -984,6 +1008,7 @@ export const store = {
 
     // Finally the user record itself.
     snapshot.users = snapshot.users.filter((u) => u.id !== userId);
+    userIndex.delete(userId);
     mongoMirror.deleteUser(userId);
 
     persist();
@@ -1593,6 +1618,9 @@ export const store = {
   deleteGroupConversation(planId: string): boolean {
     const conv = this.findGroupConversationByPlan(planId);
     if (!conv) return false;
+    const toRemove = messagesByConvIndex.get(conv.id) ?? [];
+    for (const m of toRemove) messageIndex.delete(m.id);
+    messagesByConvIndex.delete(conv.id);
     snapshot.messages = snapshot.messages.filter((m) => m.conversationId !== conv.id);
     snapshot.conversations = snapshot.conversations.filter((c) => c.id !== conv.id);
     mongoMirror.deleteMessagesByConversation(conv.id);
@@ -1758,15 +1786,13 @@ export const store = {
     return snapshot.conversations.find((c) => c.id === id);
   },
   listMessagesForConversation(conversationId: string): MessageRecord[] {
-    return snapshot.messages
-      .filter((m) => m.conversationId === conversationId)
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    return [...(messagesByConvIndex.get(conversationId) ?? [])];
   },
   /** Opening a thread marks every message read so the inbox badge can drop. */
   markConversationRead(conversationId: string, userId: string): number {
     let count = 0;
-    for (const m of snapshot.messages) {
-      if (m.conversationId !== conversationId || m.readBy.includes(userId)) continue;
+    for (const m of messagesByConvIndex.get(conversationId) ?? []) {
+      if (m.readBy.includes(userId)) continue;
       m.readBy.push(userId);
       mongoMirror.upsertMessage(m);
       count++;
@@ -1776,25 +1802,31 @@ export const store = {
   },
   /** Wipe a thread for every participant. The conversation row stays. */
   clearConversationMessages(conversationId: string): void {
+    const toRemove = messagesByConvIndex.get(conversationId) ?? [];
+    for (const m of toRemove) messageIndex.delete(m.id);
+    messagesByConvIndex.delete(conversationId);
     snapshot.messages = snapshot.messages.filter((m) => m.conversationId !== conversationId);
     mongoMirror.deleteMessagesByConversation(conversationId);
     persist();
   },
   findMessageById(messageId: string): MessageRecord | undefined {
-    return snapshot.messages.find((m) => m.id === messageId);
+    return messageIndex.get(messageId);
   },
   /** Remove one message for every participant. Rewinds the inbox preview when it was the latest. */
   deleteMessage(messageId: string): boolean {
     const idx = snapshot.messages.findIndex((m) => m.id === messageId);
     if (idx < 0) return false;
     const [removed] = snapshot.messages.splice(idx, 1);
+    messageIndex.delete(messageId);
+    const convBucket = messagesByConvIndex.get(removed.conversationId);
+    if (convBucket) {
+      const bi = convBucket.findIndex((m) => m.id === messageId);
+      if (bi >= 0) convBucket.splice(bi, 1);
+    }
     const conv = snapshot.conversations.find((c) => c.id === removed.conversationId);
     if (conv) {
-      let latest = "";
-      for (const m of snapshot.messages) {
-        if (m.conversationId !== conv.id) continue;
-        if (m.createdAt > latest) latest = m.createdAt;
-      }
+      const remaining = messagesByConvIndex.get(conv.id) ?? [];
+      const latest = remaining.at(-1)?.createdAt ?? "";
       const nextAt = latest || conv.createdAt;
       if (conv.lastMessageAt !== nextAt) {
         conv.lastMessageAt = nextAt;
@@ -1824,6 +1856,10 @@ export const store = {
       ...(replyToId ? { replyToId } : {}),
     };
     snapshot.messages.push(message);
+    messageIndex.set(message.id, message);
+    const bucket = messagesByConvIndex.get(conversationId);
+    if (bucket) bucket.push(message);
+    else messagesByConvIndex.set(conversationId, [message]);
     const conv = snapshot.conversations.find((c) => c.id === conversationId);
     if (conv) conv.lastMessageAt = message.createdAt;
     persist();
@@ -1843,6 +1879,10 @@ export const store = {
       kind: "system",
     };
     snapshot.messages.push(message);
+    messageIndex.set(message.id, message);
+    const bucket = messagesByConvIndex.get(conversationId);
+    if (bucket) bucket.push(message);
+    else messagesByConvIndex.set(conversationId, [message]);
     const conv = snapshot.conversations.find((c) => c.id === conversationId);
     if (conv) conv.lastMessageAt = message.createdAt;
     persist();
@@ -1858,13 +1898,15 @@ export const store = {
    * Returns how many messages were cloned.
    */
   cloneConversationMessages(fromConversationId: string, toConversationId: string): number {
-    const src = snapshot.messages
-      .filter((m) => m.conversationId === fromConversationId)
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const src = [...(messagesByConvIndex.get(fromConversationId) ?? [])];
     let lastAt = "";
     for (const m of src) {
       const copy: MessageRecord = { ...m, id: randomUUID(), conversationId: toConversationId };
       snapshot.messages.push(copy);
+      messageIndex.set(copy.id, copy);
+      const bucket = messagesByConvIndex.get(toConversationId);
+      if (bucket) bucket.push(copy);
+      else messagesByConvIndex.set(toConversationId, [copy]);
       mongoMirror.upsertMessage(copy);
       if (m.createdAt > lastAt) lastAt = m.createdAt;
     }
@@ -1906,6 +1948,10 @@ export const store = {
       },
     };
     snapshot.messages.push(message);
+    messageIndex.set(message.id, message);
+    const pollBucket = messagesByConvIndex.get(conversationId);
+    if (pollBucket) pollBucket.push(message);
+    else messagesByConvIndex.set(conversationId, [message]);
     const conv = snapshot.conversations.find((c) => c.id === conversationId);
     if (conv) conv.lastMessageAt = message.createdAt;
     persist();
@@ -1922,7 +1968,7 @@ export const store = {
    * the message isn't a votable poll.
    */
   votePoll(messageId: string, userId: string, optionId: string): MessageRecord | undefined {
-    const message = snapshot.messages.find((m) => m.id === messageId);
+    const message = messageIndex.get(messageId);
     if (!message || message.kind !== "poll" || !message.poll) return undefined;
     const poll = message.poll;
     if (poll.closed) return message;
@@ -1943,7 +1989,7 @@ export const store = {
 
   /** Freeze a poll's results. Permission is enforced by the caller. */
   closePoll(messageId: string): MessageRecord | undefined {
-    const message = snapshot.messages.find((m) => m.id === messageId);
+    const message = messageIndex.get(messageId);
     if (!message || message.kind !== "poll" || !message.poll) return undefined;
     message.poll.closed = true;
     message.poll.closedAt = new Date().toISOString();
@@ -1954,7 +2000,7 @@ export const store = {
 
   /** Re-open a closed poll so voting resumes. Permission is enforced by the caller. */
   reopenPoll(messageId: string): MessageRecord | undefined {
-    const message = snapshot.messages.find((m) => m.id === messageId);
+    const message = messageIndex.get(messageId);
     if (!message || message.kind !== "poll" || !message.poll) return undefined;
     message.poll.closed = false;
     delete message.poll.closedAt;
@@ -1969,7 +2015,7 @@ export const store = {
    * message (or undefined if not found).
    */
   toggleReaction(messageId: string, userId: string, emoji: string): MessageRecord | undefined {
-    const message = snapshot.messages.find((m) => m.id === messageId);
+    const message = messageIndex.get(messageId);
     if (!message) return undefined;
     const reactions: Record<string, string[]> = { ...(message.reactions ?? {}) };
     const current = new Set(reactions[emoji] ?? []);
@@ -2475,6 +2521,9 @@ export const store = {
 
     const conv = this.findCommunityConversation(communityId);
     if (conv) {
+      const toRemove = messagesByConvIndex.get(conv.id) ?? [];
+      for (const m of toRemove) messageIndex.delete(m.id);
+      messagesByConvIndex.delete(conv.id);
       snapshot.messages = snapshot.messages.filter((m) => m.conversationId !== conv.id);
       snapshot.conversations = snapshot.conversations.filter((c) => c.id !== conv.id);
       mongoMirror.deleteMessagesByConversation(conv.id);
@@ -2517,8 +2566,8 @@ export const store = {
       (c) => c.communityId === communityId && c.type === "group",
     );
     if (conv) {
-      for (const msg of snapshot.messages) {
-        if (msg.conversationId !== conv.id || msg.kind === "system") continue;
+      for (const msg of messagesByConvIndex.get(conv.id) ?? []) {
+        if (msg.kind === "system") continue;
         if (!msg.senderId || !msg.createdAt) continue;
         events.push({ at: msg.createdAt, userId: msg.senderId });
       }

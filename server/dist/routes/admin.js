@@ -1,0 +1,912 @@
+import { Router } from "express";
+import { sessionVersionMatches, verifySessionToken } from "../lib/jwt.js";
+import { isAdminPhone } from "../lib/adminPhones.js";
+import { isGcsConfigured, listDefaultCatalog, parseDataUrl, uploadCoverImage } from "../lib/gcs.js";
+import { HELP_TICKET_SECTION_LABELS, store } from "../store.js";
+import { emit } from "../lib/notify.js";
+import { listAllUsers, findUserById, deleteUser, updateUser } from "../userRepo.js";
+import { runBehaviorAgent, analyzeUserBehavior } from "../lib/behaviorAgent.js";
+import { communityCategoriesOf, normalizeCommunityCategory } from "../types/shared.js";
+import { buildAdminDashboard, buildCommunityDetail, buildGodView, sanitizeAdminDashboardView, } from "../lib/adminDashboard.js";
+import { buildCoverCatalog, invalidateCoverCatalogCache } from "../lib/coverCatalog.js";
+const adminRouter = Router();
+function adminApiToken() {
+    const t = process.env.ADMIN_API_TOKEN?.trim();
+    return t || undefined;
+}
+function tokenFromRequest(req) {
+    const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, "").trim();
+    const header = req.headers["x-admin-token"]?.trim();
+    return bearer || header || undefined;
+}
+async function userFromSessionToken(token) {
+    if (!token)
+        return null;
+    try {
+        const payload = verifySessionToken(token);
+        const user = await findUserById(payload.sub);
+        if (!user || !sessionVersionMatches(user.sessionVersion, payload.sv))
+            return null;
+        return user;
+    }
+    catch {
+        return null;
+    }
+}
+async function requireAdmin(req, res, next) {
+    const expected = adminApiToken();
+    const got = tokenFromRequest(req);
+    if (expected && got === expected) {
+        next();
+        return;
+    }
+    // Admin sign-in on the web sets `admin_session` only, so it never becomes
+    // an app login. A normal app session still works when that phone is an admin.
+    const adminUser = await userFromSessionToken(req.cookies?.admin_session);
+    const sessionUser = adminUser
+        ? null
+        : await userFromSessionToken(req.cookies?.session);
+    const user = adminUser ?? sessionUser;
+    if (!user) {
+        res.status(401).json({ error: "Sign in with an admin phone." });
+        return;
+    }
+    if (!isAdminPhone(user.phoneNumber)) {
+        res.status(403).json({ error: "This account is not authorized for admin." });
+        return;
+    }
+    req.userId = user.id;
+    next();
+}
+adminRouter.use(requireAdmin);
+function isoDay(d) {
+    return d.toISOString().slice(0, 10);
+}
+function addDays(iso, delta) {
+    const d = new Date(`${iso}T12:00:00.000Z`);
+    d.setUTCDate(d.getUTCDate() + delta);
+    return isoDay(d);
+}
+function emptyHeatmap() {
+    return Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0));
+}
+function bumpHeatmap(matrix, iso) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime()))
+        return;
+    const day = d.getUTCDay();
+    const hr = d.getUTCHours();
+    matrix[day][hr] += 1;
+}
+function seriesLastNDays(n) {
+    const today = isoDay(new Date());
+    const map = new Map();
+    for (let i = n - 1; i >= 0; i--) {
+        map.set(addDays(today, -i), 0);
+    }
+    return map;
+}
+function queryValue(value) {
+    return typeof value === "string" ? value : undefined;
+}
+function viewFromQuery(query) {
+    const from = queryValue(query.from);
+    if (!from)
+        return null;
+    const preset = queryValue(query.preset);
+    return {
+        from,
+        to: queryValue(query.to) ?? "today",
+        preset: preset === "since_launch" || preset === "last_7" || preset === "last_30" || preset === "custom" ? preset : "custom",
+        communityId: queryValue(query.communityId) || null,
+        neighborhoodId: queryValue(query.neighborhoodId) || null,
+        includeSeed: query.includeSeed === "1" || query.includeSeed === "true",
+    };
+}
+function nyToday() {
+    return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/New_York",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).format(new Date());
+}
+adminRouter.get("/dashboard", async (req, res) => {
+    const viewer = req.userId ? await findUserById(req.userId) : null;
+    const saved = viewer?.adminDashboardView ?? null;
+    const requested = viewFromQuery(req.query) ?? saved;
+    const data = await buildAdminDashboard(req.userId, requested, saved);
+    res.json(data);
+});
+adminRouter.put("/dashboard/view", async (req, res) => {
+    if (!req.userId) {
+        res.status(400).json({ error: "Sign in to save a default view." });
+        return;
+    }
+    const view = sanitizeAdminDashboardView(req.body, nyToday());
+    const user = await updateUser(req.userId, { adminDashboardView: view });
+    if (!user) {
+        res.status(404).json({ error: "Account not found" });
+        return;
+    }
+    res.json({ view });
+});
+adminRouter.delete("/dashboard/view", async (req, res) => {
+    if (!req.userId) {
+        res.status(400).json({ error: "Sign in to clear the default view." });
+        return;
+    }
+    await updateUser(req.userId, { adminDashboardView: null });
+    res.json({ ok: true });
+});
+adminRouter.get("/map", (req, res) => {
+    res.json(buildGodView(viewFromQuery(req.query)));
+});
+adminRouter.get("/map/key", (_req, res) => {
+    const key = process.env.GOOGLE_MAPS_API_KEY?.trim() || process.env.GOOGLE_PLACES_API_KEY?.trim();
+    if (!key) {
+        res.status(404).json({ error: "Google Maps is not configured." });
+        return;
+    }
+    res.json({ key });
+});
+adminRouter.get("/dashboard/communities/:id", async (req, res) => {
+    const viewer = req.userId ? await findUserById(req.userId) : null;
+    const requested = viewFromQuery(req.query) ?? viewer?.adminDashboardView ?? null;
+    const detail = buildCommunityDetail(String(req.params.id), requested);
+    if (!detail) {
+        res.status(404).json({ error: "Community not found" });
+        return;
+    }
+    res.json(detail);
+});
+adminRouter.get("/summary", async (_req, res) => {
+    const users = await listAllUsers();
+    const plans = store.listPlans();
+    const parts = store.listAllParticipations();
+    const messages = store.listAllMessages();
+    const convs = store.listAllConversations();
+    const feedback = store.listAllFeedback();
+    const suggestions = store.listAllPlanSuggestions();
+    const declines = store.listAllDeclines();
+    const logs = store.listLogsRecent(100);
+    const neighborhoods = store.listNeighborhoods();
+    const hoodName = new Map(neighborhoods.map((n) => [n.id, n.name]));
+    const today = isoDay(new Date());
+    const d7 = addDays(today, -6);
+    const d14 = addDays(today, -13);
+    const d30 = addDays(today, -29);
+    const signupsByDay = seriesLastNDays(14);
+    const plansByDay = seriesLastNDays(14);
+    const heatmap = emptyHeatmap();
+    for (const u of users) {
+        bumpHeatmap(heatmap, u.createdAt);
+        const day = u.createdAt.slice(0, 10);
+        if (signupsByDay.has(day))
+            signupsByDay.set(day, (signupsByDay.get(day) ?? 0) + 1);
+    }
+    for (const p of plans) {
+        bumpHeatmap(heatmap, p.createdAt);
+        const day = p.createdAt.slice(0, 10);
+        if (plansByDay.has(day))
+            plansByDay.set(day, (plansByDay.get(day) ?? 0) + 1);
+    }
+    for (const m of messages)
+        bumpHeatmap(heatmap, m.createdAt);
+    for (const pa of parts)
+        bumpHeatmap(heatmap, pa.updatedAt);
+    const maxHeat = Math.max(1, ...heatmap.flat());
+    const usersInRange = (since) => users.filter((u) => u.createdAt >= since).length;
+    const plansInRange = (since) => plans.filter((p) => p.createdAt >= since).length;
+    const msgsInRange = (since) => messages.filter((m) => m.createdAt >= since).length;
+    const onboarded = users.filter((u) => u.onboardingComplete).length;
+    const seedUsers = users.filter((u) => u.accountSource === "seed").length;
+    const going = parts.filter((p) => p.state === "going").length;
+    const interested = parts.filter((p) => p.state === "interested").length;
+    const uniqueCreators = new Set(plans.map((p) => p.creatorId));
+    const dms = convs.filter((c) => c.type === "dm").length;
+    const groups = convs.filter((c) => c.type === "group").length;
+    const activeUserIds = new Set();
+    const since7 = addDays(today, -6) + "T00:00:00.000Z";
+    for (const m of messages) {
+        if (m.createdAt >= since7 && m.kind === "user")
+            activeUserIds.add(m.senderId);
+    }
+    for (const pa of parts) {
+        if (pa.updatedAt >= since7)
+            activeUserIds.add(pa.userId);
+    }
+    for (const p of plans) {
+        if (p.createdAt >= since7)
+            activeUserIds.add(p.creatorId);
+    }
+    const userById = new Map(users.map((u) => [u.id, u]));
+    const signedUpWithActivity = users.filter((u) => {
+        const acts = store.listParticipationsForUser(u.id);
+        return acts.some((a) => a.state === "going" || a.state === "interested");
+    }).length;
+    const hoodCounts = new Map();
+    for (const u of users) {
+        const hid = u.neighborhoodIds?.[0] ?? u.neighborhoodId;
+        if (hid)
+            hoodCounts.set(hid, (hoodCounts.get(hid) ?? 0) + 1);
+    }
+    const neighborhoodsTop = [...hoodCounts.entries()]
+        .map(([id, count]) => ({ id, name: hoodName.get(id) ?? id, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 12);
+    const interestMix = new Map();
+    for (const u of users) {
+        for (const t of u.interests ?? []) {
+            interestMix.set(t, (interestMix.get(t) ?? 0) + 1);
+        }
+    }
+    const topInterests = [...interestMix.entries()]
+        .map(([tag, count]) => ({ tag, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+    const thumbUp = feedback.filter((f) => f.thumb === "up").length;
+    const thumbDown = feedback.filter((f) => f.thumb === "down").length;
+    res.json({
+        generatedAt: new Date().toISOString(),
+        kpis: {
+            totalUsers: users.length,
+            onboardedUsers: onboarded,
+            onboardingRatePct: users.length ? Math.round((1000 * onboarded) / users.length) / 10 : 0,
+            seedUsers,
+            totalPlans: plans.length,
+            uniqueHosts: uniqueCreators.size,
+            avgPlansPerHost: uniqueCreators.size > 0 ? Math.round((100 * plans.length) / uniqueCreators.size) / 100 : 0,
+            goingRsvps: going,
+            interestedRsvps: interested,
+            totalMessages: messages.length,
+            userMessages: messages.filter((m) => m.kind === "user").length,
+            groupChats: groups,
+            dms: dms,
+            planSuggestions: suggestions.length,
+            feedbackUp: thumbUp,
+            feedbackDown: thumbDown,
+            declines7d: declines.filter((d) => d.createdAt >= since7).length,
+            wauProxy: activeUserIds.size,
+            usersWithRsvp: signedUpWithActivity,
+        },
+        ranges: {
+            signups7d: usersInRange(d7),
+            signups14d: usersInRange(d14),
+            signups30d: usersInRange(d30),
+            plans7d: plansInRange(d7),
+            messages7d: msgsInRange(since7),
+        },
+        series14d: {
+            signups: [...signupsByDay.entries()].map(([date, count]) => ({ date, count })),
+            plans: [...plansByDay.entries()].map(([date, count]) => ({ date, count })),
+        },
+        heatmap: { matrix: heatmap, max: maxHeat, label: "UTC — signups, plans, messages, RSVPs" },
+        neighborhoodsTop,
+        topInterests,
+        recentLogs: logs.map((l) => ({ id: l.id, event: l.event, createdAt: l.createdAt })),
+        recentUsers: users.slice(0, 30).map((u) => ({
+            id: u.id,
+            firstName: u.firstName || "—",
+            phoneNumber: u.phoneNumber,
+            neighborhoodId: u.neighborhoodIds?.[0] ?? u.neighborhoodId,
+            neighborhoodName: hoodName.get(u.neighborhoodIds?.[0] ?? u.neighborhoodId ?? "") ?? null,
+            onboardingComplete: u.onboardingComplete,
+            accountSource: u.accountSource ?? "verify",
+            interestsCount: (u.interests ?? []).length,
+            networkSize: u.networkIds?.length ?? 0,
+            createdAt: u.createdAt,
+        })),
+        userTable: users.map((u) => ({
+            id: u.id,
+            firstName: u.firstName || "",
+            phoneNumber: u.phoneNumber,
+            neighborhoodId: u.neighborhoodIds?.[0] ?? u.neighborhoodId,
+            neighborhoodName: hoodName.get(u.neighborhoodIds?.[0] ?? u.neighborhoodId ?? "") ?? null,
+            onboardingComplete: u.onboardingComplete,
+            accountSource: u.accountSource ?? "verify",
+            interests: u.interests ?? [],
+            createdAt: u.createdAt,
+            plansHosted: plans.filter((p) => p.creatorId === u.id).length,
+            rsvps: store.listParticipationsForUser(u.id).length,
+        })),
+    });
+});
+// ---- Single user: full profile + activity (admin drill-down) ----
+adminRouter.get("/users/:id", async (req, res) => {
+    const id = String(req.params.id);
+    const u = await findUserById(id);
+    if (!u) {
+        res.status(404).json({ error: "User not found" });
+        return;
+    }
+    const hoodName = new Map(store.listNeighborhoods().map((n) => [n.id, n.name]));
+    const hoodIds = u.neighborhoodIds?.length
+        ? u.neighborhoodIds
+        : u.neighborhoodId
+            ? [u.neighborhoodId]
+            : [];
+    const allPlans = store.listPlans();
+    const hosted = allPlans
+        .filter((p) => p.creatorId === id)
+        .sort((a, b) => (a.date < b.date ? 1 : -1))
+        .map((p) => ({
+        id: p.id,
+        title: p.title,
+        date: p.date,
+        cancelled: Boolean(p.cancelledAt),
+        goingCount: store.listParticipationsForPlan(p.id).filter((q) => q.state === "going").length,
+    }));
+    const parts = store.listParticipationsForUser(id);
+    const participations = [];
+    for (const pa of parts) {
+        const plan = store.findPlanById(pa.planId);
+        if (!plan || plan.creatorId === id)
+            continue; // hosting shown separately
+        participations.push({ planId: plan.id, title: plan.title, date: plan.date, state: pa.state });
+    }
+    participations.sort((a, b) => (a.date < b.date ? 1 : -1));
+    const messagesCount = store
+        .listAllMessages()
+        .filter((m) => m.senderId === id && m.kind === "user").length;
+    res.json({
+        user: {
+            id: u.id,
+            firstName: u.firstName || "",
+            lastName: u.lastName ?? null,
+            phoneNumber: u.phoneNumber,
+            neighborhoodIds: hoodIds,
+            neighborhoodNames: hoodIds.map((h) => hoodName.get(h) ?? h),
+            interests: u.interests ?? [],
+            avatarSeed: u.avatarSeed,
+            avatarStyle: u.avatarStyle,
+            avatarPhotoDataUrl: u.avatarPhotoDataUrl ?? null,
+            avatarParams: u.avatarParams ?? null,
+            accountSource: u.accountSource ?? "verify",
+            onboardingComplete: u.onboardingComplete,
+            createdAt: u.createdAt,
+            networkSize: u.networkIds?.length ?? 0,
+            guidelinesAcknowledgedAt: u.guidelinesAcknowledgedAt ?? null,
+            socialLinks: u.socialLinks ?? null,
+        },
+        activity: {
+            hostedCount: hosted.length,
+            rsvpCount: parts.length,
+            goingCount: parts.filter((p) => p.state === "going").length,
+            interestedCount: parts.filter((p) => p.state === "interested").length,
+            messagesCount,
+            hosted,
+            participations,
+        },
+        behavior: analyzeUserBehavior(u),
+    });
+});
+adminRouter.get("/behavior", async (_req, res) => {
+    try {
+        const users = await listAllUsers();
+        res.json(runBehaviorAgent(users));
+    }
+    catch (err) {
+        console.error("[admin] behavior agent failed", err);
+        res.status(500).json({ error: "Behavior agent failed to run." });
+    }
+});
+function isTestAccount(user) {
+    return user.accountSource === "seed";
+}
+// DELETE /api/admin/users/:id — seed/demo accounts only. Real signups stay.
+adminRouter.delete("/users/:id", async (req, res) => {
+    const id = String(req.params.id);
+    if (req.userId && req.userId === id) {
+        res.status(400).json({ error: "You can't delete the account you're signed in with." });
+        return;
+    }
+    const user = await findUserById(id);
+    if (!user) {
+        res.status(404).json({ error: "User not found" });
+        return;
+    }
+    if (!isTestAccount(user)) {
+        res.status(400).json({ error: "Only test accounts can be deleted from here." });
+        return;
+    }
+    const ok = await deleteUser(id);
+    if (!ok) {
+        res.status(404).json({ error: "User not found" });
+        return;
+    }
+    store.log("test_account_deleted", { userId: id });
+    res.json({ ok: true });
+});
+// POST /api/admin/test-accounts/delete — remove every seed/demo account.
+adminRouter.post("/test-accounts/delete", async (req, res) => {
+    const users = await listAllUsers();
+    const targets = users.filter((u) => isTestAccount(u) && u.id !== req.userId);
+    let deleted = 0;
+    for (const u of targets) {
+        if (await deleteUser(u.id))
+            deleted += 1;
+    }
+    store.log("test_accounts_deleted", { deleted });
+    res.json({ deleted });
+});
+// ---- Event-card image library ----
+// Admins curate the cover images used on event cards without a code deploy.
+// File uploads go to Google Cloud Storage (when GCS_BUCKET is set); we store
+// the resulting public URL. External URLs are stored as-is. When GCS isn't
+// configured (local dev), uploads fall back to inline data URLs.
+const MAX_CARD_IMAGE_BYTES = 1_500_000; // ~1.5MB — fallback inline cap.
+/** Last-resort stand-ins, used only when GCS isn't configured (local dev). The
+ *  real standard library lives in the bucket's defaults folder (see GCS_DEFAULTS_PREFIX). */
+const DEFAULT_CARD_IMAGES = [
+    { url: "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=800&q=60", label: "Celebration" },
+    { url: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=800&q=60", label: "Dinner" },
+    { url: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=60", label: "Party" },
+    { url: "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=800&q=60", label: "Gathering" },
+];
+function parseCategory(raw) {
+    if (typeof raw !== "string")
+        return undefined;
+    const v = raw.trim().slice(0, 40);
+    return v || undefined;
+}
+adminRouter.get("/card-images", async (_req, res) => {
+    let catalog = [];
+    try {
+        catalog = await buildCoverCatalog();
+    }
+    catch (err) {
+        console.error("[admin] cover catalog failed", err);
+    }
+    res.json({
+        images: store.listCardImages(),
+        catalog,
+        gcsConfigured: isGcsConfigured(),
+    });
+});
+// Add by external URL (stored as-is — already hosted elsewhere).
+adminRouter.post("/card-images", (req, res) => {
+    const body = (req.body ?? {});
+    const url = typeof body.url === "string" ? body.url.trim() : "";
+    const label = typeof body.label === "string" ? body.label.trim() : undefined;
+    const category = parseCategory(body.category);
+    const isHttp = /^https?:\/\/\S+$/i.test(url);
+    const isDataImage = /^data:image\/(png|jpe?g|gif|webp|avif);base64,/i.test(url);
+    if (!isHttp && !isDataImage) {
+        res.status(400).json({ error: "Provide an http(s) image URL or an uploaded image." });
+        return;
+    }
+    if (isDataImage && url.length > MAX_CARD_IMAGE_BYTES) {
+        res.status(413).json({ error: "Image is too large — keep uploads under ~1MB." });
+        return;
+    }
+    const row = store.addCardImage({ url, label, category });
+    invalidateCoverCatalogCache();
+    res.status(201).json({ image: row });
+});
+// Upload a file: bytes arrive as a data URL, get pushed to GCS, and we store
+// the public URL. Falls back to inline storage when GCS isn't configured.
+adminRouter.post("/card-images/upload", async (req, res) => {
+    const body = (req.body ?? {});
+    const dataUrl = typeof body.dataUrl === "string" ? body.dataUrl : "";
+    const label = typeof body.label === "string" ? body.label.trim() || undefined : undefined;
+    const category = parseCategory(body.category) ?? "Other";
+    const parsed = parseDataUrl(dataUrl);
+    if (!parsed) {
+        res.status(400).json({ error: "Expected a base64 image data URL (png/jpeg/gif/webp/avif)." });
+        return;
+    }
+    if (isGcsConfigured()) {
+        try {
+            const publicUrl = await uploadCoverImage(parsed.buffer, parsed.contentType, category);
+            const row = store.addCardImage({ url: publicUrl, label, category });
+            invalidateCoverCatalogCache();
+            res.status(201).json({ image: row });
+        }
+        catch (err) {
+            console.error("[admin] card image GCS upload failed", err);
+            res.status(502).json({ error: "Upload to storage failed — check GCS config / permissions." });
+        }
+        return;
+    }
+    // No GCS — store inline, but enforce the snapshot-size cap.
+    if (dataUrl.length > MAX_CARD_IMAGE_BYTES) {
+        res.status(413).json({ error: "GCS isn't configured, so uploads are stored inline — keep this under ~1MB." });
+        return;
+    }
+    const row = store.addCardImage({ url: dataUrl, label, category });
+    invalidateCoverCatalogCache();
+    res.status(201).json({ image: row });
+});
+adminRouter.patch("/card-images/:id", (req, res) => {
+    const body = (req.body ?? {});
+    const patch = {};
+    if (body.label !== undefined) {
+        patch.label = typeof body.label === "string" ? body.label : null;
+    }
+    if (body.category !== undefined) {
+        patch.category = parseCategory(body.category) ?? null;
+    }
+    const row = store.updateCardImage(String(req.params.id), patch);
+    if (!row) {
+        res.status(404).json({ error: "Not found" });
+        return;
+    }
+    invalidateCoverCatalogCache();
+    res.json({ image: row });
+});
+// One-click: seed the standard placeholder library. When GCS is configured, the
+// defaults come from the bucket's defaults folder (GCS_DEFAULTS_PREFIX) so admins
+// can curate them without a deploy; otherwise we fall back to the built-in
+// stand-ins. Idempotent — skips images already present by URL.
+adminRouter.post("/card-images/seed-defaults", async (_req, res) => {
+    let defaults = DEFAULT_CARD_IMAGES;
+    if (isGcsConfigured()) {
+        try {
+            const fromBucket = await listDefaultCatalog();
+            if (fromBucket.length > 0) {
+                defaults = fromBucket.flatMap((c) => c.images.map((img) => ({ url: img.url, label: img.label, category: img.category })));
+            }
+        }
+        catch (err) {
+            console.error("[admin] listing default card images from GCS failed", err);
+            res.status(502).json({ error: "Could not read the defaults folder from storage — check GCS config / permissions." });
+            return;
+        }
+    }
+    const existing = new Set(store.listCardImages().map((c) => c.url));
+    const added = [];
+    for (const def of defaults) {
+        if (existing.has(def.url))
+            continue;
+        added.push(store.addCardImage(def));
+    }
+    invalidateCoverCatalogCache();
+    res.json({ added: added.length, images: store.listCardImages() });
+});
+adminRouter.delete("/card-images/:id", (req, res) => {
+    const ok = store.removeCardImage(req.params.id);
+    if (!ok) {
+        res.status(404).json({ error: "Not found" });
+        return;
+    }
+    invalidateCoverCatalogCache();
+    res.json({ ok: true });
+});
+// ---- Communities review ----
+// GET /api/admin/communities?status=pending — review queue (default pending).
+adminRouter.get("/communities", async (req, res) => {
+    const status = String(req.query.status ?? "pending");
+    const all = store.listCommunities();
+    const filtered = status === "all"
+        ? all
+        : status === "founding"
+            ? all.filter((c) => c.isFounding)
+            : all.filter((c) => c.creationStatus === status);
+    if (status === "founding") {
+        filtered.sort((a, b) => {
+            const hiddenRank = (c) => (c.hiddenAt ? 1 : 0);
+            const byHidden = hiddenRank(a) - hiddenRank(b);
+            if (byHidden !== 0)
+                return byHidden;
+            return a.name.localeCompare(b.name);
+        });
+    }
+    else {
+        filtered.sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
+    }
+    const rows = await Promise.all(filtered.map(async (c) => {
+        const organizer = await findUserById(c.organizerId);
+        return {
+            id: c.id,
+            name: c.name,
+            description: c.description,
+            category: communityCategoriesOf(c)[0],
+            categories: communityCategoriesOf(c),
+            organizer: organizer
+                ? { id: organizer.id, firstName: organizer.firstName, lastName: organizer.lastName ?? "" }
+                : { id: c.organizerId, firstName: "Unknown", lastName: "" },
+            memberCount: c.memberCount,
+            isFounding: c.isFounding,
+            hiddenAt: c.hiddenAt ?? null,
+            submittedAt: c.submittedAt,
+            creationStatus: c.creationStatus,
+        };
+    }));
+    res.json({ communities: rows });
+});
+// POST /api/admin/communities/:id/approve — goes live immediately.
+adminRouter.post("/communities/:id/approve", (req, res) => {
+    const community = store.findCommunityById(String(req.params.id));
+    if (!community) {
+        res.status(404).json({ error: "Community not found" });
+        return;
+    }
+    const updated = store.updateCommunity(community.id, {
+        creationStatus: "approved",
+        rejectionNote: null,
+        reviewedAt: new Date().toISOString(),
+        reviewedBy: req.userId ?? "admin",
+    });
+    store.log("community_approved", { communityId: community.id });
+    res.json({ ok: true, community: updated });
+});
+// POST /api/admin/communities/:id/reject { note? } — takes offline; organizer edit republishes.
+adminRouter.post("/communities/:id/reject", (req, res) => {
+    const community = store.findCommunityById(String(req.params.id));
+    if (!community) {
+        res.status(404).json({ error: "Community not found" });
+        return;
+    }
+    const note = typeof req.body?.note === "string" && req.body.note.trim()
+        ? req.body.note.trim().slice(0, 500)
+        : null;
+    const updated = store.updateCommunity(community.id, {
+        creationStatus: "rejected",
+        rejectionNote: note,
+        reviewedAt: new Date().toISOString(),
+        reviewedBy: req.userId ?? "admin",
+    });
+    store.log("community_rejected", { communityId: community.id });
+    res.json({ ok: true, community: updated });
+});
+function requireCommunity(id, res) {
+    const community = store.findCommunityById(id);
+    if (!community) {
+        res.status(404).json({ error: "Community not found" });
+        return;
+    }
+    return community;
+}
+// POST /api/admin/communities/:id/hide — take a community off the app. Data stays.
+adminRouter.post("/communities/:id/hide", (req, res) => {
+    const community = requireCommunity(String(req.params.id), res);
+    if (!community)
+        return;
+    const hiddenAt = new Date().toISOString();
+    store.updateCommunity(community.id, { hiddenAt });
+    store.log("community_hidden", { communityId: community.id, by: req.userId ?? "admin" });
+    res.json({ ok: true, hiddenAt });
+});
+// POST /api/admin/communities/:id/show — put a hidden community back.
+adminRouter.post("/communities/:id/show", (req, res) => {
+    const community = requireCommunity(String(req.params.id), res);
+    if (!community)
+        return;
+    store.updateCommunity(community.id, { hiddenAt: null });
+    store.log("community_shown", { communityId: community.id, by: req.userId ?? "admin" });
+    res.json({ ok: true, hiddenAt: null });
+});
+// DELETE /api/admin/communities/:id — permanently remove a community.
+adminRouter.delete("/communities/:id", async (req, res) => {
+    const community = requireCommunity(String(req.params.id), res);
+    if (!community)
+        return;
+    const name = community.name;
+    const communityId = community.id;
+    const actorId = req.userId ?? "admin";
+    const result = store.deleteCommunity(communityId);
+    if (!result) {
+        res.status(404).json({ error: "Community not found" });
+        return;
+    }
+    for (const planId of result.cancelledPlanIds) {
+        const plan = store.findPlanById(planId);
+        if (!plan)
+            continue;
+        const participants = store.listParticipationsForPlan(planId);
+        const recipientIds = Array.from(new Set(participants
+            .filter((p) => p.state === "going" || p.state === "interested")
+            .map((p) => p.userId)
+            .filter((id) => id !== actorId)));
+        for (const uid of recipientIds) {
+            await emit({
+                userId: uid,
+                kind: "planCancellation",
+                body: `"${plan.title}" was cancelled — ${name} was deleted`,
+                planId: plan.id,
+                dedupKey: `planCancellation:${plan.id}:${uid}`,
+            });
+        }
+    }
+    store.log("community_deleted", {
+        communityId,
+        by: actorId,
+        cancelledPlans: result.cancelledPlanIds.length,
+        founding: community.isFounding,
+    });
+    res.json({ ok: true });
+});
+// POST /api/admin/communities/founding — create-and-approve a Founding Community,
+// assigning the organizer by user lookup (phone or id).
+adminRouter.post("/communities/founding", async (req, res) => {
+    const name = String(req.body?.name ?? "").trim().slice(0, 80);
+    const description = String(req.body?.description ?? "").trim().slice(0, 2000);
+    const category = normalizeCommunityCategory(String(req.body?.category ?? ""));
+    const organizerLookup = String(req.body?.organizer ?? "").trim();
+    if (!name || !description || !organizerLookup) {
+        res.status(400).json({ error: "name, description, and organizer are required" });
+        return;
+    }
+    // Resolve organizer by user id first, then by phone.
+    let organizer = await findUserById(organizerLookup);
+    if (!organizer) {
+        const users = await listAllUsers();
+        organizer = users.find((u) => u.phoneNumber === organizerLookup || u.phoneNumber === `+${organizerLookup.replace(/\D/g, "")}`);
+    }
+    if (!organizer) {
+        res.status(404).json({ error: "Organizer user not found (pass a user id or E.164 phone)" });
+        return;
+    }
+    const community = store.createCommunity({
+        name,
+        description,
+        category,
+        organizerId: organizer.id,
+        isFounding: true,
+        creationStatus: "approved",
+        reviewedBy: req.userId ?? "admin",
+        coverImage: typeof req.body?.coverImage === "string" ? req.body.coverImage.slice(0, 2048) : null,
+    });
+    store.log("community_founding_created", { communityId: community.id, organizerId: organizer.id });
+    res.status(201).json({ ok: true, community });
+});
+// ---- Interest Forums review ----
+// GET /api/admin/forums/pending-posts — sponsored posts awaiting approval.
+adminRouter.get("/forums/pending-posts", (_req, res) => {
+    const pending = store.listPendingForumPosts();
+    const rows = pending.map((p) => ({
+        id: p.id,
+        interestTag: p.interestTag,
+        content: p.content,
+        imageUrl: p.imageUrl ?? null,
+        sponsorName: p.sponsorName ?? null,
+        createdAt: p.createdAt,
+    }));
+    res.json({ posts: rows });
+});
+// POST /api/admin/forums/posts/:id/approve
+adminRouter.post("/forums/posts/:id/approve", (req, res) => {
+    const post = store.setForumPostApprovalStatus(String(req.params.id), "approved");
+    if (!post) {
+        res.status(404).json({ error: "Post not found" });
+        return;
+    }
+    store.log("forum_post_approved", { postId: post.id });
+    res.json({ ok: true, post });
+});
+// POST /api/admin/forums/posts/:id/reject
+adminRouter.post("/forums/posts/:id/reject", (req, res) => {
+    const post = store.setForumPostApprovalStatus(String(req.params.id), "rejected");
+    if (!post) {
+        res.status(404).json({ error: "Post not found" });
+        return;
+    }
+    store.log("forum_post_rejected", { postId: post.id });
+    res.json({ ok: true, post });
+});
+const REPORT_REASON_LABELS = {
+    harassment: "Harassment or bullying",
+    spam: "Spam or scam",
+    inappropriate: "Inappropriate content",
+    safety: "Safety concern",
+    other: "Other",
+};
+adminRouter.get("/reports", async (_req, res) => {
+    const rows = store.listReports();
+    const reports = await Promise.all(rows.map(async (r) => {
+        const reporter = await findUserById(r.reporterId);
+        const target = await findUserById(r.targetUserId);
+        const plan = r.planId ? store.findPlanById(r.planId) : undefined;
+        return {
+            id: r.id,
+            reason: r.reason,
+            reasonLabel: REPORT_REASON_LABELS[r.reason] ?? r.reason,
+            details: r.details ?? "",
+            status: r.status,
+            createdAt: r.createdAt,
+            reviewedAt: r.reviewedAt ?? null,
+            reporter: reporter
+                ? { id: reporter.id, firstName: reporter.firstName, lastName: reporter.lastName ?? "" }
+                : { id: r.reporterId, firstName: "Unknown", lastName: "" },
+            target: target
+                ? { id: target.id, firstName: target.firstName, lastName: target.lastName ?? "" }
+                : { id: r.targetUserId, firstName: "Unknown", lastName: "" },
+            plan: plan ? { id: plan.id, title: plan.title } : null,
+            source: r.source ?? "report",
+            contentKind: r.contentKind ?? null,
+        };
+    }));
+    res.json({ reports });
+});
+adminRouter.post("/reports/:id/review", (req, res) => {
+    const updated = store.updateReportStatus(String(req.params.id), "reviewed");
+    if (!updated) {
+        res.status(404).json({ error: "Report not found" });
+        return;
+    }
+    store.log("report_reviewed", { reportId: updated.id });
+    res.json({ ok: true, report: updated });
+});
+adminRouter.post("/reports/:id/eject", (req, res) => {
+    const report = store.findReportById(String(req.params.id));
+    if (!report) {
+        res.status(404).json({ error: "Report not found" });
+        return;
+    }
+    if (report.planId) {
+        const plan = store.findPlanById(report.planId);
+        if (plan && !plan.cancelledAt) {
+            store.updatePlan(report.planId, { cancelledAt: new Date().toISOString() });
+        }
+    }
+    if (report.contentKind === "forum_post" && report.contentId) {
+        store.setForumPostApprovalStatus(report.contentId, "rejected");
+    }
+    if (report.contentKind === "community_post" && report.contentId) {
+        store.setCommunityPostApprovalStatus(report.contentId, "rejected");
+    }
+    const ejected = store.ejectUser(report.targetUserId);
+    if (!ejected) {
+        res.status(404).json({ error: "User not found" });
+        return;
+    }
+    const updated = store.updateReportStatus(report.id, "reviewed");
+    store.log("report_ejected", {
+        reportId: report.id,
+        targetUserId: report.targetUserId,
+    });
+    console.warn("[safety] ejected_user", {
+        reportId: report.id,
+        targetUserId: report.targetUserId,
+    });
+    res.json({ ok: true, report: updated, ejected: true });
+});
+function helpTicketAdminDTO(ticket, user) {
+    return {
+        id: ticket.id,
+        section: ticket.section,
+        sectionLabel: HELP_TICKET_SECTION_LABELS[ticket.section],
+        body: ticket.body,
+        status: ticket.status,
+        reply: ticket.reply,
+        createdAt: ticket.createdAt,
+        repliedAt: ticket.repliedAt,
+        user: user
+            ? { id: user.id, firstName: user.firstName, lastName: user.lastName ?? "" }
+            : { id: ticket.userId, firstName: "Member", lastName: "" },
+    };
+}
+adminRouter.get("/help-tickets", async (_req, res) => {
+    const rows = store.listHelpTickets().filter((t) => t.status !== "resolved");
+    const tickets = await Promise.all(rows.map(async (ticket) => helpTicketAdminDTO(ticket, await findUserById(ticket.userId))));
+    res.json({ tickets });
+});
+adminRouter.post("/help-tickets/:id/reply", async (req, res) => {
+    const reply = typeof req.body?.reply === "string" ? req.body.reply.trim().slice(0, 2000) : "";
+    if (!reply) {
+        res.status(400).json({ error: "Write a reply" });
+        return;
+    }
+    const ticket = store.replyToHelpTicket(String(req.params.id), reply);
+    if (!ticket) {
+        res.status(404).json({ error: "That request is already resolved or missing" });
+        return;
+    }
+    await emit({
+        userId: ticket.userId,
+        kind: "helpReply",
+        body: "Commons replied to your help request.",
+        dedupKey: `helpReply:${ticket.id}:${ticket.repliedAt ?? ticket.id}`,
+    });
+    res.json({ ok: true, ticket: helpTicketAdminDTO(ticket, await findUserById(ticket.userId)) });
+});
+adminRouter.post("/help-tickets/:id/resolve", async (req, res) => {
+    const ticket = store.resolveHelpTicket(String(req.params.id));
+    if (!ticket) {
+        res.status(404).json({ error: "That request is already resolved or missing" });
+        return;
+    }
+    res.json({ ok: true, ticket: helpTicketAdminDTO(ticket, await findUserById(ticket.userId)) });
+});
+export { adminRouter };
