@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { CommunityCover } from "./CommunityCover";
 import { pickCoverImage, useCardImages } from "../lib/cardImages";
 import { photoForInterest } from "../lib/placePhotos";
@@ -32,11 +33,13 @@ export function planPhotoUrl(plan: {
 export function CoverThumb({
   src,
   className = "",
+  onError,
 }: {
   src: string;
   className?: string;
+  onError?: () => void;
 }) {
-  return <img src={src} alt="" className={`cover-thumb ${className}`.trim()} loading="lazy" />;
+  return <img src={src} alt="" className={`cover-thumb ${className}`.trim()} loading="lazy" onError={onError} />;
 }
 
 /** Gradient background for ideas with no image — color is stable per seed (plan/tag id). */
@@ -86,8 +89,11 @@ export function PlanCoverThumb({
   className?: string;
 }) {
   const pool = useCardImages();
-  if (flyerDataUrl) return <CoverThumb src={flyerDataUrl} className={className} />;
-  if (isIdea) {
+  const [broken, setBroken] = useState(false);
+  if (flyerDataUrl && !broken) {
+    return <CoverThumb src={flyerDataUrl} className={className} onError={() => setBroken(true)} />;
+  }
+  if (isIdea || broken) {
     return (
       <div className={`cover-thumb-frame ${className}`.trim()}>
         <IdeaCoverFallback seed={planId} />

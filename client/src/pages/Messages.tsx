@@ -512,7 +512,7 @@ export function MessagesPage() {
                       <PlanCoverThumb
                         planId={c.communityId || c.planId || c.conversationId || "chat"}
                         flyerDataUrl={c.coverImage}
-                        isIdea={Boolean(c.isIdea) || (!c.coverImage && Boolean(c.communityId))}
+                        isIdea={Boolean(c.isIdea)}
                       />
                     )}
                     <div className="messages-row-body">

@@ -61,12 +61,6 @@ function lastSenderName(msg: { senderId: string; kind?: string } | null): string
 }
 
 
-/** Inbox rows can't carry uploaded photos — a few data-URLs stall the whole screen. */
-function inboxCover(url: string | null | undefined): string | null {
-  if (!url || url.startsWith("data:")) return null;
-  return url;
-}
-
 async function resolveChatImageUrl(raw: string): Promise<string | null> {
   if (raw.startsWith("http://") || raw.startsWith("https://")) {
     return raw.slice(0, 2048);
@@ -195,7 +189,7 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
       unreadCount: conv ? humanUnread(msgs, userId) : 0,
       participantCount,
       myRole,
-      coverImage: inboxCover(plan.flyerDataUrl ?? plan.flyerLinkPreview?.image),
+      coverImage: plan.flyerDataUrl || plan.flyerLinkPreview?.image || null,
       isIdea: plan.planKind === "looking_for" && !plan.lockedAt,
       pinned: conv ? pinRank.has(conv.id) : false,
       muted: conv ? store.isConversationMuted(userId, conv.id) : false,
@@ -228,7 +222,7 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
       myRole: community.organizerId === userId ? "hosting" : "going",
       communityId: community.id,
       communityName: community.name,
-      coverImage: inboxCover(community.coverImage),
+      coverImage: community.coverImage ?? null,
       pinned: conv ? pinRank.has(conv.id) : false,
       muted: conv ? store.isConversationMuted(userId, conv.id) : false,
     });
