@@ -18,6 +18,7 @@ import type { NavFromState } from "../lib/navState";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
 import { useStickToBottom } from "../lib/useStickToBottom";
+import { readScreen, writeScreen } from "../lib/screenCache";
 import type { ConversationDTO, MeDTO, MessageDTO, MessageReplyDTO, PublicUser } from "../types/shared";
 
 const POLL_MS = 4000;
@@ -36,8 +37,10 @@ export function DmChatPage() {
   const navFrom = (location.state as NavFromState | null) ?? null;
   const backLabel =
     navFrom?.from === "messages" ? "Messages" : navFrom?.from === "profile" ? "Profile" : "Network";
-  const [conv, setConv] = useState<ConversationDTO | null>(null);
-  const [messages, setMessages] = useState<MessageDTO[]>([]);
+  type DmCache = { conv: ConversationDTO; messages: MessageDTO[] };
+  const cachedDm = readScreen<DmCache>(`dm:${userId}`);
+  const [conv, setConv] = useState<ConversationDTO | null>(cachedDm?.conv ?? null);
+  const [messages, setMessages] = useState<MessageDTO[]>(cachedDm?.messages ?? []);
   const [body, setBody] = useState("");
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<MessageReplyDTO | null>(null);
@@ -57,7 +60,7 @@ export function DmChatPage() {
   const [gateBusy, setGateBusy] = useState(false);
   const [connectErr, setConnectErr] = useState<string | null>(null);
   const [openAttempt, setOpenAttempt] = useState(0);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(cachedDm != null);
   const composerMenuRef = useRef<HTMLDivElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -67,11 +70,11 @@ export function DmChatPage() {
 
   useEffect(() => {
     let live = true;
-    setReady(false);
+    if (!cachedDm) setReady(false);
     setError(null);
     void (async () => {
       try {
-        const c = await api<ConversationDTO>("/api/dm", {
+        const c = await api<ConversationDTO & { messages?: MessageDTO[] }>("/api/dm?messages=1", {
           method: "POST",
           body: JSON.stringify({ userId }),
         });
@@ -79,14 +82,16 @@ export function DmChatPage() {
         setError(null);
         setConnectErr(null);
         setGate(null);
-        setConv(c);
-        const msgs = await api<MessageDTO[]>(`/api/conversations/${c.id}/messages`);
-        if (!live) return;
-        setMessages(visibleMessages(msgs, deletedIdsRef.current));
+        const msgs = c.messages ?? [];
+        const freshConv: ConversationDTO = { ...c, messages: undefined };
+        const freshMessages = visibleMessages(msgs, deletedIdsRef.current);
+        setConv(freshConv);
+        setMessages(freshMessages);
+        writeScreen(`dm:${userId}`, { conv: freshConv, messages: freshMessages });
       } catch (e) {
         if (!live) return;
         const message = parseApiError(e) || "Couldn't open this chat.";
-        setError(message);
+        if (!cachedDm) setError(message);
         const profile = await peekProfile(userId);
         if (!live) return;
         setGate(gateFromError(message, profile));
@@ -97,7 +102,7 @@ export function DmChatPage() {
     return () => {
       live = false;
     };
-  }, [userId, openAttempt]);
+  }, [userId, openAttempt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll for new messages — only fetch messages newer than the last one we have.
   useEffect(() => {

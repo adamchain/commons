@@ -10,6 +10,7 @@ import {
   Plus,
 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
+import { readScreen, writeScreen } from "../lib/screenCache";
 import { Avatar } from "../components/Avatar";
 import { ComposerField, MentionText } from "../components/ComposerField";
 import { ChatReplyButton, ChatReplyDraft, ChatReplyQuote, replyTarget } from "../components/ChatReply";
@@ -61,9 +62,11 @@ export function ChatPage() {
           ? { from: "profile", profileUserId: navFrom.profileUserId ?? navFrom.planId }
           : { from: "chat", planId };
   const { user } = useAuth();
-  const [plan, setPlan] = useState<PlanDTO | null>(null);
-  const [conv, setConv] = useState<ConversationDTO | null>(null);
-  const [messages, setMessages] = useState<MessageDTO[]>([]);
+  type ChatCache = { plan: PlanDTO; conv: ConversationDTO; messages: MessageDTO[] };
+  const cached = readScreen<ChatCache>(`chat:${planId}`);
+  const [plan, setPlan] = useState<PlanDTO | null>(cached?.plan ?? null);
+  const [conv, setConv] = useState<ConversationDTO | null>(cached?.conv ?? null);
+  const [messages, setMessages] = useState<MessageDTO[]>(cached?.messages ?? []);
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
@@ -76,7 +79,7 @@ export function ChatPage() {
   const [pinnedPollsOpen, setPinnedPollsOpen] = useState(false);
   const [composerMenuOpen, setComposerMenuOpen] = useState(false);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
-  const [chatReady, setChatReady] = useState(false);
+  const [chatReady, setChatReady] = useState(cached != null);
   const [chatError, setChatError] = useState<string | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [leaveBusy, setLeaveBusy] = useState(false);
@@ -95,19 +98,22 @@ export function ChatPage() {
       try {
         const [p, c] = await Promise.all([
           api<PlanDTO>(`/api/plans/${planId}`),
-          api<ConversationDTO>(`/api/plans/${planId}/conversation`),
+          api<ConversationDTO & { messages?: MessageDTO[] }>(`/api/plans/${planId}/conversation?messages=1`),
         ]);
+        const msgs = c.messages ?? [];
+        const freshConv: ConversationDTO = { ...c, messages: undefined };
+        const freshMessages = visibleMessages(msgs, deletedIdsRef.current);
         setPlan(p);
-        setConv(c);
-        const msgs = await api<MessageDTO[]>(`/api/conversations/${c.id}/messages`);
-        setMessages(visibleMessages(msgs, deletedIdsRef.current));
+        setConv(freshConv);
+        setMessages(freshMessages);
+        writeScreen(`chat:${planId}`, { plan: p, conv: freshConv, messages: freshMessages });
       } catch (e) {
-        setChatError(parseApiError(e));
+        if (!cached) setChatError(parseApiError(e));
       } finally {
         setChatReady(true);
       }
     })();
-  }, [planId]);
+  }, [planId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll for new messages — only fetch messages newer than the last one we have.
   useEffect(() => {

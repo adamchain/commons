@@ -19,6 +19,23 @@ import type { ConversationDTO, ConversationSummaryDTO, MessageDTO, MessageReplyD
 
 const MAX_CHAT_IMAGE_CHARS = 1_600_000;
 
+/** Build the inline messages array for ?messages=1 responses. */
+export async function inlineMessages(
+  convId: string,
+  userId: string,
+  hostId: string,
+): Promise<MessageDTO[]> {
+  const raw = store.listMessagesForConversation(convId).filter((m) => {
+    if (m.kind === "system") return true;
+    if (m.senderId === userId) return true;
+    if (store.isUserEjected(m.senderId)) return false;
+    if (store.isBlockedEitherWay(userId, m.senderId)) return false;
+    if (store.viewerReportedContent(userId, "message", m.id)) return false;
+    return true;
+  });
+  return Promise.all(raw.map((m) => toMessageDto(m, userId, hostId)));
+}
+
 /** Real messages from other people. System lines don't light the inbox badge. */
 function humanUnread(
   msgs: { kind?: string; senderId: string; readBy: string[] }[],
@@ -119,7 +136,9 @@ chatRouter.post("/dm", requireAuth, async (req, res) => {
     // out of a thread they had already started.
     store.setDmHiddenFrom(conv.id, otherId, true);
   }
-  res.json(await toConversationDto(conv, userId));
+  const dto = await toConversationDto(conv, userId);
+  const withMessages = String(req.query.messages ?? "") === "1";
+  res.json(withMessages ? { ...dto, messages: await inlineMessages(conv.id, userId, dto.hostId) } : dto);
 });
 
 // GET /api/conversations — unified inbox: plan chats, community chats, and
@@ -326,9 +345,11 @@ chatRouter.get("/plans/:planId/conversation", requireAuth, async (req, res) => {
   const join = String(req.query.join ?? "1") !== "0";
   const existed = store.findGroupConversationByPlan(planId);
   const alreadyHadUser = existed?.participantIds.includes(userId) ?? false;
+  const withMessages = String(req.query.messages ?? "") === "1";
   if (!join) {
     const conv = store.ensureGroupConversation(planId, [plan.creatorId]);
-    res.json(await toConversationDto(conv, userId));
+    const dto = await toConversationDto(conv, userId);
+    res.json(withMessages ? { ...dto, messages: await inlineMessages(conv.id, userId, dto.hostId) } : dto);
     return;
   }
   // Opening chat intentionally rejoins after an inbox leave.
@@ -352,7 +373,8 @@ chatRouter.get("/plans/:planId/conversation", requireAuth, async (req, res) => {
     }
   }
 
-  res.json(await toConversationDto(conv, userId));
+  const dto = await toConversationDto(conv, userId);
+  res.json(withMessages ? { ...dto, messages: await inlineMessages(conv.id, userId, dto.hostId) } : dto);
 });
 
 // GET /api/conversations/:id/messages

@@ -371,6 +371,8 @@ export interface ConversationDTO {
   hostId: string;
   /** Host or community organizer may wipe the thread. Plan chats only after the plan. */
   canClearForEveryone?: boolean;
+  /** Only present when the fetch included ?messages=1 — eliminates a second round-trip. */
+  messages?: MessageDTO[];
 }
 
 /** A row in the unified Messages inbox — one per accessible plan group chat. */

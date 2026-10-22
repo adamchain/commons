@@ -3,6 +3,7 @@ import { requireAuth } from "../middleware/requireAuth.js";
 import { store, } from "../store.js";
 import { findUserById, findUsersByIds } from "../userRepo.js";
 import { userToPublic, planSummary } from "./plans.js";
+import { inlineMessages } from "./chat.js";
 import { mentionedUserIds } from "../lib/mentions.js";
 import { emit } from "../lib/notify.js";
 import { listAdminPhones } from "../lib/adminPhones.js";
@@ -1388,7 +1389,8 @@ communitiesRouter.get("/:id/conversation", requireAuth, async (req, res) => {
         rejoinIds: [viewerId],
     });
     const users = await findUsersByIds(conv.participantIds);
-    const messages = store.listMessagesForConversation(conv.id);
+    const convMessages = store.listMessagesForConversation(conv.id);
+    const withMessages = String(req.query.messages ?? "") === "1";
     const hostId = community.organizerId;
     res.json({
         id: conv.id,
@@ -1397,11 +1399,12 @@ communitiesRouter.get("/:id/conversation", requireAuth, async (req, res) => {
         type: conv.type,
         participants: conv.participantIds.map((id) => publicFor(id, users)),
         lastMessageAt: conv.lastMessageAt,
-        unreadCount: messages.filter((m) => !m.readBy.includes(viewerId)).length,
+        unreadCount: convMessages.filter((m) => !m.readBy.includes(viewerId)).length,
         muted: store.isConversationMuted(viewerId, conv.id),
         isHost: hostId === viewerId,
         hostId,
         coverImage: community.coverImage ?? null,
         category: community.category,
+        ...(withMessages ? { messages: await inlineMessages(conv.id, viewerId, hostId) } : {}),
     });
 });

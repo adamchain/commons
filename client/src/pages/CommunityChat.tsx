@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, BarChart2 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
+import { readScreen, writeScreen } from "../lib/screenCache";
 import { Avatar } from "../components/Avatar";
 import { ComposerField, MentionText } from "../components/ComposerField";
 import { ChatReplyButton, ChatReplyDraft, ChatReplyQuote, replyTarget } from "../components/ChatReply";
@@ -56,8 +57,10 @@ export function CommunityChatPage() {
   const backLabel = fromMessages ? "Messages" : "Community";
   const personProfileFrom: NavFromState = { from: "community-chat", communityId: id };
   const { user } = useAuth();
-  const [conv, setConv] = useState<CommunityConversation | null>(null);
-  const [messages, setMessages] = useState<MessageDTO[]>([]);
+  type CommChatCache = { conv: CommunityConversation; messages: MessageDTO[] };
+  const cachedComm = readScreen<CommChatCache>(`community-chat:${id}`);
+  const [conv, setConv] = useState<CommunityConversation | null>(cachedComm?.conv ?? null);
+  const [messages, setMessages] = useState<MessageDTO[]>(cachedComm?.messages ?? []);
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
@@ -72,7 +75,7 @@ export function CommunityChatPage() {
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [blockOpen, setBlockOpen] = useState(false);
-  const [chatReady, setChatReady] = useState(false);
+  const [chatReady, setChatReady] = useState(cachedComm != null);
   const [error, setError] = useState<string | null>(null);
   const [needsJoin, setNeedsJoin] = useState(false);
   const composerMenuRef = useRef<HTMLDivElement>(null);
@@ -87,26 +90,30 @@ export function CommunityChatPage() {
 
   useEffect(() => {
     let alive = true;
-    setChatReady(false);
-    setConv(null);
-    setMessages([]);
+    if (!cachedComm) {
+      setChatReady(false);
+      setConv(null);
+      setMessages([]);
+    }
     setError(null);
     setNeedsJoin(false);
     void (async () => {
       try {
-        const c = await api<CommunityConversation>(`/api/communities/${id}/conversation`);
+        const c = await api<CommunityConversation & { messages?: MessageDTO[] }>(
+          `/api/communities/${id}/conversation?messages=1`,
+        );
         if (!alive) return;
-        setConv(c);
-        const msgs = await api<MessageDTO[]>(`/api/conversations/${c.id}/messages`);
-        if (!alive) return;
-        setMessages(visibleMessages(msgs, deletedIdsRef.current));
+        const freshMessages = visibleMessages(c.messages ?? [], deletedIdsRef.current);
+        const freshConv: CommunityConversation = { ...c, messages: undefined } as CommunityConversation;
+        setConv(freshConv);
+        setMessages(freshMessages);
+        writeScreen(`community-chat:${id}`, { conv: freshConv, messages: freshMessages });
       } catch (e) {
         if (!alive) return;
         const msg = parseApiError(e);
-        // Non-members get 403 "Join the community…"; chat-disabled is also 403.
         if (apiErrorStatus(e) === 403 && /join/i.test(msg)) {
           setNeedsJoin(true);
-        } else {
+        } else if (!cachedComm) {
           setError(msg);
         }
       } finally {
@@ -116,7 +123,7 @@ export function CommunityChatPage() {
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll for new messages — only fetch messages newer than the last one we have.
   useEffect(() => {
