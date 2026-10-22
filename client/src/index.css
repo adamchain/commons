@@ -556,17 +556,6 @@ h1, h2, h3, h4, h5, h6 {
   overflow: hidden;
 }
 
-.plan-card-share {
-  margin-left: auto;
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: #fff;
-  color: var(--ink);
-  font-size: var(--text-body-small);
-  font-weight: 700;
-  line-height: 1.2;
-}
 .plan-card-footer {
   display: flex;
   align-items: center;
@@ -5443,6 +5432,17 @@ a.sheet-link {
   flex-shrink: 0;
   align-self: center;
 }
+.messages-row-avatar {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  align-self: center;
+  display: inline-flex;
+}
+.messages-row-avatar .avatar {
+  width: 52px;
+  height: 52px;
+}
 .messages-row-icon svg {
   width: 18px;
   height: 18px;
@@ -8522,8 +8522,6 @@ a.sheet-link {
 /* Feed CTA. Join/Joined is solid maroon. Interested is solid dusty rose, with a check once chosen. */
 .plan-card-rsvp {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
   gap: 8px;
   margin-top: 0;
   margin-left: auto;
@@ -8531,15 +8529,11 @@ a.sheet-link {
   align-self: center;
 }
 .plan-card-rsvp-error {
-  flex: 1 0 100%;
-  margin: 0;
+  margin: 4px 0 0;
   text-align: right;
   font-size: var(--text-body-small);
   font-weight: 600;
   color: var(--red);
-}
-.plan-card-quick-join.is-interested.is-active {
-  box-shadow: inset 0 0 0 1.5px var(--ink);
 }
 .plan-card-rsvp .plan-card-quick-join {
   flex: 0 0 auto;

@@ -497,11 +497,24 @@ export function MessagesPage() {
                   : preview;
                 const rowInner = (
                   <>
-                    <PlanCoverThumb
-                      planId={c.communityId || c.planId || c.dmUserId || c.conversationId || "chat"}
-                      flyerDataUrl={c.coverImage}
-                      isIdea={Boolean(c.isIdea) || (!c.coverImage && Boolean(c.dmUserId || c.communityId))}
-                    />
+                    {c.dmUserId ? (
+                      <span className="messages-row-avatar">
+                        <Avatar
+                          seed={c.avatarSeed || c.dmUserId}
+                          style={c.avatarStyle}
+                          photoDataUrl={c.coverImage ?? undefined}
+                          params={c.avatarParams}
+                          name={c.planTitle}
+                          size="md"
+                        />
+                      </span>
+                    ) : (
+                      <PlanCoverThumb
+                        planId={c.communityId || c.planId || c.conversationId || "chat"}
+                        flyerDataUrl={c.coverImage}
+                        isIdea={Boolean(c.isIdea) || (!c.coverImage && Boolean(c.communityId))}
+                      />
+                    )}
                     <div className="messages-row-body">
                       <div className="messages-row-top">
                         <span className="messages-row-title">

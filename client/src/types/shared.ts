@@ -398,7 +398,11 @@ export interface ConversationSummaryDTO {
   communityName?: string;
   /** Set on a network direct message. The client opens /dm/:dmUserId. */
   dmUserId?: string;
-  /** Plan flyer / community cover when one exists. */
+  /** Direct-message portrait. Plan and community rows leave these off. */
+  avatarSeed?: string;
+  avatarStyle?: "avataaars" | "big-smile" | "fun-emoji";
+  avatarParams?: string;
+  /** Plan flyer, community cover, or the other person's photo. */
   coverImage?: string | null;
   /** Unlocked looking-for plan — thumb uses the idea mark, not a stock cover. */
   isIdea?: boolean;

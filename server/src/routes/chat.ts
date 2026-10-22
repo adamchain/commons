@@ -259,7 +259,10 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
       participantCount: 2,
       myRole: "going",
       dmUserId: otherId,
-      coverImage: inboxCover(other?.avatarPhotoDataUrl),
+      coverImage: other?.avatarPhotoDataUrl ?? null,
+      avatarSeed: other?.avatarSeed ?? otherId,
+      avatarStyle: other?.avatarStyle ?? "avataaars",
+      ...(other?.avatarParams ? { avatarParams: other.avatarParams } : {}),
       pinned: pinRank.has(conv.id),
       muted: store.isConversationMuted(userId, conv.id),
     });
