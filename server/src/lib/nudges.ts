@@ -413,13 +413,14 @@ export async function runDidThisHappenPrompts(): Promise<void> {
 }
 
 /**
- * Looking-For recovery — two paths:
+ * Looking-For recovery is not scheduled. The group and solo nudges kept
+ * inserting a second notification for a dedup key Mongo already stored.
+ * Left in place so it can be turned back on once that write is idempotent.
+ *
  *   • Group case (≥2 RSVPs, not locked 12h after the group formed): nudge
  *     everyone in the thread so someone steps up to lock it in.
  *   • Solo case (0 non-host RSVPs, 24h since the plan was posted): nudge the
  *     creator to share it or tweak the day before it goes stale.
- * Dedup is per (plan, user) and per path so each person sees each path at most
- * once per plan.
  */
 const LOOKING_FOR_RECOVERY_NOTIFIED = new Set<string>();
 const LOOKING_FOR_SOLO_NOTIFIED = new Set<string>();
@@ -490,7 +491,8 @@ export function startNudgeSchedulers(): void {
     void runDidThisHappenPrompts().catch((e) => console.error(e));
     void runWeekendNudgeIfWeekendEve().catch((e) => console.error(e));
     void runPostPlanReviewPrompts().catch((e) => console.error(e));
-    void runLookingForRecoveryNudges().catch((e) => console.error(e));
+    // Looking-for recovery stays off. It retried the same dedup key every tick
+    // and Mongo rejected the extra notification row.
   };
   setInterval(tick, 5 * 60 * 1000);
   void tick();
