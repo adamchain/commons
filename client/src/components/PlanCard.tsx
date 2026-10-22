@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "./Avatar";
 import { JoinConfirmPopup, joinConfirmKind, type JoinConfirmKind } from "./JoinConfirmPopup";
+import { ShareSheet } from "./ShareSheet";
 import { IdeaCoverFallback, planPhotoUrl } from "./CoverThumb";
 import { BottomSheet } from "./ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
@@ -41,6 +42,7 @@ export function PlanCard({
   const { user } = useAuth();
   const isHosting = !!user && plan.creator.id === user.id;
   const cardNavigate = useNavigate();
+  const [shareOpen, setShareOpen] = useState(false);
 
   // Ideas: one "Flexible" when nothing concrete is set. Confirmed plans keep
   // date · time · place, with "flexible" only for the unset slots.
@@ -104,6 +106,19 @@ export function PlanCard({
               size="xs"
             />
             <span className="plan-card-posted-by">{plan.creator.firstName}</span>
+            {!hasEnded && !isCancelled && (
+              <button
+                type="button"
+                className="plan-card-share"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShareOpen(true);
+                }}
+              >
+                Share
+              </button>
+            )}
             {isCancelled ? (
               <span className="plan-card-kind-pill is-cancelled">Cancelled</span>
             ) : hasEnded && !hideHappened ? (
@@ -215,6 +230,8 @@ export function PlanCard({
         </div>
       </Link>
 
+      {shareOpen && <ShareSheet plan={plan} isOwn={isHosting} onClose={() => setShareOpen(false)} />}
+
       {hasEnded && isHosting && (
         <Link
           to={`/plans/new?fromPlanId=${plan.id}`}
@@ -296,6 +313,18 @@ function confirmedMetaLine(plan: PlanDTO): string {
   return formatPlanWhenWhereLine(plan);
 }
 
+function participationError(err: unknown): string {
+  if (!(err instanceof Error)) return "Couldn't update";
+  const body = err.message.replace(/^\d+:\s*/, "");
+  try {
+    const parsed = JSON.parse(body) as { error?: string };
+    if (parsed.error) return parsed.error;
+  } catch {
+    /* plain text */
+  }
+  return body || "Couldn't update";
+}
+
 function QuickJoin({
   planId,
   isLooking,
@@ -318,17 +347,20 @@ function QuickJoin({
   const [showSheet, setShowSheet] = useState(false);
   const [confirm, setConfirm] = useState<JoinConfirmKind | null>(null);
 
+  const [error, setError] = useState<string | null>(null);
   const goingActive = state === "going";
   const interestedActive = state === "interested";
-  // One action per card: Join on an open plan, Interested on an idea.
-  // A full or host-review plan can't take a direct Join, so it stays Interested.
+  // Interested stacks across plans. Join is the commitment, and the server
+  // refuses a second Join that overlaps one you're already going to.
   const joinablePlan = !isLooking && !isFull && !requiresApproval;
-  const showJoin = goingActive || (joinablePlan && !interestedActive);
+  const showInterested = !goingActive && !isFull;
+  const showJoin = goingActive || joinablePlan;
 
   async function setState(next: "going" | "interested" | null) {
     if (busy) return;
     setBusy(true);
     setShowSheet(false);
+    setError(null);
     try {
       if (next) {
         await api(`/api/plans/${planId}/participation`, {
@@ -340,8 +372,8 @@ function QuickJoin({
       }
       setConfirm(joinConfirmKind(next, { isIdea: isLooking, limitedApproval }));
       onPlanRefresh?.();
-    } catch {
-      /* surface nothing on the card */
+    } catch (err) {
+      setError(participationError(err));
     } finally {
       setBusy(false);
     }
@@ -375,29 +407,35 @@ function QuickJoin({
   return (
     <>
       <div className="plan-card-rsvp" onClick={stopNav}>
-        {isFull && !goingActive && !interestedActive ? (
+        {isFull && !goingActive ? (
           <button type="button" className="plan-card-quick-join is-full" disabled>
             Full
           </button>
-        ) : showJoin ? (
-          <button
-            type="button"
-            className="plan-card-quick-join is-join"
-            onClick={(e) => void onJoin(e)}
-            disabled={busy}
-          >
-            {busy ? "…" : goingActive ? "Joined" : "Join"}
-          </button>
         ) : (
-          <button
-            type="button"
-            className={`plan-card-quick-join is-interested${interestedActive ? " is-active" : ""}`}
-            onClick={(e) => void onInterested(e)}
-            disabled={busy}
-          >
-            {busy ? "…" : interestedActive ? "Interested ✓" : "Interested"}
-          </button>
+          <>
+            {showInterested && (
+              <button
+                type="button"
+                className={`plan-card-quick-join is-interested${interestedActive ? " is-active" : ""}`}
+                onClick={(e) => void onInterested(e)}
+                disabled={busy}
+              >
+                {busy && !goingActive ? "…" : interestedActive ? "Interested ✓" : "Interested"}
+              </button>
+            )}
+            {showJoin && (
+              <button
+                type="button"
+                className="plan-card-quick-join is-join"
+                onClick={(e) => void onJoin(e)}
+                disabled={busy}
+              >
+                {busy ? "…" : goingActive ? "Joined" : "Join"}
+              </button>
+            )}
+          </>
         )}
+        {error && <p className="plan-card-rsvp-error">{error}</p>}
       </div>
       {confirm && (
         <JoinConfirmPopup kind={confirm} onClose={() => setConfirm(null)} />

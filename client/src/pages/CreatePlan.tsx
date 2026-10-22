@@ -322,9 +322,11 @@ export function CreatePlanPage() {
   });
   const [lockCrew, setLockCrew] = useState<PublicUser[]>([]);
   const flyerRef = useRef<HTMLInputElement>(null);
+  // Open the photo choices immediately — an extra tap on an empty hero was
+  // easy to miss, and a plan without a photo rarely gets a look.
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [showCoverLib, setShowCoverLib] = useState(false);
-  const [coverPickerOpen, setCoverPickerOpen] = useState(false);
+  const [coverPickerOpen, setCoverPickerOpen] = useState(true);
   const [showInvitePicker, setShowInvitePicker] = useState(false);
 
   // F.6 — inline "what's missing" guidance. Errors only render once the host
@@ -1162,9 +1164,10 @@ export function CreatePlanPage() {
                 Library
               </button>
               <button type="button" className="cover-btn" onClick={() => void openFlyerPicker()}>
-                Upload
+                Upload a photo
               </button>
             </div>
+            <span className="cover-picker-hint">A photo is what gets people to stop and look.</span>
           </div>
         ) : (
           <button type="button" className="plan-detail-hero-cover-cta" onClick={() => setCoverPickerOpen(true)}>

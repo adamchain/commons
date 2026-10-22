@@ -832,6 +832,7 @@ function BulletinTab({
   const [busy, setBusy] = useState(false);
   const [postErr, setPostErr] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [openReplies, setOpenReplies] = useState<Record<string, boolean>>({});
   const [replyDraft, setReplyDraft] = useState("");
   const [replyBusy, setReplyBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -1150,6 +1151,17 @@ function BulletinTab({
             </div>
             {postBody(p)}
             {(p.replies?.length ?? 0) > 0 && (
+              <button
+                type="button"
+                className="cmy-replies-toggle"
+                aria-expanded={Boolean(openReplies[p.id])}
+                onClick={() => setOpenReplies((prev) => ({ ...prev, [p.id]: !prev[p.id] }))}
+              >
+                {openReplies[p.id] ? "Hide" : "Show"}{" "}
+                {p.replies!.length} {p.replies!.length === 1 ? "reply" : "replies"}
+              </button>
+            )}
+            {openReplies[p.id] && (p.replies?.length ?? 0) > 0 && (
               <ul className="cmy-reply-list">
                 {(p.replies ?? []).map((r) => (
                   <li key={r.id} className="cmy-reply">
@@ -1365,6 +1377,14 @@ export function MemberNetworkButton({
     }
   }
 
+  if (incoming) {
+    return (
+      <button type="button" className="cmy-network-btn cmy-network-btn--add" disabled={busy} onClick={() => void add()}>
+        {busy ? "…" : "Accept request"}
+      </button>
+    );
+  }
+
   if (current === "pending") {
     return (
       <button type="button" className="cmy-network-btn" disabled>
@@ -1375,7 +1395,7 @@ export function MemberNetworkButton({
 
   return (
     <button type="button" className="cmy-network-btn cmy-network-btn--add" disabled={busy} onClick={() => void add()}>
-      {busy ? "…" : incoming ? "Accept" : "Add to network"}
+      {busy ? "…" : "Add to network"}
     </button>
   );
 }

@@ -2559,16 +2559,19 @@ export const store = {
     status: CommunityMemberStatus;
     screeningAnswer?: string | null;
   }): CommunityMemberRecord {
-    const existing = this.findCommunityMembership(input.communityId, input.userId);
-    if (existing) {
-      existing.status = input.status;
-      if (input.role) existing.role = input.role;
-      if (input.screeningAnswer !== undefined) existing.screeningAnswer = input.screeningAnswer;
-      persist();
-      mongoMirror.upsertCommunityMember(existing);
+    const matches = snapshot.communityMembers.filter(
+      (m) => m.communityId === input.communityId && m.userId === input.userId,
+    );
+    if (matches.length > 0) {
+      for (const existing of matches) {
+        existing.status = input.status;
+        if (input.role) existing.role = input.role;
+        if (input.screeningAnswer !== undefined) existing.screeningAnswer = input.screeningAnswer;
+        mongoMirror.upsertCommunityMember(existing);
+      }
       this.recountCommunityMembers(input.communityId);
       persist();
-      return existing;
+      return matches[0]!;
     }
     const row: CommunityMemberRecord = {
       id: randomUUID(),

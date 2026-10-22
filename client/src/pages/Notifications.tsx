@@ -279,7 +279,9 @@ function NotifRow({ item, onDismiss }: { item: NotificationDTO; onDismiss: () =>
       <div className="notif-row-body">
         <div className="notif-row-title">{item.body}</div>
         {isGrabs && <span className="notif-row-cta">Take over hosting</span>}
-        {isNetworkAdd && item.profileUserId && <NetworkRespond userId={item.profileUserId} />}
+        {isNetworkAdd && item.profileUserId && (
+          <NetworkRespond userId={item.profileUserId} resolution={item.resolution} />
+        )}
         <div className="notif-row-sub">{formatRelative(item.createdAt)}</div>
       </div>
       {item.readAt === null && <span className="notif-row-unread" aria-label="Unread" />}
@@ -353,8 +355,16 @@ const REQUEST_KINDS = new Set<NotificationKind>([
   "communityPostPending",
 ]);
 
-function NetworkRespond({ userId }: { userId: string }) {
-  const [state, setState] = useState<"idle" | "ok" | "no" | "err">("idle");
+function NetworkRespond({
+  userId,
+  resolution,
+}: {
+  userId: string;
+  resolution?: "accepted" | "closed";
+}) {
+  const [state, setState] = useState<"idle" | "ok" | "no" | "err">(
+    resolution === "accepted" ? "ok" : resolution === "closed" ? "no" : "idle",
+  );
   async function respond(
     path: "network-accept" | "network-decline",
     e: { preventDefault(): void; stopPropagation(): void },
@@ -367,12 +377,23 @@ function NetworkRespond({ userId }: { userId: string }) {
         body: JSON.stringify({ userId }),
       });
       setState(path === "network-accept" ? "ok" : "no");
-    } catch {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (path === "network-accept" && /No pending request/i.test(msg)) {
+        setState("ok");
+        return;
+      }
       setState("err");
     }
   }
-  if (state === "ok") return <span className="notif-row-cta">You're connected</span>;
-  if (state === "no") return <span className="notif-row-cta">Declined</span>;
+  if (state === "ok") return <span className="notif-row-cta notif-row-cta--done">You're connected</span>;
+  if (state === "no") {
+    return (
+      <span className="notif-row-cta notif-row-cta--done">
+        {resolution === "closed" ? "Request closed" : "Declined"}
+      </span>
+    );
+  }
   return (
     <span className="notif-row-actions">
       <button type="button" className="notif-row-cta notif-row-accept" onClick={(e) => void respond("network-accept", e)}>

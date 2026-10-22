@@ -498,9 +498,9 @@ export function MessagesPage() {
                 const rowInner = (
                   <>
                     <PlanCoverThumb
-                      planId={c.communityId || c.planId}
+                      planId={c.communityId || c.planId || c.dmUserId || c.conversationId || "chat"}
                       flyerDataUrl={c.coverImage}
-                      isIdea={Boolean(c.isIdea)}
+                      isIdea={Boolean(c.isIdea) || (!c.coverImage && Boolean(c.dmUserId || c.communityId))}
                     />
                     <div className="messages-row-body">
                       <div className="messages-row-top">

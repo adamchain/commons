@@ -69,11 +69,17 @@ export function ShareSheet({ plan, isOwn = false, onClose }: { plan: PlanDTO; is
 
   async function copyLink() {
     try {
-      await navigator.clipboard.writeText(url);
+      await Clipboard.write({ string: url });
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      window.prompt("Copy this link", url);
+      try {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      } catch {
+        window.prompt("Copy this link", url);
+      }
     }
   }
 
@@ -154,9 +160,12 @@ export function ShareSheet({ plan, isOwn = false, onClose }: { plan: PlanDTO; is
           </div>
         </div>
 
+        <button type="button" className="share-primary-btn" onClick={() => void copyLink()}>
+          {copied ? "Link copied" : "Copy link"}
+        </button>
         {canNativeShare && (
-          <button type="button" className="share-primary-btn" onClick={nativeShare}>
-            <ShareGlyph /> Share…
+          <button type="button" className="share-primary-btn share-primary-btn--secondary" onClick={nativeShare}>
+            <ShareGlyph /> Share another way…
           </button>
         )}
 
@@ -169,12 +178,6 @@ export function ShareSheet({ plan, isOwn = false, onClose }: { plan: PlanDTO; is
               <span className="share-channel-label">{c.label}</span>
             </button>
           ))}
-          <button type="button" className="share-channel" onClick={copyLink}>
-            <span className="share-channel-icon share-channel-icon--copy" aria-hidden="true">
-              <LinkIcon />
-            </span>
-            <span className="share-channel-label">{copied ? "Copied!" : "Copy link"}</span>
-          </button>
         </div>
 
         <button className="btn-link sheet-cancel" onClick={onClose}>

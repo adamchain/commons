@@ -1,19 +1,38 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { store } from "../store.js";
-import { findUsersByIds } from "../userRepo.js";
+import { findUserById, findUsersByIds } from "../userRepo.js";
 import type { NotificationDTO } from "../types/shared.js";
+import type { NotificationRecord, UserRecord } from "../store.js";
 
 export const notificationsRouter = Router();
 
+function resolutionFor(
+  n: NotificationRecord,
+  viewer: UserRecord | undefined,
+): NotificationDTO["resolution"] {
+  if (n.kind === "networkRequest" && n.profileUserId && viewer) {
+    if ((viewer.networkIds ?? []).includes(n.profileUserId)) return "accepted";
+    if (!(viewer.incomingNetworkRequests ?? []).includes(n.profileUserId)) return "closed";
+  }
+  if (n.kind === "communityJoinRequest" && n.communityId && n.profileUserId) {
+    const membership = store.findCommunityMembership(n.communityId, n.profileUserId);
+    if (membership?.status === "active") return "accepted";
+    if (!membership || membership.status !== "pending") return "closed";
+  }
+  return undefined;
+}
+
 notificationsRouter.get("/", requireAuth, async (req, res) => {
   const userId = String(req.userId);
+  const viewer = await findUserById(userId);
   const rows = store
     .listNotificationsForUser(userId, 50)
     .filter((n) => n.kind !== "communityReview");
   const users = await findUsersByIds(rows.map((n) => n.profileUserId).filter((id): id is string => Boolean(id)));
   const dtos: NotificationDTO[] = rows.map((n) => {
     const actor = n.profileUserId ? users.get(n.profileUserId) : undefined;
+    const resolution = resolutionFor(n, viewer ?? undefined);
     return {
       id: n.id,
       kind: n.kind,
@@ -36,6 +55,7 @@ notificationsRouter.get("/", requireAuth, async (req, res) => {
         : {}),
       createdAt: n.createdAt,
       readAt: n.readAt,
+      ...(resolution ? { resolution } : {}),
     };
   });
   res.json({ notifications: dtos });

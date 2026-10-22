@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Coffee, SlidersHorizontal } from "lucide-react";
 import { api } from "../api/http";
 import { FilterSheet } from "../components/FilterSheet";
@@ -498,6 +498,7 @@ export function FeedPage() {
         )}
 
         <div id="feed-plans">
+          <PostPlanPrompt />
           {filteredPlans.length === 0 ? (
             <FeedEmptyState
               view={view}
@@ -618,6 +619,66 @@ function FeedEmptyState({
         ) : null
       }
     />
+  );
+}
+
+const POST_PLAN_PROMPT_KEY = "commons.postPlanPrompt.v1";
+
+const PLAN_EXAMPLES = [
+  { title: "Coffee this week", blurb: "An hour at a neighborhood spot." },
+  { title: "Saturday morning walk", blurb: "Same route, whoever can make it." },
+  { title: "Dinner somewhere new", blurb: "Pick a place and see who’s in." },
+];
+
+/** Once, after signup: a few real examples that open the composer already titled. */
+function PostPlanPrompt() {
+  const { user } = useAuth();
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!user?.onboardingComplete) return;
+    try {
+      if (localStorage.getItem(POST_PLAN_PROMPT_KEY) === "1") return;
+    } catch {
+      return;
+    }
+    setOpen(true);
+  }, [user?.id, user?.onboardingComplete]);
+
+  if (!open) return null;
+
+  function dismiss() {
+    try {
+      localStorage.setItem(POST_PLAN_PROMPT_KEY, "1");
+    } catch {
+      /* private mode */
+    }
+    setOpen(false);
+  }
+
+  return (
+    <section className="post-plan-prompt" aria-label="Post a plan">
+      <div className="post-plan-prompt-head">
+        <h2>Post a plan</h2>
+        <button type="button" className="btn-link" onClick={dismiss}>
+          Not now
+        </button>
+      </div>
+      <p>Start from one of these, then change anything.</p>
+      <div className="post-plan-prompt-list">
+        {PLAN_EXAMPLES.map((example) => (
+          <Link
+            key={example.title}
+            className="post-plan-prompt-example"
+            to={`/plans/new?title=${encodeURIComponent(example.title)}`}
+            onClick={dismiss}
+          >
+            <strong>{example.title}</strong>
+            <span>{example.blurb}</span>
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }
 

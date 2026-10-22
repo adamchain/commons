@@ -596,6 +596,8 @@ export interface NotificationDTO {
   };
   createdAt: string;
   readAt: string | null;
+  /** A request row that no longer needs Accept. */
+  resolution?: "accepted" | "closed";
 }
 
 export interface InviteCodeDTO {

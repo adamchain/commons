@@ -43,6 +43,26 @@ function lastSenderName(msg: { senderId: string; kind?: string } | null): string
   return name || null;
 }
 
+/** One pass over every message. The inbox used to rescan the whole log per thread. */
+function messagesByConversation() {
+  const byConv = new Map<string, ReturnType<typeof store.listAllMessages>>();
+  for (const message of store.listAllMessages()) {
+    const bucket = byConv.get(message.conversationId);
+    if (bucket) bucket.push(message);
+    else byConv.set(message.conversationId, [message]);
+  }
+  for (const bucket of byConv.values()) {
+    bucket.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+  return byConv;
+}
+
+/** Inbox rows can't carry uploaded photos — a few data-URLs stall the whole screen. */
+function inboxCover(url: string | null | undefined): string | null {
+  if (!url || url.startsWith("data:")) return null;
+  return url;
+}
+
 async function resolveChatImageUrl(raw: string): Promise<string | null> {
   if (raw.startsWith("http://") || raw.startsWith("https://")) {
     return raw.slice(0, 2048);
@@ -135,6 +155,8 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
   }
 
   const pinRank = new Map(store.pinnedConversationIds(userId).map((id, i) => [id, i]));
+  const messagesByConv = messagesByConversation();
+  const threadMessages = (id: string | null | undefined) => (id ? messagesByConv.get(id) ?? [] : []);
   const summaries: ConversationSummaryDTO[] = [];
   for (const [planId, myRole] of roleByPlan) {
     const plan = store.findPlanById(planId);
@@ -144,7 +166,7 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
     const groups = store.listGroupConversationsByPlan(planId);
     const conv = groups[0];
     if (groups.some((c) => store.hasLeftConversation(userId, c.id))) continue;
-    const msgs = conv ? store.listMessagesForConversation(conv.id) : [];
+    const msgs = threadMessages(conv?.id);
     const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
     const hasRealChatter = msgs.some((m) => m.kind !== "system");
     const isUpcoming = (plan.date ?? "") >= todayIso;
@@ -168,7 +190,7 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
       unreadCount: conv ? humanUnread(msgs, userId) : 0,
       participantCount,
       myRole,
-      coverImage: plan.flyerDataUrl ?? plan.flyerLinkPreview?.image ?? null,
+      coverImage: inboxCover(plan.flyerDataUrl ?? plan.flyerLinkPreview?.image),
       isIdea: plan.planKind === "looking_for" && !plan.lockedAt,
       pinned: conv ? pinRank.has(conv.id) : false,
       muted: conv ? store.isConversationMuted(userId, conv.id) : false,
@@ -185,7 +207,7 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
     const groups = store.listCommunityConversations(community.id);
     const conv = groups[0] ?? store.findCommunityConversation(community.id);
     if (groups.some((c) => store.hasLeftConversation(userId, c.id))) continue;
-    const msgs = conv ? store.listMessagesForConversation(conv.id) : [];
+    const msgs = threadMessages(conv?.id);
     const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
     summaries.push({
       planId: "",
@@ -201,7 +223,7 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
       myRole: community.organizerId === userId ? "hosting" : "going",
       communityId: community.id,
       communityName: community.name,
-      coverImage: community.coverImage ?? null,
+      coverImage: inboxCover(community.coverImage),
       pinned: conv ? pinRank.has(conv.id) : false,
       muted: conv ? store.isConversationMuted(userId, conv.id) : false,
     });
@@ -214,7 +236,7 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
     const otherId = conv.participantIds.find((id) => id !== userId);
     if (!otherId || store.isBlockedEitherWay(userId, otherId)) continue;
     const other = await findUserById(otherId);
-    const msgs = store.listMessagesForConversation(conv.id);
+    const msgs = threadMessages(conv.id);
     // The other person stays hidden until they accept. The sender still sees
     // the thread they just opened, even before the first message.
     const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
@@ -232,7 +254,7 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
       participantCount: 2,
       myRole: "going",
       dmUserId: otherId,
-      coverImage: other?.avatarPhotoDataUrl ?? null,
+      coverImage: inboxCover(other?.avatarPhotoDataUrl),
       pinned: pinRank.has(conv.id),
       muted: store.isConversationMuted(userId, conv.id),
     });

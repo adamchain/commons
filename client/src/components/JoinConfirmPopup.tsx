@@ -18,7 +18,7 @@ const COPY: Record<JoinConfirmKind, { title: string; sub: string; celebrate: boo
   },
   interested: {
     title: "Interested ✓",
-    sub: "We'll keep you posted.",
+    sub: "No commitment. You can be interested in a few plans — Join is the one you're locking in.",
     celebrate: true,
   },
   idea_interested: {
@@ -60,7 +60,7 @@ export function JoinConfirmPopup({
   const title = titleOverride ?? defaultTitle;
   const dismiss = useEffectEvent(onClose);
   const dismissAfter =
-    kind === "limited_interested" ? 4800 : kind === "idea_interested" ? Math.max(autoDismissMs, 3200) : autoDismissMs;
+    kind === "limited_interested" ? 4800 : kind === "idea_interested" || kind === "interested" ? Math.max(autoDismissMs, 3600) : autoDismissMs;
 
   useEffect(() => {
     const t = window.setTimeout(() => dismiss(), dismissAfter);

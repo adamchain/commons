@@ -556,6 +556,17 @@ h1, h2, h3, h4, h5, h6 {
   overflow: hidden;
 }
 
+.plan-card-share {
+  margin-left: auto;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--ink);
+  font-size: var(--text-body-small);
+  font-weight: 700;
+  line-height: 1.2;
+}
 .plan-card-footer {
   display: flex;
   align-items: center;
@@ -4646,6 +4657,11 @@ a.sheet-link {
   margin-bottom: 4px;
 }
 .share-primary-btn:active { background: var(--accent-hover); }
+.share-primary-btn--secondary {
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--border);
+}
 .share-channels {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -8429,11 +8445,24 @@ a.sheet-link {
 /* Feed CTA. Join/Joined is solid maroon. Interested is solid dusty rose, with a check once chosen. */
 .plan-card-rsvp {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
   margin-top: 0;
   margin-left: auto;
   flex-shrink: 0;
   align-self: center;
+}
+.plan-card-rsvp-error {
+  flex: 1 0 100%;
+  margin: 0;
+  text-align: right;
+  font-size: var(--text-body-small);
+  font-weight: 600;
+  color: var(--red);
+}
+.plan-card-quick-join.is-interested.is-active {
+  box-shadow: inset 0 0 0 1.5px var(--ink);
 }
 .plan-card-rsvp .plan-card-quick-join {
   flex: 0 0 auto;
@@ -10384,18 +10413,33 @@ a.sheet-link {
 }
 .notif-row-cta {
   display: inline-flex;
-  margin-top: 6px;
-  padding: 3px 8px;
-  border-radius: var(--r-control);
+  align-items: center;
+  justify-content: center;
+  margin-top: 8px;
+  min-height: 40px;
+  padding: 10px 16px;
+  border-radius: 999px;
   border: 1px solid var(--red);
   color: var(--red);
-  font-size: var(--text-caption);
+  font-size: var(--text-body-small);
   font-weight: 700;
-  background: transparent;
+  background: #fff;
   font-family: inherit;
   cursor: pointer;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   line-height: 1.2;
+}
+.notif-row-accept {
+  background: var(--red);
+  color: #fff;
+}
+.notif-row-cta--done {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+  min-height: 0;
+  padding: 4px 0 0;
+  cursor: default;
 }
 .notif-row-dismiss {
   appearance: none;
@@ -12217,6 +12261,11 @@ button.settings-row:disabled {
   font-size: var(--text-card-large);
   font-weight: 600;
   color: var(--text);
+}
+.cover-picker-hint {
+  font-size: var(--text-body-small);
+  color: var(--text-muted);
+  text-align: center;
 }
 .cover-picker-sub {
   font-size: var(--text-body);
@@ -14181,6 +14230,47 @@ button.xpl-photo-tile {
   background: var(--bg);
 }
 
+.post-plan-prompt {
+  margin: 0 0 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+.post-plan-prompt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.post-plan-prompt-head h2 {
+  margin: 0;
+  font-size: var(--text-card-large);
+}
+.post-plan-prompt > p {
+  margin: 6px 0 12px;
+  color: var(--text-muted);
+}
+.post-plan-prompt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.post-plan-prompt-example {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: #fff;
+  text-decoration: none;
+  color: var(--ink);
+}
+.post-plan-prompt-example span {
+  color: var(--text-muted);
+  font-size: var(--text-body-small);
+}
 .feed-skeleton {
   display: flex;
   flex-direction: column;
