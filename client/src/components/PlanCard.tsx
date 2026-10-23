@@ -13,6 +13,7 @@ import { useAuth } from "../context/AuthContext";
 import type { PlanDTO } from "../types/shared";
 import { formatPlanDate, formatPlanTime, formatPlanWhenWhereLine, formatVenueName, sentenceCaseTitle } from "../lib/format";
 import { saveFeedScroll, type NavFromState } from "../lib/navState";
+import { prefetchPlan, rememberPlan } from "../lib/planPrefetch";
 import { isIdeaPlan, isPlanAtCapacity, planCapacityValue, planHasEnded, planRequiresHostApproval } from "../lib/planTime";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
 
@@ -65,8 +66,17 @@ export function PlanCard({
   const showGoingLabel = !hasEnded && goingCount >= 1;
   const showInterestedLabel = !hasEnded && interestedCount > 0;
 
+  // Warm the per-plan cache the instant a tap begins: seed it with the card's
+  // own copy (so the detail hero paints immediately) and kick off a fresh fetch
+  // so revalidated data is usually ready by the time the page mounts.
+  const warmPlan = () => {
+    rememberPlan(plan);
+    void prefetchPlan(plan.id).catch(() => {});
+  };
+
   const openPlan = (hash?: string) => {
     if (navFrom.from === "feed") saveFeedScroll();
+    warmPlan();
     cardNavigate(`/plans/${plan.id}${hash ?? ""}`, { state: { ...navFrom, initialPlan: plan } });
   };
 
@@ -85,6 +95,7 @@ export function PlanCard({
       <Link
         to={`/plans/${plan.id}`}
         state={{ ...navFrom, initialPlan: plan }}
+        onPointerDown={warmPlan}
         onClick={() => {
           if (navFrom.from === "feed") saveFeedScroll();
         }}

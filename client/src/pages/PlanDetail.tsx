@@ -20,6 +20,7 @@ import { isIdeaPlan, isPlanAtCapacity, planHasEnded, planRequiresHostApproval } 
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
 import { formatPlanDate, formatPlanTime, formatPlanWhenLine, formatVenueAddressLine, formatVenueName, sentenceCaseTitle, firstHttpUrlInText, normalizeHttpUrl } from "../lib/format";
 import { hrefForBack, type NavFromState } from "../lib/navState";
+import { cachedPlan, peekPlan, prefetchPlan, rememberPlan } from "../lib/planPrefetch";
 import { INTEREST_LABELS, type ConversationDTO, type MessageDTO, type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
 
 function flyerLinkHost(url: string): string {
@@ -61,8 +62,10 @@ export function PlanDetailPage() {
   const location = useLocation();
   const navFrom = (location.state as NavFromState | null) ?? null;
   const backHref = hrefForBack(navFrom);
+  // Paint instantly from the card's copy (feed → detail) or the per-plan cache
+  // (returning to a plan, deep links after browsing) and let load() revalidate.
   const [plan, setPlan] = useState<PlanDTO | null>(
-    (location.state as { initialPlan?: PlanDTO } | null)?.initialPlan ?? null,
+    (location.state as { initialPlan?: PlanDTO } | null)?.initialPlan ?? cachedPlan(id) ?? null,
   );
   const [showShare, setShowShare] = useState(false);
   const [showAddCalendar, setShowAddCalendar] = useState(false);
@@ -87,9 +90,20 @@ export function PlanDetailPage() {
   const [cancelError, setCancelError] = useState<string | null>(null);
   const coverPool = useCardImages();
 
+  // Force-fresh fetch, used after mutations (RSVP, cancel, lock, …) where a
+  // possibly-older in-flight prefetch must not clobber the new state.
   const load = async () => {
     const data = await api<PlanDTO>(`/api/plans/${id}`);
     setPlan(data);
+    rememberPlan(data);
+  };
+
+  // Initial paint: reuse the fetch a pointer-down on the card already kicked
+  // off; otherwise start one. Revalidates whatever we painted from cache.
+  const hydrate = async () => {
+    const data = await (peekPlan(id) ?? prefetchPlan(id));
+    setPlan(data);
+    rememberPlan(data);
   };
 
   useLayoutEffect(() => {
@@ -104,7 +118,7 @@ export function PlanDetailPage() {
   }, [id]);
 
   useEffect(() => {
-    void load();
+    void hydrate();
   }, [id]);
 
   // Deep-link from feed "X Going" into the guest list modal.
