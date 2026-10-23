@@ -272,7 +272,7 @@ export function OnboardingPage() {
         title=""
         subtitle="A place for plans meant to be shared."
       >
-        <WebAppPrompt surface="auth" />
+        <WebAppPrompt />
         <div className="onboarding-phone-row">
           <label className="onboarding-country">
             <span aria-hidden="true">+</span>
