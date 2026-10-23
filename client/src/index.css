@@ -4089,6 +4089,17 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   margin-top: 2px;
   text-decoration: none;
 }
+.plan-meta-action {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+}
 .host-row {
   display: flex;
   align-items: center;

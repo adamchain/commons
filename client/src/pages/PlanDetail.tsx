@@ -10,6 +10,8 @@ import { InviteSheet } from "../components/InviteSheet";
 import { ParticipationButtons } from "../components/ParticipationButtons";
 import { PlanSafetyMenu } from "../components/PlanSafetyMenu";
 import { ShareSheet } from "../components/ShareSheet";
+import { AddToCalendarSheet } from "../components/AddToCalendarSheet";
+import { canAddToCalendar } from "../lib/calendar";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { Button } from "../components/ui/Button";
 import { useAuth } from "../context/AuthContext";
@@ -62,6 +64,7 @@ export function PlanDetailPage() {
     (location.state as { initialPlan?: PlanDTO } | null)?.initialPlan ?? null,
   );
   const [showShare, setShowShare] = useState(false);
+  const [showAddCalendar, setShowAddCalendar] = useState(false);
   const [showMapsConfirm, setShowMapsConfirm] = useState(false);
   const [showGetThere, setShowGetThere] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
@@ -434,6 +437,15 @@ export function PlanDetailPage() {
                   isFlexibleLocation: plan.isFlexibleLocation,
                 })}
               </span>
+              {!isPast && !plan.cancelledAt && canAddToCalendar(plan) && (
+                <button
+                  type="button"
+                  className="plan-meta-action"
+                  onClick={() => setShowAddCalendar(true)}
+                >
+                  Add to calendar
+                </button>
+              )}
             </div>
           </div>
           {plan.isFlexibleLocation ? (
@@ -786,6 +798,7 @@ export function PlanDetailPage() {
       </div>
 
       {showShare && <ShareSheet plan={plan} isOwn={isHosting} onClose={() => setShowShare(false)} />}
+      {showAddCalendar && <AddToCalendarSheet plan={plan} onClose={() => setShowAddCalendar(false)} />}
       {chatCleanupOpen && (
         <BottomSheet
           onClose={() => {

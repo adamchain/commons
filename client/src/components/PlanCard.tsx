@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
@@ -331,8 +331,14 @@ function QuickJoin({
   const [confirm, setConfirm] = useState<JoinConfirmKind | null>(null);
 
   const [error, setError] = useState<string | null>(null);
-  const goingActive = state === "going";
-  const interestedActive = state === "interested";
+  // Mirror the prop locally so the checkmark flips the instant you tap, rather
+  // than waiting on the request + feed refetch to flow a new prop back down.
+  const [localState, setLocalState] = useState(state);
+  useEffect(() => {
+    setLocalState(state);
+  }, [state]);
+  const goingActive = localState === "going";
+  const interestedActive = localState === "interested";
   // One button on the card. Interested can stack across plans. Join is only
   // the button once you've committed, and the server refuses a second Join
   // that overlaps a plan you're already going to.
@@ -341,6 +347,8 @@ function QuickJoin({
 
   async function setState(next: "going" | "interested" | null) {
     if (busy) return;
+    const prev = localState;
+    setLocalState(next); // optimistic — show the checkmark right away
     setBusy(true);
     setShowSheet(false);
     setError(null);
@@ -356,6 +364,7 @@ function QuickJoin({
       setConfirm(joinConfirmKind(next, { isIdea: isLooking, limitedApproval }));
       onPlanRefresh?.();
     } catch (err) {
+      setLocalState(prev); // roll back on failure
       setError(participationError(err));
     } finally {
       setBusy(false);
@@ -402,7 +411,7 @@ function QuickJoin({
               onClick={(e) => void onJoin(e)}
               disabled={busy}
             >
-              {busy ? "…" : goingActive ? "Joined" : "Join"}
+              {goingActive ? "Joined" : busy ? "…" : "Join"}
             </button>
           ) : (
             <button
@@ -411,7 +420,7 @@ function QuickJoin({
               onClick={(e) => void onInterested(e)}
               disabled={busy}
             >
-              {busy ? "…" : interestedActive ? "Interested ✓" : "Interested"}
+              {interestedActive ? "Interested ✓" : busy ? "…" : "Interested"}
             </button>
           )}
         </div>

@@ -103,6 +103,7 @@ export function CreatePlanPage() {
   // "Do it again" seeds the title from a past plan, and carries that plan's
   // crew + group chat forward via fromPlanId (handled server-side on create).
   const prefillTitle = searchParams.get("title") ?? "";
+  const prefillDescription = searchParams.get("desc") ?? "";
   const fromPlanId = searchParams.get("fromPlanId");
   const lockFromId = searchParams.get("lockFromId");
   // 0.9 — arriving here to recreate a past plan (either "Host another like
@@ -180,7 +181,7 @@ export function CreatePlanPage() {
     isFlexibleDate: false,
     isThisWeek: false,
     vibes: defaultVibes,
-    description: "",
+    description: prefillDescription,
     visibility: (inviteUserId || inviteUserIds.length > 0 ? "network" : "everyone") as PlanVisibility,
     capacityOn: false,
     capacity: "6",

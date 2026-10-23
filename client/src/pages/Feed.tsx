@@ -625,9 +625,21 @@ function FeedEmptyState({
 const POST_PLAN_PROMPT_KEY = "commons.postPlanPrompt.v1";
 
 const PLAN_EXAMPLES = [
-  { title: "Coffee this week", blurb: "An hour at a neighborhood spot." },
-  { title: "Saturday morning walk", blurb: "Same route, whoever can make it." },
-  { title: "Dinner somewhere new", blurb: "Pick a place and see who’s in." },
+  {
+    title: "Happy hour after work",
+    blurb:
+      "Anyone free Thursday around 5:30? Thinking somewhere in Rittenhouse, one drink and we’ll see.",
+  },
+  {
+    title: "Try a workout class",
+    blurb:
+      "Been meaning to try the 7am class at [studio] and need someone to hold me to it. Beginners welcome, I’m one of them.",
+  },
+  {
+    title: "Dinner somewhere new",
+    blurb:
+      "Want to try [restaurant] this week. Finally. Open to any night, just want a reason to go.",
+  },
 ];
 
 /** Once, after signup: a few real examples that open the composer already titled. */
@@ -659,18 +671,18 @@ function PostPlanPrompt() {
   return (
     <section className="post-plan-prompt" aria-label="Post a plan">
       <div className="post-plan-prompt-head">
-        <h2>Post a plan</h2>
+        <h2>Make a plan, any plan</h2>
         <button type="button" className="btn-link" onClick={dismiss}>
-          Not now
+          Maybe later
         </button>
       </div>
-      <p>Start from one of these, then change anything.</p>
+      <p>Tap one, tweak it, post it. Done in a minute.</p>
       <div className="post-plan-prompt-list">
         {PLAN_EXAMPLES.map((example) => (
           <Link
             key={example.title}
             className="post-plan-prompt-example"
-            to={`/plans/new?title=${encodeURIComponent(example.title)}`}
+            to={`/plans/new?title=${encodeURIComponent(example.title)}&desc=${encodeURIComponent(example.blurb)}`}
             onClick={dismiss}
           >
             <strong>{example.title}</strong>

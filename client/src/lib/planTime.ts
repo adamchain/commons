@@ -69,6 +69,14 @@ function zonedTimestamp(day: string, hms: string): number {
   return guess;
 }
 
+export function planStartTimestamp(plan: PlanDTO): number {
+  const day = plan.date.slice(0, 10);
+  const flexTime = plan.isFlexibleTime || !plan.time?.trim();
+  const startHms = flexTime ? "12:00:00" : timeToHms(plan.time);
+  const start = zonedTimestamp(day, startHms);
+  return Number.isFinite(start) ? start : zonedTimestamp(day, "12:00:00");
+}
+
 export function planEndTimestamp(plan: PlanDTO): number {
   const day = plan.date.slice(0, 10);
   const flexTime = plan.isFlexibleTime || !plan.time?.trim();

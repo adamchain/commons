@@ -25,8 +25,30 @@ import { Resvg } from "@resvg/resvg-js";
 import { coverPoolSync } from "../lib/coverCatalog.js";
 import { store, type CommunityRecord, type PlanRecord } from "../store.js";
 import { communityCategoryLine } from "../types/shared.js";
+import { planToIcs } from "../lib/ics.js";
 
 export const shareRouter = Router();
+
+// Apple Calendar (and any iCal app) imports a plan straight from this file.
+// Opening this URL on iOS prompts "Add to Calendar"; on the web it downloads an
+// .ics. Google Calendar instead uses a render URL built on the client.
+shareRouter.get("/plans/:id/calendar.ics", (req, res) => {
+  const plan = store.findPlanById(req.params.id);
+  if (!plan) {
+    res.status(404).send("Not found");
+    return;
+  }
+  try {
+    const ics = planToIcs(plan);
+    res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="plan.ics"');
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.send(ics);
+  } catch (err) {
+    console.error("[calendar.ics]", err);
+    res.status(500).send("Failed to build calendar event");
+  }
+});
 
 const OG_WIDTH = 1200;
 const OG_HEIGHT = 630;
