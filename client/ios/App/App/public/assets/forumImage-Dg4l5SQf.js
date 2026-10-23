@@ -1,1 +1,0 @@
-import{R as e}from"./index-C84NxNYb.js";import{r as t,t as n}from"./photoPicker-B9GufPkH.js";var r=1024,i=.85;async function a(a){return e()?n({maxPx:r,quality:i}):a?t(a,r,i):null}export{a as t};

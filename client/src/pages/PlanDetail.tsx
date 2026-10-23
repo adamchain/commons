@@ -11,6 +11,7 @@ import { ParticipationButtons } from "../components/ParticipationButtons";
 import { PlanSafetyMenu } from "../components/PlanSafetyMenu";
 import { ShareSheet } from "../components/ShareSheet";
 import { AddToCalendarSheet } from "../components/AddToCalendarSheet";
+import { JoinedActionsSheet } from "../components/JoinedActionsSheet";
 import { canAddToCalendar } from "../lib/calendar";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { Button } from "../components/ui/Button";
@@ -65,6 +66,7 @@ export function PlanDetailPage() {
   );
   const [showShare, setShowShare] = useState(false);
   const [showAddCalendar, setShowAddCalendar] = useState(false);
+  const [showJoinedActions, setShowJoinedActions] = useState(false);
   const [showMapsConfirm, setShowMapsConfirm] = useState(false);
   const [showGetThere, setShowGetThere] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
@@ -437,7 +439,7 @@ export function PlanDetailPage() {
                   isFlexibleLocation: plan.isFlexibleLocation,
                 })}
               </span>
-              {!isPast && !plan.cancelledAt && canAddToCalendar(plan) && (
+              {!isPast && !plan.cancelledAt && plan.myState === "going" && canAddToCalendar(plan) && (
                 <button
                   type="button"
                   className="plan-meta-action"
@@ -650,6 +652,7 @@ export function PlanDetailPage() {
               markedFull={plan.markedFull}
               isHosting={isHosting}
               onJustMarkedGoing={() => setShowInvite(true)}
+              onJoined={canAddToCalendar(plan) ? () => setShowJoinedActions(true) : undefined}
               onConfirmClose={(kind) => {
                 if (kind === "idea_interested") {
                   navigate(`/plans/${plan.id}/chat`, { state: { from: "plan", planId: plan.id } });
@@ -799,6 +802,16 @@ export function PlanDetailPage() {
 
       {showShare && <ShareSheet plan={plan} isOwn={isHosting} onClose={() => setShowShare(false)} />}
       {showAddCalendar && <AddToCalendarSheet plan={plan} onClose={() => setShowAddCalendar(false)} />}
+      {showJoinedActions && (
+        <JoinedActionsSheet
+          plan={plan}
+          onShare={() => {
+            setShowJoinedActions(false);
+            setShowShare(true);
+          }}
+          onClose={() => setShowJoinedActions(false)}
+        />
+      )}
       {chatCleanupOpen && (
         <BottomSheet
           onClose={() => {

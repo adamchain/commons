@@ -53,6 +53,7 @@ export function ParticipationButtons({
   isHosting = false,
   onJustMarkedGoing,
   onConfirmClose,
+  onJoined,
 }: {
   planId: string;
   initialState: ParticipationState | null;
@@ -70,6 +71,12 @@ export function ParticipationButtons({
   /** Called the first time someone confirms Join — opens the invite sheet. */
   onJustMarkedGoing?: () => void;
   onConfirmClose?: (kind: JoinConfirmKind) => void;
+  /**
+   * Called every time someone newly Joins (going). When provided it owns the
+   * post-join moment — the inline confirmation toast and the invite sheet are
+   * suppressed so the parent can show its own modal (share / add to calendar).
+   */
+  onJoined?: () => void;
 }) {
   const { user } = useAuth();
   const [state, setState] = useState<ParticipationState | null>(initialState);
@@ -135,6 +142,11 @@ export function ParticipationButtons({
       setShowGoingSheet(true);
       return;
     }
+    if (onJoined) {
+      const ok = await commit("going", { celebrate: false });
+      if (ok) onJoined();
+      return;
+    }
     const willInvite = !hasPromptedInvite(planId, user?.id) && !!onJustMarkedGoing;
     const ok = await commit("going", { celebrate: !willInvite });
     if (ok) promptInviteIfNeeded();
@@ -168,6 +180,11 @@ export function ParticipationButtons({
 
   const switchToGoing = async () => {
     setShowInterestedSheet(false);
+    if (onJoined) {
+      const ok = await commit("going", { celebrate: false });
+      if (ok) onJoined();
+      return;
+    }
     const willInvite = !hasPromptedInvite(planId, user?.id) && !!onJustMarkedGoing;
     const ok = await commit("going", { celebrate: !willInvite });
     if (ok) promptInviteIfNeeded();

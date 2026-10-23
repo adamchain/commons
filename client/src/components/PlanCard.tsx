@@ -4,6 +4,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/http";
 import { Avatar } from "./Avatar";
 import { JoinConfirmPopup, joinConfirmKind, type JoinConfirmKind } from "./JoinConfirmPopup";
+import { JoinedActionsSheet } from "./JoinedActionsSheet";
+import { ShareSheet } from "./ShareSheet";
+import { canAddToCalendar } from "../lib/calendar";
 import { IdeaCoverFallback, planPhotoUrl } from "./CoverThumb";
 import { BottomSheet } from "./ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
@@ -41,6 +44,8 @@ export function PlanCard({
   const { user } = useAuth();
   const isHosting = !!user && plan.creator.id === user.id;
   const cardNavigate = useNavigate();
+  const [showJoinedActions, setShowJoinedActions] = useState(false);
+  const [showShare, setShowShare] = useState(false);
 
   // Ideas: one "Flexible" when nothing concrete is set. Confirmed plans keep
   // date · time · place, with "flexible" only for the unset slots.
@@ -208,6 +213,7 @@ export function PlanCard({
                   requiresApproval={planRequiresHostApproval(plan)}
                   limitedApproval={planRequiresHostApproval(plan) && capacity !== null}
                   onPlanRefresh={onPlanRefresh}
+                  onJoined={canAddToCalendar(plan) ? () => setShowJoinedActions(true) : undefined}
                 />
               )}
             </footer>
@@ -225,6 +231,18 @@ export function PlanCard({
           Host another like this →
         </Link>
       )}
+
+      {showJoinedActions && (
+        <JoinedActionsSheet
+          plan={plan}
+          onShare={() => {
+            setShowJoinedActions(false);
+            setShowShare(true);
+          }}
+          onClose={() => setShowJoinedActions(false)}
+        />
+      )}
+      {showShare && <ShareSheet plan={plan} isOwn={isHosting} onClose={() => setShowShare(false)} />}
     </div>
   );
 }
@@ -316,6 +334,7 @@ function QuickJoin({
   requiresApproval,
   limitedApproval,
   onPlanRefresh,
+  onJoined,
 }: {
   planId: string;
   isLooking: boolean;
@@ -325,6 +344,8 @@ function QuickJoin({
   /** Capacity is set and the host chooses who gets a spot. */
   limitedApproval: boolean;
   onPlanRefresh?: () => void;
+  /** Newly Joined (going): owns the post-join moment instead of the toast. */
+  onJoined?: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [showSheet, setShowSheet] = useState(false);
@@ -361,7 +382,11 @@ function QuickJoin({
       } else {
         await api(`/api/plans/${planId}/participation`, { method: "DELETE" });
       }
-      setConfirm(joinConfirmKind(next, { isIdea: isLooking, limitedApproval }));
+      if (next === "going" && onJoined) {
+        onJoined();
+      } else {
+        setConfirm(joinConfirmKind(next, { isIdea: isLooking, limitedApproval }));
+      }
       onPlanRefresh?.();
     } catch (err) {
       setLocalState(prev); // roll back on failure
