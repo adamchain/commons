@@ -1,0 +1,1 @@
+var e=`/assets/wordmark-Ck9m-AWv.png`;export{e as t};
