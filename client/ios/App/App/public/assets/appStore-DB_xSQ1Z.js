@@ -1,0 +1,1 @@
+var e=`/assets/app-store-badge-DYUj62SX.png`,t=`https://apps.apple.com/us/app/commons-plans-communities/id6785627674#productRatings`;export{e as n,t};
