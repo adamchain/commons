@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Ban, Check, Hand } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { PageLoading } from "../components/LoadingScreen";
 import { AvatarCropModal } from "../components/AvatarCropModal";
 import { NumberPicker } from "../components/NumberPicker";
 import { ScreenTitle } from "../components/ui";
@@ -70,6 +71,7 @@ export function EditPlanPage() {
   }, [plan, user, id, navigate]);
 
   if (!plan) {
+    if (!error) return <PageLoading onBack={() => navigate(`/plans/${id}`)} />;
     return (
       <main className="app-shell app-shell--mid">
         <header className="app-header app-header--minimal app-header--sticky">
@@ -77,7 +79,7 @@ export function EditPlanPage() {
             <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
           </Link>
         </header>
-        {error ? <p className="error-text">{error}</p> : <p>Loading…</p>}
+        <p className="error-text">{error}</p>
       </main>
     );
   }
@@ -360,7 +362,7 @@ function EditForm({
     (proposeFlexTime || proposeTime === (plan.time || "19:00"));
 
   return (
-    <main className="app-shell app-shell--mid edit-plan-page">
+    <main className="app-shell app-shell--mid edit-plan-page page-arrive">
       <header className="app-header app-header--minimal app-header--sticky edit-plan-top">
         <Link to={`/plans/${plan.id}`} className="back-circle" aria-label="Back">
           <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />

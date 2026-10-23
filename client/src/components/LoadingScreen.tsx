@@ -1,4 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
+import { ArrowLeft } from "lucide-react";
+import wordmark from "../assets/wordmark.png";
 
 const ICONS: Array<{
   key: string;
@@ -175,6 +177,32 @@ const ICONS: Array<{
     ),
   },
 ];
+
+/** Full-screen stand-in for the small "Loading…" line. Fades in, then the page fades in over it. */
+export function PageLoading({
+  onBack,
+  label = "Loading",
+  belowBar = false,
+}: {
+  onBack?: () => void;
+  label?: string;
+  /** Keep the top bar and bottom nav visible and center the loader between them. */
+  belowBar?: boolean;
+}) {
+  return (
+    <div className={`route-loading${belowBar ? " route-loading--below-bar" : ""}`} role="status" aria-live="polite" aria-label={label}>
+      {onBack ? (
+        <button type="button" className="back-circle route-loading-back" aria-label="Back" onClick={onBack}>
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
+        </button>
+      ) : null}
+      <div className="route-loading-center">
+        <img className="route-loading-mark" src={wordmark} alt="" />
+        <div className="loader-bar" />
+      </div>
+    </div>
+  );
+}
 
 export function LoadingScreen({
   tagline = "A place for plans meant to be shared.",

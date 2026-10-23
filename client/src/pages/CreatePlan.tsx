@@ -17,6 +17,7 @@ import { api, parseApiError } from "../api/http";
 import { FLEXIBLE_DATE_PLACEHOLDER, thisWeekAnchorDate } from "../lib/planTime";
 import { formatPlanDate, formatPlanTime, formatVenueAddressLine, normalizeHttpUrl } from "../lib/format";
 import { Avatar } from "../components/Avatar";
+import { PageLoading } from "../components/LoadingScreen";
 import { AvatarCropModal } from "../components/AvatarCropModal";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
 import { LocationAutocomplete } from "../components/LocationAutocomplete";
@@ -955,14 +956,7 @@ export function CreatePlanPage() {
 
   if ((editingPlanId || lockFromId) && !editReady) {
     return (
-      <main className="app-shell app-shell--mid">
-        <header className="app-header app-header--minimal app-header--sticky">
-          <button type="button" className="back-circle" aria-label="Back" onClick={leaveCreatePlan}>
-            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
-          </button>
-        </header>
-        <p>Loading…</p>
-      </main>
+      <PageLoading onBack={leaveCreatePlan} />
     );
   }
 
@@ -1095,6 +1089,7 @@ export function CreatePlanPage() {
           onFetchLink={fetchLinkPreview}
           linkBusy={linkBusy}
           linkError={linkError}
+          arrive={Boolean(editingPlanId || lockFromId)}
         />
         <input
           ref={flyerRef}
@@ -1127,7 +1122,7 @@ export function CreatePlanPage() {
     .filter((t): t is InterestTag => Boolean(t));
 
   return (
-    <main className="app-shell app-shell--wide plan-detail-page plan-detail-page--create">
+    <main className={`app-shell app-shell--wide plan-detail-page plan-detail-page--create${editingPlanId || lockFromId ? " page-arrive" : ""}`}>
       <header className="create-plan-topbar">
         <button type="button" className="back-circle" aria-label="Back" onClick={leaveCreatePlan}>
           <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
@@ -1919,6 +1914,7 @@ function IdeaForm({
   onFetchLink,
   linkBusy,
   linkError,
+  arrive = false,
 }: {
   form: FormShape;
   setForm: (updater: (f: FormShape) => FormShape) => void;
@@ -1946,6 +1942,7 @@ function IdeaForm({
   onFetchLink: (rawUrl: string) => Promise<void>;
   linkBusy: boolean;
   linkError: string | null;
+  arrive?: boolean;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [coverPickerOpen, setCoverPickerOpen] = useState(false);
@@ -2045,7 +2042,7 @@ function IdeaForm({
   const titleMissing = attemptedSubmit && !form.title.trim();
 
   return (
-    <main className="app-shell app-shell--mid idea-form-page">
+    <main className={`app-shell app-shell--mid idea-form-page${arrive ? " page-arrive" : ""}`}>
       <header className="idea-form-header">
         <button type="button" className="back-circle" aria-label="Back" onClick={onBack}>
           <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />

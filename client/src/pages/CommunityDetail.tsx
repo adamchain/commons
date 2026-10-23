@@ -9,6 +9,7 @@ import { LinkedText } from "../components/LinkedText";
 import { AvatarCropModal } from "../components/AvatarCropModal";
 import { CoverLibraryModal } from "../components/CoverLibraryModal";
 import { JoinConfirmPopup } from "../components/JoinConfirmPopup";
+import { PageLoading } from "../components/LoadingScreen";
 import { PlanCard } from "../components/PlanCard";
 import { CommunityShareSheet } from "../components/ShareSheet";
 import { PlanSafetyMenu } from "../components/PlanSafetyMenu";
@@ -121,14 +122,7 @@ export function CommunityDetailPage() {
   }, [community, tab]);
 
   if (loading) {
-    return (
-      <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy">
-        <button type="button" className="back-circle" aria-label="Back" onClick={() => navigate(backHref)}>
-          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
-        </button>
-        <p className="cmy-muted">Loading…</p>
-      </main>
-    );
+    return <PageLoading belowBar onBack={() => navigate(backHref)} />;
   }
   if (notFound || !community) {
     return (
@@ -184,7 +178,7 @@ export function CommunityDetailPage() {
   }
 
   return (
-    <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy">
+    <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy page-arrive">
       {community.creationStatus === "pending" && (
         <div className="cmy-review-banner">
           ⏳ Pending review — COMMONS is reviewing this community before it goes live.

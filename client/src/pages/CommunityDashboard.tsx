@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { ArrowLeft } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
+import { PageLoading } from "../components/LoadingScreen";
 import { CommunityCover } from "../components/CommunityCover";
 import { MemberNetworkButton } from "./CommunityDetail";
 import {
@@ -158,11 +159,7 @@ export function CommunityDashboardPage() {
   }
 
   if (loading) {
-    return (
-      <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy">
-        <p className="cmy-muted">Loading…</p>
-      </main>
-    );
+    return <PageLoading belowBar onBack={() => navigate(`/communities/${id}`)} />;
   }
 
   if (missing || !data) {
@@ -190,7 +187,7 @@ export function CommunityDashboardPage() {
   const growthEnd = data.growth.points[data.growth.points.length - 1]?.label ?? "";
 
   return (
-    <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy cmy-dash">
+    <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy cmy-dash page-arrive">
       <header className="cmy-dash-head">
         <button type="button" className="cmy-dash-back" aria-label="Back" onClick={() => navigate(`/communities/${id}`)}>
           <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
