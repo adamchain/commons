@@ -4546,11 +4546,13 @@ a.action-btn--stack {
 }
 .sheet-body {
   /* flex: 1 + min-height: 0 inside an auto-height sheet collapses this box
-     in WKWebView, so the action buttons paint on top of each other. Size to
-     the content, and only scroll once the sheet is near the top of the screen. */
+     in WKWebView, so the action buttons paint on top of each other. Stay
+     flex: none so height comes from the content. Do not set min-height:
+     min-content — that forces a second layout of every paragraph (including
+     .sheet-copy) and beats max-height, so the sheet never scrolls. */
   flex: none;
   width: 100%;
-  min-height: min-content;
+  min-height: 0;
   max-height: calc(92dvh - 96px - env(safe-area-inset-bottom, 0px));
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -4589,6 +4591,11 @@ a.action-btn--stack {
   font-size: var(--type-body);
   color: var(--text-muted);
   line-height: 1.5;
+  /* A long word was stretching the sheet to its min-content width and
+     laying the paragraph out twice. */
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .sheet-section-label {
   font-size: var(--type-caption);
