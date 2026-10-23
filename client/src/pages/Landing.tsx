@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import wordmark from "../assets/wordmark.png";
 import appStoreBadge from "../assets/app-store-badge.png";
 import { APP_STORE_URL } from "../lib/appStore";
+import { WebAppPrompt } from "../components/WebAppPrompt";
 
 /**
  * Public marketing landing (routed at /welcome) — a warm, editorial one-pager:
@@ -32,8 +33,11 @@ const picnicImg = "/landing/photo-picnic.jpg";
 function Nav() {
   return (
     <nav style={{ position: "sticky", top: 0, zIndex: 50, background: BEIGE }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 48px", height: 68, display: "flex", alignItems: "center", justifyContent: "flex-start", borderBottom: `1px solid rgba(20,17,48,0.06)` }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 48px", height: 68, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid rgba(20,17,48,0.06)` }}>
         <img src={wordmark} alt="Commons" style={{ height: 26, width: "auto" }} />
+        <Link to="/onboarding" style={{ fontFamily: B, fontSize: 13, fontWeight: 600, color: NAVY, textDecoration: "none" }}>
+          Log in
+        </Link>
       </div>
     </nav>
   );
@@ -200,6 +204,7 @@ function Footer() {
 export function LandingPage() {
   return (
     <div style={{ background: BEIGE, minHeight: "100vh" }}>
+      <WebAppPrompt surface="landing" />
       <style>{`
         @media (max-width: 920px) {
           .hero-grid, .pathways-header-grid, .pathway-grid, .how-grid {

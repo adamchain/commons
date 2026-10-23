@@ -3264,6 +3264,69 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
   color: var(--text-muted);
   text-decoration: underline;
 }
+/* Web visitors: download the app, or keep going in the browser. */
+.web-app-prompt {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  background: rgba(26, 26, 46, 0.46);
+}
+.web-app-prompt-card {
+  width: min(400px, 100%);
+  background: var(--card);
+  border-radius: 22px;
+  padding: 28px 22px 16px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.web-app-prompt-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: var(--ink);
+  white-space: normal;
+}
+.web-app-prompt-copy {
+  margin: 10px auto 0;
+  max-width: 32ch;
+  font-size: var(--text-body);
+  line-height: 1.5;
+  color: var(--muted);
+  white-space: normal;
+}
+.web-app-prompt-store {
+  display: inline-block;
+  margin-top: 22px;
+  line-height: 0;
+}
+.web-app-prompt-store img {
+  height: 52px;
+  width: auto;
+  display: block;
+}
+.web-app-prompt-continue {
+  display: block;
+  width: 100%;
+  margin-top: 22px;
+  padding: 8px 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.web-app-prompt-continue:hover {
+  color: var(--ink);
+}
+
 /* Landing/login variant: full-bleed b&w hero photo with white type stacked
    over a subtle top/bottom darkening gradient for legibility. */
 .onboarding-shell--landing {

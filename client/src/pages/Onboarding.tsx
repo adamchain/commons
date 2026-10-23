@@ -17,6 +17,7 @@ import { hasOnboardingPhoto, needsOnboarding, safePostAuthPath } from "../lib/on
 import { LoadingScreen } from "../components/LoadingScreen";
 import { LegalContent } from "../components/LegalContent";
 import { BottomSheet } from "../components/ui/BottomSheet";
+import { WebAppPrompt } from "../components/WebAppPrompt";
 import { Button } from "../components/ui/Button";
 import { LEGAL_DOCS } from "../content/legal";
 import wordmark from "../assets/wordmark.png";
@@ -271,6 +272,7 @@ export function OnboardingPage() {
         title=""
         subtitle="A place for plans meant to be shared."
       >
+        <WebAppPrompt surface="auth" />
         <div className="onboarding-phone-row">
           <label className="onboarding-country">
             <span aria-hidden="true">+</span>
