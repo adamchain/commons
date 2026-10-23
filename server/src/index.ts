@@ -15,6 +15,8 @@ import { chatRouter } from "./routes/chat.js";
 import { communitiesRouter } from "./routes/communities.js";
 import { devicesRouter } from "./routes/devices.js";
 import { feedbackRouter } from "./routes/feedback.js";
+import { imagesRouter } from "./routes/images.js";
+import { primeImageCache, rememberImageOrigin } from "./lib/imageCache.js";
 import { forumsRouter } from "./routes/forums.js";
 import { neighborhoodsRouter } from "./routes/neighborhoods.js";
 import { notificationsRouter } from "./routes/notifications.js";
@@ -93,10 +95,20 @@ app.use(
 app.use(express.json({ limit: "2mb" }));
 app.use(cookieParser());
 
+// Capture the host clients actually reach us on, so content-addressed image
+// URLs (/api/img/<hash>) are absolute and work from native WKWebView too.
+app.use((req, _res, next) => {
+  const proto = (req.headers["x-forwarded-proto"] as string)?.split(",")[0]?.trim() || req.protocol;
+  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0]?.trim();
+  if (host) rememberImageOrigin(`${proto}://${host}`);
+  next();
+});
+
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+app.use("/api/img", imagesRouter);
 app.use("/api/admin/auth", adminAuthRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/auth", authRouter);
@@ -180,6 +192,19 @@ function removeCommunitySubAccounts(): void {
   }
 }
 
+/** Hash every stored image data URL so /api/img/<hash> resolves after a cold start. */
+function primeImages(): void {
+  primeImageCache(
+    (function* () {
+      for (const u of store.listUsers()) {
+        yield u.avatarPhotoDataUrl;
+        if (u.profilePhotos) yield* u.profilePhotos;
+      }
+      for (const p of store.listPlans()) yield p.flyerDataUrl;
+    })(),
+  );
+}
+
 async function bootstrap(): Promise<void> {
   await connectMongo();
   // Mongo is the source of truth. After connecting, pull everything into the
@@ -195,6 +220,7 @@ async function bootstrap(): Promise<void> {
   await seedIfEmpty();
   startNudgeSchedulers();
   warmCoverCatalog();
+  primeImages();
 
   app.listen(port, () => {
     console.log(`Commons API listening on http://localhost:${port}`);

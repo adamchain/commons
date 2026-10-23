@@ -10,6 +10,7 @@ import {
 } from "../lib/verify.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { requireAuth } from "../middleware/requireAuth.js";
+import { toImageUrl, fromImageUrl } from "../lib/imageCache.js";
 import { INVITE_CODES_PER_USER, normalizeInviteCode, store } from "../store.js";
 import type { UserRecord } from "../store.js";
 import { createUser, deleteUser, findUserByPhone, findUserById, updateUser, type UserPatch } from "../userRepo.js";
@@ -132,7 +133,7 @@ export function meFromUser(user: UserRecord): MeDTO {
     interests: user.interests,
     avatarSeed: user.avatarSeed,
     avatarStyle: user.avatarStyle,
-    avatarPhotoDataUrl: user.avatarPhotoDataUrl,
+    avatarPhotoDataUrl: toImageUrl(user.avatarPhotoDataUrl),
     avatarParams: user.avatarParams,
     onboardingComplete: user.onboardingComplete,
     createdAt: user.createdAt,
@@ -140,7 +141,7 @@ export function meFromUser(user: UserRecord): MeDTO {
     // Self always sees own social links — visibility check applies only to
     // other-viewer profile reads (see /api/profile).
     socialLinks: user.socialLinks,
-    profilePhotos: user.profilePhotos?.length ? user.profilePhotos : [],
+    profilePhotos: user.profilePhotos?.length ? user.profilePhotos.map((p) => toImageUrl(p)) : [],
     canAccessAdmin: isAdminPhone(user.phoneNumber),
     guidelinesAcknowledgedAt: user.guidelinesAcknowledgedAt ?? null,
     termsAcceptedAt: user.termsAcceptedAt ?? null,
@@ -438,7 +439,9 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
   if (Array.isArray(req.body?.interests)) patch.interests = req.body.interests;
   if (typeof req.body?.avatarSeed === "string") patch.avatarSeed = req.body.avatarSeed;
   if (typeof req.body?.avatarStyle === "string") patch.avatarStyle = req.body.avatarStyle;
-  if (typeof req.body?.avatarPhotoDataUrl === "string") patch.avatarPhotoDataUrl = req.body.avatarPhotoDataUrl;
+  // fromImageUrl: if the client re-sent the proxy URL we served, store the
+  // original base64 back rather than a link to ourselves.
+  if (typeof req.body?.avatarPhotoDataUrl === "string") patch.avatarPhotoDataUrl = fromImageUrl(req.body.avatarPhotoDataUrl);
   if (req.body?.avatarPhotoDataUrl === null) patch.avatarPhotoDataUrl = null;
   if (typeof req.body?.avatarParams === "string") patch.avatarParams = req.body.avatarParams;
   if (req.body?.avatarParams === null) patch.avatarParams = null;
@@ -497,7 +500,9 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
       return;
     }
     const photos: string[] = [];
-    for (const item of incoming) {
+    for (const raw of incoming) {
+      // Kept photos come back as the proxy URL we served — rehydrate to base64.
+      const item = typeof raw === "string" ? fromImageUrl(raw) : raw;
       if (typeof item !== "string" || !item.startsWith("data:image/") || item.length > 450_000) {
         res.status(400).json({ error: "Couldn't use one of those photos. Try a smaller image." });
         return;
@@ -927,7 +932,7 @@ authRouter.get("/network", requireAuth, async (req, res) => {
         neighborhoodId: u.neighborhoodId ?? null,
         avatarSeed: u.avatarSeed,
         avatarStyle: u.avatarStyle,
-        avatarPhotoDataUrl: u.avatarPhotoDataUrl,
+        avatarPhotoDataUrl: toImageUrl(u.avatarPhotoDataUrl),
         avatarParams: u.avatarParams,
         neighborhoodName: hoodId ? (store.findNeighborhoodById(hoodId)?.name ?? null) : null,
         mutualCount: (u.networkIds ?? []).filter((id) => viewerNetwork.has(id)).length,

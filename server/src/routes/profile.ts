@@ -5,8 +5,13 @@ import { findUserById } from "../userRepo.js";
 import { communityCardsForUser } from "./communities.js";
 import { calendarDayInPlanZone, planHasEnded } from "../lib/planTime.js";
 import { planSummary, userToPublic } from "./plans.js";
+import { toImageUrl } from "../lib/imageCache.js";
 
 export const profileRouter = Router();
+
+// The profile "Past" row renders only the first 12 thumbnails (Profile.tsx:
+// `past.slice(0, 12)`), so only those carry flyer image data over the wire.
+const PAST_FLYER_LIMIT = 12;
 
 // GET /api/profile/:userId — public-facing host profile
 profileRouter.get("/:userId", requireAuth, async (req, res) => {
@@ -117,20 +122,24 @@ profileRouter.get("/:userId", requireAuth, async (req, res) => {
       ? await Promise.all(upcoming.map((p) => planSummary(p, viewerId)))
       : await Promise.all(sharedUpcoming.map((p) => planSummary(p, viewerId))),
     past: plansOpen
-      ? past.slice(0, 200).map((p) => ({
+      ? past.slice(0, 200).map((p, i) => ({
             id: p.id,
             title: p.title,
             date: p.date,
             wentCount: store.listParticipationsForPlan(p.id).filter((q) => q.state === "going").length,
-            flyerDataUrl: p.flyerDataUrl,
-            flyerLinkPreview: p.flyerLinkPreview,
+            // Flyers are base64 data URLs — multiple MB across a long history. The
+            // client only renders thumbnails for the first PAST_FLYER_LIMIT past
+            // plans, so skip the heavy image payload on the rest (keeps the row
+            // count intact for "See all plans").
+            flyerDataUrl: i < PAST_FLYER_LIMIT ? toImageUrl(p.flyerDataUrl) : undefined,
+            flyerLinkPreview: i < PAST_FLYER_LIMIT ? p.flyerLinkPreview : undefined,
             planKind: p.planKind ?? "standard",
             lockedAt: p.lockedAt ?? null,
           }))
       : [],
     sharedPlanId,
     socialLinks,
-    profilePhotos: target.profilePhotos ?? [],
+    profilePhotos: (target.profilePhotos ?? []).map((p) => toImageUrl(p)),
     plansGated: !plansOpen && !isSelf,
     profilePrivate: !isSelf && !plansOpen && !communitiesOpen,
     network: {

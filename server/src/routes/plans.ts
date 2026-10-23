@@ -10,6 +10,7 @@ import {
   userHoods,
 } from "../lib/feedScope.js";
 import { distanceMiles, userOrigin } from "../lib/geo.js";
+import { toImageUrl, fromImageUrl } from "../lib/imageCache.js";
 import {
   ALL_INTERESTS,
   type InterestTag,
@@ -69,7 +70,9 @@ function communityPlanNotify(plan: { communityId?: string | null }): {
 /** Accept uploaded data-URLs or library http(s) covers; drop anything else. */
 function normalizeFlyerDataUrl(raw: unknown): string | undefined {
   if (typeof raw !== "string") return undefined;
-  const value = raw.trim();
+  // Editors re-send the cover they were shown; turn our proxy URL back into the
+  // original base64 so we store image bytes, not a link to ourselves.
+  const value = fromImageUrl(raw).trim();
   if (value.startsWith("data:image/") && value.length < 1_600_000) return value;
   // Cover library / GCS URLs — keep the exact string (don't re-serialize via
   // URL.toString(), which can alter encoding on Firebase download links).
@@ -111,7 +114,7 @@ export function userToPublic(user: UserRecord): PublicUser {
     neighborhoodId: user.neighborhoodId,
     avatarSeed: user.avatarSeed,
     avatarStyle: user.avatarStyle,
-    avatarPhotoDataUrl: user.avatarPhotoDataUrl,
+    avatarPhotoDataUrl: toImageUrl(user.avatarPhotoDataUrl),
     avatarParams: user.avatarParams,
   };
 }
@@ -202,7 +205,7 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     happenedOutcome: plan.happenedOutcome ?? null,
     chatEnabled: plan.chatEnabled !== false,
     chatKeptAt: plan.chatKeptAt ?? null,
-    flyerDataUrl: plan.flyerDataUrl,
+    flyerDataUrl: toImageUrl(plan.flyerDataUrl),
     flyerLinkUrl: plan.flyerLinkUrl,
     flyerLinkPreview: plan.flyerLinkPreview,
     pendingTimeProposal: plan.pendingTimeProposal ?? null,
