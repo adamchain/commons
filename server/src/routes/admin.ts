@@ -3,9 +3,9 @@ import type { Request, Response, NextFunction } from "express";
 import { sessionVersionMatches, verifySessionToken } from "../lib/jwt.js";
 import { isAdminPhone } from "../lib/adminPhones.js";
 import { isGcsConfigured, listDefaultCatalog, parseDataUrl, uploadCoverImage } from "../lib/gcs.js";
-import { HELP_TICKET_SECTION_LABELS, store, type CommunityRecord, type HelpTicketRecord } from "../store.js";
+import { HELP_TICKET_SECTION_LABELS, store, type CommunityRecord, type HelpTicketRecord, type PlanRecord } from "../store.js";
 import { emit } from "../lib/notify.js";
-import { listAllUsers, findUserById, deleteUser, updateUser } from "../userRepo.js";
+import { listAllUsers, findUserById, findUsersByIds, deleteUser, updateUser } from "../userRepo.js";
 import { runBehaviorAgent, analyzeUserBehavior } from "../lib/behaviorAgent.js";
 import { communityCategoriesOf, normalizeCommunityCategory } from "../types/shared.js";
 import {
@@ -417,6 +417,276 @@ adminRouter.get("/users/:id", async (req, res) => {
     },
     behavior: analyzeUserBehavior(u),
   });
+});
+
+// ---- Posts (plans) control ----
+// Admin oversight over any plan: view the roster, manually add or remove
+// attendees (bypassing capacity/approval), edit the core details, and
+// force-cancel or restore. Mirrors the host-only controls in routes/plans.ts
+// but without the host check, so support can fix up any post.
+
+function planChatOn(plan: { chatEnabled?: boolean }): boolean {
+  return plan.chatEnabled !== false;
+}
+
+function fullName(user: { firstName?: string; lastName?: string | null } | undefined): string {
+  if (!user) return "Unknown";
+  const name = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
+  return name || "Unknown";
+}
+
+// Resolve a user by id first, then by E.164 phone (with or without the +).
+async function resolveUserLookup(lookup: string) {
+  const trimmed = lookup.trim();
+  if (!trimmed) return null;
+  const byId = await findUserById(trimmed);
+  if (byId) return byId;
+  const digits = trimmed.replace(/\D/g, "");
+  const users = await listAllUsers();
+  return (
+    users.find((u) => u.phoneNumber === trimmed || u.phoneNumber === `+${digits}`) ?? null
+  );
+}
+
+// GET /api/admin/plans?q=&includeCancelled= — searchable plan list.
+adminRouter.get("/plans", async (req, res) => {
+  const q = (queryValue(req.query.q) ?? "").trim().toLowerCase();
+  const includeCancelled =
+    req.query.includeCancelled === "1" || req.query.includeCancelled === "true";
+  const plans = store.listPlans();
+  const creators = await findUsersByIds(Array.from(new Set(plans.map((p) => p.creatorId))));
+  const communityName = new Map(store.listCommunities().map((c) => [c.id, c.name]));
+
+  let rows = plans.map((p) => {
+    const parts = store.listParticipationsForPlan(p.id);
+    return {
+      id: p.id,
+      title: p.title,
+      date: p.date,
+      creatorId: p.creatorId,
+      creatorName: fullName(creators.get(p.creatorId)),
+      goingCount: parts.filter((x) => x.state === "going").length,
+      interestedCount: parts.filter((x) => x.state === "interested").length,
+      capacity: p.capacity ?? null,
+      cancelled: Boolean(p.cancelledAt),
+      communityId: p.communityId ?? null,
+      communityName: p.communityId ? communityName.get(p.communityId) ?? null : null,
+    };
+  });
+  if (!includeCancelled) rows = rows.filter((r) => !r.cancelled);
+  if (q) {
+    rows = rows.filter(
+      (r) => r.title.toLowerCase().includes(q) || r.creatorName.toLowerCase().includes(q),
+    );
+  }
+  rows.sort((a, b) => (a.date < b.date ? 1 : -1));
+  res.json({ plans: rows.slice(0, 200) });
+});
+
+// GET /api/admin/plans/:id — plan detail + full participant roster.
+adminRouter.get("/plans/:id", async (req, res) => {
+  const plan = store.findPlanById(String(req.params.id));
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  const parts = store.listParticipationsForPlan(plan.id);
+  const coHostIds = plan.coHostIds ?? [];
+  const users = await findUsersByIds(
+    Array.from(new Set([plan.creatorId, ...coHostIds, ...parts.map((p) => p.userId)])),
+  );
+  const participants = parts
+    .map((p) => ({
+      userId: p.userId,
+      name: fullName(users.get(p.userId)),
+      phoneNumber: users.get(p.userId)?.phoneNumber ?? null,
+      state: p.state,
+      isHost: p.userId === plan.creatorId,
+      isCoHost: coHostIds.includes(p.userId),
+      createdAt: p.createdAt ?? p.updatedAt,
+    }))
+    .sort((a, b) => {
+      if (a.isHost !== b.isHost) return a.isHost ? -1 : 1;
+      if (a.state !== b.state) return a.state === "going" ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+  res.json({
+    plan: {
+      id: plan.id,
+      title: plan.title,
+      description: plan.description ?? "",
+      date: plan.date,
+      time: plan.time,
+      locationName: plan.location?.name ?? "",
+      creatorId: plan.creatorId,
+      creatorName: fullName(users.get(plan.creatorId)),
+      capacity: plan.capacity ?? null,
+      joinType: plan.joinType ?? "open",
+      markedFull: plan.markedFull === true,
+      cancelled: Boolean(plan.cancelledAt),
+      cancelledAt: plan.cancelledAt ?? null,
+      communityId: plan.communityId ?? null,
+    },
+    participants,
+  });
+});
+
+// POST /api/admin/plans/:id/participants { user, state? } — manually add a user
+// (by id or phone). Bypasses capacity and approval, wires them into the group
+// chat, and notifies them.
+adminRouter.post("/plans/:id/participants", async (req, res) => {
+  const plan = store.findPlanById(String(req.params.id));
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  const lookup = String(req.body?.user ?? "");
+  const state = req.body?.state === "interested" ? "interested" : "going";
+  if (!lookup.trim()) {
+    res.status(400).json({ error: "Provide a user id or phone number." });
+    return;
+  }
+  const user = await resolveUserLookup(lookup);
+  if (!user) {
+    res.status(404).json({ error: "No user found for that id or phone." });
+    return;
+  }
+  const already = store.findParticipation(plan.id, user.id);
+  store.upsertParticipation(plan.id, user.id, state);
+  if (state === "going" && planChatOn(plan)) {
+    store.ensureGroupConversation(plan.id, [plan.creatorId, user.id]);
+  }
+  if (user.id !== plan.creatorId && !plan.cancelledAt) {
+    await emit({
+      userId: user.id,
+      kind: "planInvite",
+      body: `You were added to "${plan.title}"`,
+      planId: plan.id,
+      dedupKey: `adminAdd:${plan.id}:${user.id}:${new Date().toISOString()}`,
+    });
+  }
+  store.log("admin_plan_participant_added", {
+    planId: plan.id,
+    userId: user.id,
+    state,
+    by: req.userId ?? "admin",
+    wasPresent: Boolean(already),
+  });
+  res.json({ ok: true, userId: user.id, name: fullName(user), state });
+});
+
+// DELETE /api/admin/plans/:id/participants/:userId — remove a participant.
+adminRouter.delete("/plans/:id/participants/:userId", (req, res) => {
+  const plan = store.findPlanById(String(req.params.id));
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  const userId = String(req.params.userId);
+  if (userId === plan.creatorId) {
+    res.status(400).json({ error: "Can't remove the host — cancel the plan instead." });
+    return;
+  }
+  if (!store.findParticipation(plan.id, userId)) {
+    res.status(404).json({ error: "That user isn't on this plan." });
+    return;
+  }
+  store.deleteParticipation(plan.id, userId);
+  store.log("admin_plan_participant_removed", {
+    planId: plan.id,
+    userId,
+    by: req.userId ?? "admin",
+  });
+  res.json({ ok: true });
+});
+
+// PATCH /api/admin/plans/:id — edit the core details.
+adminRouter.patch("/plans/:id", (req, res) => {
+  const plan = store.findPlanById(String(req.params.id));
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const patch: Partial<PlanRecord> = {};
+  if (typeof body.title === "string" && body.title.trim()) {
+    patch.title = body.title.trim().slice(0, 140);
+  }
+  if (typeof body.description === "string") {
+    patch.description = body.description.slice(0, 4000);
+  }
+  if (typeof body.date === "string" && body.date.trim()) patch.date = body.date.trim();
+  if (typeof body.time === "string" && body.time.trim()) patch.time = body.time.trim();
+  if (typeof body.locationName === "string" && body.locationName.trim()) {
+    patch.location = { ...plan.location, name: body.locationName.trim().slice(0, 160) };
+  }
+  if (body.capacity !== undefined) {
+    if (body.capacity === null) patch.capacity = null;
+    else if (typeof body.capacity === "number" && body.capacity > 0) {
+      patch.capacity = Math.floor(body.capacity);
+    }
+  }
+  if (body.joinType === "open" || body.joinType === "approve") patch.joinType = body.joinType;
+  if (typeof body.markedFull === "boolean") patch.markedFull = body.markedFull;
+
+  if (Object.keys(patch).length === 0) {
+    res.status(400).json({ error: "Nothing to update." });
+    return;
+  }
+  const updated = store.updatePlan(plan.id, patch);
+  store.log("admin_plan_edited", {
+    planId: plan.id,
+    fields: Object.keys(patch),
+    by: req.userId ?? "admin",
+  });
+  res.json({ ok: true, plan: updated });
+});
+
+// POST /api/admin/plans/:id/cancel — force-cancel and notify guests.
+adminRouter.post("/plans/:id/cancel", async (req, res) => {
+  const plan = store.findPlanById(String(req.params.id));
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  if (plan.cancelledAt) {
+    res.json({ ok: true, alreadyCancelled: true });
+    return;
+  }
+  const actorId = req.userId ?? "admin";
+  store.updatePlan(plan.id, { cancelledAt: new Date().toISOString() });
+  const recipientIds = Array.from(
+    new Set(
+      store
+        .listParticipationsForPlan(plan.id)
+        .filter((p) => p.state === "going" || p.state === "interested")
+        .map((p) => p.userId)
+        .filter((id) => id !== actorId),
+    ),
+  );
+  for (const uid of recipientIds) {
+    await emit({
+      userId: uid,
+      kind: "planCancellation",
+      body: `"${plan.title}" was cancelled`,
+      planId: plan.id,
+      dedupKey: `planCancellation:${plan.id}:${uid}`,
+    });
+  }
+  store.log("admin_plan_cancelled", { planId: plan.id, by: actorId, notified: recipientIds.length });
+  res.json({ ok: true, notified: recipientIds.length });
+});
+
+// POST /api/admin/plans/:id/restore — clear a cancellation.
+adminRouter.post("/plans/:id/restore", (req, res) => {
+  const plan = store.findPlanById(String(req.params.id));
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  store.updatePlan(plan.id, { cancelledAt: null });
+  store.log("admin_plan_restored", { planId: plan.id, by: req.userId ?? "admin" });
+  res.json({ ok: true });
 });
 
 adminRouter.get("/behavior", async (_req, res) => {

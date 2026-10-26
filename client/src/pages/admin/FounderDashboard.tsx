@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Activity,
+  CalendarDays,
   LayoutGrid,
   Map as MapIcon,
   Settings2,
@@ -16,13 +17,14 @@ import {
   CommunitiesReview,
   FoundingCommunityControls,
   HelpTicketsReview,
+  PostsManager,
   ReportsReview,
   ReviewInbox,
 } from "../Admin";
 import { AdminSignIn } from "./AdminSignIn";
 import "./FounderDashboard.css";
 
-type PageId = "overview" | "health" | "acquisition" | "communities" | "users" | "map" | "operations";
+type PageId = "overview" | "health" | "acquisition" | "communities" | "posts" | "users" | "map" | "operations";
 
 type Delta = { value: number | null; previous: number | null; delta: number | null; spark: number[] };
 
@@ -178,6 +180,7 @@ const PAGES: { id: PageId; label: string; icon: typeof LayoutGrid }[] = [
   { id: "health", label: "Health", icon: Activity },
   { id: "acquisition", label: "Acquisition", icon: UserPlus },
   { id: "communities", label: "Communities", icon: Users },
+  { id: "posts", label: "Posts", icon: CalendarDays },
   { id: "users", label: "Users", icon: UserRound },
   { id: "map", label: "God view", icon: MapIcon },
   { id: "operations", label: "Operations", icon: Settings2 },
@@ -590,6 +593,7 @@ export function AdminPage() {
                 onChanged={() => void refresh()}
               />
             )}
+            {page === "posts" && <PostsManager />}
             {page === "users" && (
               <UsersPage data={data} onSelectUser={setSelectedUserId} onChanged={() => void refresh()} />
             )}

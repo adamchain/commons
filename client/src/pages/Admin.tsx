@@ -669,6 +669,483 @@ interface AdminReportRow {
   plan: { id: string; title: string } | null;
 }
 
+// ---- Posts (plans) control ----
+
+type AdminPlanRow = {
+  id: string;
+  title: string;
+  date: string;
+  creatorId: string;
+  creatorName: string;
+  goingCount: number;
+  interestedCount: number;
+  capacity: number | null;
+  cancelled: boolean;
+  communityId: string | null;
+  communityName: string | null;
+};
+
+type AdminPlanParticipant = {
+  userId: string;
+  name: string;
+  phoneNumber: string | null;
+  state: "going" | "interested";
+  isHost: boolean;
+  isCoHost: boolean;
+  createdAt: string;
+};
+
+type AdminPlanDetail = {
+  plan: {
+    id: string;
+    title: string;
+    description: string;
+    date: string;
+    time: string;
+    locationName: string;
+    creatorId: string;
+    creatorName: string;
+    capacity: number | null;
+    joinType: "open" | "approve";
+    markedFull: boolean;
+    cancelled: boolean;
+    cancelledAt: string | null;
+    communityId: string | null;
+  };
+  participants: AdminPlanParticipant[];
+};
+
+const adminErr = (e: unknown, fallback = "Something went wrong") =>
+  e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : fallback;
+
+export function PostsManager() {
+  const [query, setQuery] = useState("");
+  const [includeCancelled, setIncludeCancelled] = useState(false);
+  const [rows, setRows] = useState<AdminPlanRow[] | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const params = new URLSearchParams();
+      if (query.trim()) params.set("q", query.trim());
+      if (includeCancelled) params.set("includeCancelled", "1");
+      const r = await api<{ plans: AdminPlanRow[] }>(`/api/admin/plans?${params.toString()}`);
+      setRows(r.plans);
+      setError(null);
+    } catch (e) {
+      setError(adminErr(e, "Failed to load plans"));
+    }
+  }, [query, includeCancelled]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return (
+    <section className="admin-section" id="posts-control">
+      <h2 className="admin-section-title">Posts{rows ? ` · ${rows.length}` : ""}</h2>
+      <p style={{ fontSize: 13, opacity: 0.75, margin: "0 0 12px" }}>
+        Manage any plan: add or remove attendees, edit the details, or cancel and restore.
+      </p>
+      <div className="admin-card">
+        {error && <p className="error-text">{error}</p>}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+          <input
+            className="admin-input"
+            placeholder="Search by title or host"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ flex: "1 1 220px", minWidth: 0 }}
+          />
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+            <input
+              type="checkbox"
+              checked={includeCancelled}
+              onChange={(e) => setIncludeCancelled(e.target.checked)}
+            />
+            Include cancelled
+          </label>
+        </div>
+        {!rows ? (
+          <p>Loading…</p>
+        ) : rows.length === 0 ? (
+          <p style={{ opacity: 0.7, margin: 0 }}>No plans match.</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {rows.map((p) => (
+              <div
+                key={p.id}
+                style={{
+                  border: "1px solid rgba(0,0,0,0.1)",
+                  borderRadius: 12,
+                  padding: "0.75rem",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 8,
+                  alignItems: "center",
+                  opacity: p.cancelled ? 0.6 : 1,
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <strong>{p.title}</strong>
+                  {p.cancelled ? <span style={{ fontSize: 12, opacity: 0.7 }}> · cancelled</span> : null}
+                  <div style={{ fontSize: 13, opacity: 0.75 }}>
+                    {new Date(p.date).toLocaleDateString()} · {p.creatorName}
+                    {p.communityName ? ` · ${p.communityName}` : ""}
+                  </div>
+                  <div style={{ fontSize: 12, opacity: 0.6 }}>
+                    {p.goingCount} going · {p.interestedCount} interested
+                    {p.capacity ? ` · cap ${p.capacity}` : ""}
+                  </div>
+                </div>
+                <button type="button" className="admin-btn" onClick={() => setSelectedId(p.id)}>
+                  Manage
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {selectedId && (
+        <PostDetailModal
+          planId={selectedId}
+          onClose={() => setSelectedId(null)}
+          onChanged={() => void load()}
+        />
+      )}
+    </section>
+  );
+}
+
+function PostDetailModal({
+  planId,
+  onClose,
+  onChanged,
+}: {
+  planId: string;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [data, setData] = useState<AdminPlanDetail | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [addUser, setAddUser] = useState("");
+  const [addState, setAddState] = useState<"going" | "interested">("going");
+  const [form, setForm] = useState<{
+    title: string;
+    description: string;
+    date: string;
+    time: string;
+    locationName: string;
+    capacity: string;
+    joinType: "open" | "approve";
+    markedFull: boolean;
+  } | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await api<AdminPlanDetail>(`/api/admin/plans/${planId}`);
+      setData(r);
+      setForm({
+        title: r.plan.title,
+        description: r.plan.description,
+        date: r.plan.date,
+        time: r.plan.time,
+        locationName: r.plan.locationName,
+        capacity: r.plan.capacity === null ? "" : String(r.plan.capacity),
+        joinType: r.plan.joinType,
+        markedFull: r.plan.markedFull,
+      });
+      setError(null);
+    } catch (e) {
+      setError(adminErr(e, "Failed to load plan"));
+    }
+  }, [planId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function addParticipant() {
+    if (!addUser.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api(`/api/admin/plans/${planId}/participants`, {
+        method: "POST",
+        body: JSON.stringify({ user: addUser.trim(), state: addState }),
+      });
+      setAddUser("");
+      await load();
+      onChanged();
+    } catch (e) {
+      setError(adminErr(e, "Couldn't add that user"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeParticipant(userId: string, name: string) {
+    if (!window.confirm(`Remove ${name} from this plan?`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api(`/api/admin/plans/${planId}/participants/${userId}`, { method: "DELETE" });
+      await load();
+      onChanged();
+    } catch (e) {
+      setError(adminErr(e, "Couldn't remove that user"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveEdits() {
+    if (!form) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const capacity =
+        form.capacity.trim() === "" ? null : Math.max(1, Math.floor(Number(form.capacity)));
+      await api(`/api/admin/plans/${planId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          title: form.title,
+          description: form.description,
+          date: form.date,
+          time: form.time,
+          locationName: form.locationName,
+          capacity: Number.isFinite(capacity as number) ? capacity : null,
+          joinType: form.joinType,
+          markedFull: form.markedFull,
+        }),
+      });
+      await load();
+      onChanged();
+    } catch (e) {
+      setError(adminErr(e, "Couldn't save changes"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function cancelOrRestore() {
+    if (!data) return;
+    const restoring = data.plan.cancelled;
+    if (!restoring && !window.confirm("Cancel this plan? Going and interested guests are notified.")) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api(`/api/admin/plans/${planId}/${restoring ? "restore" : "cancel"}`, { method: "POST" });
+      await load();
+      onChanged();
+    } catch (e) {
+      setError(adminErr(e, "Couldn't update the plan"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="admin-modal-backdrop" onClick={onClose}>
+      <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="admin-modal-head">
+          <h2 className="admin-section-title" style={{ margin: 0 }}>Manage post</h2>
+          <button type="button" className="admin-btn admin-btn--ghost" onClick={onClose}>
+            Close
+          </button>
+        </div>
+
+        {error ? <p className="admin-err">{error}</p> : null}
+
+        {!data || !form ? (
+          <p className="admin-muted">Loading…</p>
+        ) : (
+          <>
+            <div className="admin-user-head">
+              <div>
+                <div className="admin-user-name">{data.plan.title}</div>
+                <div className="admin-muted">
+                  Hosted by {data.plan.creatorName}
+                  {data.plan.cancelled ? " · cancelled" : ""}
+                </div>
+              </div>
+              <Link className="admin-link" to={`/plans/${data.plan.id}`}>
+                View in app →
+              </Link>
+            </div>
+
+            {/* Attendees */}
+            <h3 className="admin-section-title" style={{ fontSize: 15, margin: "1rem 0 0.5rem" }}>
+              Attendees · {data.participants.length}
+            </h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {data.participants.map((p) => (
+                <div
+                  key={p.userId}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 8,
+                    border: "1px solid rgba(0,0,0,0.08)",
+                    borderRadius: 10,
+                    padding: "0.4rem 0.6rem",
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <Link className="admin-link" to={`/profile/${p.userId}`}>
+                      {p.name}
+                    </Link>
+                    <span style={{ fontSize: 12, opacity: 0.6 }}>
+                      {" "}
+                      · {p.isHost ? "host" : p.isCoHost ? "co-host" : p.state}
+                      {p.phoneNumber ? ` · ${p.phoneNumber}` : ""}
+                    </span>
+                  </div>
+                  {!p.isHost && (
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn--ghost"
+                      disabled={busy}
+                      onClick={() => void removeParticipant(p.userId, p.name)}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Add attendee */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
+              <input
+                className="admin-input"
+                placeholder="User id or phone (+1…)"
+                value={addUser}
+                onChange={(e) => setAddUser(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void addParticipant();
+                }}
+                style={{ flex: "1 1 200px", minWidth: 0 }}
+              />
+              <select
+                className="admin-input"
+                value={addState}
+                onChange={(e) => setAddState(e.target.value as "going" | "interested")}
+              >
+                <option value="going">Going</option>
+                <option value="interested">Interested</option>
+              </select>
+              <button type="button" className="admin-btn" disabled={busy || !addUser.trim()} onClick={() => void addParticipant()}>
+                Add to post
+              </button>
+            </div>
+
+            {/* Edit details */}
+            <h3 className="admin-section-title" style={{ fontSize: 15, margin: "1.25rem 0 0.5rem" }}>
+              Details
+            </h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <label className="admin-field">
+                <span>Title</span>
+                <input
+                  className="admin-input"
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                />
+              </label>
+              <label className="admin-field">
+                <span>Description</span>
+                <textarea
+                  className="admin-input"
+                  rows={3}
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                />
+              </label>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <label className="admin-field" style={{ flex: "1 1 140px" }}>
+                  <span>Date</span>
+                  <input
+                    className="admin-input"
+                    value={form.date}
+                    onChange={(e) => setForm({ ...form, date: e.target.value })}
+                  />
+                </label>
+                <label className="admin-field" style={{ flex: "1 1 120px" }}>
+                  <span>Time</span>
+                  <input
+                    className="admin-input"
+                    value={form.time}
+                    onChange={(e) => setForm({ ...form, time: e.target.value })}
+                  />
+                </label>
+              </div>
+              <label className="admin-field">
+                <span>Location</span>
+                <input
+                  className="admin-input"
+                  value={form.locationName}
+                  onChange={(e) => setForm({ ...form, locationName: e.target.value })}
+                />
+              </label>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <label className="admin-field" style={{ flex: "1 1 100px" }}>
+                  <span>Capacity</span>
+                  <input
+                    className="admin-input"
+                    type="number"
+                    min={1}
+                    placeholder="none"
+                    value={form.capacity}
+                    onChange={(e) => setForm({ ...form, capacity: e.target.value })}
+                  />
+                </label>
+                <label className="admin-field" style={{ flex: "1 1 120px" }}>
+                  <span>Join type</span>
+                  <select
+                    className="admin-input"
+                    value={form.joinType}
+                    onChange={(e) => setForm({ ...form, joinType: e.target.value as "open" | "approve" })}
+                  >
+                    <option value="open">Open</option>
+                    <option value="approve">Approve</option>
+                  </select>
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, marginTop: 18 }}>
+                  <input
+                    type="checkbox"
+                    checked={form.markedFull}
+                    onChange={(e) => setForm({ ...form, markedFull: e.target.checked })}
+                  />
+                  Marked full
+                </label>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 16 }}>
+              <button type="button" className="admin-btn" disabled={busy} onClick={() => void saveEdits()}>
+                {busy ? "Saving…" : "Save details"}
+              </button>
+              <button
+                type="button"
+                className="admin-btn"
+                disabled={busy}
+                style={data.plan.cancelled ? undefined : { background: "var(--red, #c13b3b)" }}
+                onClick={() => void cancelOrRestore()}
+              >
+                {data.plan.cancelled ? "Restore plan" : "Cancel plan"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function ReportsReview() {
   const [rows, setRows] = useState<AdminReportRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
