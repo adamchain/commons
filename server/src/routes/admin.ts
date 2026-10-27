@@ -346,6 +346,31 @@ adminRouter.get("/summary", async (_req, res) => {
   });
 });
 
+// GET /api/admin/users/search?q= — find accounts by name or phone (max 12).
+// Registered before /users/:id so "search" isn't treated as a user id.
+adminRouter.get("/users/search", async (req, res) => {
+  const q = (queryValue(req.query.q) ?? "").trim().toLowerCase();
+  if (q.length < 2) {
+    res.json({ users: [] });
+    return;
+  }
+  const digits = q.replace(/\D/g, "");
+  const users = await listAllUsers();
+  const matched = users
+    .filter((u) => {
+      const name = fullName(u).toLowerCase();
+      const phoneDigits = (u.phoneNumber ?? "").replace(/\D/g, "");
+      return (
+        name.includes(q) ||
+        u.id.toLowerCase() === q ||
+        (digits.length >= 3 && phoneDigits.includes(digits))
+      );
+    })
+    .slice(0, 12)
+    .map((u) => ({ id: u.id, name: fullName(u), phoneNumber: u.phoneNumber ?? null }));
+  res.json({ users: matched });
+});
+
 // ---- Single user: full profile + activity (admin drill-down) ----
 adminRouter.get("/users/:id", async (req, res) => {
   const id = String(req.params.id);
@@ -556,7 +581,8 @@ adminRouter.post("/plans/:id/participants", async (req, res) => {
   if (state === "going" && planChatOn(plan)) {
     store.ensureGroupConversation(plan.id, [plan.creatorId, user.id]);
   }
-  if (user.id !== plan.creatorId && !plan.cancelledAt) {
+  const shouldNotify = user.id !== plan.creatorId && !plan.cancelledAt;
+  if (shouldNotify) {
     await emit({
       userId: user.id,
       kind: "planInvite",
@@ -572,7 +598,7 @@ adminRouter.post("/plans/:id/participants", async (req, res) => {
     by: req.userId ?? "admin",
     wasPresent: Boolean(already),
   });
-  res.json({ ok: true, userId: user.id, name: fullName(user), state });
+  res.json({ ok: true, userId: user.id, name: fullName(user), state, notified: shouldNotify });
 });
 
 // DELETE /api/admin/plans/:id/participants/:userId — remove a participant.

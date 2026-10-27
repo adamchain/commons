@@ -715,6 +715,8 @@ type AdminPlanDetail = {
   participants: AdminPlanParticipant[];
 };
 
+type AdminUserSearchResult = { id: string; name: string; phoneNumber: string | null };
+
 const adminErr = (e: unknown, fallback = "Something went wrong") =>
   e instanceof Error ? e.message.replace(/^\d+:\s*/, "") : fallback;
 
@@ -830,8 +832,12 @@ function PostDetailModal({
   const [data, setData] = useState<AdminPlanDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [addUser, setAddUser] = useState("");
   const [addState, setAddState] = useState<"going" | "interested">("going");
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState<AdminUserSearchResult[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [selected, setSelected] = useState<AdminUserSearchResult | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [form, setForm] = useState<{
     title: string;
     description: string;
@@ -867,16 +873,46 @@ function PostDetailModal({
     void load();
   }, [load]);
 
+  // Live account lookup as the admin types (debounced). Pauses once an account
+  // is picked so the dropdown doesn't reopen over the selection.
+  useEffect(() => {
+    const q = search.trim();
+    if (selected || q.length < 2) {
+      setResults(null);
+      setSearching(false);
+      return;
+    }
+    let active = true;
+    setSearching(true);
+    const t = setTimeout(() => {
+      api<{ users: AdminUserSearchResult[] }>(`/api/admin/users/search?q=${encodeURIComponent(q)}`)
+        .then((r) => active && setResults(r.users))
+        .catch(() => active && setResults([]))
+        .finally(() => active && setSearching(false));
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(t);
+    };
+  }, [search, selected]);
+
   async function addParticipant() {
-    if (!addUser.trim()) return;
+    if (!selected) return;
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
-      await api(`/api/admin/plans/${planId}/participants`, {
-        method: "POST",
-        body: JSON.stringify({ user: addUser.trim(), state: addState }),
-      });
-      setAddUser("");
+      const r = await api<{ name: string; notified: boolean }>(
+        `/api/admin/plans/${planId}/participants`,
+        {
+          method: "POST",
+          body: JSON.stringify({ user: selected.id, state: addState }),
+        },
+      );
+      setNotice(`Added ${r.name}${r.notified ? " — they've been notified." : "."}`);
+      setSelected(null);
+      setSearch("");
+      setResults(null);
       await load();
       onChanged();
     } catch (e) {
@@ -1018,29 +1054,106 @@ function PostDetailModal({
               ))}
             </div>
 
-            {/* Add attendee */}
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
-              <input
-                className="admin-input"
-                placeholder="User id or phone (+1…)"
-                value={addUser}
-                onChange={(e) => setAddUser(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void addParticipant();
-                }}
-                style={{ flex: "1 1 200px", minWidth: 0 }}
-              />
-              <select
-                className="admin-input"
-                value={addState}
-                onChange={(e) => setAddState(e.target.value as "going" | "interested")}
-              >
-                <option value="going">Going</option>
-                <option value="interested">Interested</option>
-              </select>
-              <button type="button" className="admin-btn" disabled={busy || !addUser.trim()} onClick={() => void addParticipant()}>
-                Add to post
-              </button>
+            {/* Add attendee — search accounts by name or phone, pick, then add. */}
+            {notice ? (
+              <p style={{ fontSize: 13, color: "var(--green, #3f7d52)", margin: "10px 0 0" }}>{notice}</p>
+            ) : null}
+            <div style={{ position: "relative", marginTop: 10 }}>
+              {selected ? (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      border: "1px solid rgba(0,0,0,0.15)",
+                      borderRadius: 999,
+                      padding: "0.3rem 0.7rem",
+                      fontSize: 13,
+                    }}
+                  >
+                    <strong>{selected.name}</strong>
+                    {selected.phoneNumber ? (
+                      <span style={{ opacity: 0.6 }}>{selected.phoneNumber}</span>
+                    ) : null}
+                    <button
+                      type="button"
+                      aria-label="Clear selection"
+                      onClick={() => setSelected(null)}
+                      style={{ border: "none", background: "none", cursor: "pointer", fontSize: 15, lineHeight: 1 }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <select
+                    className="admin-input"
+                    value={addState}
+                    onChange={(e) => setAddState(e.target.value as "going" | "interested")}
+                  >
+                    <option value="going">Going</option>
+                    <option value="interested">Interested</option>
+                  </select>
+                  <button type="button" className="admin-btn" disabled={busy} onClick={() => void addParticipant()}>
+                    {busy ? "Adding…" : "Add to post"}
+                  </button>
+                </div>
+              ) : (
+                <input
+                  className="admin-input"
+                  placeholder="Search a member by name or phone…"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setNotice(null);
+                  }}
+                  style={{ width: "100%" }}
+                />
+              )}
+
+              {!selected && search.trim().length >= 2 && (
+                <div
+                  style={{
+                    border: "1px solid rgba(0,0,0,0.12)",
+                    borderRadius: 10,
+                    marginTop: 4,
+                    maxHeight: 220,
+                    overflowY: "auto",
+                    background: "var(--surface, #fff)",
+                  }}
+                >
+                  {searching && results === null ? (
+                    <div style={{ padding: "0.5rem 0.7rem", fontSize: 13, opacity: 0.6 }}>Searching…</div>
+                  ) : results && results.length > 0 ? (
+                    results.map((u) => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => {
+                          setSelected(u);
+                          setResults(null);
+                        }}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 8,
+                          width: "100%",
+                          textAlign: "left",
+                          border: "none",
+                          background: "none",
+                          cursor: "pointer",
+                          padding: "0.5rem 0.7rem",
+                          fontSize: 14,
+                        }}
+                      >
+                        <span>{u.name}</span>
+                        {u.phoneNumber ? <span style={{ opacity: 0.55 }}>{u.phoneNumber}</span> : null}
+                      </button>
+                    ))
+                  ) : (
+                    <div style={{ padding: "0.5rem 0.7rem", fontSize: 13, opacity: 0.6 }}>No matches.</div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Edit details */}
