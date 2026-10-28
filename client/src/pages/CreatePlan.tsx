@@ -65,6 +65,12 @@ type Recurrence = "none" | "weekly" | "biweekly" | "monthly";
 // Date.getDay().
 const DAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
+// Cap the plan title — people were pasting whole paragraphs into the title
+// field. Keep it to a glanceable headline and push the rest to the description.
+// (The "Just an idea" form deliberately reuses `title` as a free-text area, so
+// this cap applies only to the Make-a-plan title input.)
+const MAX_PLAN_TITLE_LEN = 80;
+
 // Day-of-week (0=Sun) for a YYYY-MM-DD string, parsed in local time to avoid
 // the UTC-midnight off-by-one that `new Date("2026-06-23")` produces.
 const weekdayOf = (iso: string) => {
@@ -191,6 +197,7 @@ export function CreatePlanPage() {
     // date; only used when recurrence is weekly/biweekly.
     repeatDays: [weekdayOf(today())] as number[],
     flyerDataUrl: null as string | null,
+    flyerAttachmentDataUrl: null as string | null,
     flyerLinkUrl: "",
     flyerLinkPreview: null as null | {
       title?: string;
@@ -412,6 +419,7 @@ export function CreatePlanPage() {
           capacity: prev.capacity !== null ? String(prev.capacity) : f.capacity,
           joinType: prev.joinType,
           flyerDataUrl: prev.flyerDataUrl ?? null,
+          flyerAttachmentDataUrl: prev.flyerAttachmentDataUrl ?? null,
           chatEnabled: prev.chatEnabled !== false,
         }));
         setPath("plan");
@@ -471,6 +479,7 @@ export function CreatePlanPage() {
           capacity: prev.capacity !== null ? String(prev.capacity) : f.capacity,
           joinType: prev.joinType,
           flyerDataUrl: prev.flyerDataUrl ?? null,
+          flyerAttachmentDataUrl: prev.flyerAttachmentDataUrl ?? null,
           flyerLinkUrl: prev.flyerLinkUrl ?? "",
           flyerLinkPreview: prev.flyerLinkPreview ?? null,
           chatEnabled: prev.chatEnabled !== false,
@@ -528,6 +537,7 @@ export function CreatePlanPage() {
           capacity: prev.capacity !== null ? String(prev.capacity) : f.capacity,
           joinType: prev.joinType,
           flyerDataUrl: prev.flyerDataUrl ?? null,
+          flyerAttachmentDataUrl: prev.flyerAttachmentDataUrl ?? null,
           chatEnabled: prev.chatEnabled !== false,
         }));
         const crew = [
@@ -691,6 +701,7 @@ export function CreatePlanPage() {
               ? form.repeatDays
               : undefined,
           flyerDataUrl: form.flyerDataUrl ?? undefined,
+          flyerAttachmentDataUrl: form.flyerAttachmentDataUrl ?? undefined,
           flyerLinkUrl: normalizeHttpUrl(form.flyerLinkUrl),
           flyerLinkPreview: form.flyerLinkPreview ?? undefined,
           // Only when this screen was opened as "Do it again" / host-again.
@@ -755,6 +766,7 @@ export function CreatePlanPage() {
           capacity: capacityNum,
           joinType: capacityNum !== null && form.joinType === "approve" ? "approve" : "open",
           flyerDataUrl: form.flyerDataUrl ?? null,
+          flyerAttachmentDataUrl: form.flyerAttachmentDataUrl ?? null,
           flyerLinkUrl: normalizeHttpUrl(form.flyerLinkUrl) ?? null,
           flyerLinkPreview: form.flyerLinkPreview ?? null,
           hostEmoji: VIBE_OPTIONS.find((o) => o.id === form.vibes[0])?.emoji ?? "✨",
@@ -839,6 +851,7 @@ export function CreatePlanPage() {
           capacity: capacityNum,
           joinType: capacityNum !== null && form.joinType === "approve" ? "approve" : "open",
           flyerDataUrl: form.flyerDataUrl ?? null,
+          flyerAttachmentDataUrl: form.flyerAttachmentDataUrl ?? null,
           flyerLinkUrl: normalizeHttpUrl(form.flyerLinkUrl) ?? null,
           hostEmoji: VIBE_OPTIONS.find((o) => o.id === form.vibes[0])?.emoji ?? "✨",
           inviteUserIds: [...invitedIds],
@@ -911,6 +924,29 @@ export function CreatePlanPage() {
       }}
     />
   ) : null;
+
+  // Event flyer/poster — an optional full image shown on the plan, separate
+  // from the cover. Kept uncropped so portrait posters keep their shape.
+  const flyerAttachmentRef = useRef<HTMLInputElement>(null);
+  const setFlyerAttachment = (dataUrl: string) =>
+    setForm((f) => ({ ...f, flyerAttachmentDataUrl: dataUrl }));
+  const onFlyerAttachmentPick = (file: File) => {
+    fileToResizedDataUrl(file, 1600, 0.9)
+      .then(setFlyerAttachment)
+      .catch(() => setError("Couldn't read that image. Try another."));
+  };
+  const openFlyerAttachmentPicker = async () => {
+    if (isNative()) {
+      try {
+        const dataUrl = await pickPhotoNative({ maxPx: 1600, quality: 0.9 });
+        if (dataUrl) setFlyerAttachment(dataUrl);
+      } catch {
+        /* user canceled */
+      }
+      return;
+    }
+    flyerAttachmentRef.current?.click();
+  };
 
   const [linkBusy, setLinkBusy] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
@@ -1077,6 +1113,8 @@ export function CreatePlanPage() {
           onOpenLibrary={() => setShowCoverLib(true)}
           onOpenFlyer={() => void openFlyerPicker()}
           onClearFlyer={() => setForm((f) => ({ ...f, flyerDataUrl: null }))}
+          onOpenFlyerAttachment={() => void openFlyerAttachmentPicker()}
+          onClearFlyerAttachment={() => setForm((f) => ({ ...f, flyerAttachmentDataUrl: null }))}
           inviteUserName={inviteUserName}
           inviteNames={inviteNames}
           invitedCount={invitedIds.size}
@@ -1101,6 +1139,17 @@ export function CreatePlanPage() {
             const f = e.target.files?.[0];
             if (f) onFlyerPick(f);
             if (flyerRef.current) flyerRef.current.value = "";
+          }}
+        />
+        <input
+          ref={flyerAttachmentRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) onFlyerAttachmentPick(file);
+            if (flyerAttachmentRef.current) flyerAttachmentRef.current.value = "";
           }}
         />
         {showCoverLib && (
@@ -1288,12 +1337,20 @@ export function CreatePlanPage() {
               id="title"
               ref={titleInputRef}
               className="plan-detail-title plan-detail-title-input"
-              placeholder="Plan name"
+              placeholder="Short plan name"
               value={form.title}
+              maxLength={MAX_PLAN_TITLE_LEN}
               aria-invalid={Boolean(attemptedSubmit && titleError)}
-              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value.slice(0, MAX_PLAN_TITLE_LEN) }))}
             />
           </div>
+          {form.title.length >= MAX_PLAN_TITLE_LEN - 15 && (
+            <p className="plan-title-hint">
+              {MAX_PLAN_TITLE_LEN - form.title.length === 0
+                ? "That's the limit — keep the title short and add the rest below."
+                : `${MAX_PLAN_TITLE_LEN - form.title.length} characters left — save the details for the description.`}
+            </p>
+          )}
           {attemptedSubmit && titleError && <p className="luma-inline-error">{titleError}</p>}
           <div
             ref={locationCardRef}
@@ -1740,6 +1797,50 @@ export function CreatePlanPage() {
             </div>
           )}
             </section>
+
+            {/* Flyer — an optional event poster shown on the plan, separate
+                from the cover photo at the top of the form. */}
+            <section className="form-section">
+              <label className="form-question">Flyer</label>
+              <p className="form-help">Attach an event flyer or poster — it shows in full on the plan.</p>
+              {form.flyerAttachmentDataUrl ? (
+                <div className="flyer-attachment-preview">
+                  <img src={form.flyerAttachmentDataUrl} alt="Flyer preview" />
+                  <div className="flyer-attachment-actions">
+                    <button type="button" className="cover-chip" onClick={() => void openFlyerAttachmentPicker()}>
+                      Replace
+                    </button>
+                    <button
+                      type="button"
+                      className="cover-chip"
+                      onClick={() => setForm((f) => ({ ...f, flyerAttachmentDataUrl: null }))}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="flyer-attachment-add"
+                  onClick={() => void openFlyerAttachmentPicker()}
+                >
+                  <ImagePlus size={16} strokeWidth={1.8} aria-hidden="true" />
+                  Upload a flyer
+                </button>
+              )}
+              <input
+                ref={flyerAttachmentRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) onFlyerAttachmentPick(file);
+                  if (flyerAttachmentRef.current) flyerAttachmentRef.current.value = "";
+                }}
+              />
+            </section>
           </div>
         )}
         </div>
@@ -1871,6 +1972,7 @@ type FormShape = {
   recurrence: Recurrence;
   repeatDays: number[];
   flyerDataUrl: string | null;
+  flyerAttachmentDataUrl: string | null;
   flyerLinkUrl: string;
   flyerLinkPreview: null | {
     title?: string;
@@ -1902,6 +2004,8 @@ function IdeaForm({
   onOpenLibrary,
   onOpenFlyer,
   onClearFlyer,
+  onOpenFlyerAttachment,
+  onClearFlyerAttachment,
   inviteUserName,
   inviteNames,
   invitedCount,
@@ -1930,6 +2034,8 @@ function IdeaForm({
   onOpenLibrary: () => void;
   onOpenFlyer: () => void;
   onClearFlyer: () => void;
+  onOpenFlyerAttachment: () => void;
+  onClearFlyerAttachment: () => void;
   inviteUserName: string | null;
   inviteNames: string[];
   invitedCount: number;
@@ -2367,6 +2473,32 @@ function IdeaForm({
                   </label>
                 </div>
                 {linkError && <p className="link-preview-notice" role="status">{linkError}</p>}
+              </div>
+
+              <div className="idea-flyer-block">
+                <p className="plan-meta-label">Flyer</p>
+                {form.flyerAttachmentDataUrl ? (
+                  <div className="flyer-attachment-preview">
+                    <img src={form.flyerAttachmentDataUrl} alt="Flyer preview" />
+                    <div className="flyer-attachment-actions">
+                      <button type="button" className="cover-chip" onClick={onOpenFlyerAttachment}>
+                        Replace
+                      </button>
+                      <button type="button" className="cover-chip" onClick={onClearFlyerAttachment}>
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="flyer-attachment-add"
+                    onClick={onOpenFlyerAttachment}
+                  >
+                    <ImagePlus size={16} strokeWidth={1.8} aria-hidden="true" />
+                    Upload a flyer
+                  </button>
+                )}
               </div>
 
               <div className="plan-detail-card plan-detail-card--composer idea-notes-card">

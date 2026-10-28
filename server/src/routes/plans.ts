@@ -206,6 +206,7 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     chatEnabled: plan.chatEnabled !== false,
     chatKeptAt: plan.chatKeptAt ?? null,
     flyerDataUrl: toImageUrl(plan.flyerDataUrl),
+    flyerAttachmentDataUrl: toImageUrl(plan.flyerAttachmentDataUrl),
     flyerLinkUrl: plan.flyerLinkUrl,
     flyerLinkPreview: plan.flyerLinkPreview,
     pendingTimeProposal: plan.pendingTimeProposal ?? null,
@@ -511,6 +512,9 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     return;
   }
 
+  // Optional event flyer/poster — distinct from the cover, shown on the plan.
+  const flyerAttachmentDataUrl = normalizeFlyerDataUrl(req.body?.flyerAttachmentDataUrl);
+
   // Optional shareable link. Preview text and image are fetched here, not
   // taken from the client, so a pasted link can't smuggle arbitrary content.
   let flyerLinkUrl: string | undefined;
@@ -546,6 +550,7 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     isRecurring,
     lockedAt: null,
     flyerDataUrl,
+    flyerAttachmentDataUrl,
     flyerLinkUrl,
     flyerLinkPreview,
     chatEnabled: req.body?.chatEnabled !== false,
@@ -773,6 +778,14 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
     else {
       const normalized = normalizeFlyerDataUrl(raw);
       if (normalized) patch.flyerDataUrl = normalized;
+    }
+  }
+  if (req.body?.flyerAttachmentDataUrl !== undefined) {
+    const raw = req.body.flyerAttachmentDataUrl;
+    if (raw === null || raw === "") patch.flyerAttachmentDataUrl = undefined;
+    else {
+      const normalized = normalizeFlyerDataUrl(raw);
+      if (normalized) patch.flyerAttachmentDataUrl = normalized;
     }
   }
   if (req.body?.flyerLinkUrl !== undefined) {
@@ -1150,6 +1163,14 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
     isFlexibleLocation: false,
     ...flyerPatch,
   };
+  if (req.body?.flyerAttachmentDataUrl !== undefined) {
+    const raw = req.body.flyerAttachmentDataUrl;
+    if (raw === null || raw === "") patch.flyerAttachmentDataUrl = undefined;
+    else {
+      const normalized = normalizeFlyerDataUrl(raw);
+      if (normalized) patch.flyerAttachmentDataUrl = normalized;
+    }
+  }
   if (req.body?.flyerLinkUrl !== undefined) {
     const parsed = parseHttpUrl(req.body.flyerLinkUrl);
     if (parsed) {

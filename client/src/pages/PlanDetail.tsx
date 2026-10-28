@@ -527,6 +527,18 @@ export function PlanDetailPage() {
           </a>
         )}
 
+        {plan.flyerAttachmentDataUrl && (
+          <div className="plan-detail-card plan-detail-flyer">
+            <span className="plan-meta-label">Flyer</span>
+            <img
+              src={plan.flyerAttachmentDataUrl}
+              alt="Event flyer"
+              className="plan-detail-flyer-image"
+              loading="lazy"
+            />
+          </div>
+        )}
+
         <button
           type="button"
           className="host-row plan-detail-card"

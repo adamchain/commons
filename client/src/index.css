@@ -1367,6 +1367,11 @@ img.avatar {
   color: var(--faint);
   font-weight: 600;
 }
+.plan-title-hint {
+  margin: 4px 0 0;
+  font-size: var(--text-body-small);
+  color: var(--faint);
+}
 .plan-detail-desc-input {
   width: 100%;
   min-height: 72px;
@@ -1756,6 +1761,54 @@ a.plan-detail-meta:hover .plan-detail-meta-label {
 .plan-detail-link svg {
   flex-shrink: 0;
   color: var(--muted);
+}
+
+/* Plan detail: attached event flyer/poster, shown in full (not cropped). */
+.plan-detail-flyer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.plan-detail-flyer-image {
+  width: 100%;
+  border-radius: 10px;
+  object-fit: contain;
+  background: var(--tan);
+}
+
+/* Create/edit: optional flyer attachment control under Additional details. */
+.flyer-attachment-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border: 1.5px dashed var(--tan-mid, var(--tan));
+  border-radius: 10px;
+  background: var(--tan);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: var(--text-body-small);
+  cursor: pointer;
+}
+.flyer-attachment-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.flyer-attachment-preview img {
+  width: 100%;
+  border-radius: 10px;
+  object-fit: contain;
+  background: var(--tan);
+}
+.flyer-attachment-actions {
+  display: flex;
+  gap: 8px;
+}
+.idea-flyer-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 /* Plan detail: Display title, Label eyebrows, Body copy. */
@@ -12231,9 +12284,8 @@ button.settings-row:disabled {
   flex-shrink: 0;
 }
 .poll-option-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
   font-weight: 400;
   color: var(--ink);
 }
@@ -12273,6 +12325,13 @@ button.settings-row:disabled {
   font-weight: 600;
   font-size: var(--text-body-small);
   color: var(--faint);
+}
+.poll-option-voter-names {
+  margin: 3px 4px 0;
+  font-size: var(--text-body-small);
+  line-height: 1.3;
+  color: var(--faint);
+  overflow-wrap: anywhere;
 }
 
 .poll-card-foot {

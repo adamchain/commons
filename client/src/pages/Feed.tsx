@@ -13,12 +13,12 @@ import { useAuth } from "../context/AuthContext";
 import { FLEXIBLE_DATE_PLACEHOLDER, isIdeaPlan, planBelongsInPast } from "../lib/planTime";
 import { cachedFeedPlans, peekFeedPlans, rememberFeedPlans } from "../lib/feedPrefetch";
 import { consumeFeedScroll } from "../lib/navState";
+import { FEED_FILTERS_KEY, FEED_FILTERS_RESET_EVENT } from "../lib/feedFilters";
 import type { AgeRange, InterestTag, MeDTO, NetworkPromptDTO, PlanDTO } from "../types/shared";
 
-// Feed filters persist across navigation + reload — losing "hide cancelled"
-// every time you left the feed was a papercut.
-const FEED_FILTERS_KEY = "commons.feedFilters.v1";
-
+// Feed filters persist across in-app navigation — losing "hide cancelled" every
+// time you left the feed was a papercut. They're reset on every app open; see
+// lib/feedFilters.ts and the reset hook in App.tsx.
 const NEARBY_MILES = 15;
 
 type PersistedFilters = {
@@ -322,6 +322,20 @@ export function FeedPage() {
       /* storage unavailable — non-fatal */
     }
   }, [selectedTag, nearbyOnly, selectedAgeRange, hideCancelled, networkOnly]);
+
+  // Drop the live filter state when the app is (re)opened — App.tsx dispatches
+  // this on cold start and whenever the app returns to the foreground.
+  useEffect(() => {
+    function onReset() {
+      setSelectedTag(EMPTY_FILTERS.selectedTag);
+      setNearbyOnly(EMPTY_FILTERS.nearbyOnly);
+      setSelectedAgeRange(EMPTY_FILTERS.selectedAgeRange);
+      setHideCancelled(EMPTY_FILTERS.hideCancelled);
+      setNetworkOnly(EMPTY_FILTERS.networkOnly);
+    }
+    window.addEventListener(FEED_FILTERS_RESET_EVENT, onReset);
+    return () => window.removeEventListener(FEED_FILTERS_RESET_EVENT, onReset);
+  }, []);
 
   useEffect(() => {
     if (!justPostedId) return;

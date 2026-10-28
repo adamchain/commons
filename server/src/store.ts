@@ -212,6 +212,9 @@ export interface PlanRecord {
   seriesId?: string | null;
   lockedAt?: string | null;
   flyerDataUrl?: string;
+  /** Optional event flyer/poster attached by the host — stored like the cover
+   *  (base64 or proxy URL), shown on the plan separate from `flyerDataUrl`. */
+  flyerAttachmentDataUrl?: string;
   /**
    * Host-proposed date/time change waiting to be applied. Set by
    * `propose-time`, cleared by `apply-time` / `delete propose-time`. The plan's
@@ -1390,6 +1393,9 @@ export const store = {
     // undefined, which JSON/Mongo would otherwise omit and leave stale.
     if ("flyerDataUrl" in patch && patch.flyerDataUrl === undefined) {
       delete plan.flyerDataUrl;
+    }
+    if ("flyerAttachmentDataUrl" in patch && patch.flyerAttachmentDataUrl === undefined) {
+      delete plan.flyerAttachmentDataUrl;
     }
     persist();
     mongoMirror.upsertPlan(plan);

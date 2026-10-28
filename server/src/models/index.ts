@@ -97,6 +97,7 @@ const PlanSchema = new Schema<PlanRecord>(
     chatKeptAt: { type: String, default: null },
     audienceUserIds: { type: [String], default: undefined },
     flyerDataUrl: { type: String },
+    flyerAttachmentDataUrl: { type: String },
     flyerLinkUrl: { type: String },
     flyerLinkPreview: {
       title: { type: String },

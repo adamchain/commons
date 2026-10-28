@@ -130,7 +130,7 @@ export function PollCard({
                     {variant === "card" && voters.length > 0 && (
                       <span className="poll-option-voters" aria-hidden="true">
                         {voters.slice(0, 3).map((v) => (
-                          <span key={v.id} className="poll-option-voter">
+                          <span key={v.id} className="poll-option-voter" title={v.firstName}>
                             <Avatar
                               seed={v.avatarSeed}
                               style={v.avatarStyle}
@@ -146,6 +146,11 @@ export function PollCard({
                   </span>
                 )}
               </button>
+              {variant === "card" && revealed && voters.length > 0 && (
+                <p className="poll-option-voter-names">
+                  {voters.map((v) => v.firstName).join(", ")}
+                </p>
+              )}
             </li>
           );
         })}

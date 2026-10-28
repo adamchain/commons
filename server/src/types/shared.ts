@@ -220,6 +220,9 @@ export interface PlanDTO {
   chatKeptAt?: string | null;
   /** Optional flyer/cover — uploaded data URL or library https URL. */
   flyerDataUrl?: string;
+  /** Optional event flyer/poster attached by the host — a full image shown on
+   *  the plan, separate from the cover photo above. */
+  flyerAttachmentDataUrl?: string;
   /** Optional shareable link (event page, ticket page, etc.). */
   flyerLinkUrl?: string;
   /** Cached OG-style preview captured at create time. */

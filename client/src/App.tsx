@@ -11,6 +11,7 @@ import { CoachMarks } from "./components/CoachMarks";
 import { TopBar } from "./components/TopBar";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { listenForDeepLinks } from "./lib/deepLinks";
+import { resetFeedFilters } from "./lib/feedFilters";
 import { needsOnboarding } from "./lib/onboarding";
 import { getCurrentCoords } from "./lib/geolocate";
 import { api } from "./api/http";
@@ -203,10 +204,24 @@ function useLocationRefresh() {
   }, [user?.location, refreshUser]);
 }
 
+// Reset the feed filters every time the app is opened — on cold start and each
+// time it returns to the foreground — so a session always begins unfiltered.
+// Clears the saved filters and tells a mounted FeedPage to drop its live state.
+function useFilterResetOnOpen() {
+  useEffect(() => {
+    resetFeedFilters();
+    const handle = CapApp.addListener("appStateChange", (state) => {
+      if (state.isActive) resetFeedFilters();
+    });
+    return () => { void handle.then((h) => h.remove()); };
+  }, []);
+}
+
 export default function App() {
   usePushOpenNavigation();
   useDeepLinkNavigation();
   useLocationRefresh();
+  useFilterResetOnOpen();
   useWarmRoutes();
   return (
     <>

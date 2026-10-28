@@ -121,6 +121,7 @@ function EditForm({
     markedFull: plan.markedFull === true,
     visibility: plan.visibility,
     flyerDataUrl: plan.flyerDataUrl ?? null,
+    flyerAttachmentDataUrl: plan.flyerAttachmentDataUrl ?? null,
     flyerLinkUrl: plan.flyerLinkUrl ?? "",
     flyerLinkPreview: (plan.flyerLinkPreview ?? null) as LinkPreview | null,
     chatEnabled: plan.chatEnabled !== false,
@@ -181,6 +182,27 @@ function EditForm({
     fileToResizedDataUrl(file, 1600, 0.9)
       .then(setCropSrc)
       .catch(() => setSubmitErr("Couldn't read that image. Try another."));
+  }
+
+  // Event flyer/poster — optional, kept uncropped (no crop modal) so posters
+  // keep their aspect; saved alongside the cover.
+  const flyerAttachmentRef = useRef<HTMLInputElement>(null);
+  function onFlyerAttachmentPick(file: File): void {
+    fileToResizedDataUrl(file, 1600, 0.9)
+      .then((dataUrl) => setForm((f) => ({ ...f, flyerAttachmentDataUrl: dataUrl })))
+      .catch(() => setSubmitErr("Couldn't read that image. Try another."));
+  }
+  async function openFlyerAttachmentPicker(): Promise<void> {
+    if (isNative()) {
+      try {
+        const dataUrl = await pickPhotoNative({ maxPx: 1600, quality: 0.9 });
+        if (dataUrl) setForm((f) => ({ ...f, flyerAttachmentDataUrl: dataUrl }));
+      } catch {
+        /* user canceled */
+      }
+      return;
+    }
+    flyerAttachmentRef.current?.click();
   }
 
   async function openFlyerPicker(): Promise<void> {
@@ -293,6 +315,7 @@ function EditForm({
         method: "PATCH",
         body: JSON.stringify({
           flyerDataUrl: form.flyerDataUrl ?? null,
+          flyerAttachmentDataUrl: form.flyerAttachmentDataUrl ?? null,
           flyerLinkUrl: normalizeHttpUrl(form.flyerLinkUrl) ?? null,
           flyerLinkPreview: form.flyerLinkPreview ?? null,
         }),
@@ -750,6 +773,39 @@ function EditForm({
               }}
             />
           </div>
+          <label className="form-question" style={{ marginTop: 12 }}>
+            Flyer
+          </label>
+          <p className="form-help">An event flyer or poster, shown in full on the plan.</p>
+          <div className="flyer-uploader">
+            {form.flyerAttachmentDataUrl ? (
+              <div className="flyer-preview">
+                <img src={form.flyerAttachmentDataUrl} alt="" />
+                <button
+                  type="button"
+                  className="btn-link"
+                  onClick={() => setForm((f) => ({ ...f, flyerAttachmentDataUrl: null }))}
+                >Remove</button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="btn-secondary btn-block"
+                onClick={() => void openFlyerAttachmentPicker()}
+              >Upload flyer</button>
+            )}
+            <input
+              ref={flyerAttachmentRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) onFlyerAttachmentPick(f);
+                if (flyerAttachmentRef.current) flyerAttachmentRef.current.value = "";
+              }}
+            />
+          </div>
           <label className="form-question" htmlFor="flyer-link" style={{ marginTop: 12 }}>
             Or paste a link
           </label>
@@ -795,7 +851,7 @@ function EditForm({
             disabled={saving}
             onClick={() => void saveCover()}
           >
-            {saving ? "Saving…" : "Save cover photo"}
+            {saving ? "Saving…" : "Save cover & flyer"}
           </button>
         </section>
       </div>
