@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Commons HQ · Draft queue (preview)</title>
+<style>
+  :root {
+    --red: #c13b3b;
+    --accent-hover: #a62525;
+    --card: #fdfaf7;
+    --surface: #f0e9df;
+    --surface-2: #ede5d8;
+    --ink: #1a1a2e;
+    --text-muted: #7a7a8a;
+    --faint: #8a8a9a;
+    --border: rgba(0, 0, 0, 0.07);
+    --success: #2f8f55;
+    --success-bg: #e8f5ee;
+    --success-border: #b5dcc6;
+    --shadow: 0 1px 0 rgba(180, 160, 140, 0.18), 0 4px 20px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    --font: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--surface);
+    font-family: var(--font);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    padding: 28px 16px 64px;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+
+  /* ---- Admin header ---- */
+  .admin-head { margin-bottom: 6px; }
+  .admin-head h1 {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 4px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .hq-badge {
+    font-size: 11px; font-weight: 700; color: #fff; background: var(--ink);
+    padding: 3px 9px; border-radius: 999px; letter-spacing: 0.02em;
+  }
+  .admin-head p { margin: 0; font-size: 13px; color: var(--text-muted); max-width: 640px; line-height: 1.4; }
+
+  /* ---- Fake generate bar (context only) ---- */
+  .gen-bar {
+    margin: 20px 0 24px; padding: 14px 16px; background: var(--card);
+    border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  }
+  .gen-bar .label { font-size: 12px; font-weight: 600; color: var(--faint); margin-right: 2px; }
+  .chip {
+    font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--surface-2); color: var(--ink); cursor: default;
+  }
+  .chip.on { background: var(--red); color: #fff; border-color: var(--red); }
+  .gen-btn {
+    margin-left: auto; font-size: 13px; font-weight: 700; color: #fff; background: var(--red);
+    border: none; padding: 9px 18px; border-radius: 999px; cursor: default;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+
+  .queue-head { font-size: 13px; color: var(--text-muted); margin: 0 0 14px; font-weight: 600; }
+
+  /* ---- Grid of draft cards ---- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 22px; }
+
+  /* draft wrapper = card + review chrome */
+  .draft { display: flex; flex-direction: column; }
+
+  /* source ribbon */
+  .ribbon {
+    display: flex; align-items: center; gap: 8px; padding: 0 2px 8px;
+    font-size: 11px; font-weight: 600; color: var(--faint);
+  }
+  .src-pill {
+    display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px;
+    background: var(--card); border: 1px solid var(--border); color: var(--ink);
+  }
+  .src-pill .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .src-pill.places .dot { background: #4285F4; }
+  .src-pill.url .dot { background: #965252; }
+  .ai-pill {
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px;
+    background: #efeafb; color: #6b4fbb; border: 1px solid #ddd2f5; font-weight: 700;
+  }
+
+  /* ---- Plan card (faithful to app) ---- */
+  .plan-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  .flyer {
+    aspect-ratio: 3 / 2; border-radius: 20px 20px 0 0; position: relative;
+    display: flex; align-items: flex-end; padding: 12px; overflow: hidden;
+    background: var(--surface-2);
+  }
+  .flyer img.cover {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center top;
+  }
+  .flyer .photo-src {
+    position: relative; z-index: 1;
+    font-size: 10px; font-weight: 700; color: #fff; background: rgba(0,0,0,0.5);
+    padding: 3px 8px; border-radius: 999px; letter-spacing: 0.02em;
+  }
+
+  .body { padding: 10px 12px; }
+  .poster-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .avatar {
+    width: 24px; height: 24px; border-radius: 50%; background: #fff; overflow: hidden;
+    display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
+    border: 1px solid var(--border);
+  }
+  .avatar img { width: 100%; height: 100%; object-fit: contain; padding: 2px; }
+  .posted-by { font-size: 12px; color: var(--faint); }
+  .verified { color: #4285F4; font-size: 12px; }
+
+  .kind-pill {
+    margin-left: auto; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+    background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border);
+  }
+  .kind-pill.week { background: var(--surface-2); color: var(--text-muted); border-color: var(--border); }
+
+  .title { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.15; margin: 0 0 4px; }
+  .meta { font-size: 13px; color: var(--text-muted); margin: 2px 0; }
+  .desc { font-size: 13px; color: var(--text-muted); line-height: 1.35; margin: 6px 0 0;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .tag {
+    font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+    background: var(--surface-2); color: var(--ink); border: 1px solid var(--border);
+  }
+
+  /* ---- Review chrome under the card ---- */
+  .review {
+    margin-top: 10px; padding: 10px 12px; background: var(--card);
+    border: 1px solid var(--border); border-radius: 14px;
+  }
+  .grounding { font-size: 11px; color: var(--faint); line-height: 1.5; margin: 0 0 10px; }
+  .grounding b { color: var(--ink); font-weight: 600; }
+  .g-fact { color: var(--success); font-weight: 600; }
+  .g-ai { color: #6b4fbb; font-weight: 600; }
+  .actions { display: flex; gap: 8px; }
+  .act {
+    flex: 1; font-size: 13px; font-weight: 700; padding: 8px 10px; border-radius: 999px;
+    border: 1px solid var(--border); cursor: default; text-align: center;
+  }
+  .act.approve { background: var(--red); color: #fff; border-color: var(--red); }
+  .act.edit { background: var(--surface-2); color: var(--ink); }
+  .act.discard { background: transparent; color: var(--text-muted); flex: 0 0 auto; padding: 8px 14px; }
+
+  .foot-note { max-width: 760px; margin: 40px auto 0; font-size: 12px; color: var(--faint); line-height: 1.6; text-align: center; }
+  .foot-note code { background: var(--surface-2); padding: 1px 5px; border-radius: 5px; font-size: 11px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="admin-head">
+    <h1>Draft queue <span class="hq-badge">COMMONS HQ</span></h1>
+    <p>AI-generated plan drafts from local data. Nothing is live — each draft waits here for a human to edit, approve, or discard before it publishes.</p>
+  </div>
+
+  <!-- Context-only control bar (not wired) -->
+  <div class="gen-bar">
+    <span class="label">Generate from</span>
+    <span class="chip on">🍽 Restaurants</span>
+    <span class="chip on">🧘 Yoga &amp; wellness</span>
+    <span class="chip on">👶 New-mom events</span>
+    <span class="chip">🎨 Arts</span>
+    <span class="chip">·  Fishtown + Northern Liberties</span>
+    <button class="gen-btn">✨ Generate drafts</button>
+  </div>
+
+  <p class="queue-head">3 of 5 draft slots used · generation pauses at 5 pending to keep the DB light</p>
+
+  <div class="grid">
+
+    <!-- ========== CARD 1: Restaurant (Places) ========== -->
+    <div class="draft">
+      <div class="ribbon">
+        <span class="src-pill places"><span class="dot"></span>Google Places</span>
+        <span class="ai-pill">✦ AI draft</span>
+      </div>
+
+      <div class="plan-card">
+        <div class="flyer">
+          <img class="cover" src="client/public/card-image-samples/cafe.jpg" alt="Restaurant" />
+          <span class="photo-src">Stored · /api/img/4af2…c1</span>
+        </div>
+        <div class="body">
+          <div class="poster-row">
+            <span class="avatar"><img src="https://www.oncommons.co/assets/wordmark-Ck9m-AWv.png" alt="Commons HQ" /></span>
+            <span class="posted-by">Commons HQ <span class="verified">✔</span></span>
+            <span class="kind-pill week">This week</span>
+          </div>
+          <h3 class="title">BYOB dinner at Elwood</h3>
+          <div class="meta">This week · Flexible time · 1007 Frankford Ave, Fishtown</div>
+          <p class="desc">Tiny Fishtown BYOB doing refined Pennsylvania-sourced cooking — guinea hen, whole rabbit, garden views. Grab a bottle, split a few plates, and meet a couple of neighbors over a slow dinner.</p>
+          <div class="tags">
+            <span class="tag">🍷 Food &amp; drinks</span>
+            <span class="tag">BYOB</span>
+            <span class="tag">Date night</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="review">
+        <p class="grounding">
+          <b>From Places:</b> <span class="g-fact">name, address, coords, photo</span> ·
+          <b>Written by AI:</b> <span class="g-ai">title, description, tags</span> ·
+          <b>HQ to set:</b> a specific date/time (defaulted to “This week”).
+        </p>
+        <div class="actions">
+          <span class="act approve">Approve &amp; publish</span>
+          <span class="act edit">Edit</span>
+          <span class="act discard">Discard</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== CARD 2: Prenatal yoga (Places) ========== -->
+    <div class="draft">
+      <div class="ribbon">
+        <span class="src-pill places"><span class="dot"></span>Google Places</span>
+        <span class="ai-pill">✦ AI draft</span>
+      </div>
+
+      <div class="plan-card">
+        <div class="flyer">
+          <img class="cover" src="client/public/landing/feed-yoga.jpg" alt="Yoga" />
+          <span class="photo-src">Stored · /api/img/9b7e…3d</span>
+        </div>
+        <div class="body">
+          <div class="poster-row">
+            <span class="avatar"><img src="https://www.oncommons.co/assets/wordmark-Ck9m-AWv.png" alt="Commons HQ" /></span>
+            <span class="posted-by">Commons HQ <span class="verified">✔</span></span>
+            <span class="kind-pill">Confirmed</span>
+          </div>
+          <h3 class="title">Prenatal yoga at Pacific Yoga</h3>
+          <div class="meta">Sat, Nov 1 · 10:30 AM · Pacific Yoga, Fishtown</div>
+          <p class="desc">A gentle weekly class built for expecting and newly-postpartum moms. Go together, then grab coffee after — an easy way to meet other moms in the neighborhood.</p>
+          <div class="tags">
+            <span class="tag">🧘 Wellness</span>
+            <span class="tag">Prenatal</span>
+            <span class="tag">New moms</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="review">
+        <p class="grounding">
+          <b>From Places:</b> <span class="g-fact">name, address, coords, photo</span> ·
+          <b>Written by AI:</b> <span class="g-ai">description, tags</span> ·
+          <b>⚠ Needs check:</b> class day/time is AI-suggested — confirm against the studio schedule before publish.
+        </p>
+        <div class="actions">
+          <span class="act approve">Approve &amp; publish</span>
+          <span class="act edit">Edit</span>
+          <span class="act discard">Discard</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== CARD 3: New-mom event (Paste-a-URL) ========== -->
+    <div class="draft">
+      <div class="ribbon">
+        <span class="src-pill url"><span class="dot"></span>From URL</span>
+        <span class="ai-pill">✦ AI draft</span>
+      </div>
+
+      <div class="plan-card">
+        <div class="flyer">
+          <img class="cover" src="client/public/card-image-samples/picnic.jpg" alt="Baby and me" />
+          <span class="photo-src">Stored · /api/img/e10a…77</span>
+        </div>
+        <div class="body">
+          <div class="poster-row">
+            <span class="avatar"><img src="https://www.oncommons.co/assets/wordmark-Ck9m-AWv.png" alt="Commons HQ" /></span>
+            <span class="posted-by">Commons HQ <span class="verified">✔</span></span>
+            <span class="kind-pill">Confirmed</span>
+          </div>
+          <h3 class="title">Baby + Me Sunday</h3>
+          <div class="meta">Sun, Nov 2 · 11:00 AM · Mama’s Wellness Joint</div>
+          <p class="desc">A laid-back baby-and-me class for little ones 6 weeks to pre-crawlers. Bring the baby, stretch a little, and swap notes with other new parents. No experience needed.</p>
+          <div class="tags">
+            <span class="tag">👶 New moms</span>
+            <span class="tag">🧘 Wellness</span>
+            <span class="tag">Family</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="review">
+        <p class="grounding">
+          <b>From page:</b> <span class="g-fact">title, date/time, og:image</span> ·
+          <b>Written by AI:</b> <span class="g-ai">description, tags</span> ·
+          <b>Source:</b> mamaswellnessjoint.com event page.
+        </p>
+        <div class="actions">
+          <span class="act approve">Approve &amp; publish</span>
+          <span class="act edit">Edit</span>
+          <span class="act discard">Discard</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="foot-note">
+    Static preview — buttons are inert. Cards use the app’s real plan-card styling (<code>#c13b3b</code>, Inter, 20px radius).
+    Covers are ingested &amp; stored as <code>/api/img/&lt;hash&gt;</code> (chips show the stored ref). Queue is capped at 5 pending drafts.
+    HQ avatar is the Commons wordmark. Real venues from current Fishtown / Northern Liberties listings.
+  </p>
+
+</div>
+</body>
+</html>
