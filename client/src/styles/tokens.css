@@ -140,6 +140,9 @@
   --max-shell-wide: 1180px;
 
   --nav-height: 58px;
+  /* Instagram-style desktop web shell (see .commons-web in index.css) */
+  --web-sidebar: 320px;
+  --web-rail: 320px;
   --community-pink: var(--red);
   --community-pink-soft: transparent;
   --community-pink-border: rgba(var(--accent-rgb), 0.35);

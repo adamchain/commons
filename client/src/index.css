@@ -17583,3 +17583,124 @@ span.profile-other-cta {
   color: var(--muted);
   cursor: default;
 }
+
+/* ============================================================
+   Instagram-style web desktop shell (WEB ONLY, >=1024px wide).
+   App.tsx adds the `.commons-web` wrapper class only when
+   !isNative() and the route shows the shell (WebAppShell.tsx).
+   Below 1024px, and on native, nothing here applies — the
+   mobile TopBar + BottomNav layout is used unchanged.
+   ============================================================ */
+.web-sidebar,
+.web-rail { display: none; }
+
+@media (min-width: 1024px) {
+  .commons-web { padding-left: var(--web-sidebar); }
+  .commons-web.commons-web--rail { padding-right: var(--web-rail); }
+
+  /* The mobile chrome is replaced by the persistent sidebar on desktop web. */
+  .commons-web > .top-bar,
+  .commons-web > .bottom-nav { display: none !important; }
+
+  /* Reclaim the top/bottom space the TopBar + BottomNav reserved. */
+  .commons-web .app-shell,
+  .commons-web .app-shell--with-topbar { padding-top: 40px; }
+  .commons-web .app-shell { padding-bottom: 64px; }
+
+  /* Feed: a wide "section" holds a much wider calendar strip (~75%), while the
+     toolbar + plan list sit in a thinner centered column matching the standard
+     page width (communities, profile, etc.) so navigation feels consistent. */
+  .commons-web .app-shell--wide { max-width: 980px; }
+  .commons-web .week-strip-wrap { width: 75%; margin-left: auto; margin-right: auto; }
+  .commons-web .feed-divider,
+  .commons-web .feed-toolbar,
+  .commons-web #feed-plans { max-width: var(--max-shell); margin-left: auto; margin-right: auto; }
+
+  /* ---- Left sidebar ---- */
+  .web-sidebar {
+    display: block;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: var(--web-sidebar);
+    z-index: 30;
+    background: var(--card);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+  }
+  .web-sidebar-inner {
+    display: flex; flex-direction: column; gap: 4px;
+    min-height: 100%;
+    padding: 26px 16px 20px;
+  }
+  .web-brand { display: block; padding: 2px 8px 22px; }
+  .web-brand img { height: 26px; width: auto; }
+  .web-profile {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px; margin-bottom: 6px;
+    border-radius: 14px; text-decoration: none; color: inherit;
+    transition: background .15s;
+  }
+  .web-profile:hover { background: var(--bg); }
+  .web-profile-text { display: grid; gap: 1px; min-width: 0; }
+  .web-profile-text strong { font-size: 15px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .web-profile-text small { font-size: 12px; color: var(--muted); }
+  .web-nav { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+  .web-nav-item {
+    display: flex; align-items: center; gap: 15px;
+    padding: 11px 12px; border-radius: 12px;
+    color: var(--ink); text-decoration: none;
+    font-size: 15px; font-weight: 500;
+    transition: background .15s;
+  }
+  .web-nav-item:hover { background: var(--bg); }
+  .web-nav-item.active { font-weight: 700; }
+  .web-nav-item.active .web-nav-icon { color: var(--red); }
+  .web-nav-icon { position: relative; display: grid; place-items: center; color: var(--ink); }
+  .web-nav-badge {
+    position: absolute; top: -6px; right: -8px;
+    min-width: 16px; height: 16px; padding: 0 4px;
+    display: grid; place-items: center;
+    border-radius: 10px; background: var(--red);
+    color: #fff; font-size: 10px; font-weight: 700; line-height: 1;
+  }
+  .web-create {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin-top: 16px; padding: 12px; border-radius: 12px;
+    background: var(--red); color: #fff; text-decoration: none;
+    font-size: 14px; font-weight: 700;
+    transition: filter .15s;
+  }
+  .web-create:hover { filter: brightness(.95); }
+  .web-logout {
+    display: flex; align-items: center; gap: 15px;
+    margin-top: auto; padding: 11px 12px;
+    border: 0; background: transparent; color: var(--muted);
+    font-size: 15px; font-weight: 500; border-radius: 12px;
+    cursor: pointer; text-align: left;
+    transition: background .15s, color .15s;
+  }
+  .web-logout:hover { background: var(--bg); color: var(--ink); }
+
+  /* ---- Right rail: upcoming plans ---- */
+  .web-rail {
+    display: block;
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: var(--web-rail);
+    z-index: 20;
+    padding: 40px 24px 24px;
+    overflow-y: auto;
+    border-left: 1px solid var(--border);
+  }
+  .web-rail-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; }
+  .web-rail-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .web-rail-head strong { font-size: 14px; color: var(--ink); }
+  .web-rail-head a { font-size: 12px; color: var(--red); text-decoration: none; font-weight: 600; }
+  .web-rail-empty { color: var(--muted); font-size: 13px; line-height: 1.55; }
+  .web-rail-empty a { color: var(--red); text-decoration: none; font-weight: 600; }
+  .web-rail-row { display: grid; gap: 2px; padding: 11px 0; border-top: 1px solid var(--border); text-decoration: none; }
+  .web-rail-row:first-of-type { border-top: 0; padding-top: 4px; }
+  .web-rail-row-name { font-size: 13px; font-weight: 600; color: var(--ink); }
+  .web-rail-row-meta { font-size: 12px; color: var(--muted); }
+  .web-rail-copy { margin: 16px 4px 0; font-size: 11px; color: var(--faint); }
+}

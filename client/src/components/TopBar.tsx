@@ -24,6 +24,7 @@ export function TopBar() {
   const isOtherUserProfile = Boolean(otherProfile && otherProfile[1] !== user?.id);
 
   const hide =
+    pathname === "/new" ||
     pathname.startsWith("/welcome") ||
     pathname.startsWith("/legal") ||
     pathname.startsWith("/onboarding") ||

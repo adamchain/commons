@@ -56,6 +56,7 @@ export function BottomNav() {
   }, [user?.id, pathname]);
 
   const hide =
+    pathname === "/new" ||
     pathname.startsWith("/welcome") ||
     pathname.startsWith("/legal") ||
     pathname.startsWith("/admin") ||

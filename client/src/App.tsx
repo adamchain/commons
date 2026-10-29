@@ -9,6 +9,7 @@ import { ChatCleanupPrompt } from "./components/ChatCleanupPrompt";
 import { SmsConsentPrompt } from "./components/SmsConsentPrompt";
 import { CoachMarks } from "./components/CoachMarks";
 import { TopBar } from "./components/TopBar";
+import { WebAppShell, webShellVisible, webShellHasRail } from "./components/WebAppShell";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { listenForDeepLinks } from "./lib/deepLinks";
 import { resetFeedFilters } from "./lib/feedFilters";
@@ -23,6 +24,7 @@ const FeedPage = lazy(() => import("./pages/Feed").then(m => ({ default: m.FeedP
 const NotificationsPage = lazy(() => import("./pages/Notifications").then(m => ({ default: m.NotificationsPage })));
 const OnboardingPage = lazy(() => import("./pages/Onboarding").then(m => ({ default: m.OnboardingPage })));
 const LandingPage = lazy(() => import("./pages/Landing").then(m => ({ default: m.LandingPage })));
+const NewLandingPage = lazy(() => import("./pages/NewLanding").then(m => ({ default: m.NewLandingPage })));
 const LegalPage = lazy(() => import("./pages/Legal").then(m => ({ default: m.LegalPage })));
 const PlanDetailPage = lazy(() => import("./pages/PlanDetail").then(m => ({ default: m.PlanDetailPage })));
 const PublicEventPage = lazy(() => import("./pages/PublicEvent").then(m => ({ default: m.PublicEventPage })));
@@ -223,8 +225,15 @@ export default function App() {
   useLocationRefresh();
   useFilterResetOnOpen();
   useWarmRoutes();
+  const { user } = useAuth();
+  const { pathname } = useLocation();
+  const webShell = !isNative() && webShellVisible(pathname, user);
+  const shellClass = webShell
+    ? `commons-web${webShellHasRail(pathname) ? " commons-web--rail" : ""}`
+    : undefined;
   return (
-    <>
+    <div className={shellClass}>
+      {!isNative() && <WebAppShell />}
       <TopBar />
       <AppUpdatePrompt />
       <ChatCleanupPrompt />
@@ -232,6 +241,7 @@ export default function App() {
       <Suspense fallback={PAGE_FALLBACK}>
       <Routes>
         <Route path="/welcome" element={<LandingPage />} />
+        <Route path="/new" element={<NewLandingPage />} />
         <Route path="/legal/:slug" element={<LegalPage />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route path="/admin" element={<AdminPage />} />
@@ -273,6 +283,6 @@ export default function App() {
       </Suspense>
       <BottomNav />
       <CoachMarks />
-    </>
+    </div>
   );
 }
