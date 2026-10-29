@@ -7,11 +7,14 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "ios:sync": "VITE_API_URL=https://www.oncommons.co npm run build && npx cap copy ios",
+    "android:sync": "VITE_API_URL=https://www.oncommons.co npm run build && npx cap copy android",
+    "android:run": "VITE_API_URL=https://www.oncommons.co npm run build && npx cap sync android && npx cap run android",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "@aparajita/capacitor-secure-storage": "^7.1.6",
+    "@capacitor/android": "^7.6.10",
     "@capacitor/app": "^7.1.2",
     "@capacitor/camera": "^7.0.5",
     "@capacitor/cli": "^7.6.6",

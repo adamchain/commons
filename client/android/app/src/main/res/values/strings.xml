@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">COMMONS</string>
+    <string name="title_activity_main">COMMONS</string>
+    <string name="package_name">com.oncommons.mvp</string>
+    <string name="custom_url_scheme">com.oncommons.mvp</string>
+</resources>
