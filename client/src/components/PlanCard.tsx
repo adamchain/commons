@@ -371,12 +371,11 @@ function QuickJoin({
   }, [state]);
   const goingActive = localState === "going";
   const interestedActive = localState === "interested";
-  // Open plans offer both. Interested can stack. Join is the commitment, and
-  // the server refuses a second Join that overlaps a plan you're already going to.
-  // Ideas and host-approval plans stay Interested-only.
+  // One button on the card. An open plan offers Join right away. An idea, a
+  // full plan, or a host-approval plan stays Interested. Once you've marked
+  // interest, that button stays so you can switch or drop out from the sheet.
   const joinablePlan = !isLooking && !isFull && !requiresApproval;
-  const showJoin = goingActive || joinablePlan;
-  const showInterested = !goingActive;
+  const showJoin = goingActive || (joinablePlan && !interestedActive);
 
   async function setState(next: "going" | "interested" | null) {
     if (busy) return;
@@ -441,29 +440,24 @@ function QuickJoin({
             <button type="button" className="plan-card-quick-join is-full" disabled>
               Full
             </button>
+          ) : showJoin ? (
+            <button
+              type="button"
+              className="plan-card-quick-join is-join"
+              onClick={(e) => void onJoin(e)}
+              disabled={busy}
+            >
+              {goingActive ? "Joined" : busy ? "…" : "Join"}
+            </button>
           ) : (
-            <>
-              {showInterested && (
-                <button
-                  type="button"
-                  className={`plan-card-quick-join is-interested${interestedActive ? " is-active" : ""}`}
-                  onClick={(e) => void onInterested(e)}
-                  disabled={busy}
-                >
-                  {interestedActive ? "Interested ✓" : busy ? "…" : "Interested"}
-                </button>
-              )}
-              {showJoin && (
-                <button
-                  type="button"
-                  className="plan-card-quick-join is-join"
-                  onClick={(e) => void onJoin(e)}
-                  disabled={busy}
-                >
-                  {goingActive ? "Joined" : busy ? "…" : "Join"}
-                </button>
-              )}
-            </>
+            <button
+              type="button"
+              className={`plan-card-quick-join is-interested${interestedActive ? " is-active" : ""}`}
+              onClick={(e) => void onInterested(e)}
+              disabled={busy}
+            >
+              {interestedActive ? "Interested ✓" : busy ? "…" : "Interested"}
+            </button>
           )}
         </div>
         {error && <p className="plan-card-rsvp-error">{error}</p>}
