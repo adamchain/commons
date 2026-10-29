@@ -1,7 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ClipboardEvent } from "react";
 import { Link } from "react-router-dom";
+import { Clipboard } from "@capacitor/clipboard";
 import { isNative } from "../lib/platform";
 import { LinkedText } from "./LinkedText";
+
+/**
+ * A copied link on iOS lands on the pasteboard as a URL, and the message
+ * field drops it. Pull the address out of the paste when the clipboard has
+ * one and nothing else.
+ */
+function pastedLink(data: DataTransfer | null): string | null {
+  if (!data) return null;
+  const uri = data.getData("text/uri-list");
+  const uriLine = uri
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line && !line.startsWith("#"));
+  if (uriLine && /^https?:\/\//i.test(uriLine)) return uriLine;
+  const plain = (data.getData("text/plain") || data.getData("text")).trim();
+  if (/^(https?:\/\/|www\.)\S+$/i.test(plain)) return plain;
+  if (plain) return null;
+  const href = data.getData("text/html").match(/href\s*=\s*["'](https?:\/\/[^"']+)["']/i)?.[1];
+  return href ?? null;
+}
 
 export type MentionPerson = { id: string; firstName: string };
 
@@ -73,12 +95,7 @@ export function ComposerField({
     }).slice(0, 6);
   }, [mention, people]);
 
-  function insert(person: MentionPerson) {
-    if (!mention) return;
-    const name = person.firstName.trim();
-    const next = `${value.slice(0, mention.start)}@${name} ${value.slice(caret)}`;
-    onChange(next);
-    const place = mention.start + name.length + 2;
+  function placeCaret(place: number) {
     setCaret(place);
     requestAnimationFrame(() => {
       const el = ref.current;
@@ -86,6 +103,49 @@ export function ComposerField({
       el.focus();
       el.setSelectionRange(place, place);
     });
+  }
+
+  function insertAt(el: HTMLTextAreaElement, chunk: string, start: number, end: number) {
+    const current = el.value;
+    const next = current.slice(0, start) + chunk + current.slice(end);
+    onChange(next);
+    placeCaret(start + chunk.length);
+  }
+
+  function insert(person: MentionPerson) {
+    if (!mention) return;
+    const name = person.firstName.trim();
+    const next = `${value.slice(0, mention.start)}@${name} ${value.slice(caret)}`;
+    onChange(next);
+    placeCaret(mention.start + name.length + 2);
+  }
+
+  function onPaste(e: ClipboardEvent<HTMLTextAreaElement>) {
+    if (!isNative()) return;
+    const el = e.currentTarget;
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? start;
+    const link = pastedLink(e.clipboardData);
+    if (link) {
+      e.preventDefault();
+      insertAt(el, link, start, end);
+      return;
+    }
+    if ((e.clipboardData.getData("text/plain") || e.clipboardData.getData("text")).length > 0) return;
+    const before = el.value;
+    window.setTimeout(() => {
+      void (async () => {
+        const node = ref.current;
+        if (!node || node.value !== before) return;
+        try {
+          const { value: clip, type } = await Clipboard.read();
+          if (!clip || type?.startsWith("image/") || ref.current?.value !== before) return;
+          insertAt(node, clip, start, end);
+        } catch {
+          // The system blocked the read, or the pasteboard was empty.
+        }
+      })();
+    }, 0);
   }
 
   return (
@@ -116,6 +176,7 @@ export function ComposerField({
         }}
         onClick={(e) => setCaret(e.currentTarget.selectionStart ?? value.length)}
         onKeyUp={(e) => setCaret(e.currentTarget.selectionStart ?? value.length)}
+        onPaste={onPaste}
         onKeyDown={(e) => {
           if (e.key === "Escape") {
             onEscape?.();
