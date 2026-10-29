@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "ios:sync": "VITE_API_URL=https://www.oncommons.co npm run build && npx cap copy ios",
+    "ios:sync": "VITE_API_URL=https://www.oncommons.co npm run build && npx cap copy ios && rm -rf ios/App/App/public/videos",
     "android:sync": "VITE_API_URL=https://www.oncommons.co npm run build && npx cap copy android",
     "android:run": "VITE_API_URL=https://www.oncommons.co npm run build && npx cap sync android && npx cap run android",
     "lint": "eslint .",
