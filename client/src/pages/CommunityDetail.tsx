@@ -76,10 +76,32 @@ export function CommunityDetailPage() {
   const [notFound, setNotFound] = useState(false);
   const [tab, setTab] = useState<Tab>(() => tabFromParam(searchParams.get("tab")) ?? "bulletin");
   const tabParam = searchParams.get("tab");
+  const tabsRef = useRef<HTMLElement>(null);
   useEffect(() => {
     const next = tabFromParam(tabParam);
     if (next) setTab(next);
   }, [tabParam]);
+
+  // The tab bar sticks under the status bar. Only mask the strip above it with an
+  // opaque backdrop once it's actually stuck — otherwise the mask would sit over
+  // the bottom of the header card (the social pills) in the resting position.
+  useEffect(() => {
+    if (loading) return;
+    const el = tabsRef.current;
+    if (!el) return;
+    const probe = document.createElement("div");
+    probe.style.cssText =
+      "position:fixed;top:0;left:0;width:0;height:env(safe-area-inset-top,0px);visibility:hidden;pointer-events:none";
+    document.body.appendChild(probe);
+    const safeTop = probe.getBoundingClientRect().height;
+    probe.remove();
+    const onScroll = () => {
+      el.classList.toggle("is-stuck", el.getBoundingClientRect().top <= safeTop + 1);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [loading]);
   const [joinConfirm, setJoinConfirm] = useState(false);
   const [editSocials, setEditSocials] = useState(false);
   const [leaveBusy, setLeaveBusy] = useState(false);
@@ -371,7 +393,7 @@ export function CommunityDetailPage() {
         </div>
       </header>
 
-      <nav className="cmy-tabs" role="tablist">
+      <nav ref={tabsRef} className="cmy-tabs" role="tablist">
         {community.bulletinEnabled && (
           <TabButton id="bulletin" tab={tab} setTab={setTab} badge={community.pendingBulletinCount || undefined}>
             Bulletin

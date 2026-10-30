@@ -1138,7 +1138,8 @@ button.cmy-joined-pill {
 }
 /* When the bar sticks, it pins below the status bar, leaving the strip above it
    uncovered so posts scroll through behind the clock/battery. Extend the opaque
-   background up through that strip so the status-bar area stays clean. */
+   background up through that strip — but only once stuck, otherwise it would sit
+   over the bottom of the header card (social pills) in the natural position. */
 .cmy-tabs::before {
   content: "";
   position: absolute;
@@ -1148,6 +1149,10 @@ button.cmy-joined-pill {
   height: env(safe-area-inset-top, 0px);
   background: var(--bg);
   pointer-events: none;
+  opacity: 0;
+}
+.cmy-tabs.is-stuck::before {
+  opacity: 1;
 }
 .cmy-tabs:not(:has(.cmy-tab:nth-child(4))) {
   grid-template-columns: repeat(3, minmax(0, 1fr));

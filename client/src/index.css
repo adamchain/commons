@@ -13090,6 +13090,12 @@ a.sheet-link {
   backdrop-filter: blur(16px);
   border-top: 1px solid var(--line);
   box-shadow: none;
+  transition: transform 180ms ease;
+}
+/* Keyboard open: slide the bar out of view so it doesn't float above the keyboard. */
+.bottom-nav.is-keyboard {
+  transform: translateY(100%);
+  pointer-events: none;
 }
 
 /* Five-slot layout: Home · Communities · + · Messages · Network.

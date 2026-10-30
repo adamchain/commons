@@ -24,6 +24,33 @@ export function BottomNav() {
   const { pathname } = useLocation();
   const { user } = useAuth();
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+
+  // When the on-screen keyboard opens (e.g. focusing the Network/search inputs),
+  // iOS shrinks the web viewport, which drags this `position: fixed; bottom: 0`
+  // bar up to sit on top of the keyboard. Detect the shrink and slide it away.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    let baseline = window.innerHeight;
+    const check = () => {
+      const winH = window.innerHeight;
+      if (winH > baseline) baseline = winH; // tallest height = no keyboard
+      const vvH = vv?.height ?? winH;
+      // The keyboard shrinks either the layout viewport (webview resize) or just
+      // the visual viewport. Catch whichever one moved.
+      const shrink = Math.max(baseline - winH, winH - vvH);
+      setKeyboardOpen(shrink > 120);
+    };
+    check();
+    window.addEventListener("resize", check);
+    vv?.addEventListener("resize", check);
+    vv?.addEventListener("scroll", check);
+    return () => {
+      window.removeEventListener("resize", check);
+      vv?.removeEventListener("resize", check);
+      vv?.removeEventListener("scroll", check);
+    };
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -75,7 +102,10 @@ export function BottomNav() {
   if (hide) return null;
 
   return (
-    <nav className="bottom-nav bottom-nav--five" aria-label="Primary">
+    <nav
+      className={`bottom-nav bottom-nav--five${keyboardOpen ? " is-keyboard" : ""}`}
+      aria-label="Primary"
+    >
       <NavLink
         to="/"
         end

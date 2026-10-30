@@ -1348,7 +1348,9 @@ export function CreatePlanPage() {
                 aria-invalid={Boolean(dateError)}
                 onChange={(e) => {
                   const nextDate = e.target.value;
-                  if (!nextDate) return;
+                  // Hard guard: never accept a past date even if the native
+                  // `min` is bypassed on some pickers.
+                  if (!nextDate || nextDate < today()) return;
                   setForm((f) => ({ ...f, date: nextDate, isFlexibleDate: false, isThisWeek: false }));
                 }}
               />
@@ -2225,7 +2227,7 @@ function IdeaForm({
                       min={today()}
                       value={form.date}
                       onChange={(e) => {
-                        if (!e.target.value) return;
+                        if (!e.target.value || e.target.value < today()) return;
                         setForm((f) => ({ ...f, date: e.target.value, isFlexibleDate: false, isThisWeek: false }));
                       }}
                     />
