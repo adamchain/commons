@@ -598,6 +598,8 @@ export interface NotificationDTO {
   body: string;
   /** Optional plan link — clients route to /plans/:planId on tap. */
   planId?: string;
+  /** Weekly digest — each listed plan, in body order. */
+  planIds?: string[];
   /** Optional conversation link — chat-message events route here. */
   conversationId?: string;
   /** Optional profile link — network request/accept route here. */

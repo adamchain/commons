@@ -64,6 +64,7 @@ export async function emit(input: {
   body: string;
   dedupKey: string;
   planId?: string;
+  planIds?: string[];
   conversationId?: string;
   profileUserId?: string;
   communityId?: string;
@@ -92,6 +93,7 @@ export async function emit(input: {
     body: input.body,
     dedupKey: input.dedupKey,
     planId: input.planId,
+    planIds: input.planIds,
     conversationId: input.conversationId,
     profileUserId: input.profileUserId,
     communityId: input.communityId,

@@ -494,6 +494,8 @@ export interface NotificationDTO {
   kind: NotificationKind;
   body: string;
   planId?: string;
+  /** Weekly digest — each listed plan, in body order. */
+  planIds?: string[];
   conversationId?: string;
   profileUserId?: string;
   /** Present on community notifications — links to the community page. */

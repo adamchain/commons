@@ -124,7 +124,8 @@ export async function runWeekendNudgeIfWeekendEve(): Promise<void> {
     await emit({
       userId: u.id,
       kind: "weeklyFridayDigest",
-      body: `Here's what's happening in Philly this week:\n${lines}`,
+      body: `This week in Philly\n${lines}`,
+      planIds: upcoming.map((p) => p.id),
       dedupKey: `weeklyFridayDigest:${dayKey}:${u.id}`,
     });
     if (seen.size >= 80) break;

@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { BarChart2, Check, ChevronDown } from "lucide-react";
+import { useMemo, useState, type CSSProperties } from "react";
+import { Check, ChevronDown } from "lucide-react";
 import type { NavFromState } from "../lib/navState";
 import { Avatar } from "./Avatar";
 import { ChatPersonLink } from "./ChatPersonLink";
@@ -76,20 +76,20 @@ export function PollCard({
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
           >
-            <span className="poll-card-badge" aria-hidden="true">
-              <BarChart2 size={14} strokeWidth={1.8} />
-            </span>
-            <div className="poll-card-question">{poll.question}</div>
+            <div className="poll-card-copy">
+              <span className="poll-card-kicker">Poll</span>
+              <div className="poll-card-question">{poll.question}</div>
+            </div>
             <span className={`poll-card-chevron ${open ? "is-open" : ""}`} aria-hidden="true">
-              <ChevronDown size={12} strokeWidth={2} />
+              <ChevronDown size={14} strokeWidth={2} />
             </span>
           </button>
         ) : (
           <div className="poll-card-head">
-            <span className="poll-card-badge" aria-hidden="true">
-              <BarChart2 size={14} strokeWidth={1.8} />
-            </span>
-            <div className="poll-card-question">{poll.question}</div>
+            <div className="poll-card-copy">
+              <span className="poll-card-kicker">Poll</span>
+              <div className="poll-card-question">{poll.question}</div>
+            </div>
           </div>
         )
       )}
@@ -115,17 +115,17 @@ export function PollCard({
               <button
                 type="button"
                 className={`poll-option ${revealed ? "is-revealed" : ""} ${mine ? "is-mine" : ""} ${isWinner ? "is-winner" : ""}`}
+                style={revealed ? ({ "--pct": `${pct}%` } as CSSProperties) : undefined}
                 onClick={() => onVote(opt.id)}
                 disabled={busy || poll.closed}
                 aria-pressed={mine}
               >
-                <span className="poll-option-label">
-                  {showCheck && (
-                    <Check className="poll-option-check" size={11} strokeWidth={2.5} aria-hidden="true" />
-                  )}
-                  <span className={`poll-option-text ${isWinner ? "is-winner-text" : ""}`}>{opt.text}</span>
+                {revealed && <span className="poll-option-fill" aria-hidden="true" />}
+                <span className={`poll-option-radio ${showCheck ? "is-on" : ""}`} aria-hidden="true">
+                  {showCheck ? <Check size={11} strokeWidth={2.6} /> : null}
                 </span>
-                {revealed && (
+                <span className={`poll-option-text ${isWinner ? "is-winner-text" : ""}`}>{opt.text}</span>
+                {revealed ? (
                   <span className="poll-option-stats">
                     {variant === "card" && voters.length > 0 && (
                       <span className="poll-option-voters" aria-hidden="true">
@@ -142,15 +142,12 @@ export function PollCard({
                         ))}
                       </span>
                     )}
-                    <span className="poll-option-pct">{pct}%</span>
+                    <small className="poll-option-pct">
+                      {count} {count === 1 ? "vote" : "votes"}
+                    </small>
                   </span>
-                )}
+                ) : null}
               </button>
-              {variant === "card" && revealed && voters.length > 0 && (
-                <p className="poll-option-voter-names">
-                  {voters.map((v) => v.firstName).join(", ")}
-                </p>
-              )}
             </li>
           );
         })}

@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { PushNotifications } from "@capacitor/push-notifications";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Bell, MessageCircle } from "lucide-react";
 import { api } from "../api/http";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { ensurePushRegistered } from "../lib/push";
 import { isNative } from "../lib/platform";
@@ -54,18 +55,13 @@ export function NotificationPrefsPage() {
   }
 
   return (
-    <main className="app-shell app-shell--with-nav app-shell--with-topbar">
+    <main className="app-shell app-shell--with-nav app-shell--with-topbar notif-prefs-page">
       <header className="app-header app-header--minimal">
         <Link to="/settings" className="back-circle" aria-label="Back">
           <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </Link>
       </header>
-      <h1 className="brand" style={{ marginBottom: 6 }}>
-        Notifications
-      </h1>
-      <p className="brand-tagline" style={{ marginBottom: 12, textTransform: "none", letterSpacing: 0 }}>
-        Pick what reaches you, when.
-      </p>
+      <ScreenTitle title="Notifications" subtitle="Pick what reaches you, when." />
 
       <Group label="Plans">
         <ToggleRow
@@ -135,7 +131,7 @@ export function NotificationPrefsPage() {
           onChange={(next) => void setPushEnabled(next)}
         />
         <InfoRow
-          icon="💬"
+          icon={<MessageCircle size={18} strokeWidth={1.8} />}
           title="SMS"
           sub={
             user.phoneNumber
@@ -235,7 +231,7 @@ function ToggleRow({
     >
       <div className="settings-row-body" style={{ paddingLeft: 0 }}>
         <div className="settings-row-title">{title}</div>
-        <div className="settings-row-sub" style={{ whiteSpace: "normal" }}>{sub}</div>
+        <div className="settings-row-sub">{sub}</div>
       </div>
       <span className={`flex-switch${on ? " is-on" : ""}`} aria-hidden="true">
         <span className="flex-switch-knob" />
@@ -289,11 +285,11 @@ function PushSetupRow({
       onClick={() => onChange(!shownOn)}
     >
       <span className="settings-row-icon" aria-hidden="true">
-        <span style={{ fontSize: 18 }}>🔔</span>
+        <Bell size={18} strokeWidth={1.8} />
       </span>
       <div className="settings-row-body">
         <div className="settings-row-title">Push notifications</div>
-        <div className="settings-row-sub" style={{ whiteSpace: "normal" }}>{sub}</div>
+        <div className="settings-row-sub">{sub}</div>
       </div>
       <span className={`flex-switch${shownOn ? " is-on" : ""}`} aria-hidden="true">
         <span className="flex-switch-knob" />
@@ -302,11 +298,11 @@ function PushSetupRow({
   );
 }
 
-function InfoRow({ icon, title, sub }: { icon: string; title: string; sub: string }) {
+function InfoRow({ icon, title, sub }: { icon: ReactNode; title: string; sub: string }) {
   return (
     <div className="settings-row">
       <span className="settings-row-icon" aria-hidden="true">
-        <span style={{ fontSize: 18 }}>{icon}</span>
+        {icon}
       </span>
       <div className="settings-row-body">
         <div className="settings-row-title">{title}</div>

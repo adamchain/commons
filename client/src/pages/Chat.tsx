@@ -14,7 +14,9 @@ import { readScreen, writeScreen } from "../lib/screenCache";
 import { Avatar } from "../components/Avatar";
 import { ComposerField, MentionText } from "../components/ComposerField";
 import { ChatReplyButton, ChatReplyDraft, ChatReplyQuote, replyTarget } from "../components/ChatReply";
+import { ChatAttachSheet } from "../components/ChatAttachSheet";
 import { ChatPersonLink } from "../components/ChatPersonLink";
+import { ChatSystemEvent } from "../components/ChatSystemEvent";
 import { HoldToDelete } from "../components/HoldToDelete";
 import { BlockConfirmModal, ReportModal } from "../components/PlanSafetyMenu";
 import { PollCard } from "../components/PollCard";
@@ -86,7 +88,6 @@ export function ChatPage() {
   const [leaveErr, setLeaveErr] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [blockOpen, setBlockOpen] = useState(false);
-  const composerMenuRef = useRef<HTMLDivElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const deletedIdsRef = useRef(new Set<string>());
@@ -138,17 +139,6 @@ export function ChatPage() {
     }, POLL_MS);
     return () => clearInterval(interval);
   }, [conv]);
-
-  useEffect(() => {
-    if (!composerMenuOpen) return;
-    const close = (e: MouseEvent) => {
-      if (composerMenuRef.current && !composerMenuRef.current.contains(e.target as Node)) {
-        setComposerMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [composerMenuOpen]);
 
   useEffect(() => {
     if (!headerMenuOpen) return;
@@ -576,7 +566,7 @@ export function ChatPage() {
               }
               if (entry.kind === "system") {
                 return (
-                  <div key={entry.id} className="chat-system-line">{entry.body}</div>
+                  <ChatSystemEvent key={entry.id} body={entry.body} at={entry.createdAt} />
                 );
               }
               if (entry.kind === "poll") {
@@ -721,47 +711,14 @@ export function ChatPage() {
             </div>
           )}
           <div className="chat-composer-row">
-            <div className="chat-composer-menu-wrap" ref={composerMenuRef}>
-              <button
-                type="button"
-                className="chat-composer-add"
-                onClick={() => setComposerMenuOpen((v) => !v)}
-                aria-label="More actions"
-                aria-expanded={composerMenuOpen}
-              >
-                <Plus size={14} strokeWidth={2} aria-hidden="true" />
-              </button>
-              {composerMenuOpen && (
-                <div className="chat-composer-menu" role="menu">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setComposerMenuOpen(false);
-                      setPollModalOpen(true);
-                    }}
-                  >
-                    Add a poll
-                  </button>
-                  <Link
-                    to={canLockIdea ? lockHref : replanHref}
-                    role="menuitem"
-                    className="chat-composer-menu-link"
-                    onClick={() => setComposerMenuOpen(false)}
-                  >
-                    {canLockIdea ? "Lock it in" : "Make a plan"}
-                  </Link>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    disabled={attachingImage || sending}
-                    onClick={() => void pickImage()}
-                  >
-                    {attachingImage ? "Adding…" : "Upload an image"}
-                  </button>
-                </div>
-              )}
-            </div>
+            <button
+              type="button"
+              className="chat-composer-add"
+              onClick={() => setComposerMenuOpen(true)}
+              aria-label="Add to the conversation"
+            >
+              <Plus size={20} strokeWidth={2} aria-hidden="true" />
+            </button>
             <input
               ref={imageInputRef}
               type="file"
@@ -798,6 +755,22 @@ export function ChatPage() {
           </div>
         </form>
       </div>
+
+      {composerMenuOpen && (
+        <ChatAttachSheet
+          photoBusy={attachingImage || sending}
+          plan={{
+            label: canLockIdea ? "Lock it in" : "Plan",
+            href: canLockIdea ? lockHref : replanHref,
+          }}
+          onClose={() => setComposerMenuOpen(false)}
+          onPhoto={() => void pickImage()}
+          onPoll={() => {
+            setComposerMenuOpen(false);
+            setPollModalOpen(true);
+          }}
+        />
+      )}
 
       {pollModalOpen && (
         <PollSheet
@@ -865,7 +838,7 @@ function formatTimeOnly(iso: string): string {
 
 type GroupedEntry =
   | { kind: "day"; key: string; label: string }
-  | { kind: "system"; id: string; body: string }
+  | { kind: "system"; id: string; body: string; createdAt: string }
   | { kind: "poll"; id: string; message: MessageDTO }
   | {
       kind: "user";
@@ -895,7 +868,7 @@ function groupMessages(msgs: MessageDTO[]): GroupedEntry[] {
       lastUserAt = 0;
     }
     if (m.kind === "system") {
-      out.push({ kind: "system", id: m.id, body: m.body });
+      out.push({ kind: "system", id: m.id, body: m.body, createdAt: m.createdAt });
       lastUserSenderId = "";
       lastUserAt = 0;
       continue;

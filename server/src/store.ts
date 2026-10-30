@@ -612,6 +612,8 @@ export interface NotificationRecord {
     | "helpReply";
   body: string;
   planId?: string;
+  /** Weekly digest — each listed plan, in body order. */
+  planIds?: string[];
   conversationId?: string;
   /** For person-centric notifications (network request/accept) — links to a profile. */
   profileUserId?: string;

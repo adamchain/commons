@@ -38,6 +38,7 @@ notificationsRouter.get("/", requireAuth, async (req, res) => {
       kind: n.kind,
       body: n.body,
       planId: n.planId,
+      ...(n.planIds?.length ? { planIds: n.planIds } : {}),
       conversationId: n.conversationId,
       profileUserId: n.profileUserId,
       communityId: n.communityId,

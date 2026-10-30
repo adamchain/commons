@@ -143,53 +143,53 @@ export function CommunitiesPage() {
 
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar cmy-list">
-      <header className="cmy-list-masthead">
-        {directory && (
-          <Link to="/communities" className="back-circle" aria-label="Back to communities">
-            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
-          </Link>
-        )}
-        <div className="cmy-list-masthead-copy">
+      {directory && (
+        <Link to="/communities" className="back-circle" aria-label="Back to communities">
+          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
+        </Link>
+      )}
+      <header className="cmy-list-header">
+        <div className="cmy-list-header-row">
           <h1 className="cmy-list-title">Communities</h1>
+          <button
+            type="button"
+            className="cmy-btn cmy-btn--primary cmy-list-create"
+            onClick={() => navigate("/communities/new")}
+          >
+            <Plus size={16} strokeWidth={2.4} aria-hidden="true" />
+            Create
+          </button>
         </div>
-        <button
-          type="button"
-          className="cmy-btn cmy-btn--primary cmy-list-create"
-          onClick={() => navigate("/communities/new")}
-        >
-          <Plus size={15} strokeWidth={2.4} aria-hidden="true" />
-          Create
-        </button>
+        <div className="network-search-wrap cmy-search">
+          <Search size={18} strokeWidth={1.8} aria-hidden="true" />
+          <input
+            className="network-search-input"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setShown(COMMUNITY_PAGE);
+            }}
+            placeholder="Search communities..."
+            aria-label="Search communities"
+            enterKeyHint="search"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+          <button
+            type="button"
+            className={`network-search-clear${query ? " is-on" : ""}`}
+            onClick={() => {
+              setQuery("");
+              setShown(COMMUNITY_PAGE);
+            }}
+            aria-label="Clear search"
+            tabIndex={query ? 0 : -1}
+          >
+            ×
+          </button>
+        </div>
       </header>
-      <div className="network-search-wrap cmy-search">
-        <Search size={16} strokeWidth={1.8} aria-hidden="true" />
-        <input
-          className="network-search-input"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setShown(COMMUNITY_PAGE);
-          }}
-          placeholder="Search communities…"
-          aria-label="Search communities"
-          enterKeyHint="search"
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-        />
-        <button
-          type="button"
-          className={`network-search-clear${query ? " is-on" : ""}`}
-          onClick={() => {
-            setQuery("");
-            setShown(COMMUNITY_PAGE);
-          }}
-          aria-label="Clear search"
-          tabIndex={query ? 0 : -1}
-        >
-          ×
-        </button>
-      </div>
       <div className="cmy-cat-pills" data-axis-scroll="">
         {user && (
           <Link

@@ -443,10 +443,12 @@ function QuickJoin({
           ) : showJoin ? (
             <button
               type="button"
-              className="plan-card-quick-join is-join"
+              className={`plan-card-quick-join is-join${goingActive ? " is-active" : ""}`}
               onClick={(e) => void onJoin(e)}
               disabled={busy}
+              aria-pressed={goingActive}
             >
+              <span className="response-state-dot" aria-hidden="true" />
               {goingActive ? "Joined" : busy ? "…" : "Join"}
             </button>
           ) : (
@@ -455,8 +457,10 @@ function QuickJoin({
               className={`plan-card-quick-join is-interested${interestedActive ? " is-active" : ""}`}
               onClick={(e) => void onInterested(e)}
               disabled={busy}
+              aria-pressed={interestedActive}
             >
-              {interestedActive ? "Interested ✓" : busy ? "…" : "Interested"}
+              <span className="response-state-dot" aria-hidden="true" />
+              {interestedActive ? "Interested" : busy ? "…" : "Interested"}
             </button>
           )}
         </div>

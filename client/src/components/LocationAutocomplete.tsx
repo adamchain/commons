@@ -178,7 +178,8 @@ export function LocationAutocomplete({
         value={query}
         onChange={(e) => handleInput(e.target.value)}
         onFocus={() => {
-          if (suggestions.length > 0) setOpen(true);
+          setOpen(true);
+          if (query.trim().length >= 2 && suggestions.length === 0) runSearch(query);
         }}
         autoComplete="off"
       />
@@ -193,11 +194,11 @@ export function LocationAutocomplete({
               type="button"
               className="location-suggestion"
               onPointerDown={(e) => {
-                // Keep the field focused so the menu isn't clipped or dismissed
-                // before the tap lands — otherwise the row below swallows it.
+                // iOS often drops click after preventDefault; pick on the
+                // pointer down so a suggestion actually selects.
                 e.preventDefault();
+                void pick(s);
               }}
-              onClick={() => void pick(s)}
             >
               <div className="location-suggestion-name">{formatVenueName(s.name) || s.name}</div>
               {formatVenueAddressLine(s.name, s.address) ? (

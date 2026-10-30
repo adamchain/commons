@@ -403,7 +403,6 @@ export function PlanDetailPage() {
                       style={person.avatarStyle}
                       photoDataUrl={person.avatarPhotoDataUrl}
                       params={person.avatarParams}
-                      name={person.firstName}
                       size="sm"
                     />
                   </span>
@@ -411,10 +410,11 @@ export function PlanDetailPage() {
               </span>
             )}
             <span className="plan-detail-people-count">
-              {goingCount} going
-              <span className="plan-detail-people-sep" aria-hidden="true">·</span>
-              {interestedCount} interested
+              <strong>{goingCount} going</strong>
+              <i className="plan-detail-people-dot" aria-hidden="true" />
+              <span>{interestedCount} interested</span>
             </span>
+            <ChevronRight className="plan-detail-people-chevron" size={18} strokeWidth={2} aria-hidden="true" />
           </button>
           {!isPast && !plan.cancelledAt && goingCount <= 1 && !(plan.communityId && !isHosting) && (
             <button
@@ -1038,6 +1038,8 @@ export function PlanDetailPage() {
 function ParticipantsRow({
   people,
   planId,
+  userId,
+  hostId,
   expanded,
   onToggle,
   countLabel,
@@ -1045,6 +1047,8 @@ function ParticipantsRow({
 }: {
   people: PublicUser[];
   planId: string;
+  userId?: string;
+  hostId?: string;
   expanded: boolean;
   onToggle: () => void;
   countLabel: string;
@@ -1054,24 +1058,10 @@ function ParticipantsRow({
   const visible = expanded ? people : people.slice(0, 5);
   const canExpand = people.length > 0;
   const nameList = (
-    <ul className="who-row-name-list">
+    <ul className="guest-list">
       {people.map((person) => (
         <li key={person.id}>
-          <Link to={`/profile/${person.id}`} state={profileFrom} className="who-row-name">
-            <Avatar
-              seed={person.avatarSeed}
-              style={person.avatarStyle}
-              photoDataUrl={person.avatarPhotoDataUrl}
-              params={person.avatarParams}
-              size="sm"
-            />
-            <span className="who-row-name-text">
-              <span className="who-row-name-primary">{person.firstName}</span>
-              {person.lastName ? (
-                <span className="who-row-name-sub">{person.lastName}</span>
-              ) : null}
-            </span>
-          </Link>
+          <GuestRow person={person} planId={planId} userId={userId} hostId={hostId} />
         </li>
       ))}
     </ul>
@@ -1147,16 +1137,23 @@ function PlanGuests({
   variant?: "page" | "modal";
 }) {
   const listOnly = variant === "modal";
+  const hostId = plan.creator.id;
+  const interestedTitle = planRequiresHostApproval(plan) && isHosting ? "Applications" : "Interested";
   return (
-    <section id={listOnly ? undefined : "guests"} className={listOnly ? "plan-guests-modal-list" : "who-block plan-detail-card"}>
-      <div className="who-row">
-        <h3 className="who-block-heading">Going · {plan.participants.going.length}</h3>
+    <section id={listOnly ? undefined : "guests"} className="guest-sheet">
+      <div className="guest-card">
+        <div className="guest-section-head">
+          <h3>Going</h3>
+          <span>{plan.participants.going.length}</span>
+        </div>
         {plan.participants.going.length === 0 ? (
-          <p className="subtle" style={{ margin: 0 }}>Be the first to say &ldquo;I&apos;m in.&rdquo;</p>
+          <p className="guest-empty">Be the first to say you&apos;re in.</p>
         ) : (
           <ParticipantsRow
             people={plan.participants.going}
             planId={plan.id}
+            hostId={hostId}
+            userId={userId}
             expanded={listOnly || showAllGoing}
             onToggle={onToggleGoing}
             countLabel={`${plan.participants.going.length} going`}
@@ -1165,58 +1162,96 @@ function PlanGuests({
         )}
       </div>
 
-      {plan.participants.interested.length > 0 && (
-        <div className="who-row" style={{ marginTop: 14 }}>
-          <h3 className="who-block-heading">
-            {planRequiresHostApproval(plan) && isHosting ? "Applications" : "Interested"} · {plan.participants.interested.length}
-          </h3>
-          {planRequiresHostApproval(plan) && isHosting ? (
-            <div className="participant-list-interested">
-              {plan.participants.interested.map((person) => (
-                <div key={person.id} className="participant-row participant-row--with-action">
-                  <Link
-                    to={`/profile/${person.id}`}
-                    state={{ from: "plan", planId: plan.id }}
-                    className="participant-row-link"
-                  >
-                    <Avatar seed={person.avatarSeed} style={person.avatarStyle} photoDataUrl={person.avatarPhotoDataUrl} params={person.avatarParams} size="sm" />
-                    <span className="participant-name">
-                      {person.firstName}
-                      {person.id === userId && <span className="you-pill">You</span>}
-                    </span>
-                  </Link>
-                  {person.id !== userId && (
-                    <button
-                      type="button"
-                      className="btn-secondary participant-approve-btn"
-                      onClick={() => {
-                        void api(`/api/plans/${plan.id}/approve`, {
-                          method: "POST",
-                          body: JSON.stringify({ userId: person.id }),
-                        })
-                          .then(() => onApproved())
-                          .catch(() => undefined);
-                      }}
-                    >
-                      Let them in
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <ParticipantsRow
-              people={plan.participants.interested}
-              planId={plan.id}
-              expanded={listOnly || showAllInterested}
-              onToggle={onToggleInterested}
-              countLabel={`${plan.participants.interested.length} interested`}
-              listOnly={listOnly}
-            />
-          )}
+      <div className="guest-card">
+        <div className="guest-section-head">
+          <h3>{interestedTitle}</h3>
+          <span>{plan.participants.interested.length}</span>
         </div>
-      )}
+        {plan.participants.interested.length === 0 ? (
+          <p className="guest-empty">No one&apos;s marked interested yet.</p>
+        ) : planRequiresHostApproval(plan) && isHosting ? (
+          <ul className="guest-list">
+            {plan.participants.interested.map((person) => (
+              <li key={person.id}>
+                <GuestRow
+                  person={person}
+                  planId={plan.id}
+                  userId={userId}
+                  hostId={hostId}
+                  action={
+                    person.id !== userId ? (
+                      <button
+                        type="button"
+                        className="guest-approve"
+                        onClick={() => {
+                          void api(`/api/plans/${plan.id}/approve`, {
+                            method: "POST",
+                            body: JSON.stringify({ userId: person.id }),
+                          })
+                            .then(() => onApproved())
+                            .catch(() => undefined);
+                        }}
+                      >
+                        Let them in
+                      </button>
+                    ) : null
+                  }
+                />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <ParticipantsRow
+            people={plan.participants.interested}
+            planId={plan.id}
+            userId={userId}
+            hostId={hostId}
+            expanded={listOnly || showAllInterested}
+            onToggle={onToggleInterested}
+            countLabel={`${plan.participants.interested.length} interested`}
+            listOnly={listOnly}
+          />
+        )}
+      </div>
     </section>
+  );
+}
+
+function GuestRow({
+  person,
+  planId,
+  userId,
+  hostId,
+  action,
+}: {
+  person: PublicUser;
+  planId: string;
+  userId?: string;
+  hostId?: string;
+  action?: ReactNode;
+}) {
+  const fullName = [person.firstName, person.lastName].filter(Boolean).join(" ");
+  const roles = [
+    person.id === userId ? "You" : null,
+    hostId && person.id === hostId ? "Host" : null,
+  ].filter(Boolean);
+  return (
+    <div className="guest-row">
+      <Link to={`/profile/${person.id}`} state={{ from: "plan", planId }} className="guest-row-link">
+        <Avatar
+          seed={person.avatarSeed}
+          style={person.avatarStyle}
+          photoDataUrl={person.avatarPhotoDataUrl}
+          params={person.avatarParams}
+          size="md"
+        />
+        <span className="guest-row-copy">
+          <strong>{fullName || person.firstName}</strong>
+          {roles.length > 0 ? <small>{roles.join(" · ")}</small> : null}
+        </span>
+      </Link>
+      {action}
+    </div>
   );
 }
 

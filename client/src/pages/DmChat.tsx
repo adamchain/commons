@@ -5,7 +5,9 @@ import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { ComposerField, MentionText } from "../components/ComposerField";
 import { ChatReplyButton, ChatReplyDraft, ChatReplyQuote, replyTarget } from "../components/ChatReply";
+import { ChatAttachSheet } from "../components/ChatAttachSheet";
 import { ChatPersonLink } from "../components/ChatPersonLink";
+import { ChatSystemEvent } from "../components/ChatSystemEvent";
 import { HoldToDelete } from "../components/HoldToDelete";
 import { PollCard } from "../components/PollCard";
 import { PollSheet } from "../components/PollSheet";
@@ -61,7 +63,6 @@ export function DmChatPage() {
   const [connectErr, setConnectErr] = useState<string | null>(null);
   const [openAttempt, setOpenAttempt] = useState(0);
   const [ready, setReady] = useState(cachedDm != null);
-  const composerMenuRef = useRef<HTMLDivElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const deletedIdsRef = useRef(new Set<string>());
@@ -136,17 +137,6 @@ export function DmChatPage() {
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, [headerMenuOpen]);
-
-  useEffect(() => {
-    if (!composerMenuOpen) return;
-    const close = (e: MouseEvent) => {
-      if (composerMenuRef.current && !composerMenuRef.current.contains(e.target as Node)) {
-        setComposerMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [composerMenuOpen]);
 
   const personProfileFrom: NavFromState = { from: "dm", dmUserId: userId };
   const other = conv?.participants.find((p) => p.id !== user?.id) ?? conv?.participants[0];
@@ -520,11 +510,7 @@ export function DmChatPage() {
           )}
           {messages.map((m) => {
             if (m.kind === "system") {
-              return (
-                <div key={m.id} className="chat-system-line">
-                  {m.body}
-                </div>
-              );
+              return <ChatSystemEvent key={m.id} body={m.body} at={m.createdAt} />;
             }
             if (m.kind === "poll" && m.poll && m.sender && conv) {
               return (
@@ -638,49 +624,14 @@ export function DmChatPage() {
               </div>
             )}
             <div className="chat-composer-row">
-              <div className="chat-composer-menu-wrap" ref={composerMenuRef}>
-                <button
-                  type="button"
-                  className="chat-composer-add"
-                  onClick={() => setComposerMenuOpen((v) => !v)}
-                  aria-label="More actions"
-                  aria-expanded={composerMenuOpen}
-                >
-                  <Plus size={14} strokeWidth={2} aria-hidden="true" />
-                </button>
-                {composerMenuOpen && (
-                  <div className="chat-composer-menu" role="menu">
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        setComposerMenuOpen(false);
-                        setPollModalOpen(true);
-                      }}
-                    >
-                      Add a poll
-                    </button>
-                    {other && (
-                      <Link
-                        to={`/plans/new?inviteUser=${encodeURIComponent(other.id)}&inviteName=${encodeURIComponent(other.firstName)}`}
-                        role="menuitem"
-                        className="chat-composer-menu-link"
-                        onClick={() => setComposerMenuOpen(false)}
-                      >
-                        Make a plan
-                      </Link>
-                    )}
-                    <button
-                      type="button"
-                      role="menuitem"
-                      disabled={attachingImage || sending}
-                      onClick={() => void pickImage()}
-                    >
-                      {attachingImage ? "Adding…" : "Upload an image"}
-                    </button>
-                  </div>
-                )}
-              </div>
+              <button
+                type="button"
+                className="chat-composer-add"
+                onClick={() => setComposerMenuOpen(true)}
+                aria-label="Add to the conversation"
+              >
+                <Plus size={20} strokeWidth={2} aria-hidden="true" />
+              </button>
               <input
                 ref={imageInputRef}
                 type="file"
@@ -738,6 +689,25 @@ export function DmChatPage() {
             </Button>
           </div>
         </BottomSheet>
+      )}
+      {composerMenuOpen && (
+        <ChatAttachSheet
+          photoBusy={attachingImage || sending}
+          plan={
+            other
+              ? {
+                  label: "Plan",
+                  href: `/plans/new?inviteUser=${encodeURIComponent(other.id)}&inviteName=${encodeURIComponent(other.firstName)}`,
+                }
+              : null
+          }
+          onClose={() => setComposerMenuOpen(false)}
+          onPhoto={() => void pickImage()}
+          onPoll={() => {
+            setComposerMenuOpen(false);
+            setPollModalOpen(true);
+          }}
+        />
       )}
       {pollModalOpen && (
         <PollSheet

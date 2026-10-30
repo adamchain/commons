@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import { App as CapApp } from "@capacitor/app";
 import { useAuth } from "./context/AuthContext";
 import { BottomNav } from "./components/BottomNav";
+import { RouteStage } from "./components/RouteStage";
+import { CreateLauncher } from "./components/CreateLauncher";
 import { AppUpdatePrompt } from "./components/AppUpdatePrompt";
 import { ChatCleanupPrompt } from "./components/ChatCleanupPrompt";
 import { SmsConsentPrompt } from "./components/SmsConsentPrompt";
@@ -239,6 +241,7 @@ export default function App() {
       <ChatCleanupPrompt />
       <SmsConsentPrompt />
       <Suspense fallback={PAGE_FALLBACK}>
+      <RouteStage>
       <Routes>
         <Route path="/welcome" element={<LandingPage />} />
         <Route path="/new" element={<NewLandingPage />} />
@@ -280,8 +283,10 @@ export default function App() {
         {/* Own profile is reachable mid-onboarding so people can review themselves. Other profiles wait. */}
         <Route path="/profile/:userId" element={<ProfileGate />} />
       </Routes>
+      </RouteStage>
       </Suspense>
       <BottomNav />
+      <CreateLauncher />
       <CoachMarks />
     </div>
   );

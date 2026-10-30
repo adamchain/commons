@@ -43,49 +43,60 @@ export function FilterSheet({
     ...userInterests,
     ...ALL_INTERESTS.filter((t) => !interestSet.has(t)),
   ];
+  const hasActive =
+    networkOnly || hideCancelled || selectedAgeRange !== null || nearbyOnly || selectedTag !== null;
 
   return (
-    <BottomSheet onClose={onClose} labelledBy="filter-sheet-title">
-        <div className="filter-sheet-header">
-          <h2 id="filter-sheet-title" className="filter-sheet-title">Filters</h2>
-          <button type="button" className="btn-link" onClick={onClear}>
-            Clear
+    <BottomSheet onClose={onClose} labelledBy="filter-sheet-title" className="filters-panel">
+      <div className="filter-sheet-header">
+        <h2 id="filter-sheet-title" className="filter-sheet-title">
+          Filters
+        </h2>
+        <button type="button" className="filter-sheet-clear" onClick={onClear} disabled={!hasActive}>
+          Clear
+        </button>
+      </div>
+
+      <div className="filters-scroll">
+        <div className="filter-section">
+          <button
+            type="button"
+            className="filter-toggle"
+            role="switch"
+            aria-checked={networkOnly}
+            onClick={() => onNetworkOnlyChange(!networkOnly)}
+          >
+            <span className="filter-toggle-copy">
+              <strong>Your network</strong>
+              <small>Only people you&apos;ve been out with</small>
+            </span>
+            <span className={`flex-switch${networkOnly ? " is-on" : ""}`} aria-hidden="true">
+              <span className="flex-switch-knob" />
+            </span>
+          </button>
+          <button
+            type="button"
+            className="filter-toggle"
+            role="switch"
+            aria-checked={hideCancelled}
+            onClick={() => onHideCancelledChange(!hideCancelled)}
+          >
+            <span className="filter-toggle-copy">
+              <strong>Hide cancelled</strong>
+              <small>Skip plans that aren&apos;t happening</small>
+            </span>
+            <span className={`flex-switch${hideCancelled ? " is-on" : ""}`} aria-hidden="true">
+              <span className="flex-switch-knob" />
+            </span>
           </button>
         </div>
 
-        <div className="filter-sheet-group">
-          <div className="filter-sheet-chips">
+        <div className="filter-section">
+          <div className="filter-section-label">Age range</div>
+          <div className="filter-pills">
             <button
               type="button"
-              className={`community-chip ${networkOnly ? "is-active" : ""}`}
-              onClick={() => onNetworkOnlyChange(!networkOnly)}
-              aria-pressed={networkOnly}
-            >
-              Your Network
-            </button>
-          </div>
-        </div>
-
-        <div className="filter-sheet-group">
-          <div className="filter-sheet-group-label">Show</div>
-          <div className="filter-sheet-chips">
-            <button
-              type="button"
-              className={`community-chip ${hideCancelled ? "is-active" : ""}`}
-              onClick={() => onHideCancelledChange(!hideCancelled)}
-              aria-pressed={hideCancelled}
-            >
-              Hide cancelled
-            </button>
-          </div>
-        </div>
-
-        <div className="filter-sheet-group">
-          <div className="filter-sheet-group-label">Age range</div>
-          <div className="filter-sheet-chips">
-            <button
-              type="button"
-              className={`community-chip ${selectedAgeRange === null ? "is-active" : ""}`}
+              className={`filter-pill${!selectedAgeRange ? " is-active" : ""}`}
               onClick={() => onAgeRangeChange(null)}
             >
               All ages
@@ -94,7 +105,7 @@ export function FilterSheet({
               <button
                 key={r}
                 type="button"
-                className={`community-chip ${selectedAgeRange === r ? "is-active" : ""}`}
+                className={`filter-pill${selectedAgeRange === r ? " is-active" : ""}`}
                 onClick={() => onAgeRangeChange(selectedAgeRange === r ? null : r)}
               >
                 {AGE_RANGE_LABELS[r]}
@@ -104,21 +115,21 @@ export function FilterSheet({
         </div>
 
         {hasLocation && (
-          <div className="filter-sheet-group">
-            <div className="filter-sheet-group-label">Distance</div>
-            <div className="filter-sheet-chips">
+          <div className="filter-section">
+            <div className="filter-section-label">Distance</div>
+            <div className="filter-pills">
               <button
                 type="button"
-                className={`community-chip ${!nearbyOnly ? "is-active" : ""}`}
+                className={`filter-pill${!nearbyOnly ? " is-active" : ""}`}
                 onClick={() => onNearbyOnlyChange(false)}
               >
-                All distances
+                Anywhere
               </button>
               <button
                 type="button"
-                className={`community-chip ${nearbyOnly ? "is-active" : ""}`}
-                onClick={() => onNearbyOnlyChange(true)}
+                className={`filter-pill${nearbyOnly ? " is-active" : ""}`}
                 aria-pressed={nearbyOnly}
+                onClick={() => onNearbyOnlyChange(true)}
               >
                 Within 15 miles
               </button>
@@ -126,12 +137,12 @@ export function FilterSheet({
           </div>
         )}
 
-        <div className="filter-sheet-group">
-          <div className="filter-sheet-group-label">Interests</div>
-          <div className="filter-sheet-chips">
+        <div className="filter-section">
+          <div className="filter-section-label">Interests</div>
+          <div className="filter-pills">
             <button
               type="button"
-              className={`community-chip ${selectedTag === null ? "is-active" : ""}`}
+              className={`filter-pill${selectedTag === null ? " is-active" : ""}`}
               onClick={() => onTagChange(null)}
             >
               All
@@ -140,7 +151,7 @@ export function FilterSheet({
               <button
                 key={t}
                 type="button"
-                className={`community-chip ${selectedTag === t ? "is-active" : ""}`}
+                className={`filter-pill${selectedTag === t ? " is-active" : ""}`}
                 onClick={() => onTagChange(selectedTag === t ? null : t)}
               >
                 {INTEREST_LABELS[t]}
@@ -148,12 +159,13 @@ export function FilterSheet({
             ))}
           </div>
         </div>
+      </div>
 
-        <div className="sheet-actions">
-          <Button variant="primary" block onClick={onClose}>
-            Done
-          </Button>
-        </div>
+      <div className="sheet-actions">
+        <Button variant="primary" block onClick={onClose}>
+          Done
+        </Button>
+      </div>
     </BottomSheet>
   );
 }

@@ -278,6 +278,7 @@ export function formatAreaLabel(raw: string | undefined | null): string {
 
 export function formatRelative(iso: string): string {
   const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return "";
   const seconds = Math.max(0, Math.round((Date.now() - then) / 1000));
   if (seconds < 60) return "just now";
   const minutes = Math.round(seconds / 60);
@@ -286,7 +287,12 @@ export function formatRelative(iso: string): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.round(hours / 24);
   if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
+  const weeks = Math.round(days / 7);
+  if (weeks < 5) return `${weeks}w ago`;
+  const months = Math.round(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  const years = Math.max(1, Math.round(days / 365));
+  return `${years}y ago`;
 }
 
 /** True when the string is a valid US (NANP) or +E.164 phone number. */

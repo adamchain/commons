@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { flushSync } from "react-dom";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
-  Calendar,
-  Camera,
+  CalendarDays,
+  Check,
+  ChevronDown,
+  ChevronRight,
   Clock,
   Globe,
   ImagePlus,
   Link2,
   MapPin,
+  Pencil,
+  Search,
   Users,
 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
@@ -26,10 +29,15 @@ import type { NavFromState } from "../lib/navState";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
-import { NumberPicker } from "../components/NumberPicker";
-import { interestVisual } from "../lib/interestIcons";
 import {
-  INTEREST_LABELS,
+  clearCreateDraft,
+  loadCreateDraft,
+  saveCreateDraft,
+  type CreateDraft,
+  type CreateDraftPath,
+} from "../lib/createDraft";
+import { NumberPicker } from "../components/NumberPicker";
+import {
   VIBE_OPTIONS,
   type InterestTag,
   type JoinType,
@@ -78,10 +86,6 @@ const weekdayOf = (iso: string) => {
   return new Date(y, m - 1, d).getDay();
 };
 
-// F.11 — loose date buckets for "Just an idea" (specific day, sometime this
-// week, or fully open-ended).
-type IdeaDateMode = "specific" | "week" | "anytime";
-
 // Placeholder copy — pick one at random on mount (not on keystroke).
 const IDEA_PLACEHOLDERS = [
   "Anyone down for a spontaneous dinner tonight?",
@@ -112,6 +116,8 @@ export function CreatePlanPage() {
   const prefillDescription = searchParams.get("desc") ?? "";
   const fromPlanId = searchParams.get("fromPlanId");
   const lockFromId = searchParams.get("lockFromId");
+  const kindParam = searchParams.get("kind");
+  const startAsIdea = kindParam === "idea";
   // 0.9 — arriving here to recreate a past plan (either "Host another like
   // this" or "Do it again") should send Back to that plan, not into a blank
   // New Plan flow.
@@ -182,9 +188,9 @@ export function CreatePlanPage() {
     neighborhoodId: user?.neighborhoodIds?.[0] ?? user?.neighborhoodId ?? "",
     date: today(),
     time: defaultPlanTime(),
-    isFlexibleTime: false,
-    isFlexibleLocation: false,
-    isFlexibleDate: false,
+    isFlexibleTime: startAsIdea,
+    isFlexibleLocation: startAsIdea,
+    isFlexibleDate: startAsIdea,
     isThisWeek: false,
     vibes: defaultVibes,
     description: prefillDescription,
@@ -220,23 +226,74 @@ export function CreatePlanPage() {
     isFlexibleDate: boolean;
     isThisWeek?: boolean;
   } | null>(null);
-  // Step 1 — user picks Make a plan (full form) vs Just an idea (loose, looking_for).
-  // Skipped automatically when arriving with an invite seed or community tag.
-  type Path = "choose" | "plan" | "idea";
-  const [path, setPath] = useState<Path>(
-    editingPlanId ||
-    lockFromId ||
-    inviteUserId ||
-      inviteUserIds.length > 0 ||
-      prefillTitle ||
-      prefillName ||
-      hostAgainFrom ||
-      fromPlanId ||
-      fromForumTag ||
-      communityId
-      ? "plan"
-      : "choose",
-  );
+  type Path = CreateDraftPath;
+  const [path, setPath] = useState<Path>(startAsIdea ? "idea" : "plan");
+  useEffect(() => {
+    if (kindParam === "idea") setPath("idea");
+    else if (kindParam === "plan") setPath("plan");
+  }, [kindParam]);
+
+  const skipDraft =
+    Boolean(editingPlanId) ||
+    Boolean(lockFromId) ||
+    Boolean(hostAgainFrom) ||
+    Boolean(fromPlanId) ||
+    Boolean(communityId) ||
+    Boolean(inviteUserId) ||
+    inviteUserIds.length > 0 ||
+    Boolean(fromForumTag) ||
+    Boolean(prefillTitle) ||
+    Boolean(prefillDescription) ||
+    Boolean(prefillName);
+  const restoredForPath = useRef<Path | null>(null);
+  useEffect(() => {
+    if (skipDraft) return;
+    if (restoredForPath.current === path) return;
+    restoredForPath.current = path;
+    const draft = loadCreateDraft(path);
+    if (!draft) return;
+    setForm((f) => ({
+      ...f,
+      ...draft,
+      flyerDataUrl: f.flyerDataUrl,
+      flyerAttachmentDataUrl: f.flyerAttachmentDataUrl,
+      flyerLinkPreview: f.flyerLinkPreview,
+    }));
+  }, [path, skipDraft]);
+  useEffect(() => {
+    if (skipDraft) return;
+    const t = window.setTimeout(() => {
+      const draft: CreateDraft = {
+        title: form.title,
+        locationName: form.locationName,
+        locationAddress: form.locationAddress,
+        locationLat: form.locationLat,
+        locationLng: form.locationLng,
+        locationPlaceId: form.locationPlaceId,
+        neighborhoodId: form.neighborhoodId,
+        date: form.date,
+        time: form.time,
+        isFlexibleTime: form.isFlexibleTime,
+        isFlexibleLocation: form.isFlexibleLocation,
+        isFlexibleDate: form.isFlexibleDate,
+        isThisWeek: form.isThisWeek,
+        vibes: form.vibes,
+        description: form.description,
+        visibility: form.visibility,
+        capacityOn: form.capacityOn,
+        capacity: form.capacity,
+        joinType: form.joinType,
+        recurrence: form.recurrence,
+        repeatDays: form.repeatDays,
+        flyerLinkUrl: form.flyerLinkUrl,
+        chatEnabled: form.chatEnabled,
+        networkEveryone: form.networkEveryone,
+        markedFull: form.markedFull,
+      };
+      saveCreateDraft(path, draft);
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [form, path, skipDraft]);
 
   const navigate = useNavigate();
 
@@ -283,15 +340,12 @@ export function CreatePlanPage() {
       leaveCreatePlan();
       return;
     }
-    setPath("choose");
+    leaveCreatePlan();
   };
   // Replan source — read live from the URL / nav state on every submit so a
   // leftover "Do it again" id can't stick around after navigating to a fresh
   // /plans/new (same route often doesn't remount, so useState would go stale).
   const replanFromId = hostAgainFrom ?? fromPlanId;
-  // The path selector now requires an explicit pick + Continue rather than
-  // navigating on the first tap.
-  const [pendingPath, setPendingPath] = useState<"plan" | "idea" | null>(null);
   const [network, setNetwork] = useState<PublicUser[] | null>(null);
 
   // Community tagging — when arriving from a community's "Post a plan" button
@@ -335,8 +389,6 @@ export function CreatePlanPage() {
   // easy to miss, and a plan without a photo rarely gets a look.
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [showCoverLib, setShowCoverLib] = useState(false);
-  const [coverPickerOpen, setCoverPickerOpen] = useState(true);
-  const [showInvitePicker, setShowInvitePicker] = useState(false);
 
   // F.6 — inline "what's missing" guidance. Errors only render once the host
   // has actually tried to post, so the form doesn't nag while they're still
@@ -344,8 +396,10 @@ export function CreatePlanPage() {
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const locationCardRef = useRef<HTMLDivElement>(null);
-  const dateCardRef = useRef<HTMLDivElement>(null);
-  const capacityRowRef = useRef<HTMLElement>(null);
+  const dateCardRef = useRef<HTMLLabelElement>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
+  const timeInputRef = useRef<HTMLInputElement>(null);
+  const capacityRowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Always load the user's network once — needed for both the
@@ -613,7 +667,7 @@ export function CreatePlanPage() {
       ? "Enter a number of spots, or turn off the limit."
       : null;
   const titleError = !form.title.trim() ? "Give your plan a title." : null;
-  const photoError = !form.flyerDataUrl ? "A photo is required." : null;
+  const photoError = path !== "idea" && !form.flyerDataUrl ? "A photo is required." : null;
 
   // F.6 — flag exactly what's missing inline, next to the field, and scroll
   // it into view, instead of leaving the host to guess from a generic bottom
@@ -663,7 +717,7 @@ export function CreatePlanPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const created = await api<{ id: string }>("/api/plans", {
+      const created = await api<{ id: string; title?: string }>("/api/plans", {
         method: "POST",
         body: JSON.stringify({
           title: form.title.trim(),
@@ -728,11 +782,18 @@ export function CreatePlanPage() {
       }
       // Hub posts stay on that community's Events tab. Everywhere else lands
       // on the feed with a "you're live" success sheet.
+      clearCreateDraft(path);
       const hubId = hubEventsReturnId.current || (returnToCommunityEvents ? effectiveCommunityId : null);
       if (hubId) {
         navigate(`/communities/${hubId}?tab=events`, { replace: true });
       } else {
-        navigate("/", { state: { justPostedId: created.id, showPostSuccess: true } });
+        navigate("/", {
+          state: {
+            justPostedId: created.id,
+            justPostedTitle: created.title || form.title.trim(),
+            showPostSuccess: true,
+          },
+        });
       }
     } catch (err) {
       setError(parseApiError(err) || "Couldn't post — check your connection and try again.");
@@ -885,7 +946,11 @@ export function CreatePlanPage() {
   const toggleVibe = (id: VibeIcon) => {
     setForm((prev) => ({
       ...prev,
-      vibes: prev.vibes.includes(id) ? prev.vibes.filter((v) => v !== id) : [...prev.vibes, id],
+      vibes: prev.vibes.includes(id)
+        ? prev.vibes.filter((v) => v !== id)
+        : prev.vibes.length >= 3
+          ? prev.vibes
+          : [...prev.vibes, id],
     }));
   };
 
@@ -1010,87 +1075,6 @@ export function CreatePlanPage() {
     );
   }
 
-  if (path === "choose") {
-    const firstName = user?.firstName || "there";
-    return (
-      <main className="app-shell app-shell--mid path-picker-page">
-        <header className="app-header app-header--minimal app-header--sticky path-picker-header">
-          <button type="button" className="back-circle" aria-label="Back" onClick={leaveCreatePlan}>
-            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
-          </button>
-        </header>
-        <h1 className="path-picker-intent-head">
-          Hey {firstName},<br />what&apos;s on your mind?
-        </h1>
-        <p className="path-picker-intent-sub">
-          Drop something in, you never know who&apos;s down.
-        </p>
-        <div className="path-picker-divider" />
-        <div className="path-picker">
-          <button
-            type="button"
-            className={`path-picker-card ${pendingPath === "idea" ? "is-selected" : ""}`}
-            onClick={() => setPendingPath("idea")}
-            aria-pressed={pendingPath === "idea"}
-          >
-            <span className="path-picker-title">Just an idea</span>
-            <span className="path-picker-sub">
-              A casual thought — see who&apos;s down before committing to anything.
-            </span>
-          </button>
-          <button
-            type="button"
-            className={`path-picker-card ${pendingPath === "plan" ? "is-selected" : ""}`}
-            onClick={() => setPendingPath("plan")}
-            aria-pressed={pendingPath === "plan"}
-          >
-            <span className="path-picker-title">Make a plan</span>
-            <span className="path-picker-sub">
-              Know what you want to do. Set the details, post it, and see who&apos;s in.
-            </span>
-          </button>
-        </div>
-        <div className="path-picker-divider" />
-        <button
-          type="button"
-          className="btn btn-primary btn-block"
-          disabled={!pendingPath}
-          onClick={() => {
-            if (pendingPath === "idea") {
-              setForm((f) => ({
-                ...f,
-                isFlexibleLocation: true,
-                isFlexibleTime: true,
-                isFlexibleDate: true,
-                isThisWeek: false,
-              }));
-              setPath("idea");
-            } else if (pendingPath === "plan") {
-              // Make a plan always starts exact — Flexible is opt-in per field.
-              // Reset in case the host peeked at "Just an idea" first (which
-              // seeds all three flexible flags).
-              setForm((f) => ({
-                ...f,
-                isFlexibleLocation: false,
-                isFlexibleTime: false,
-                isFlexibleDate: false,
-                isThisWeek: false,
-                date:
-                  f.date && f.date >= today() && f.date !== FLEXIBLE_DATE_PLACEHOLDER
-                    ? f.date
-                    : today(),
-                time: f.time || defaultPlanTime(),
-              }));
-              setPath("plan");
-            }
-          }}
-        >
-          Continue
-        </button>
-      </main>
-    );
-  }
-
   const isIdea = path === "idea";
 
   // Idea path renders a stripped-down form (single text input + a couple of
@@ -1107,7 +1091,6 @@ export function CreatePlanPage() {
           submitting={submitting}
           error={error}
           attemptedSubmit={attemptedSubmit}
-          dateError={dateError}
           toggleVibe={toggleVibe}
           onBack={backFromForm}
           onOpenLibrary={() => setShowCoverLib(true)}
@@ -1115,6 +1098,9 @@ export function CreatePlanPage() {
           onClearFlyer={() => setForm((f) => ({ ...f, flyerDataUrl: null }))}
           onOpenFlyerAttachment={() => void openFlyerAttachmentPicker()}
           onClearFlyerAttachment={() => setForm((f) => ({ ...f, flyerAttachmentDataUrl: null }))}
+          onFetchLink={fetchLinkPreview}
+          linkBusy={linkBusy}
+          linkError={linkError}
           inviteUserName={inviteUserName}
           inviteNames={inviteNames}
           invitedCount={invitedIds.size}
@@ -1125,9 +1111,6 @@ export function CreatePlanPage() {
           communityName={communityName}
           communityVisibility={communityVisibility}
           onCommunityVisibilityChange={setCommunityVisibility}
-          onFetchLink={fetchLinkPreview}
-          linkBusy={linkBusy}
-          linkError={linkError}
           arrive={Boolean(editingPlanId || lockFromId)}
         />
         <input
@@ -1166,59 +1149,39 @@ export function CreatePlanPage() {
     );
   }
 
-  const invitedPeople = inviteNetwork.filter((u) => invitedIds.has(u.id));
-  const selectedInterests = form.vibes
-    .map((id) => VIBE_OPTIONS.find((o) => o.id === id)?.tag)
-    .filter((t): t is InterestTag => Boolean(t));
+  const essentialsDone = [
+    form.title.trim(),
+    form.isFlexibleLocation || form.locationName.trim(),
+    form.isFlexibleDate || Boolean(form.date),
+  ].filter(Boolean).length;
 
   return (
-    <main className={`app-shell app-shell--wide plan-detail-page plan-detail-page--create${editingPlanId || lockFromId ? " page-arrive" : ""}`}>
-      <header className="create-plan-topbar">
+    <main className={`app-shell app-shell--wide plan-detail-page plan-detail-page--create plan-builder${editingPlanId || lockFromId ? " page-arrive" : ""}`}>
+      <header className="create-plan-topbar plan-builder-header">
         <button type="button" className="back-circle" aria-label="Back" onClick={leaveCreatePlan}>
           <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </button>
+        <div className="plan-builder-heading">
+          <span>{editingPlanId ? "Edit plan" : lockFromId ? "Lock it in" : "New plan"}</span>
+          <strong>{editingPlanId ? "Update the details" : "Build your plan"}</strong>
+        </div>
       </header>
       <form id="create-plan-form" onSubmit={submit}>
       <div id="create-plan-cover" className={`plan-detail-hero${form.flyerDataUrl ? "" : " plan-detail-hero--empty"}`}>
         {form.flyerDataUrl && <img src={form.flyerDataUrl} alt="" />}
         {form.flyerDataUrl ? (
-          <div className="plan-detail-hero-cover-overlay">
-            <button type="button" className="cover-chip" onClick={() => setShowCoverLib(true)}>
-              Library
-            </button>
-            <button type="button" className="cover-chip" onClick={() => void openFlyerPicker()}>
-              Upload
-            </button>
-            <button
-              type="button"
-              className="cover-chip"
-              onClick={() => {
-                setForm((f) => ({ ...f, flyerDataUrl: null }));
-                setCoverPickerOpen(false);
-              }}
-            >
-              Remove
-            </button>
-          </div>
-        ) : coverPickerOpen ? (
-          <div className="plan-detail-hero-cover-empty">
-            <span className="cover-picker-title">Add a cover photo</span>
-            <div className="cover-picker-buttons">
-              <button type="button" className="cover-btn" onClick={() => setShowCoverLib(true)}>
-                <ImagePlus size={16} strokeWidth={1.8} aria-hidden="true" />
-                Library
-              </button>
-              <button type="button" className="cover-btn" onClick={() => void openFlyerPicker()}>
-                Upload a photo
-              </button>
-            </div>
-            <span className="cover-picker-hint">A photo is what gets people to stop and look.</span>
-          </div>
-        ) : (
-          <button type="button" className="plan-detail-hero-cover-cta" onClick={() => setCoverPickerOpen(true)}>
-            <Camera size={18} strokeWidth={1.8} aria-hidden="true" />
-            Add a cover photo
+          <button type="button" className="plan-builder-edit-cover" onClick={() => setShowCoverLib(true)}>
+            <ImagePlus size={17} /> Change cover
           </button>
+        ) : (
+          <div className="plan-builder-cover-empty">
+            <button type="button" className="plan-builder-edit-cover" onClick={() => setShowCoverLib(true)}>
+              <ImagePlus size={17} /> Add a cover
+            </button>
+            <button type="button" className="plan-builder-upload-cover" onClick={() => void openFlyerPicker()}>
+              Upload a photo
+            </button>
+          </div>
         )}
         <input
           ref={flyerRef}
@@ -1322,28 +1285,18 @@ export function CreatePlanPage() {
           </div>
         ) : null}
 
-        <header className="plan-detail-heading">
-          {selectedInterests.length > 0 && (
-            <div className="plan-detail-interests">
-              {selectedInterests.map((t) => (
-                <span key={t} className="plan-detail-interest">
-                  {INTEREST_LABELS[t]}
-                </span>
-              ))}
-            </div>
-          )}
-          <div className="plan-detail-title-row plan-detail-title-box">
-            <input
-              id="title"
-              ref={titleInputRef}
-              className="plan-detail-title plan-detail-title-input"
-              placeholder="Short plan name"
-              value={form.title}
-              maxLength={MAX_PLAN_TITLE_LEN}
-              aria-invalid={Boolean(attemptedSubmit && titleError)}
-              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value.slice(0, MAX_PLAN_TITLE_LEN) }))}
-            />
-          </div>
+        <section className="plan-detail-title-row plan-detail-title-box">
+          <label className="plan-builder-label" htmlFor="title">Plan name</label>
+          <input
+            id="title"
+            ref={titleInputRef}
+            className="plan-detail-title plan-detail-title-input"
+            placeholder="Give your plan a name"
+            value={form.title}
+            maxLength={MAX_PLAN_TITLE_LEN}
+            aria-invalid={Boolean(attemptedSubmit && titleError)}
+            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value.slice(0, MAX_PLAN_TITLE_LEN) }))}
+          />
           {form.title.length >= MAX_PLAN_TITLE_LEN - 15 && (
             <p className="plan-title-hint">
               {MAX_PLAN_TITLE_LEN - form.title.length === 0
@@ -1352,186 +1305,10 @@ export function CreatePlanPage() {
             </p>
           )}
           {attemptedSubmit && titleError && <p className="luma-inline-error">{titleError}</p>}
-          <div
-            ref={locationCardRef}
-            className="plan-meta-card plan-meta-card--edit"
-            aria-invalid={Boolean(attemptedSubmit && (locationError || dateError || timeError)) || undefined}
-          >
-            <div className="plan-meta-row plan-meta-row--edit">
-              <span className="plan-meta-icon" aria-hidden="true"><MapPin size={18} strokeWidth={1.8} /></span>
-              <div className="plan-meta-text">
-                <span className="plan-meta-label">Venue</span>
-                {form.isFlexibleLocation ? (
-                  <span className="plan-meta-value is-placeholder">Anywhere</span>
-                ) : (
-                  <>
-                    <LocationAutocomplete
-                      name={form.locationName}
-                      address={form.locationAddress}
-                      placeholder="Add a venue"
-                      onChange={(v) => {
-                        setForm((f) => ({
-                          ...f,
-                          locationName: v.name,
-                          locationAddress: v.address,
-                          locationLat: v.lat,
-                          locationLng: v.lng,
-                          isFlexibleLocation: false,
-                        }));
-                      }}
-                    />
-                    {formatVenueAddressLine(form.locationName, form.locationAddress) ? (
-                      <span className="plan-meta-sub">
-                        {formatVenueAddressLine(form.locationName, form.locationAddress)}
-                      </span>
-                    ) : null}
-                  </>
-                )}
-              </div>
-              {!lockFromId && (
-              <FlexToggle
-                variant="switch"
-                active={form.isFlexibleLocation}
-                onClick={() =>
-                  setForm((f) => {
-                    const next = !f.isFlexibleLocation;
-                    return next
-                      ? {
-                          ...f,
-                          isFlexibleLocation: true,
-                          locationName: "",
-                          locationAddress: "",
-                          locationLat: undefined,
-                          locationLng: undefined,
-                          locationPlaceId: undefined,
-                        }
-                      : { ...f, isFlexibleLocation: false };
-                  })
-                }
-                label="Flexible"
-              />
-              )}
-            </div>
-            <div ref={dateCardRef} className="plan-meta-row plan-meta-row--edit">
-              <span className="plan-meta-icon" aria-hidden="true"><Calendar size={18} strokeWidth={1.8} /></span>
-              <label className="plan-meta-text" htmlFor="date">
-                <span className="plan-meta-label">Day</span>
-                {form.isFlexibleDate ? (
-                  <span className="plan-meta-value is-placeholder">Anytime</span>
-                ) : (
-                  <span className="plan-meta-value-hit">
-                    <span className={`plan-meta-value ${!form.date ? "is-placeholder" : ""}`}>
-                      {form.date ? formatPlanDate(form.date) : "Pick a day"}
-                    </span>
-                    <input
-                      id="date"
-                      className="plan-meta-native-input"
-                      type="date"
-                      min={today()}
-                      value={form.date}
-                      aria-invalid={Boolean(dateError)}
-                      onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-                    />
-                  </span>
-                )}
-              </label>
-              {!lockFromId && (
-              <FlexToggle
-                variant="switch"
-                active={form.isFlexibleDate}
-                onClick={() =>
-                  setForm((f) => {
-                    const next = !f.isFlexibleDate;
-                    return next
-                      ? { ...f, isFlexibleDate: true, isThisWeek: false }
-                      : {
-                          ...f,
-                          isFlexibleDate: false,
-                          isThisWeek: false,
-                          date:
-                            f.date && f.date >= today() && f.date !== FLEXIBLE_DATE_PLACEHOLDER
-                              ? f.date
-                              : today(),
-                        };
-                  })
-                }
-                label="Flexible"
-              />
-              )}
-            </div>
-            <div className="plan-meta-row plan-meta-row--edit">
-              <span className="plan-meta-icon" aria-hidden="true"><Clock size={18} strokeWidth={1.8} /></span>
-              <label className="plan-meta-text" htmlFor="time">
-                <span className="plan-meta-label">Time</span>
-                {form.isFlexibleTime ? (
-                  <span className="plan-meta-value is-placeholder">Open</span>
-                ) : (
-                  <span className="plan-meta-value-hit">
-                    <span className={`plan-meta-value ${!form.time ? "is-placeholder" : ""}`}>
-                      {form.time ? formatPlanTime(form.time, false) : "Pick a time"}
-                    </span>
-                    <input
-                      id="time"
-                      className="plan-meta-native-input"
-                      type="time"
-                      min={!form.isFlexibleDate && form.date === today() ? nowTime() : undefined}
-                      value={form.time}
-                      aria-invalid={Boolean(timeError)}
-                      onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
-                    />
-                  </span>
-                )}
-              </label>
-              {!lockFromId && (
-              <FlexToggle
-                variant="switch"
-                active={form.isFlexibleTime}
-                onClick={() =>
-                  setForm((f) => {
-                    const next = !f.isFlexibleTime;
-                    return next
-                      ? { ...f, isFlexibleTime: true }
-                      : { ...f, isFlexibleTime: false, time: f.time || defaultPlanTime() };
-                  })
-                }
-                label="Flexible"
-              />
-              )}
-            </div>
-          </div>
-          {(attemptedSubmit && locationError) || dateError || timeError ? (
-            <p className="luma-inline-error">{locationError || dateError || timeError}</p>
-          ) : null}
-        </header>
+        </section>
 
-        <button
-          type="button"
-          className="host-row plan-detail-card"
-          onClick={() => setShowInvitePicker(true)}
-        >
-          {user && (
-            <Avatar
-              seed={user.avatarSeed}
-              style={user.avatarStyle}
-              photoDataUrl={user.avatarPhotoDataUrl}
-              params={user.avatarParams}
-              name={user.firstName}
-              size="sm"
-            />
-          )}
-          <span className="host-row-text">
-            <span className="host-row-label">Started by</span>
-            <strong>
-              You
-              {invitedPeople.length > 0
-                ? ` · ${invitedPeople.length} invited`
-                : ""}
-            </strong>
-          </span>
-          <span className="host-row-chevron" aria-hidden="true">›</span>
-        </button>
-
-        <div className="plan-detail-card plan-detail-card--composer">
+        <section className="plan-detail-card plan-detail-card--composer plan-builder-desc">
+          <label className="plan-builder-label" htmlFor="description">Description</label>
           <textarea
             id="description"
             className="plan-detail-desc-input"
@@ -1539,83 +1316,154 @@ export function CreatePlanPage() {
             value={form.description}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
           />
-        </div>
+        </section>
 
-        {showInvitePicker && (
-          <div className="plan-detail-card">
-            <p className="form-question" style={{ marginTop: 0 }}>Invite from your network</p>
-            <NetworkHandPick network={inviteNetwork} invitedIds={invitedIds} onToggle={toggleInvited} />
+        <div
+          ref={locationCardRef}
+          className="plan-summary-card"
+          aria-invalid={Boolean(attemptedSubmit && (locationError || dateError || timeError)) || undefined}
+        >
+          <div className="plan-when-pair">
+            <label ref={dateCardRef} className="plan-when-field">
+              <span className="plan-summary-icon" aria-hidden="true"><CalendarDays size={18} /></span>
+              <span className="plan-when-copy">
+                <small>Date</small>
+                <strong className={form.isFlexibleDate || !form.date ? "is-placeholder" : undefined}>
+                  {form.isFlexibleDate
+                    ? form.isThisWeek
+                      ? "This week"
+                      : "Pick a day"
+                    : form.date
+                      ? formatPlanDate(form.date)
+                      : "Pick a day"}
+                </strong>
+              </span>
+              <input
+                ref={dateInputRef}
+                id="date"
+                className="plan-meta-native-input"
+                type="date"
+                min={today()}
+                value={form.isFlexibleDate ? "" : form.date}
+                aria-invalid={Boolean(dateError)}
+                onChange={(e) => {
+                  const nextDate = e.target.value;
+                  if (!nextDate) return;
+                  setForm((f) => ({ ...f, date: nextDate, isFlexibleDate: false, isThisWeek: false }));
+                }}
+              />
+            </label>
+            <label className="plan-when-field">
+              <span className="plan-summary-icon" aria-hidden="true"><Clock size={18} /></span>
+              <span className="plan-when-copy">
+                <small>Time</small>
+                <strong className={form.isFlexibleTime || !form.time ? "is-placeholder" : undefined}>
+                  {form.isFlexibleTime || !form.time
+                    ? "Pick a time"
+                    : formatPlanTime(form.time, false)}
+                </strong>
+              </span>
+              <input
+                ref={timeInputRef}
+                id="time"
+                className="plan-meta-native-input"
+                type="time"
+                min={!form.isFlexibleDate && form.date === today() ? nowTime() : undefined}
+                value={form.time}
+                aria-invalid={Boolean(timeError)}
+                onChange={(e) => {
+                  if (!e.target.value) return;
+                  setForm((f) => ({ ...f, time: e.target.value, isFlexibleTime: false }));
+                }}
+              />
+            </label>
           </div>
-        )}
+          <div className="plan-summary-row plan-summary-row--place">
+            <span className="plan-summary-icon" aria-hidden="true"><MapPin size={20} /></span>
+            <span className="plan-summary-place">
+              <small>Location</small>
+              <LocationAutocomplete
+                name={form.locationName}
+                address={form.locationAddress}
+                placeholder="Add a venue"
+                onChange={(v) => {
+                  setForm((f) => ({
+                    ...f,
+                    locationName: v.name,
+                    locationAddress: v.address,
+                    locationLat: v.lat,
+                    locationLng: v.lng,
+                    isFlexibleLocation: false,
+                  }));
+                }}
+              />
+              {formatVenueAddressLine(form.locationName, form.locationAddress) ? (
+                <em>{formatVenueAddressLine(form.locationName, form.locationAddress)}</em>
+              ) : null}
+            </span>
+            <Pencil size={17} aria-hidden="true" />
+          </div>
+        </div>
+        {(attemptedSubmit && locationError) || dateError || timeError ? (
+          <p className="luma-inline-error">{locationError || dateError || timeError}</p>
+        ) : null}
 
-        {/* Category — wrapping pills. */}
-        <p className="form-eyebrow">Category <span className="form-eyebrow-optional">— optional</span></p>
-        <div className="vibe-grid">
-          {VIBE_OPTIONS.map((opt) => {
-            const selected = form.vibes.includes(opt.id);
-            const { Icon, iconColor, tint } = interestVisual(opt.tag);
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                className={`vibe-tile ${selected ? "is-selected" : ""}`}
-                onClick={() => toggleVibe(opt.id)}
-                aria-pressed={selected}
-              >
-                {selected && <span className="vibe-tile-dot" aria-hidden="true" />}
-                <span
-                  className="vibe-tile-icon"
-                  style={{ background: tint, color: iconColor }}
-                  aria-hidden="true"
+        <section className="plan-builder-completion" aria-label="Plan essentials">
+          <div>
+            <span>Plan essentials</span>
+            <strong>{essentialsDone} of 3 complete</strong>
+          </div>
+          <i><b style={{ width: `${(essentialsDone / 3) * 100}%` }} /></i>
+        </section>
+
+        <section className="plan-builder-card">
+          <div className="plan-builder-card-head">
+            <h2>Help people find it</h2>
+            <p>Choose up to three interests that fit this plan.</p>
+          </div>
+          <div className="vibe-grid">
+            {VIBE_OPTIONS.map((opt) => {
+              const selected = form.vibes.includes(opt.id);
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  className={`vibe-tile ${selected ? "is-selected" : ""}`}
+                  onClick={() => toggleVibe(opt.id)}
+                  aria-pressed={selected}
                 >
-                  <Icon size={18} strokeWidth={1.8} />
-                </span>
-                <span className="vibe-tile-label">{opt.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Settings — visibility segmented toggle + optional extras. */}
-        <p className="form-eyebrow">Settings</p>
-        <div className="settings-card">
-          <div className="settings-row">
-            <span className="settings-row-label">Visibility</span>
-            <div className="vis-pill-toggle" role="group" aria-label="Visibility">
-              <button
-                type="button"
-                className={`vis-pill ${form.visibility === "everyone" ? "is-active" : ""}`}
-                onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
-                aria-pressed={form.visibility === "everyone"}
-              >
-                <Globe size={12} strokeWidth={1.8} aria-hidden="true" />
-                Everyone
-              </button>
-              <button
-                type="button"
-                className={`vis-pill ${form.visibility === "network" ? "is-active" : ""}`}
-                onClick={() => setForm((f) => ({ ...f, visibility: "network", networkEveryone: false }))}
-                aria-pressed={form.visibility === "network"}
-              >
-                <Users size={12} strokeWidth={1.8} aria-hidden="true" />
-                Your Network
-              </button>
-            </div>
+                  <span className="vibe-tile-label">{opt.label}</span>
+                </button>
+              );
+            })}
           </div>
+        </section>
 
-          <div className="settings-row">
-            <span className="settings-row-label">Group Chat</span>
-            <FlexToggle
-              variant="switch"
-              active={form.chatEnabled}
-              label={form.chatEnabled ? "On" : "Off"}
-              onClick={(e) => {
-                e.preventDefault();
-                setForm((f) => ({ ...f, chatEnabled: !f.chatEnabled }));
-              }}
-            />
+        <section className="plan-builder-card">
+          <div className="plan-builder-card-head">
+            <h2>Visibility</h2>
+            <p>Choose who can see this plan.</p>
           </div>
-
+          <div className="vis-pill-toggle" role="group" aria-label="Visibility">
+            <button
+              type="button"
+              className={`vis-pill ${form.visibility === "everyone" ? "is-active" : ""}`}
+              onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
+              aria-pressed={form.visibility === "everyone"}
+            >
+              <Globe size={15} strokeWidth={1.8} aria-hidden="true" />
+              Everyone
+            </button>
+            <button
+              type="button"
+              className={`vis-pill ${form.visibility === "network" ? "is-active" : ""}`}
+              onClick={() => setForm((f) => ({ ...f, visibility: "network", networkEveryone: false }))}
+              aria-pressed={form.visibility === "network"}
+            >
+              <Users size={15} strokeWidth={1.8} aria-hidden="true" />
+              My network
+            </button>
+          </div>
           {form.visibility === "network" && (
             <div className="settings-handpick">
               <NetworkHandPick
@@ -1627,56 +1475,134 @@ export function CreatePlanPage() {
               />
             </div>
           )}
+        </section>
 
-          {/* Options — spots, repeats, link. Collapsed to keep the form short. */}
-          <button
-            type="button"
-            className="settings-options-toggle"
-            onClick={() => setShowMore((s) => !s)}
-            aria-expanded={showMore}
-          >
-            <span className="settings-row-label">Additional Details</span>
-            <ChevronIcon open={showMore} />
-          </button>
+        <button
+          type="button"
+          className="plan-optional-toggle"
+          onClick={() => setShowMore((s) => !s)}
+          aria-expanded={showMore}
+        >
+          <span>
+            <strong>Optional details</strong>
+            <small>Add context without slowing down posting.</small>
+          </span>
+          <ChevronDown className={showMore ? "is-open" : ""} size={20} />
+        </button>
 
-        {showMore && (
-          <div className="create-more">
-            {/* Spots — toggle for open vs capped */}
-            <section className="form-section" ref={capacityRowRef}>
-              <div className="form-row-flex">
-                <div className="form-row-flex-main">
-                  <label className="form-question">Capacity</label>
+        <div className="plan-optional-list" hidden={!showMore}>
+            {!lockFromId ? (
+              <>
+                <div className="plan-optional-row">
+                  <span>
+                    <strong>Flexible date</strong>
+                    <small>{form.isFlexibleDate ? "Anytime is fine" : "Locked to a day"}</small>
+                  </span>
+                  <FlexToggle
+                    variant="switch"
+                    active={form.isFlexibleDate}
+                    label="Flexible date"
+                    onClick={() =>
+                      setForm((f) => {
+                        const next = !f.isFlexibleDate;
+                        return next
+                          ? { ...f, isFlexibleDate: true, isThisWeek: false }
+                          : {
+                              ...f,
+                              isFlexibleDate: false,
+                              isThisWeek: false,
+                              date:
+                                f.date && f.date >= today() && f.date !== FLEXIBLE_DATE_PLACEHOLDER
+                                  ? f.date
+                                  : today(),
+                            };
+                      })
+                    }
+                  />
                 </div>
-                <FlexToggle
-                  active={form.capacityOn}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setForm((f) => ({ ...f, capacityOn: !f.capacityOn }));
-                  }}
-                  label="Set limit"
-                />
-              </div>
-              {form.capacityOn && (
+                <div className="plan-optional-row">
+                  <span>
+                    <strong>Flexible time</strong>
+                    <small>{form.isFlexibleTime ? "Time stays open" : "Locked to a time"}</small>
+                  </span>
+                  <FlexToggle
+                    variant="switch"
+                    active={form.isFlexibleTime}
+                    label="Flexible time"
+                    onClick={() =>
+                      setForm((f) => {
+                        const next = !f.isFlexibleTime;
+                        return next
+                          ? { ...f, isFlexibleTime: true }
+                          : { ...f, isFlexibleTime: false, time: f.time || defaultPlanTime() };
+                      })
+                    }
+                  />
+                </div>
+                <div className="plan-optional-row">
+                  <span>
+                    <strong>Flexible location</strong>
+                    <small>{form.isFlexibleLocation ? "Decide the spot later" : "Venue is set"}</small>
+                  </span>
+                  <FlexToggle
+                    variant="switch"
+                    active={form.isFlexibleLocation}
+                    label="Flexible location"
+                    onClick={() =>
+                      setForm((f) => {
+                        const next = !f.isFlexibleLocation;
+                        return next
+                          ? {
+                              ...f,
+                              isFlexibleLocation: true,
+                              locationName: "",
+                              locationAddress: "",
+                              locationLat: undefined,
+                              locationLng: undefined,
+                              locationPlaceId: undefined,
+                            }
+                          : { ...f, isFlexibleLocation: false };
+                      })
+                    }
+                  />
+                </div>
+              </>
+            ) : null}
+
+            <div className="plan-optional-row" ref={capacityRowRef}>
+              <span>
+                <strong>Capacity</strong>
+                <small>{form.capacityOn ? `${form.capacity} spots` : "No limit"}</small>
+              </span>
+              <FlexToggle
+                variant="switch"
+                active={form.capacityOn}
+                label="Set a capacity"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setForm((f) => ({ ...f, capacityOn: !f.capacityOn }));
+                }}
+              />
+            </div>
+            {form.capacityOn && (
+              <div className="plan-optional-extra">
                 <NumberPicker
                   value={Number(form.capacity) || 0}
                   onChange={(n) => setForm((f) => ({ ...f, capacity: String(n) }))}
                   ariaLabel="Number of spots"
                 />
-              )}
-              {attemptedSubmit && capacityError && (
-                <p className="luma-inline-error">{capacityError}</p>
-              )}
-
-              {form.capacityOn && (
-                <div className="form-row-flex" style={{ marginTop: 12 }}>
-                  <div className="form-row-flex-main">
-                    <label className="form-question">Approve who joins</label>
-                    <p className="form-help">
+                {attemptedSubmit && capacityError && (
+                  <p className="luma-inline-error">{capacityError}</p>
+                )}
+                <div className="plan-optional-row plan-optional-row--nested">
+                  <span>
+                    <strong>Approve who joins</strong>
+                    <small>
                       {form.joinType === "approve"
                         ? "People tap Interested. You let them in."
                         : "People tap Join until it's full."}
-                    </p>
-                  </div>
+                    </small>
+                  </span>
                   <FlexToggle
                     active={form.joinType === "approve"}
                     variant="switch"
@@ -1687,47 +1613,63 @@ export function CreatePlanPage() {
                     }}
                   />
                 </div>
-              )}
+              </div>
+            )}
 
-              {editingPlanId && (
-                <div className="form-row-flex" style={{ marginTop: 12 }}>
-                  <div className="form-row-flex-main">
-                    <label className="form-question">Mark as full</label>
-                    <p className="form-help">
-                      {form.markedFull
-                        ? "Join is closed. Anyone who isn't going comes off now."
-                        : "Close Join anytime. Anyone who isn't going comes off right away."}
-                    </p>
-                  </div>
-                  <FlexToggle
-                    active={form.markedFull}
-                    variant="switch"
-                    label="Mark as full"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setForm((f) => ({ ...f, markedFull: !f.markedFull }));
-                    }}
-                  />
-                </div>
-              )}
-            </section>
+            {editingPlanId && (
+              <div className="plan-optional-row">
+                <span>
+                  <strong>Mark as full</strong>
+                  <small>
+                    {form.markedFull
+                      ? "Join is closed. Anyone who isn't going comes off now."
+                      : "Close Join anytime."}
+                  </small>
+                </span>
+                <FlexToggle
+                  active={form.markedFull}
+                  variant="switch"
+                  label="Mark as full"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setForm((f) => ({ ...f, markedFull: !f.markedFull }));
+                  }}
+                />
+              </div>
+            )}
 
-            {/* Repeats — Zoom-style cadence dropdown */}
-            <section className="form-section">
-              <label className="form-question" htmlFor="repeats">Repeats</label>
-              <select
-                id="repeats"
-                className="form-select"
-                value={form.recurrence}
-                onChange={(e) => setForm((f) => ({ ...f, recurrence: e.target.value as Recurrence }))}
-              >
-                <option value="none">Doesn't repeat</option>
-                <option value="weekly">Weekly</option>
-                <option value="biweekly">Every 2 weeks</option>
-                <option value="monthly">Monthly</option>
-              </select>
+            <div className="plan-optional-row plan-optional-row--stack">
+              <span>
+                <strong>Repeats</strong>
+                <small>
+                  {form.recurrence === "none"
+                    ? "Doesn't repeat"
+                    : form.recurrence === "weekly"
+                      ? "Weekly"
+                      : form.recurrence === "biweekly"
+                        ? "Every 2 weeks"
+                        : "Monthly"}
+                </small>
+              </span>
+              <div className="plan-optional-pills" role="group" aria-label="Repeats">
+                {([
+                  ["none", "Never"],
+                  ["weekly", "Weekly"],
+                  ["biweekly", "2 weeks"],
+                  ["monthly", "Monthly"],
+                ] as const).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={form.recurrence === value ? "is-selected" : ""}
+                    onClick={() => setForm((f) => ({ ...f, recurrence: value }))}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               {(form.recurrence === "weekly" || form.recurrence === "biweekly") && (
-                <div className="repeat-days" role="group" aria-label="Repeats on">
+                <div className="repeat-days plan-optional-days" role="group" aria-label="Repeats on">
                   {DAY_LABELS.map((label, i) => {
                     const on = form.repeatDays.includes(i);
                     return (
@@ -1752,81 +1694,72 @@ export function CreatePlanPage() {
                   })}
                 </div>
               )}
-            </section>
-
-            {/* Link — paste a URL to show a preview on the plan. The cover
-                image at the top of the form handles uploads. */}
-            <section className="form-section">
-              <label className="form-question" htmlFor="flyer-link">
-                Add a link
-              </label>
-          <input
-            id="flyer-link"
-            type="url"
-            placeholder="https://…"
-            value={form.flyerLinkUrl}
-            onChange={(e) => setForm((f) => ({ ...f, flyerLinkUrl: e.target.value }))}
-            onBlur={(e) => void fetchLinkPreview(e.target.value)}
-            disabled={linkBusy}
-          />
-          {linkBusy && <p className="form-help">Loading preview…</p>}
-          {linkError && <p className="link-preview-notice" role="status">{linkError}</p>}
-          {form.flyerLinkPreview && (
-            <div className="link-preview link-preview--form">
-              {form.flyerLinkPreview.image && (
-                <img src={form.flyerLinkPreview.image} alt="" className="link-preview-image" />
-              )}
-              <div className="link-preview-body">
-                {form.flyerLinkPreview.siteName && (
-                  <div className="link-preview-site">{form.flyerLinkPreview.siteName}</div>
-                )}
-                {form.flyerLinkPreview.title && (
-                  <div className="link-preview-title">{form.flyerLinkPreview.title}</div>
-                )}
-                {form.flyerLinkPreview.description && (
-                  <div className="link-preview-desc">{form.flyerLinkPreview.description}</div>
-                )}
-              </div>
-              <button
-                type="button"
-                className="btn-link"
-                onClick={() => setForm((f) => ({ ...f, flyerLinkUrl: "", flyerLinkPreview: null }))}
-              >
-                Remove
-              </button>
             </div>
-          )}
-            </section>
 
-            {/* Flyer — an optional event poster shown on the plan, separate
-                from the cover photo at the top of the form. */}
-            <section className="form-section">
-              <label className="form-question">Flyer</label>
-              <p className="form-help">Attach an event flyer or poster — it shows in full on the plan.</p>
+            <div className="plan-optional-row plan-optional-row--stack">
+              <span>
+                <strong>Link</strong>
+                <small>{form.flyerLinkPreview?.title || form.flyerLinkUrl || "Add a link"}</small>
+              </span>
+              <span className="plan-optional-icon" aria-hidden="true"><Link2 size={16} /></span>
+              <input
+                id="flyer-link"
+                className="plan-optional-input"
+                type="url"
+                placeholder="https://…"
+                value={form.flyerLinkUrl}
+                onChange={(e) => setForm((f) => ({ ...f, flyerLinkUrl: e.target.value }))}
+                onBlur={(e) => void fetchLinkPreview(e.target.value)}
+                disabled={linkBusy}
+              />
+              {linkBusy && <p className="form-help">Loading preview…</p>}
+              {linkError && <p className="link-preview-notice" role="status">{linkError}</p>}
+              {form.flyerLinkPreview && (
+                <div className="link-preview link-preview--form">
+                  {form.flyerLinkPreview.image && (
+                    <img src={form.flyerLinkPreview.image} alt="" className="link-preview-image" />
+                  )}
+                  <div className="link-preview-body">
+                    {form.flyerLinkPreview.siteName && (
+                      <div className="link-preview-site">{form.flyerLinkPreview.siteName}</div>
+                    )}
+                    {form.flyerLinkPreview.title && (
+                      <div className="link-preview-title">{form.flyerLinkPreview.title}</div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-link"
+                    onClick={() => setForm((f) => ({ ...f, flyerLinkUrl: "", flyerLinkPreview: null }))}
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="plan-optional-row plan-optional-row--stack">
+              <span>
+                <strong>Flyer</strong>
+                <small>{form.flyerAttachmentDataUrl ? "Attached" : "Optional poster for the plan"}</small>
+              </span>
               {form.flyerAttachmentDataUrl ? (
-                <div className="flyer-attachment-preview">
+                <div className="plan-optional-flyer">
                   <img src={form.flyerAttachmentDataUrl} alt="Flyer preview" />
-                  <div className="flyer-attachment-actions">
-                    <button type="button" className="cover-chip" onClick={() => void openFlyerAttachmentPicker()}>
-                      Replace
-                    </button>
-                    <button
-                      type="button"
-                      className="cover-chip"
-                      onClick={() => setForm((f) => ({ ...f, flyerAttachmentDataUrl: null }))}
-                    >
-                      Remove
-                    </button>
+                  <div>
+                    <button type="button" onClick={() => void openFlyerAttachmentPicker()}>Replace</button>
+                    <button type="button" onClick={() => setForm((f) => ({ ...f, flyerAttachmentDataUrl: null }))}>Remove</button>
                   </div>
                 </div>
               ) : (
                 <button
                   type="button"
-                  className="flyer-attachment-add"
+                  className="plan-optional-add"
                   onClick={() => void openFlyerAttachmentPicker()}
                 >
-                  <ImagePlus size={16} strokeWidth={1.8} aria-hidden="true" />
+                  <span className="plan-optional-icon" aria-hidden="true"><ImagePlus size={16} /></span>
                   Upload a flyer
+                  <ChevronRight size={16} aria-hidden="true" />
                 </button>
               )}
               <input
@@ -1840,14 +1773,45 @@ export function CreatePlanPage() {
                   if (flyerAttachmentRef.current) flyerAttachmentRef.current.value = "";
                 }}
               />
-            </section>
-          </div>
-        )}
+            </div>
         </div>
 
+        <section className="plan-builder-settings">
+          <div>
+            <span>
+              <strong>Open joining</strong>
+              <small>Anyone can join immediately.</small>
+            </span>
+            <FlexToggle
+              variant="switch"
+              active={form.joinType !== "approve"}
+              label={form.joinType === "approve" ? "Off" : "On"}
+              onClick={(e) => {
+                e.preventDefault();
+                setForm((f) => ({ ...f, joinType: f.joinType === "approve" ? "open" : "approve" }));
+              }}
+            />
+          </div>
+          <div>
+            <span>
+              <strong>Group chat</strong>
+              <small>Opens when the plan is posted.</small>
+            </span>
+            <FlexToggle
+              variant="switch"
+              active={form.chatEnabled}
+              label={form.chatEnabled ? "On" : "Off"}
+              onClick={(e) => {
+                e.preventDefault();
+                setForm((f) => ({ ...f, chatEnabled: !f.chatEnabled }));
+              }}
+            />
+          </div>
+        </section>
+
         {inviteUserId && (
-          <section className="form-section">
-            <label className="form-question">Invite from your network</label>
+          <section className="plan-builder-card">
+            <label className="plan-builder-label">Invite from your network</label>
             <p className="form-help">
               {inviteUserName ? <><strong>{inviteUserName}</strong> is already in.</> : "Anyone else?"}
             </p>
@@ -1930,7 +1894,7 @@ export function CreatePlanPage() {
                 ? "Save"
                 : lockFromId
                   ? "Lock it in"
-                  : "Post it"}
+                  : "Preview and post"}
           </button>
         </div>
       </form>
@@ -1987,8 +1951,7 @@ type FormShape = {
 };
 
 /**
- * Just an Idea form — prompt, text box, and image up front; Settings matches
- * Make a Plan (visibility + collapsible Additional details).
+ * Just an Idea form — Figma builder: prompt, optional cover, interests, audience.
  */
 function IdeaForm({
   form,
@@ -1998,7 +1961,6 @@ function IdeaForm({
   submitting,
   error,
   attemptedSubmit,
-  dateError,
   toggleVibe,
   onBack,
   onOpenLibrary,
@@ -2006,6 +1968,9 @@ function IdeaForm({
   onClearFlyer,
   onOpenFlyerAttachment,
   onClearFlyerAttachment,
+  onFetchLink,
+  linkBusy,
+  linkError,
   inviteUserName,
   inviteNames,
   invitedCount,
@@ -2016,9 +1981,6 @@ function IdeaForm({
   communityName,
   communityVisibility,
   onCommunityVisibilityChange,
-  onFetchLink,
-  linkBusy,
-  linkError,
   arrive = false,
 }: {
   form: FormShape;
@@ -2028,7 +1990,6 @@ function IdeaForm({
   submitting: boolean;
   error: string | null;
   attemptedSubmit: boolean;
-  dateError: string | null;
   toggleVibe: (id: VibeIcon) => void;
   onBack: () => void;
   onOpenLibrary: () => void;
@@ -2036,6 +1997,9 @@ function IdeaForm({
   onClearFlyer: () => void;
   onOpenFlyerAttachment: () => void;
   onClearFlyerAttachment: () => void;
+  onFetchLink: (rawUrl: string) => Promise<void>;
+  linkBusy: boolean;
+  linkError: string | null;
   inviteUserName: string | null;
   inviteNames: string[];
   invitedCount: number;
@@ -2046,20 +2010,62 @@ function IdeaForm({
   communityName: string | null;
   communityVisibility: "public" | "community_only";
   onCommunityVisibilityChange: (v: "public" | "community_only") => void;
-  onFetchLink: (rawUrl: string) => Promise<void>;
-  linkBusy: boolean;
-  linkError: string | null;
   arrive?: boolean;
 }) {
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [coverPickerOpen, setCoverPickerOpen] = useState(false);
-  const [dateMode, setDateMode] = useState<IdeaDateMode>(
-    form.isThisWeek ? "week" : form.isFlexibleDate ? "anytime" : "specific",
-  );
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [placeholderIdx] = useState(() => Math.floor(Math.random() * IDEA_PLACEHOLDERS.length));
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const detailsRef = useRef<HTMLDivElement>(null);
   const ideaDateRef = useRef<HTMLInputElement>(null);
+  const ideaTimeRef = useRef<HTMLInputElement>(null);
+  const dateMode: "specific" | "week" | "anytime" = form.isThisWeek
+    ? "week"
+    : form.isFlexibleDate
+      ? "anytime"
+      : "specific";
+
+  const openIdeaCalendar = () => {
+    const input = ideaDateRef.current;
+    if (!input) return;
+    try {
+      if (typeof input.showPicker === "function") {
+        input.showPicker();
+        return;
+      }
+    } catch {
+      /* showPicker can throw if the input isn't ready */
+    }
+    input.focus();
+    input.click();
+  };
+
+  const selectDateMode = (mode: "specific" | "week" | "anytime") => {
+    if (mode === "specific") {
+      setForm((f) => ({
+        ...f,
+        isFlexibleDate: false,
+        isThisWeek: false,
+        date: f.date && f.date >= today() && f.date !== FLEXIBLE_DATE_PLACEHOLDER ? f.date : today(),
+      }));
+      window.setTimeout(openIdeaCalendar, 80);
+      return;
+    }
+    if (mode === "week") {
+      setForm((f) => ({
+        ...f,
+        isFlexibleDate: false,
+        isThisWeek: true,
+        date: thisWeekAnchorDate(),
+      }));
+      return;
+    }
+    setForm((f) => ({
+      ...f,
+      isFlexibleDate: true,
+      isThisWeek: false,
+      date: today(),
+    }));
+  };
 
   useEffect(() => {
     if (attemptedSubmit && !form.title.trim()) {
@@ -2068,20 +2074,6 @@ function IdeaForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attemptedSubmit]);
-
-  useEffect(() => {
-    if (!detailsOpen) return;
-    const t = setTimeout(() => {
-      detailsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 150);
-    return () => clearTimeout(t);
-  }, [detailsOpen]);
-
-  const scrollFieldIntoView = (el: HTMLElement | null) => {
-    setTimeout(() => {
-      el?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 300);
-  };
 
   const [keyboardInset, setKeyboardInset] = useState(0);
   useEffect(() => {
@@ -2099,72 +2091,22 @@ function IdeaForm({
     };
   }, []);
 
-  const openIdeaCalendar = () => {
-    const input = ideaDateRef.current;
-    if (!input) return;
-    try {
-      if (typeof input.showPicker === "function") {
-        input.showPicker();
-        return;
-      }
-    } catch {
-      /* showPicker can throw if the input isn't ready */
-    }
-    input.focus();
-    input.click();
-  };
-
-  const selectDateMode = (mode: IdeaDateMode) => {
-    if (mode === "specific") {
-      flushSync(() => {
-        setDateMode("specific");
-        setForm((f) => ({
-          ...f,
-          isFlexibleDate: false,
-          isThisWeek: false,
-          date: f.date && f.date >= today() && f.date !== FLEXIBLE_DATE_PLACEHOLDER ? f.date : today(),
-        }));
-      });
-      openIdeaCalendar();
-      return;
-    }
-    setDateMode(mode);
-    if (mode === "week") {
-      setForm((f) => ({
-        ...f,
-        isFlexibleDate: false,
-        isThisWeek: true,
-        date: thisWeekAnchorDate(),
-      }));
-    } else {
-      setForm((f) => ({
-        ...f,
-        isFlexibleDate: true,
-        isThisWeek: false,
-        date: today(),
-      }));
-    }
-  };
-
   const titleMissing = attemptedSubmit && !form.title.trim();
 
   return (
-    <main className={`app-shell app-shell--mid idea-form-page${arrive ? " page-arrive" : ""}`}>
-      <header className="idea-form-header">
+    <main className={`app-shell app-shell--mid idea-form-page idea-builder${arrive ? " page-arrive" : ""}`}>
+      <header className="idea-form-header plan-builder-header">
         <button type="button" className="back-circle" aria-label="Back" onClick={onBack}>
           <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
         </button>
+        <div className="plan-builder-heading">
+          <span>Just an idea</span>
+          <strong>See who&apos;s down</strong>
+        </div>
       </header>
 
       <form id="idea-form" onSubmit={submit} className="idea-form">
         <div className="idea-form-scroll">
-          <div className="idea-form-title-block">
-            <h1 className="idea-form-title">Just an Idea</h1>
-            <p className="idea-form-sub">
-              Have an idea? See who&apos;s down
-            </p>
-          </div>
-
           {(inviteUserName || inviteNames.length > 0) && (
             <div className="create-plan-invite-banner" role="note">
               Inviting{" "}
@@ -2183,340 +2125,235 @@ function IdeaForm({
                 : "On the feed"}
             </div>
           ) : null}
-        {communityId ? (
-          <div className="create-community-tag">
-            <div className="seg-toggle" role="group" aria-label="Community visibility">
-              <button
-                type="button"
-                className={`seg-toggle-btn ${communityVisibility === "public" ? "is-active" : ""}`}
-                onClick={() => onCommunityVisibilityChange("public")}
-                aria-pressed={communityVisibility === "public"}
-              >
-                Public
-              </button>
-              <button
-                type="button"
-                className={`seg-toggle-btn ${communityVisibility === "community_only" ? "is-active" : ""}`}
-                onClick={() => onCommunityVisibilityChange("community_only")}
-                aria-pressed={communityVisibility === "community_only"}
-              >
-                Community only
-              </button>
+          {communityId ? (
+            <div className="create-community-tag">
+              <div className="seg-toggle" role="group" aria-label="Community visibility">
+                <button
+                  type="button"
+                  className={`seg-toggle-btn ${communityVisibility === "public" ? "is-active" : ""}`}
+                  onClick={() => onCommunityVisibilityChange("public")}
+                  aria-pressed={communityVisibility === "public"}
+                >
+                  Public
+                </button>
+                <button
+                  type="button"
+                  className={`seg-toggle-btn ${communityVisibility === "community_only" ? "is-active" : ""}`}
+                  onClick={() => onCommunityVisibilityChange("community_only")}
+                  aria-pressed={communityVisibility === "community_only"}
+                >
+                  Community only
+                </button>
+              </div>
+              <p className="create-community-tag-hint">
+                {communityVisibility === "public"
+                  ? "On the feed."
+                  : "Just members."}
+              </p>
             </div>
-            <p className="create-community-tag-hint">
-              {communityVisibility === "public"
-                ? "On the feed."
-                : "Just members."}
-            </p>
-          </div>
-        ) : null}
-        <p className="idea-inspiration-label">Need some inspiration?</p>
+          ) : null}
 
-        <div className="idea-textarea-card">
-          <textarea
-            ref={textareaRef}
-            className="idea-textarea"
-            placeholder={IDEA_PLACEHOLDERS[placeholderIdx]}
-            value={form.title}
-            aria-invalid={titleMissing}
-            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-            rows={5}
-          />
-        </div>
-        {titleMissing && <p className="luma-inline-error">Add a few words about the idea.</p>}
-
-        <div id="create-plan-cover">
-        {form.flyerDataUrl ? (
-          <div className="cover-picker cover-picker--filled idea-cover-picker">
-            <img className="cover-picker-img" src={form.flyerDataUrl} alt="" />
-            <div className="cover-picker-overlay">
-              <button type="button" className="cover-chip" onClick={onOpenLibrary}>
-                Library
-              </button>
-              <button type="button" className="cover-chip" onClick={onOpenFlyer}>
-                Upload
-              </button>
-              <button
-                type="button"
-                className="cover-chip"
-                onClick={() => {
-                  onClearFlyer();
-                  setCoverPickerOpen(false);
-                }}
-              >
-                Remove
-              </button>
+          <section className="idea-builder-prompt">
+            <div>
+              <span>Your idea</span>
+              <small>Keep it casual. You can make it a plan later.</small>
             </div>
-          </div>
-        ) : coverPickerOpen ? (
-          <div className="cover-picker idea-cover-picker">
-            <span className="cover-picker-title">Add a cover photo</span>
-            <div className="cover-picker-buttons">
-              <button type="button" className="cover-btn" onClick={onOpenLibrary}>
-                <ImagePlus size={16} strokeWidth={1.8} aria-hidden="true" />
-                Library
-              </button>
-              <button type="button" className="cover-btn" onClick={onOpenFlyer}>
-                Upload
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            type="button"
-            className="idea-photo-upload"
-            onClick={() => setCoverPickerOpen(true)}
-          >
-            <Camera size={16} strokeWidth={1.8} aria-hidden="true" />
-            Add a cover photo
-          </button>
-        )}
-        {attemptedSubmit && !form.flyerDataUrl && (
-          <p className="luma-inline-error">A photo is required.</p>
-        )}
-        </div>
-
-        <p className="form-eyebrow">Settings</p>
-        <div className="settings-card">
-          <div className="settings-row">
-            <span className="settings-row-label">Visibility</span>
-            <div className="vis-pill-toggle" role="group" aria-label="Visibility">
-              <button
-                type="button"
-                className={`vis-pill ${form.visibility === "everyone" ? "is-active" : ""}`}
-                onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
-                aria-pressed={form.visibility === "everyone"}
-              >
-                <Globe size={12} strokeWidth={1.8} aria-hidden="true" />
-                Everyone
-              </button>
-              <button
-                type="button"
-                className={`vis-pill ${form.visibility === "network" ? "is-active" : ""}`}
-                onClick={() => setForm((f) => ({ ...f, visibility: "network", networkEveryone: false }))}
-                aria-pressed={form.visibility === "network"}
-              >
-                <Users size={12} strokeWidth={1.8} aria-hidden="true" />
-                Your Network
-              </button>
-            </div>
-          </div>
-
-          <div className="settings-row">
-            <span className="settings-row-label">Group Chat</span>
-            <FlexToggle
-              variant="switch"
-              active={form.chatEnabled}
-              label={form.chatEnabled ? "On" : "Off"}
-              onClick={(e) => {
-                e.preventDefault();
-                setForm((f) => ({ ...f, chatEnabled: !f.chatEnabled }));
-              }}
+            <textarea
+              ref={textareaRef}
+              className="idea-textarea"
+              placeholder={IDEA_PLACEHOLDERS[placeholderIdx]}
+              value={form.title}
+              aria-invalid={titleMissing}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              rows={5}
             />
-          </div>
+          </section>
+          {titleMissing && <p className="luma-inline-error">Add a few words about the idea.</p>}
 
-          {form.visibility === "network" && (
-            <div className="settings-handpick">
-              <NetworkHandPick
-                network={network}
-                invitedIds={invitedIds}
-                onToggle={onToggleInvited}
-                everyone={form.networkEveryone}
-                onEveryone={() => setForm((f) => ({ ...f, networkEveryone: !f.networkEveryone }))}
-              />
-            </div>
-          )}
-
+          <section className="plan-optional-wrap">
           <button
             type="button"
-            className="settings-options-toggle"
-            onClick={() => setDetailsOpen((v) => !v)}
+            className="plan-optional-toggle"
+            onClick={() => setDetailsOpen((open) => !open)}
             aria-expanded={detailsOpen}
           >
-            <span className="settings-row-label">Additional Details</span>
-            <ChevronIcon open={detailsOpen} />
+            <span>
+              <strong>Optional details</strong>
+              <small>When, venue, link, flyer, and category.</small>
+            </span>
+            <ChevronDown className={detailsOpen ? "is-open" : ""} size={20} />
           </button>
-
-          {detailsOpen && (
-            <div className="idea-accordion-panel" ref={detailsRef}>
-              <div className="plan-meta-card plan-meta-card--edit">
-                <div className="plan-meta-row plan-meta-row--edit idea-when-row">
-                  <span className="plan-meta-icon" aria-hidden="true"><Calendar size={18} strokeWidth={1.8} /></span>
-                  <div className="plan-meta-text">
-                    <div className="idea-when-value">
-                      <span className="plan-meta-label">When</span>
-                      {dateMode === "specific" ? (
-                        <span className="plan-meta-value-hit">
-                          <span className={`plan-meta-value ${!form.date ? "is-placeholder" : ""}`}>
-                            {form.date ? formatPlanDate(form.date) : "Pick a day"}
-                          </span>
-                          <input
-                            ref={ideaDateRef}
-                            id="idea-date"
-                            className="plan-meta-native-input"
-                            type="date"
-                            min={today()}
-                            value={form.date}
-                            aria-invalid={Boolean(dateError)}
-                            onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-                            onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
-                          />
-                        </span>
-                      ) : (
-                        <span className={`plan-meta-value ${dateMode === "anytime" ? "is-placeholder" : ""}`}>
-                          {dateMode === "week" ? "This week" : "Anytime"}
-                        </span>
-                      )}
-                    </div>
-                    <div className="seg-toggle idea-date-toggle" role="group" aria-label="When">
-                      <button
-                        type="button"
-                        className={`seg-toggle-btn ${dateMode === "specific" ? "is-active" : ""}`}
-                        onClick={() => selectDateMode("specific")}
-                        aria-pressed={dateMode === "specific"}
-                      >
-                        A day
-                      </button>
-                      <button
-                        type="button"
-                        className={`seg-toggle-btn ${dateMode === "week" ? "is-active" : ""}`}
-                        onClick={() => selectDateMode("week")}
-                        aria-pressed={dateMode === "week"}
-                      >
-                        This week
-                      </button>
-                      <button
-                        type="button"
-                        className={`seg-toggle-btn ${dateMode === "anytime" ? "is-active" : ""}`}
-                        onClick={() => selectDateMode("anytime")}
-                        aria-pressed={dateMode === "anytime"}
-                      >
-                        Anytime
-                      </button>
-                    </div>
-                    {dateError && <p className="luma-inline-error">{dateError}</p>}
-                  </div>
-                </div>
-                <div className="plan-meta-row plan-meta-row--edit">
-                  <span className="plan-meta-icon" aria-hidden="true"><MapPin size={18} strokeWidth={1.8} /></span>
-                  <div className="plan-meta-text">
-                    <span className="plan-meta-label">Venue</span>
-                    {form.isFlexibleLocation ? (
-                      <span className="plan-meta-value is-placeholder">Anywhere</span>
-                    ) : (
-                      <>
-                        <LocationAutocomplete
-                          name={form.locationName}
-                          address={form.locationAddress}
-                          placeholder="Add a venue"
-                          onChange={(v) => {
-                            setForm((f) => ({
-                              ...f,
-                              locationName: v.name,
-                              locationAddress: v.address,
-                              locationLat: v.lat,
-                              locationLng: v.lng,
-                              isFlexibleLocation: false,
-                            }));
-                          }}
-                        />
-                        {formatVenueAddressLine(form.locationName, form.locationAddress) ? (
-                          <span className="plan-meta-sub">
-                            {formatVenueAddressLine(form.locationName, form.locationAddress)}
-                          </span>
-                        ) : null}
-                      </>
-                    )}
-                  </div>
-                  <FlexToggle
-                    variant="switch"
-                    active={form.isFlexibleLocation}
-                    onClick={() =>
-                      setForm((f) => {
-                        const next = !f.isFlexibleLocation;
-                        return next
-                          ? {
-                              ...f,
-                              isFlexibleLocation: true,
-                              locationName: "",
-                              locationAddress: "",
-                              locationLat: undefined,
-                              locationLng: undefined,
-                              locationPlaceId: undefined,
-                            }
-                          : { ...f, isFlexibleLocation: false };
-                      })
-                    }
-                    label="Flexible"
-                  />
-                </div>
-                <div className="plan-meta-row plan-meta-row--edit">
-                  <span className="plan-meta-icon" aria-hidden="true"><Link2 size={18} strokeWidth={1.8} /></span>
-                  <label className="plan-meta-text" htmlFor="idea-link">
-                    <span className="plan-meta-label">Link</span>
+          {detailsOpen ? (
+          <div className="plan-optional-list">
+            <div className="plan-optional-row plan-optional-row--stack">
+              <span>
+                <strong>When</strong>
+                <small>
+                  {dateMode === "specific"
+                    ? form.date
+                      ? formatPlanDate(form.date)
+                      : "Pick a day"
+                    : dateMode === "week"
+                      ? "Sometime this week"
+                      : "Anytime"}
+                </small>
+              </span>
+              <select
+                className="plan-optional-input plan-optional-select"
+                aria-label="When"
+                value={dateMode}
+                onChange={(e) => selectDateMode(e.target.value as "specific" | "week" | "anytime")}
+              >
+                <option value="specific">A day</option>
+                <option value="week">This week</option>
+                <option value="anytime">Anytime</option>
+              </select>
+              {dateMode === "specific" && (
+                <div className="plan-when-pair plan-when-pair--nested">
+                  <label className="plan-when-field">
+                    <span className="plan-optional-icon" aria-hidden="true"><CalendarDays size={16} /></span>
+                    <span className="plan-when-copy">
+                      <small>Date</small>
+                      <strong className={!form.date ? "is-placeholder" : undefined}>
+                        {form.date ? formatPlanDate(form.date) : "Pick a day"}
+                      </strong>
+                    </span>
                     <input
-                      id="idea-link"
-                      className="idea-link-input"
-                      type="url"
-                      inputMode="url"
-                      placeholder="https://…"
-                      value={form.flyerLinkUrl}
-                      onChange={(e) => setForm((f) => ({ ...f, flyerLinkUrl: e.target.value }))}
-                      onBlur={(e) => void onFetchLink(e.target.value)}
-                      onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
-                      disabled={linkBusy}
+                      ref={ideaDateRef}
+                      className="plan-meta-native-input"
+                      type="date"
+                      min={today()}
+                      value={form.date}
+                      onChange={(e) => {
+                        if (!e.target.value) return;
+                        setForm((f) => ({ ...f, date: e.target.value, isFlexibleDate: false, isThisWeek: false }));
+                      }}
                     />
-                    {linkBusy && <span className="plan-meta-sub">Loading preview…</span>}
-                    {form.flyerLinkPreview?.title && (
-                      <span className="plan-meta-sub">{form.flyerLinkPreview.title}</span>
-                    )}
+                  </label>
+                  <label className="plan-when-field">
+                    <span className="plan-optional-icon" aria-hidden="true"><Clock size={16} /></span>
+                    <span className="plan-when-copy">
+                      <small>Time</small>
+                      <strong className={form.isFlexibleTime || !form.time ? "is-placeholder" : undefined}>
+                        {form.isFlexibleTime || !form.time
+                          ? "Pick a time"
+                          : formatPlanTime(form.time, false)}
+                      </strong>
+                    </span>
+                    <input
+                      ref={ideaTimeRef}
+                      className="plan-meta-native-input"
+                      type="time"
+                      value={form.time}
+                      onChange={(e) => {
+                        if (!e.target.value) return;
+                        setForm((f) => ({ ...f, time: e.target.value, isFlexibleTime: false }));
+                      }}
+                    />
                   </label>
                 </div>
-                {linkError && <p className="link-preview-notice" role="status">{linkError}</p>}
-              </div>
+              )}
+            </div>
 
-              <div className="idea-flyer-block">
-                <p className="plan-meta-label">Flyer</p>
-                {form.flyerAttachmentDataUrl ? (
-                  <div className="flyer-attachment-preview">
-                    <img src={form.flyerAttachmentDataUrl} alt="Flyer preview" />
-                    <div className="flyer-attachment-actions">
-                      <button type="button" className="cover-chip" onClick={onOpenFlyerAttachment}>
-                        Replace
-                      </button>
-                      <button type="button" className="cover-chip" onClick={onClearFlyerAttachment}>
-                        Remove
-                      </button>
-                    </div>
+            <div className="plan-optional-row plan-optional-row--stack">
+              <span>
+                <strong>Venue</strong>
+                <small>{form.isFlexibleLocation ? "Anywhere is fine" : form.locationName || "Add a venue"}</small>
+              </span>
+              <span className="plan-optional-icon" aria-hidden="true"><MapPin size={16} /></span>
+              <div className="plan-optional-venue">
+                <LocationAutocomplete
+                  name={form.locationName}
+                  address={form.locationAddress}
+                  placeholder="Add a venue"
+                  onChange={(v) => {
+                    setForm((f) => ({
+                      ...f,
+                      locationName: v.name,
+                      locationAddress: v.address,
+                      locationLat: v.lat,
+                      locationLng: v.lng,
+                      isFlexibleLocation: !v.name.trim(),
+                    }));
+                  }}
+                />
+                {formatVenueAddressLine(form.locationName, form.locationAddress) ? (
+                  <em>{formatVenueAddressLine(form.locationName, form.locationAddress)}</em>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="plan-optional-row plan-optional-row--stack">
+              <span>
+                <strong>Link</strong>
+                <small>{form.flyerLinkPreview?.title || form.flyerLinkUrl || "Add a link"}</small>
+              </span>
+              <span className="plan-optional-icon" aria-hidden="true"><Link2 size={16} /></span>
+              <input
+                className="plan-optional-input"
+                type="url"
+                placeholder="https://…"
+                value={form.flyerLinkUrl}
+                onChange={(e) => setForm((f) => ({ ...f, flyerLinkUrl: e.target.value }))}
+                onBlur={(e) => void onFetchLink(e.target.value)}
+                disabled={linkBusy}
+              />
+              {linkBusy && <p className="form-help">Loading preview…</p>}
+              {linkError && <p className="link-preview-notice" role="status">{linkError}</p>}
+              {form.flyerLinkPreview && (
+                <div className="link-preview link-preview--form">
+                  {form.flyerLinkPreview.image && (
+                    <img src={form.flyerLinkPreview.image} alt="" className="link-preview-image" />
+                  )}
+                  <div className="link-preview-body">
+                    {form.flyerLinkPreview.siteName && (
+                      <div className="link-preview-site">{form.flyerLinkPreview.siteName}</div>
+                    )}
+                    {form.flyerLinkPreview.title && (
+                      <div className="link-preview-title">{form.flyerLinkPreview.title}</div>
+                    )}
                   </div>
-                ) : (
                   <button
                     type="button"
-                    className="flyer-attachment-add"
-                    onClick={onOpenFlyerAttachment}
+                    className="btn-link"
+                    onClick={() => setForm((f) => ({ ...f, flyerLinkUrl: "", flyerLinkPreview: null }))}
                   >
-                    <ImagePlus size={16} strokeWidth={1.8} aria-hidden="true" />
-                    Upload a flyer
+                    Remove
                   </button>
-                )}
-              </div>
+                </div>
+              )}
+            </div>
 
-              <div className="plan-detail-card plan-detail-card--composer idea-notes-card">
-                <textarea
-                  className="plan-detail-desc-input"
-                  placeholder="Anything else worth knowing?"
-                  value={form.description}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
-                  rows={3}
-                />
-              </div>
+            <div className="plan-optional-row plan-optional-row--stack">
+              <span>
+                <strong>Flyer</strong>
+                <small>{form.flyerAttachmentDataUrl ? "Attached" : "Optional poster"}</small>
+              </span>
+              {form.flyerAttachmentDataUrl ? (
+                <div className="plan-optional-flyer">
+                  <img src={form.flyerAttachmentDataUrl} alt="Flyer preview" />
+                  <div>
+                    <button type="button" onClick={onOpenFlyerAttachment}>Replace</button>
+                    <button type="button" onClick={onClearFlyerAttachment}>Remove</button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" className="plan-optional-add" onClick={onOpenFlyerAttachment}>
+                  <span className="plan-optional-icon" aria-hidden="true"><ImagePlus size={16} /></span>
+                  Upload a flyer
+                  <ChevronRight size={16} aria-hidden="true" />
+                </button>
+              )}
+            </div>
 
-              <p className="form-eyebrow">Category <span className="form-eyebrow-optional">— optional</span></p>
+            <div className="plan-optional-row plan-optional-row--stack">
+              <span>
+                <strong>Category</strong>
+                <small>Choose up to three interests.</small>
+              </span>
               <div className="vibe-grid" role="group" aria-label="Interest tags">
                 {VIBE_OPTIONS.map((opt) => {
                   const selected = form.vibes.includes(opt.id);
-                  const { Icon, iconColor, tint } = interestVisual(opt.tag);
                   return (
                     <button
                       key={opt.id}
@@ -2525,38 +2362,135 @@ function IdeaForm({
                       onClick={() => toggleVibe(opt.id)}
                       aria-pressed={selected}
                     >
-                      {selected && <span className="vibe-tile-dot" aria-hidden="true" />}
-                      <span
-                        className="vibe-tile-icon"
-                        style={{ background: tint, color: iconColor }}
-                        aria-hidden="true"
-                      >
-                        <Icon size={18} strokeWidth={1.8} />
-                      </span>
                       <span className="vibe-tile-label">{opt.label}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
-          )}
-        </div>
-
-        {error && (
-          <div className="form-error-banner">
-            <p className="error-text">{error}</p>
-            <button type="button" className="btn-link" onClick={retry} disabled={submitting}>
-              Try again
-            </button>
           </div>
-        )}
+          ) : null}
+          </section>
+
+          <section id="create-plan-cover" className="idea-builder-cover">
+            {form.flyerDataUrl ? (
+              <div className="idea-builder-cover-preview">
+                <img src={form.flyerDataUrl} alt="" />
+                <button type="button" onClick={onOpenLibrary}>
+                  <ImagePlus size={17} /> Change cover
+                </button>
+                <button type="button" className="idea-builder-cover-remove" onClick={onClearFlyer}>
+                  Remove
+                </button>
+              </div>
+            ) : coverPickerOpen ? (
+              <div className="cover-picker idea-cover-picker">
+                <span className="cover-picker-title">Add a cover photo</span>
+                <div className="cover-picker-buttons">
+                  <button type="button" className="cover-btn" onClick={onOpenLibrary}>
+                    <ImagePlus size={16} strokeWidth={1.8} aria-hidden="true" />
+                    Library
+                  </button>
+                  <button type="button" className="cover-btn" onClick={onOpenFlyer}>
+                    Upload
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="idea-builder-add-cover"
+                onClick={() => setCoverPickerOpen(true)}
+              >
+                <span><ImagePlus size={21} /></span>
+                <span>
+                  <strong>Add a cover</strong>
+                  <small>Optional, but helpful for discovery.</small>
+                </span>
+                <ChevronRight size={18} />
+              </button>
+            )}
+          </section>
+
+          <section className="plan-builder-card">
+            <div className="plan-builder-card-head">
+              <h2>Visibility</h2>
+              <p>Choose who can see this idea.</p>
+            </div>
+            <div className="vis-pill-toggle" role="group" aria-label="Visibility">
+              <button
+                type="button"
+                className={`vis-pill ${form.visibility === "everyone" ? "is-active" : ""}`}
+                onClick={() => setForm((f) => ({ ...f, visibility: "everyone" }))}
+                aria-pressed={form.visibility === "everyone"}
+              >
+                <Globe size={15} strokeWidth={1.8} aria-hidden="true" />
+                Everyone
+              </button>
+              <button
+                type="button"
+                className={`vis-pill ${form.visibility === "network" ? "is-active" : ""}`}
+                onClick={() => setForm((f) => ({ ...f, visibility: "network", networkEveryone: false }))}
+                aria-pressed={form.visibility === "network"}
+              >
+                <Users size={15} strokeWidth={1.8} aria-hidden="true" />
+                My network
+              </button>
+            </div>
+            {form.visibility === "network" && (
+              <div className="settings-handpick">
+                <NetworkHandPick
+                  network={network}
+                  invitedIds={invitedIds}
+                  onToggle={onToggleInvited}
+                  everyone={form.networkEveryone}
+                  onEveryone={() => setForm((f) => ({ ...f, networkEveryone: !f.networkEveryone }))}
+                />
+              </div>
+            )}
+          </section>
+
+          <section className="plan-builder-settings">
+            <div>
+              <span>
+                <strong>Group chat</strong>
+                <small>People can talk once they&apos;re interested.</small>
+              </span>
+              <FlexToggle
+                variant="switch"
+                active={form.chatEnabled}
+                label={form.chatEnabled ? "On" : "Off"}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setForm((f) => ({ ...f, chatEnabled: !f.chatEnabled }));
+                }}
+              />
+            </div>
+          </section>
+
+          <section className="idea-builder-make-real">
+            <span className="idea-builder-make-real-icon"><CalendarDays size={21} /></span>
+            <span>
+              <strong>Easy to make real later</strong>
+              <small>Add a date and place when enough people are interested.</small>
+            </span>
+          </section>
+
+          {error && (
+            <div className="form-error-banner">
+              <p className="error-text">{error}</p>
+              <button type="button" className="btn-link" onClick={retry} disabled={submitting}>
+                Try again
+              </button>
+            </div>
+          )}
         </div>
         <div
           className="idea-form-cta"
           style={keyboardInset > 0 ? { paddingBottom: 16 + keyboardInset } : undefined}
         >
           <button type="submit" className="btn btn-primary btn-block idea-primary-cta" disabled={submitting}>
-            {submitting ? "Posting…" : "Put It Out There"}
+            {submitting ? "Posting…" : "Put it out there"}
           </button>
         </div>
       </form>
@@ -2564,10 +2498,6 @@ function IdeaForm({
   );
 }
 
-/**
- * Who in the network sees this plan. Picked people are the audience.
- * "Everyone" is an explicit choice, not the default.
- */
 function NetworkHandPick({
   network,
   invitedIds,
@@ -2581,6 +2511,17 @@ function NetworkHandPick({
   everyone?: boolean;
   onEveryone?: () => void;
 }) {
+  const [query, setQuery] = useState("");
+  const filtered = useMemo(() => {
+    if (!network) return [];
+    const q = query.trim().toLowerCase();
+    if (!q) return network;
+    return network.filter((u) => {
+      const full = `${u.firstName} ${u.lastName ?? ""}`.toLowerCase();
+      return full.includes(q);
+    });
+  }, [network, query]);
+
   if (network === null) {
     return <p className="form-help" style={{ marginTop: 8 }}>Loading your network…</p>;
   }
@@ -2602,45 +2543,75 @@ function NetworkHandPick({
     );
   }
   return (
-    <div style={{ marginTop: 10 }}>
+    <div className="plan-network-pick">
       {onEveryone && (
-        <>
-          <p className="form-help" style={{ marginTop: 0 }}>
-            {everyone
-              ? "Everyone in your network can see this."
-              : "Pick who should see this. Only they will."}
-          </p>
-          <button type="button" className="btn-link" onClick={onEveryone} style={{ marginBottom: 8 }}>
-            {everyone ? "Choose specific people" : "Share with everyone in your network"}
-          </button>
-        </>
+        <button
+          type="button"
+          className={`plan-network-all ${everyone ? "is-on" : ""}`}
+          onClick={onEveryone}
+          aria-pressed={everyone}
+        >
+          <span>
+            <strong>Everyone in my network</strong>
+            <small>{network.length} {network.length === 1 ? "person" : "people"}</small>
+          </span>
+          <span className={`plan-network-check ${everyone ? "is-on" : ""}`} aria-hidden="true">
+            {everyone ? <Check size={14} strokeWidth={2.4} /> : null}
+          </span>
+        </button>
       )}
       {!everyone && (
-      <div className="invite-people-list">
-        {network.map((u) => {
-          const picked = invitedIds.has(u.id);
-          return (
-            <button
-              key={u.id}
-              type="button"
-              className={`invite-person ${picked ? "is-picked" : ""}`}
-              onClick={() => onToggle(u.id)}
-              aria-pressed={picked}
-            >
-              <Avatar
-                seed={u.avatarSeed}
-                style={u.avatarStyle}
-                photoDataUrl={u.avatarPhotoDataUrl}
-                params={u.avatarParams}
-                name={u.firstName}
-                size="sm"
+        <>
+          <p className="plan-network-hint">
+            {invitedIds.size === 0
+              ? "Select who should see this."
+              : `${invitedIds.size} selected`}
+          </p>
+          {network.length > 6 && (
+            <label className="plan-network-search">
+              <Search size={16} strokeWidth={2} aria-hidden="true" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search your people"
+                autoComplete="off"
+                autoCorrect="off"
               />
-              <span className="invite-person-name">{u.firstName}</span>
-              {picked && <span className="invite-person-check">✓</span>}
-            </button>
-          );
-        })}
-      </div>
+            </label>
+          )}
+          <div className="plan-network-list" role="list">
+            {filtered.length === 0 && (
+              <p className="plan-network-empty">No one matches “{query.trim()}”.</p>
+            )}
+            {filtered.map((u) => {
+              const picked = invitedIds.has(u.id);
+              const fullName = [u.firstName, u.lastName].filter(Boolean).join(" ");
+              return (
+                <button
+                  key={u.id}
+                  type="button"
+                  className={`plan-network-row ${picked ? "is-picked" : ""}`}
+                  onClick={() => onToggle(u.id)}
+                  aria-pressed={picked}
+                >
+                  <Avatar
+                    seed={u.avatarSeed}
+                    style={u.avatarStyle}
+                    photoDataUrl={u.avatarPhotoDataUrl}
+                    params={u.avatarParams}
+                    name={u.firstName}
+                    size="sm"
+                  />
+                  <span className="plan-network-name">{fullName}</span>
+                  <span className={`plan-network-check ${picked ? "is-on" : ""}`} aria-hidden="true">
+                    {picked ? <Check size={14} strokeWidth={2.4} /> : null}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );
@@ -2698,19 +2669,3 @@ function FlexIcon() {
   );
 }
 
-function ChevronIcon({ open }: { open: boolean }) {
-  return (
-    <svg
-      className={`create-more-chevron ${open ? "is-open" : ""}`}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="m6 9 6 6 6-6" />
-    </svg>
-  );
-}

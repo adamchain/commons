@@ -221,6 +221,7 @@ export function LandingPage() {
   return (
     <div style={{ background: BEIGE, minHeight: "100vh" }}>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap');
         @media (max-width: 920px) {
           .hero-grid, .pathways-header-grid, .pathway-grid, .how-grid {
             grid-template-columns: 1fr !important;

@@ -3,6 +3,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { Home, UserRound, Users, Plus, MessageCircle } from "lucide-react";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
+import { openCreateLauncher } from "./CreateLauncher";
 import { needsOnboarding } from "../lib/onboarding";
 import type { ConversationSummaryDTO } from "../types/shared";
 
@@ -89,7 +90,7 @@ export function BottomNav() {
         }}
       >
         <span className="bottom-nav-icon-wrap">
-          <Home size={22} strokeWidth={1.6} />
+          <Home size={23} strokeWidth={1.7} />
         </span>
         <span className="bottom-nav-label">Home</span>
       </NavLink>
@@ -102,14 +103,20 @@ export function BottomNav() {
         onPointerDown={() => warmNav("/communities")}
       >
         <span className="bottom-nav-icon-wrap">
-          <Users size={22} strokeWidth={1.6} />
+          <Users size={23} strokeWidth={1.7} />
         </span>
         <span className="bottom-nav-label">Communities</span>
       </NavLink>
 
-      <NavLink to="/plans/new" className="bottom-nav-cta" aria-label="Make a plan" onPointerDown={() => warmNav("/plans/new")}>
-        <Plus size={28} strokeWidth={2.2} color="white" />
-      </NavLink>
+      <button
+        type="button"
+        className="bottom-nav-cta"
+        aria-label="Make a plan"
+        onPointerDown={() => warmNav("/plans/new")}
+        onClick={openCreateLauncher}
+      >
+        <Plus size={33} strokeWidth={1.8} color="white" />
+      </button>
 
       <NavLink
         to="/messages"
@@ -118,7 +125,7 @@ export function BottomNav() {
         onPointerDown={() => warmNav("/messages")}
       >
         <span className="bottom-nav-icon-wrap">
-          <MessageCircle size={22} strokeWidth={1.6} />
+          <MessageCircle size={23} strokeWidth={1.7} />
           {unreadMessages > 0 && (
             <span className="bottom-nav-badge">{unreadMessages > 9 ? "9+" : unreadMessages}</span>
           )}
@@ -133,7 +140,7 @@ export function BottomNav() {
         onPointerDown={() => warmNav("/network")}
       >
         <span className="bottom-nav-icon-wrap">
-          <UserRound size={22} strokeWidth={1.6} />
+          <UserRound size={23} strokeWidth={1.7} />
         </span>
         <span className="bottom-nav-label">Network</span>
       </NavLink>

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { BarChart2, BellOff, MessageCircle, Pin, SquarePen, Trash2 } from "lucide-react";
+import { BarChart2, BellOff, MessageCircle, Pin, Search, SquarePen, Trash2 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { PlanCoverThumb } from "../components/CoverThumb";
-import { EmptyCard, ScreenTitle } from "../components/ui";
+import { EmptyCard } from "../components/ui";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { Button } from "../components/ui/Button";
 import { sentenceCaseTitle } from "../lib/format";
@@ -228,6 +228,7 @@ export function MessagesPage() {
   const [items, setItems] = useState<ConversationSummaryDTO[]>(
     () => readScreen<ConversationSummaryDTO[]>("inbox") ?? [],
   );
+  const [inboxQuery, setInboxQuery] = useState("");
   const [composeOpen, setComposeOpen] = useState(false);
   const [composePeople, setComposePeople] = useState<PublicUser[] | null>(null);
   const [ready, setReady] = useState(() => readScreen<ConversationSummaryDTO[]>("inbox") != null);
@@ -412,6 +413,12 @@ export function MessagesPage() {
     }
   }
 
+  function conversationKind(c: ConversationSummaryDTO): { key: "direct" | "community" | "plan"; label: string } {
+    if (c.dmUserId) return { key: "direct", label: "DIRECT MESSAGE" };
+    if (c.communityId) return { key: "community", label: "COMMUNITY" };
+    return { key: "plan", label: "PLAN" };
+  }
+
   function rowKey(c: ConversationSummaryDTO) {
     return c.dmUserId ? `dm-${c.dmUserId}` : c.communityId ? `comm-${c.communityId}` : c.planId;
   }
@@ -441,6 +448,15 @@ export function MessagesPage() {
     }
   }
 
+  const q = inboxQuery.trim().toLowerCase();
+  const visibleItems = q
+    ? items.filter((c) => {
+        const title = (c.communityName ?? c.planTitle ?? "").toLowerCase();
+        const preview = (c.lastMessagePreview ?? "").toLowerCase();
+        return title.includes(q) || preview.includes(q);
+      })
+    : items;
+
   return (
     <main className="app-shell app-shell--with-nav app-shell--with-topbar app-shell--messages-lock">
       <div
@@ -452,17 +468,29 @@ export function MessagesPage() {
       >
         <span className="feed-pull-spinner" />
       </div>
-      <div className="messages-title-row">
-        <ScreenTitle title="Messages" />
-        <button
-          type="button"
-          className="messages-compose"
-          aria-label="New message"
-          onClick={() => setComposeOpen(true)}
-        >
-          <SquarePen size={18} strokeWidth={1.8} aria-hidden="true" />
-        </button>
-      </div>
+      <header className="messages-header-card">
+        <div className="messages-title-row">
+          <h1 className="messages-page-title">Messages</h1>
+          <button
+            type="button"
+            className="messages-compose"
+            aria-label="New message"
+            onClick={() => setComposeOpen(true)}
+          >
+            <SquarePen size={20} strokeWidth={1.8} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="messages-search">
+          <Search size={18} strokeWidth={1.8} aria-hidden="true" />
+          <input
+            value={inboxQuery}
+            onChange={(e) => setInboxQuery(e.target.value)}
+            placeholder="Search conversations"
+            aria-label="Search conversations"
+            autoComplete="off"
+          />
+        </div>
+      </header>
 
       <div ref={scrollRef} className={`messages-scroll${ready && items.length === 0 ? " messages-scroll--empty" : ""}`}>
       <div ref={contentRef} className="feed-pull-content">
@@ -471,7 +499,7 @@ export function MessagesPage() {
           <div className="feed-skeleton-card" />
           <div className="feed-skeleton-card" />
         </div>
-      ) : items.length === 0 ? (
+      ) : visibleItems.length === 0 ? (
         <EmptyCard
           className="ref-empty-card--inbox"
           icon={<MessageCircle size={22} strokeWidth={1.6} color="var(--red)" />}
@@ -485,13 +513,14 @@ export function MessagesPage() {
           {pinErr && <p className="error-text" style={{ marginBottom: 8 }}>{pinErr}</p>}
           <div className="messages-card">
             <div className="messages-list">
-              {items.map((c) => {
+              {visibleItems.map((c) => {
                 const preview = cleanPreview(c.lastMessagePreview);
                 const isPoll = previewLooksLikePoll(c.lastMessagePreview);
                 const canDismiss = true;
                 const title = c.communityName ?? sentenceCaseTitle(c.planTitle);
                 const time = formatInboxTime(c.lastMessageAt ?? c.planDate);
                 const unread = c.unreadCount > 0;
+                const kind = conversationKind(c);
                 const previewLine = c.lastMessageSender && c.lastMessagePreview
                   ? `${c.lastMessageSender}: ${preview}`
                   : preview;
@@ -526,20 +555,17 @@ export function MessagesPage() {
                           ) : null}
                           <span className="messages-row-title-text">{title}</span>
                         </span>
-                        {time ? (
-                          <span className={`messages-row-time${unread ? " is-unread" : ""}`}>{time}</span>
-                        ) : null}
+                        <span className="messages-row-meta-time">
+                          {time ? <time className={`messages-row-time${unread ? " is-unread" : ""}`}>{time}</time> : null}
+                          {unread ? <i className="messages-row-unread-dot" aria-label={`${c.unreadCount} unread`} /> : null}
+                        </span>
                       </div>
+                      <span className={`messages-row-kind messages-row-kind--${kind.key}`}>{kind.label}</span>
                       <div className="messages-row-bottom">
                         <div className="messages-row-preview">
                           {isPoll && <BarChart2 size={14} strokeWidth={1.8} />}
                           <span>{previewLine}</span>
                         </div>
-                        {unread && (
-                          <span className="messages-row-unread" aria-label={`${c.unreadCount} unread`}>
-                            {c.unreadCount > 9 ? "9+" : c.unreadCount}
-                          </span>
-                        )}
                       </div>
                     </div>
                   </>
@@ -566,7 +592,7 @@ export function MessagesPage() {
                             : `/plans/${c.planId}/chat`
                       }
                       state={{ from: "messages" }}
-                      className="messages-row"
+                      className={`messages-row${unread ? " is-unread" : ""}`}
                     >
                       {rowInner}
                     </Link>

@@ -15,8 +15,8 @@ import {
   RefreshCw,
   Search,
   Shield,
-  Trash2,
   Unlock,
+  X,
   UserPlus,
   UserRound,
   Users,
@@ -49,6 +49,7 @@ export function NotificationsPage() {
   // F.8 — the empty state reads differently once you're actually plugged
   // into a plan; find out before deciding which warm line to show.
   const [hasPlans, setHasPlans] = useState(false);
+  const [digestPlans, setDigestPlans] = useState<PlanDTO[]>([]);
 
   useEffect(() => {
     let alive = true;
@@ -78,8 +79,14 @@ export function NotificationsPage() {
   useEffect(() => {
     if (!user) return;
     void api<PlanDTO[]>("/api/plans")
-      .then((plans) => setHasPlans(plans.some((p) => p.creator.id === user.id || p.myState !== null)))
-      .catch(() => setHasPlans(false));
+      .then((plans) => {
+        setDigestPlans(plans);
+        setHasPlans(plans.some((p) => p.creator.id === user.id || p.myState !== null));
+      })
+      .catch(() => {
+        setDigestPlans([]);
+        setHasPlans(false);
+      });
   }, [user]);
 
   const sorted = useMemo(() => {
@@ -129,20 +136,22 @@ export function NotificationsPage() {
 
   if (items === null) {
     return (
-      <main className="app-shell app-shell--mid app-shell--with-nav app-shell--with-topbar notif-page">
-        <div className="notif-header">
-          <button
-            type="button"
-            className="back-circle"
-            aria-label="Back"
-            onClick={() => {
-              if (window.history.length > 1) navigate(-1);
-              else navigate("/");
-            }}
-          >
-            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
-          </button>
-          <h1 className="notif-title">Notifications</h1>
+      <main className="app-shell app-shell--mid app-shell--with-nav notif-page">
+        <div className="notif-masthead">
+          <header className="app-header app-header--minimal notif-header">
+            <button
+              type="button"
+              className="back-circle"
+              aria-label="Back"
+              onClick={() => {
+                if (window.history.length > 1) navigate(-1);
+                else navigate("/");
+              }}
+            >
+              <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
+            </button>
+          </header>
+          <h1 className="notif-page-title">Notifications</h1>
         </div>
         <div className="feed-skeleton" aria-busy="true" aria-label="Loading notifications">
           <div className="feed-skeleton-card" />
@@ -154,33 +163,36 @@ export function NotificationsPage() {
   }
 
   return (
-    <main className="app-shell app-shell--mid app-shell--with-nav app-shell--with-topbar notif-page">
-      <div className="notif-top">
-      <div className="notif-header">
-        <button
-          type="button"
-          className="back-circle"
-          aria-label="Back"
-          onClick={() => {
-            if (window.history.length > 1) navigate(-1);
-            else navigate("/");
-          }}
-        >
-          <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
-        </button>
-        <h1 className="notif-title">Notifications</h1>
-        {openedUnread > 0 && (
-          <span className="notif-count-badge">{openedUnread > 9 ? "9+" : openedUnread}</span>
-        )}
+    <main className="app-shell app-shell--mid app-shell--with-nav notif-page">
+      <div className="notif-masthead">
+        <header className="app-header app-header--minimal notif-header">
+          <button
+            type="button"
+            className="back-circle"
+            aria-label="Back"
+            onClick={() => {
+              if (window.history.length > 1) navigate(-1);
+              else navigate("/");
+            }}
+          >
+            <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
+          </button>
+        </header>
+        <div className="notif-title-row">
+          <h1 className="notif-page-title">Notifications</h1>
+          {openedUnread > 0 && (
+            <span className="notif-count-badge">{openedUnread > 9 ? "9+" : openedUnread}</span>
+          )}
+        </div>
       </div>
 
       {sorted.length > 0 && (
-        <div className="notif-tabs" role="tablist" aria-label="Notification sections">
+        <div className="segmented segmented-feed-view notif-tabs" role="tablist" aria-label="Notification sections">
           <button
             type="button"
             role="tab"
             aria-selected={tab === "activity"}
-            className={`notif-tab${tab === "activity" ? " is-active" : ""}`}
+            className={tab === "activity" ? "is-active" : ""}
             onClick={() => setTab("activity")}
           >
             Activity
@@ -189,7 +201,7 @@ export function NotificationsPage() {
             type="button"
             role="tab"
             aria-selected={tab === "requests"}
-            className={`notif-tab${tab === "requests" ? " is-active" : ""}`}
+            className={tab === "requests" ? "is-active" : ""}
             onClick={() => setTab("requests")}
           >
             Requests
@@ -210,24 +222,18 @@ export function NotificationsPage() {
               disabled={unreadCount === 0}
               onClick={markAllRead}
             >
-              Mark all as read
+              Mark all read
             </button>
-            <button
-              type="button"
-              className="notif-toolbar-link notif-toolbar-link--accent"
-              onClick={clearAll}
-            >
-              <Trash2 size={13} strokeWidth={1.8} aria-hidden="true" /> Clear all
+            <button type="button" className="notif-toolbar-link notif-toolbar-link--accent" onClick={clearAll}>
+              Clear all
             </button>
           </div>
         </div>
       )}
-      </div>
 
       {sorted.length === 0 ? (
         <EmptyCard
-          icon={<Bell size={22} strokeWidth={1.6} color="#6B5AA0" />}
-          tint="#D8D0F0"
+          icon={<Bell size={22} strokeWidth={1.6} color="var(--muted)" />}
           title="It's quiet in here."
           body={
             hasPlans
@@ -242,9 +248,9 @@ export function NotificationsPage() {
         </p>
       ) : (
         <section className="notif-section">
-          <div className="notif-list">
+          <div className="notif-list notif-card">
             {visible.map((n) => (
-              <NotifRow key={n.id} item={n} onDismiss={() => dismiss(n.id)} />
+              <NotifRow key={n.id} item={n} digestPlans={digestPlans} onDismiss={() => dismiss(n.id)} />
             ))}
           </div>
         </section>
@@ -253,7 +259,15 @@ export function NotificationsPage() {
   );
 }
 
-function NotifRow({ item, onDismiss }: { item: NotificationDTO; onDismiss: () => void }) {
+function NotifRow({
+  item,
+  digestPlans,
+  onDismiss,
+}: {
+  item: NotificationDTO;
+  digestPlans: PlanDTO[];
+  onDismiss: () => void;
+}) {
   const href = hrefFor(item);
   const isGrabs = item.kind === "planUpForGrabs";
   const isNetworkAdd =
@@ -269,7 +283,7 @@ function NotifRow({ item, onDismiss }: { item: NotificationDTO; onDismiss: () =>
           photoDataUrl={item.actor.avatarPhotoDataUrl}
           params={item.actor.avatarParams}
           name={item.actor.firstName}
-          size="sm"
+          size="md"
         />
       ) : (
         <span className="notif-row-icon" aria-hidden="true">
@@ -277,7 +291,11 @@ function NotifRow({ item, onDismiss }: { item: NotificationDTO; onDismiss: () =>
         </span>
       )}
       <div className="notif-row-body">
-        <div className="notif-row-title">{item.body}</div>
+        {item.kind === "weeklyFridayDigest" ? (
+          <DigestCopy body={item.body} planIds={item.planIds} digestPlans={digestPlans} />
+        ) : (
+          <div className="notif-row-title">{item.body}</div>
+        )}
         {isGrabs && <span className="notif-row-cta">Take over hosting</span>}
         {isNetworkAdd && item.profileUserId && (
           <NetworkRespond userId={item.profileUserId} resolution={item.resolution} />
@@ -295,19 +313,29 @@ function NotifRow({ item, onDismiss }: { item: NotificationDTO; onDismiss: () =>
           onDismiss();
         }}
       >
-        ×
+        <X size={16} strokeWidth={2} aria-hidden="true" />
       </button>
     </>
   );
   if (href) {
     const linkState: NavFromState = { from: "notifications" };
     return (
-      <Link to={href} state={linkState} className={`notif-row${isGrabs ? " notif-row--grabs" : ""}`}>
+      <Link
+        to={href}
+        state={linkState}
+        className={`notif-row${isGrabs ? " notif-row--grabs" : ""}${item.kind === "weeklyFridayDigest" ? " notif-row--digest" : ""}${item.readAt === null ? " is-unread" : ""}`}
+      >
         {inner}
       </Link>
     );
   }
-  return <div className={`notif-row${isGrabs ? " notif-row--grabs" : ""}`}>{inner}</div>;
+  return (
+    <div
+      className={`notif-row${isGrabs ? " notif-row--grabs" : ""}${item.kind === "weeklyFridayDigest" ? " notif-row--digest" : ""}${item.readAt === null ? " is-unread" : ""}`}
+    >
+      {inner}
+    </div>
+  );
 }
 
 function hrefFor(n: NotificationDTO): string | null {
@@ -316,6 +344,7 @@ function hrefFor(n: NotificationDTO): string | null {
   }
   if (n.kind === "newGroupChatMessage" && n.profileUserId && !n.planId) return `/dm/${n.profileUserId}`;
   if (n.kind === "newGroupChatMessage" && n.planId) return `/plans/${n.planId}/chat`;
+  if (n.kind === "weeklyFridayDigest") return null;
   if (n.kind === "welcome") return "/settings/interests";
   if (n.kind === "helpReply") return "/helpchat";
   // Network request/accept link to the other person's profile, where the
@@ -354,6 +383,55 @@ const REQUEST_KINDS = new Set<NotificationKind>([
   "communityJoinRequest",
   "communityPostPending",
 ]);
+
+function parseDigest(body: string): { headline: string; items: string[] } {
+  const withBreaks = body.replace(/\s*•\s*/g, "\n• ");
+  const items = withBreaks
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => /^[•\-*]/.test(line))
+    .map((line) => line.replace(/^[•\-*]\s*/, "").trim())
+    .filter(Boolean);
+  return { headline: "This week in Philly", items };
+}
+
+function DigestCopy({
+  body,
+  planIds,
+  digestPlans,
+}: {
+  body: string;
+  planIds?: string[];
+  digestPlans: PlanDTO[];
+}) {
+  const { headline, items } = parseDigest(body);
+  const byTitle = new Map(digestPlans.map((p) => [p.title.trim().toLowerCase(), p.id]));
+  const linkState: NavFromState = { from: "notifications" };
+  return (
+    <div className="notif-digest">
+      <p className="notif-digest-kicker">Weekend roundup</p>
+      <p className="notif-row-title">{headline}</p>
+      {items.length > 0 ? (
+        <ul className="notif-digest-list">
+          {items.map((item, i) => {
+            const planId = planIds?.[i] ?? byTitle.get(item.trim().toLowerCase());
+            return (
+              <li key={`${item}-${i}`}>
+                {planId ? (
+                  <Link className="notif-digest-item" to={`/plans/${planId}`} state={linkState}>
+                    {item}
+                  </Link>
+                ) : (
+                  item
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
 
 function NetworkRespond({
   userId,
@@ -407,7 +485,7 @@ function NetworkRespond({
 }
 
 function iconFor(kind: NotificationKind): ReactNode {
-  const props = { size: 16 as const, strokeWidth: 1.6 as const, color: "var(--muted)" };
+  const props = { size: 18 as const, strokeWidth: 1.7 as const, color: "var(--ink)" };
   switch (kind) {
     case "someoneJoinedYourPlan":
       return <UserRound {...props} />;

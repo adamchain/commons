@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, UserMinus } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { PageLoading } from "../components/LoadingScreen";
@@ -565,27 +565,30 @@ export function CommunityDashboardPage() {
                     <span className="cmy-dash-person-sub">Joined {formatRelative(m.joinedAt)}</span>
                     {m.screeningAnswer && <span className="cmy-dash-person-answer">“{m.screeningAnswer}”</span>}
                   </div>
-                  <MemberNetworkButton
-                    userId={m.user.id}
-                    status={m.networkStatus}
-                    requestReceived={m.networkRequestReceived}
-                  />
-                  {m.role === "organizer" ? (
-                    <span className="cmy-org-badge cmy-org-badge--pill">Organizer</span>
-                  ) : (
-                    <button
-                      type="button"
-                      className="cmy-icon-btn cmy-remove"
-                      disabled={busyId !== null}
-                      onClick={() =>
-                        void run(`remove-${m.user.id}`, () =>
-                          api(`/api/communities/${id}/members/${m.user.id}`, { method: "DELETE" }),
-                        )
-                      }
-                    >
-                      Remove
-                    </button>
-                  )}
+                  <div className="cmy-member-actions">
+                    <MemberNetworkButton
+                      userId={m.user.id}
+                      status={m.networkStatus}
+                      requestReceived={m.networkRequestReceived}
+                    />
+                    {m.role === "organizer" ? (
+                      <span className="cmy-member-chip cmy-member-chip--pending">Organizer</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="cmy-member-icon"
+                        disabled={busyId !== null}
+                        aria-label={`Remove ${personName(m.user)} from this community`}
+                        onClick={() =>
+                          void run(`remove-${m.user.id}`, () =>
+                            api(`/api/communities/${id}/members/${m.user.id}`, { method: "DELETE" }),
+                          )
+                        }
+                      >
+                        <UserMinus size={16} strokeWidth={2} aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>

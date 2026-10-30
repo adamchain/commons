@@ -9,7 +9,20 @@ type CoverCatalogCategory = {
   images: { url: string; label: string; category: string }[];
 };
 
-const COVER_PAGE_SIZE = 12;
+const COVER_PAGE_SIZE = 16;
+
+function uniqueImages(categories: CoverCatalogCategory[]) {
+  const seen = new Set<string>();
+  const images: CoverCatalogCategory["images"] = [];
+  for (const category of categories) {
+    for (const image of category.images) {
+      if (seen.has(image.url)) continue;
+      seen.add(image.url);
+      images.push(image);
+    }
+  }
+  return images;
+}
 
 export function CoverLibraryModal({
   onPick,
@@ -18,11 +31,11 @@ export function CoverLibraryModal({
   onPick: (url: string) => void;
   onClose: () => void;
 }) {
-  const [categories, setCategories] = useState<CoverCatalogCategory[] | null>(null);
-  const [active, setActive] = useState<string>("");
+  const [allImages, setAllImages] = useState<CoverCatalogCategory["images"] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(COVER_PAGE_SIZE);
   const gridRef = useRef<HTMLDivElement>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let alive = true;
@@ -30,13 +43,11 @@ export function CoverLibraryModal({
       try {
         const r = await api<{ categories: CoverCatalogCategory[] }>("/api/card-images/catalog");
         if (!alive) return;
-        setCategories(r.categories);
-        // Start on the first category — "All" would fire ~100 full-res downloads.
-        setActive(r.categories[0]?.id ?? "all");
+        setAllImages(uniqueImages(r.categories));
       } catch (e) {
         if (!alive) return;
         setError(e instanceof Error ? e.message : "Couldn't load covers");
-        setCategories([]);
+        setAllImages([]);
       }
     })();
     return () => {
@@ -44,26 +55,24 @@ export function CoverLibraryModal({
     };
   }, []);
 
-  // Reset the progressive window whenever the category changes.
+  const images = (allImages ?? []).slice(0, visibleCount);
+  const hasMore = (allImages?.length ?? 0) > visibleCount;
+
   useEffect(() => {
-    setVisibleCount(COVER_PAGE_SIZE);
-    gridRef.current?.scrollTo({ top: 0 });
-  }, [active]);
-
-  const chips = categories ?? [];
-  const allImages =
-    !categories
-      ? []
-      : active === "all"
-        ? categories.flatMap((c) => c.images)
-        : (categories.find((c) => c.id === active)?.images ?? []);
-  const images = allImages.slice(0, visibleCount);
-  const hasMore = visibleCount < allImages.length;
-
-  function loadMore() {
-    if (!hasMore) return;
-    setVisibleCount((n) => Math.min(n + COVER_PAGE_SIZE, allImages.length));
-  }
+    const node = moreRef.current;
+    const root = gridRef.current;
+    if (!node || !root || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setVisibleCount((n) => Math.min(n + COVER_PAGE_SIZE, allImages?.length ?? n));
+        }
+      },
+      { root, rootMargin: "240px 0px", threshold: 0.01 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, visibleCount, allImages?.length]);
 
   return (
     <BottomSheet onClose={onClose} labelledBy="cover-lib-title" className="cover-lib">
@@ -74,61 +83,29 @@ export function CoverLibraryModal({
           </button>
         </div>
 
-        {chips.length > 1 && (
-          <div className="cover-lib-cats" role="tablist" aria-label="Cover categories">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={active === "all"}
-              className={`cover-lib-cat ${active === "all" ? "is-active" : ""}`}
-              onClick={() => setActive("all")}
-            >
-              All
-            </button>
-            {chips.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                role="tab"
-                aria-selected={active === c.id}
-                className={`cover-lib-cat ${active === c.id ? "is-active" : ""}`}
-                onClick={() => setActive(c.id)}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {categories === null ? (
+        {allImages === null ? (
           <p className="cover-lib-status">Loading covers…</p>
         ) : error ? (
           <p className="cover-lib-status">{error}</p>
         ) : allImages.length === 0 ? (
           <p className="cover-lib-status">Empty library — upload one.</p>
         ) : (
-          <div
-            ref={gridRef}
-            className="cover-lib-grid"
-            onScroll={(e) => {
-              const el = e.currentTarget;
-              if (el.scrollTop + el.clientHeight >= el.scrollHeight - 160) loadMore();
-            }}
-          >
-            {images.map((img) => (
+          <div ref={gridRef} className="cover-lib-grid">
+            {images.map((img, index) => (
               <LazyCoverTile
                 key={img.url}
                 url={img.url}
                 label={img.label}
+                index={index}
                 root={gridRef}
                 onPick={onPick}
               />
             ))}
-            {hasMore && (
-              <button type="button" className="cover-lib-more" onClick={loadMore}>
-                Show more ({allImages.length - visibleCount} left)
-              </button>
-            )}
+            {hasMore ? (
+              <div ref={moreRef} className="cover-lib-more" aria-hidden>
+                Loading more…
+              </div>
+            ) : null}
           </div>
         )}
     </BottomSheet>
@@ -140,16 +117,19 @@ export function CoverLibraryModal({
 function LazyCoverTile({
   url,
   label,
+  index,
   root,
   onPick,
 }: {
   url: string;
   label: string;
+  index: number;
   root: RefObject<HTMLDivElement | null>;
   onPick: (url: string) => void;
 }) {
   const tileRef = useRef<HTMLButtonElement>(null);
   const [src, setSrc] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const node = tileRef.current;
@@ -171,12 +151,17 @@ function LazyCoverTile({
     <button
       ref={tileRef}
       type="button"
-      className={`cover-lib-tile ${src ? "" : "is-pending"}`}
+      className={`cover-lib-tile ${src ? "" : "is-pending"} ${ready ? "is-ready" : ""}`}
+      style={{ animationDelay: `${Math.min(index, 11) * 28}ms` }}
       onClick={() => onPick(url)}
       aria-label={label || "Cover image"}
     >
       <span className="cover-lib-tile-frame">
-        {src ? <img src={src} alt="" decoding="async" /> : <span className="cover-lib-skel" aria-hidden />}
+        {src ? (
+          <img src={src} alt="" decoding="async" onLoad={() => setReady(true)} />
+        ) : (
+          <span className="cover-lib-skel" aria-hidden />
+        )}
       </span>
     </button>
   );

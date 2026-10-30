@@ -19,6 +19,7 @@ import { needsOnboarding } from "../lib/onboarding";
 import { formatPlanWhenWhereLine, sentenceCaseTitle } from "../lib/format";
 import { planBelongsInPast } from "../lib/planTime";
 import { Avatar } from "./Avatar";
+import { openCreateLauncher } from "./CreateLauncher";
 import type { ConversationSummaryDTO, MeDTO, PlanDTO } from "../types/shared";
 
 /**
@@ -165,9 +166,9 @@ export function WebAppShell() {
             ))}
           </nav>
 
-          <NavLink to="/plans/new" className="web-create">
+          <button type="button" className="web-create" onClick={openCreateLauncher}>
             <Plus size={20} strokeWidth={2.4} /> Create a plan
-          </NavLink>
+          </button>
 
           <button className="web-logout" onClick={logout} type="button">
             <LogOut size={20} strokeWidth={1.9} /> Log out

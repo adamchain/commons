@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from "react-router-do
 import { ArrowLeft, Users } from "lucide-react";
 import { api } from "../api/http";
 import { Avatar } from "../components/Avatar";
-import { EmptyCard, ScreenTitle } from "../components/ui";
+import { EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { ALL_INTERESTS, INTEREST_LABELS, type InterestTag, type NetworkLinkStatus, type PersonSearchResultDTO, type PublicUser, type SearchResultsDTO } from "../types/shared";
 
@@ -152,18 +152,24 @@ export function NetworkPage() {
           </Link>
         </header>
       )}
-      <div className="network-top">
-      <ScreenTitle title="Network" />
-
-      <div className="network-tabs" role="tablist" aria-label="Network">
-        <button type="button" role="tab" aria-selected={tab === "discover"} className={`network-tab${tab === "discover" ? " is-active" : ""}`} onClick={() => setTab("discover")}>
-          Discover
-        </button>
-        <button type="button" role="tab" aria-selected={tab === "search"} className={`network-tab${tab === "search" ? " is-active" : ""}`} onClick={() => setTab("search")}>
-          Your Network
-        </button>
-      </div>
-      </div>
+      <header className="network-header-card">
+        <div>
+          <h1 className="network-page-title">Network</h1>
+          <p className="network-page-sub">
+            {tab === "discover"
+              ? "Find people through shared interests and mutual connections."
+              : `${network.length} ${network.length === 1 ? "person" : "people"} in your network.`}
+          </p>
+        </div>
+        <div className="network-tabs" role="tablist" aria-label="Network">
+          <button type="button" role="tab" aria-selected={tab === "discover"} className={`network-tab${tab === "discover" ? " is-active" : ""}`} onClick={() => setTab("discover")}>
+            Discover
+          </button>
+          <button type="button" role="tab" aria-selected={tab === "search"} className={`network-tab${tab === "search" ? " is-active" : ""}`} onClick={() => setTab("search")}>
+            Your Network
+          </button>
+        </div>
+      </header>
 
       {tab === "discover" ? (
         <>
@@ -173,8 +179,8 @@ export function NetworkPage() {
               className="network-search-input"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search Network"
-              aria-label="Search Network"
+              placeholder="Search people"
+              aria-label="Search people"
               enterKeyHint="search"
               autoComplete="off"
               autoCorrect="off"
@@ -190,6 +196,7 @@ export function NetworkPage() {
               ×
             </button>
           </div>
+          <section className="network-surface">
           <div className="network-chips" role="group" aria-label="Interests">
             <button type="button" className={`network-chip${interest === null ? " is-active" : ""}`} onClick={() => setInterest(null)}>
               All
@@ -238,10 +245,19 @@ export function NetworkPage() {
               body="Try another interest, or search by name."
             />
           ) : (
-            <div className="network-card">
+            <>
+            <div className="network-section-head">
+              <div>
+                <h2>People you may know</h2>
+                <p>Based on mutuals and shared interests.</p>
+              </div>
+              <span>{suggested.length}</span>
+            </div>
+            <div className="network-card network-card--grid">
               {suggested.map((person) => (
                 <NetworkRow
                   key={person.user.id}
+                  layout="card"
                   row={{
                     user: person.user,
                     neighborhoodName: person.neighborhoodName,
@@ -255,94 +271,106 @@ export function NetworkPage() {
                 />
               ))}
             </div>
+            </>
           )}
+          </section>
         </>
       ) : (
         <>
-      <div className="network-search-wrap">
-        <SearchIcon />
-        <input
-          ref={searchRef}
-          className="network-search-input"
-          autoFocus={adding}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search people"
-          aria-label="Search people"
-          enterKeyHint="search"
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-        />
-        <button
-          type="button"
-          className={`network-search-clear${query ? " is-on" : ""}`}
-          onClick={() => setQuery("")}
-          aria-label="Clear search"
-          tabIndex={query ? 0 : -1}
-        >
-          ×
-        </button>
-      </div>
-
-      {serverPeople && (
-        <p className="network-results-label">Results for “{trimmed}”</p>
-      )}
-
-      {rows.length > 0 ? (
-        <div className="network-card">
-          {rows.map((row) => (
-            <NetworkRow
-              key={row.user.id}
-              row={row}
-              busy={busyId === row.user.id}
-              onConnect={() => void connect(row.user.id)}
+          <div className="network-search-wrap">
+            <SearchIcon />
+            <input
+              ref={searchRef}
+              className="network-search-input"
+              autoFocus={adding}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search your people"
+              aria-label="Search your people"
+              enterKeyHint="search"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
             />
-          ))}
-        </div>
-      ) : (
-        loaded &&
-        !searching &&
-        !waitingForResults &&
-        trimmed && (
-          <p className="network-empty">Nobody by that name.</p>
-        )
-      )}
-
-      {loaded && !trimmed && rows.length === 0 && (
-        <EmptyCard
-          icon={<Users size={22} strokeWidth={1.6} color="#3A6A3A" />}
-          tint="#C8DDC8"
-          title="Your people show up here once you connect."
-          body="Plans make that easy."
-        />
-      )}
-
-      <p className="network-invite">
-        Not finding someone? <Link to="/invite">Invite them →</Link>
-      </p>
-      {!trimmed && suggested && suggested.length > 0 && (
-        <>
-          <h2 className="network-suggest-label">Suggested for you</h2>
-          <div className="network-card">
-            {suggested.slice(0, 8).map((person) => (
-              <NetworkRow
-                key={person.user.id}
-                row={{
-                  user: person.user,
-                  neighborhoodName: person.neighborhoodName,
-                  mutualCount: person.mutualCount,
-                  networkStatus: overrides[person.user.id] ?? person.networkStatus,
-                  reason: person.reason,
-                }}
-                busy={busyId === person.user.id}
-                onConnect={() => void connect(person.user.id)}
-                actionLabel="Add"
-              />
-            ))}
+            <button
+              type="button"
+              className={`network-search-clear${query ? " is-on" : ""}`}
+              onClick={() => setQuery("")}
+              aria-label="Clear search"
+              tabIndex={query ? 0 : -1}
+            >
+              ×
+            </button>
           </div>
-        </>
-      )}
+          <section className="network-surface">
+            {trimmed ? (
+              rows.length > 0 ? (
+                <>
+                  <div className="network-section-head">
+                    <div>
+                      <h2>Results</h2>
+                      <p>Matches in your network and the city.</p>
+                    </div>
+                    <span>{rows.length}</span>
+                  </div>
+                  <div className="network-card network-card--grid">
+                    {rows.map((row) => (
+                      <NetworkRow
+                        key={row.user.id}
+                        layout="card"
+                        row={row}
+                        busy={busyId === row.user.id}
+                        onConnect={() => void connect(row.user.id)}
+                        actionLabel="Add"
+                      />
+                    ))}
+                  </div>
+                </>
+              ) : !searching && !waitingForResults ? (
+                <p className="network-empty">Nobody by that name.</p>
+              ) : (
+                <div className="feed-skeleton" aria-busy="true" aria-label="Searching">
+                  <div className="feed-skeleton-card" />
+                </div>
+              )
+            ) : !loaded ? (
+              <div className="feed-skeleton" aria-busy="true" aria-label="Loading your network">
+                <div className="feed-skeleton-card" />
+                <div className="feed-skeleton-card" />
+              </div>
+            ) : rows.length === 0 ? (
+              <EmptyCard
+                icon={<Users size={22} strokeWidth={1.6} color="#3A6A3A" />}
+                tint="#C8DDC8"
+                title="Your network starts here."
+                body="Add people you meet through plans and communities."
+              />
+            ) : (
+              <>
+                <div className="network-section-head">
+                  <div>
+                    <h2>Your people</h2>
+                    <p>Everyone you’ve added.</p>
+                  </div>
+                  <span>{network.length}</span>
+                </div>
+                <div className="network-card network-card--grid">
+                  {rows.map((row) => (
+                    <NetworkRow
+                      key={row.user.id}
+                      layout="card"
+                      row={row}
+                      busy={busyId === row.user.id}
+                      onConnect={() => void connect(row.user.id)}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+            <p className="network-invite">
+              Not finding someone? <Link to="/invite">Invite them →</Link>
+            </p>
+          </section>
         </>
       )}
     </main>
@@ -354,23 +382,28 @@ function NetworkRow({
   busy,
   onConnect,
   actionLabel = "Add",
+  layout = "row",
 }: {
   row: Row;
   busy: boolean;
   onConnect: () => void;
   actionLabel?: string;
+  layout?: "row" | "card";
 }) {
   const navigate = useNavigate();
-  const { user, mutualCount, networkStatus, reason } = row;
+  const { user, neighborhoodName, mutualCount, networkStatus, reason } = row;
   const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || "Friend";
-  const meta = reason && !reason.startsWith("Also into")
-    ? reason
-    : mutualCount > 0
-      ? `${mutualCount} mutual`
-      : "";
+  const meta =
+    reason && !reason.startsWith("Also into")
+      ? reason
+      : neighborhoodName
+        ? neighborhoodName
+        : mutualCount > 0
+          ? `${mutualCount} mutual`
+          : "";
 
   return (
-    <div className="network-row">
+    <div className={`network-row${layout === "card" ? " is-card" : ""}`}>
       <Link to={`/profile/${user.id}`} state={{ from: "network" }} className="network-row-main">
         <Avatar
           seed={user.avatarSeed}
@@ -378,7 +411,7 @@ function NetworkRow({
           photoDataUrl={user.avatarPhotoDataUrl}
           params={user.avatarParams}
           name={user.firstName}
-          size="md"
+          size={layout === "card" ? "lg" : "md"}
         />
         <span className="network-row-copy">
           <span className="network-row-name">{name}</span>

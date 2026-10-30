@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Coffee, SlidersHorizontal } from "lucide-react";
+import { ChevronRight, Coffee, Dumbbell, SlidersHorizontal, UtensilsCrossed, Wine } from "lucide-react";
 import { api } from "../api/http";
 import { FilterSheet } from "../components/FilterSheet";
 import { InviteSheet } from "../components/InviteSheet";
@@ -47,6 +47,8 @@ const EMPTY_FILTERS: PersistedFilters = {
   networkOnly: false,
 };
 
+const POST_PLAN_PROMPT_KEY = "commons.postPlanPrompt.v1";
+
 function loadPersistedFilters(): PersistedFilters {
   try {
     const raw = localStorage.getItem(FEED_FILTERS_KEY);
@@ -75,18 +77,28 @@ export function FeedPage() {
   const navigate = useNavigate();
   const navState = location.state as {
     justPostedId?: string;
+    justPostedTitle?: string;
     openInviteForPlanId?: string;
     showPostSuccess?: boolean;
   } | null;
   // justPostedId pins the freshly-created plan to the very top for the whole
   // feed session and scrolls it into view once.
   const [justPostedId] = useState<string | null>(navState?.justPostedId ?? null);
+  const [justPostedTitle] = useState<string>(navState?.justPostedTitle ?? "");
   const [inviteForPlanId, setInviteForPlanId] = useState<string | null>(
     navState?.openInviteForPlanId ?? null,
   );
   const [postSuccessId, setPostSuccessId] = useState<string | null>(
     navState?.showPostSuccess ? navState?.justPostedId ?? null : null,
   );
+  const [firstRunSpark, setFirstRunSpark] = useState(() => {
+    try {
+      return localStorage.getItem(POST_PLAN_PROMPT_KEY) !== "1";
+    } catch {
+      return false;
+    }
+  });
+  const [quietSparkDismissed, setQuietSparkDismissed] = useState(false);
 
   const [refreshing, setRefreshing] = useState(false);
   const refreshingRef = useRef(false);
@@ -438,6 +450,11 @@ export function FeedPage() {
     (selectedAgeRange ? 1 : 0) +
     (hideCancelled ? 1 : 0) +
     (networkOnly ? 1 : 0);
+  const hasSheetFilters = activeFilterCount > 0 || selectedDayIso !== null;
+  const cityQuiet = (plans ?? []).every((p) => Boolean(p.cancelledAt) || planBelongsInPast(p));
+  const showSpark =
+    Boolean(user?.onboardingComplete) &&
+    (firstRunSpark || (cityQuiet && !hasSheetFilters && !quietSparkDismissed));
 
   if (!feedReady) {
     return (
@@ -512,8 +529,21 @@ export function FeedPage() {
         )}
 
         <div id="feed-plans">
-          <PostPlanPrompt />
-          {filteredPlans.length === 0 ? (
+          {showSpark ? (
+            <PostPlanPrompt
+              preferIdea={view === "ideas"}
+              onDismiss={() => {
+                setFirstRunSpark(false);
+                try {
+                  localStorage.setItem(POST_PLAN_PROMPT_KEY, "1");
+                } catch {
+                  /* private mode */
+                }
+                if (cityQuiet) setQuietSparkDismissed(true);
+              }}
+            />
+          ) : null}
+          {filteredPlans.length === 0 && !showSpark ? (
             <FeedEmptyState
               view={view}
               hasAnyPlans={(plans?.length ?? 0) > 0}
@@ -526,7 +556,7 @@ export function FeedPage() {
                 setHideCancelled(false);
               }}
             />
-          ) : (
+          ) : filteredPlans.length === 0 ? null : (
             <div className="plan-grid">
               {filteredPlans.map((plan, index) => {
                 const farther =
@@ -550,13 +580,23 @@ export function FeedPage() {
       </div>
 
       {postSuccessId && (
-        <PostSuccessSheet onDone={() => setPostSuccessId(null)} />
+        <PostSuccessSheet
+          onInvite={() => {
+            setInviteForPlanId(postSuccessId);
+            setPostSuccessId(null);
+          }}
+          onDone={() => setPostSuccessId(null)}
+        />
       )}
 
       {inviteForPlanId && (
         <InviteSheet
           planId={inviteForPlanId}
-          planTitle={plans.find((p) => p.id === inviteForPlanId)?.title ?? "your plan"}
+          planTitle={
+            plans.find((p) => p.id === inviteForPlanId)?.title ||
+            (inviteForPlanId === justPostedId ? justPostedTitle : "") ||
+            "your plan"
+          }
           onClose={() => setInviteForPlanId(null)}
         />
       )}
@@ -622,7 +662,7 @@ function FeedEmptyState({
       icon={<Coffee size={22} strokeWidth={1.6} color="var(--muted)" />}
       title={headline}
       body={body}
-      cta={{ to: "/plans/new", label: view === "ideas" ? "Share an idea" : "Post a plan" }}
+      cta={{ to: view === "ideas" ? "/plans/new?kind=idea" : "/plans/new?kind=plan", label: view === "ideas" ? "Share an idea" : "Post a plan" }}
       footer={
         hasFilters ? (
           <div className="feed-empty-actions">
@@ -636,74 +676,73 @@ function FeedEmptyState({
   );
 }
 
-const POST_PLAN_PROMPT_KEY = "commons.postPlanPrompt.v1";
-
 const PLAN_EXAMPLES = [
   {
     title: "Happy hour after work",
+    hint: "Thursday · 5:30",
     blurb:
       "Anyone free Thursday around 5:30? Thinking somewhere in Rittenhouse, one drink and we’ll see.",
+    Icon: Wine,
   },
   {
     title: "Try a workout class",
+    hint: "Morning · beginners",
     blurb:
       "Been meaning to try the 7am class at [studio] and need someone to hold me to it. Beginners welcome, I’m one of them.",
+    Icon: Dumbbell,
   },
   {
     title: "Dinner somewhere new",
+    hint: "This week · any night",
     blurb:
       "Want to try [restaurant] this week. Finally. Open to any night, just want a reason to go.",
+    Icon: UtensilsCrossed,
   },
 ];
 
-/** Once, after signup: a few real examples that open the composer already titled. */
-function PostPlanPrompt() {
-  const { user } = useAuth();
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!user?.onboardingComplete) return;
-    try {
-      if (localStorage.getItem(POST_PLAN_PROMPT_KEY) === "1") return;
-    } catch {
-      return;
-    }
-    setOpen(true);
-  }, [user?.id, user?.onboardingComplete]);
-
-  if (!open) return null;
-
-  function dismiss() {
-    try {
-      localStorage.setItem(POST_PLAN_PROMPT_KEY, "1");
-    } catch {
-      /* private mode */
-    }
-    setOpen(false);
-  }
-
+/** Starter examples for a first post, and again when Home is actually empty. */
+function PostPlanPrompt({
+  preferIdea,
+  onDismiss,
+}: {
+  preferIdea: boolean;
+  onDismiss: () => void;
+}) {
+  const kind = preferIdea ? "idea" : "plan";
   return (
     <section className="post-plan-prompt" aria-label="Post a plan">
       <div className="post-plan-prompt-head">
-        <h2>Make a plan, any plan</h2>
-        <button type="button" className="btn-link" onClick={dismiss}>
+        <div>
+          <p className="post-plan-prompt-kicker">Easy start</p>
+          <h2>Make a plan, any plan</h2>
+        </div>
+        <button type="button" className="post-plan-prompt-later" onClick={onDismiss}>
           Maybe later
         </button>
       </div>
-      <p>Tap one, tweak it, post it. Done in a minute.</p>
+      <p className="post-plan-prompt-sub">Pick a spark. Tweak it. Post it.</p>
       <div className="post-plan-prompt-list">
         {PLAN_EXAMPLES.map((example) => (
           <Link
             key={example.title}
             className="post-plan-prompt-example"
-            to={`/plans/new?title=${encodeURIComponent(example.title)}&desc=${encodeURIComponent(example.blurb)}`}
-            onClick={dismiss}
+            to={`/plans/new?kind=${kind}&title=${encodeURIComponent(example.title)}&desc=${encodeURIComponent(example.blurb)}`}
+            onClick={onDismiss}
           >
-            <strong>{example.title}</strong>
-            <span>{example.blurb}</span>
+            <span className="post-plan-prompt-icon" aria-hidden="true">
+              <example.Icon size={20} strokeWidth={1.8} />
+            </span>
+            <span className="post-plan-prompt-copy">
+              <strong>{example.title}</strong>
+              <small>{example.hint}</small>
+            </span>
+            <ChevronRight size={18} aria-hidden="true" />
           </Link>
         ))}
       </div>
+      <Link className="post-plan-prompt-blank" to={`/plans/new?kind=${kind}`} onClick={onDismiss}>
+        Or start from scratch
+      </Link>
     </section>
   );
 }

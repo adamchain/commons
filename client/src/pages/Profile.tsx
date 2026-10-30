@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -27,7 +27,7 @@ import { LinkedText } from "../components/LinkedText";
 import { ReportModal } from "../components/PlanSafetyMenu";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
-import { formatAreaLabel, formatPlanDate, formatPlanWhenLine } from "../lib/format";
+import { formatAreaLabel, formatPlanDate } from "../lib/format";
 import { fileToResizedDataUrl, shrinkDataUrl } from "../lib/imageResize";
 import { resolvePhotoDataUrl } from "../lib/photoPicker";
 import { getPublicWebOrigin, isNative } from "../lib/platform";
@@ -128,6 +128,7 @@ export function ProfilePage() {
   const [communities, setCommunities] = useState<CommunityCardDTO[]>([]);
   const [communityFilter, setCommunityFilter] = useState<"all" | "running">("all");
   const [plansView, setPlansView] = useState<"list" | "calendar">("list");
+  const [profileTab, setProfileTab] = useState<"communities" | "plans">("communities");
   const [actionSheetOpen, setActionSheetOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [showProfileTip, setShowProfileTip] = useState(false);
@@ -156,6 +157,7 @@ export function ProfilePage() {
     reloadProfile();
     setPlansView("list");
     setCommunityFilter("all");
+    setProfileTab("communities");
   }, [userId, location.pathname, location.key]);
 
   // Refetch when returning to the tab so joins show up without a hard reload.
@@ -184,19 +186,11 @@ export function ProfilePage() {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [isSelf]);
 
-  // "Your communities" links here with #communities. Scroll once, by the
-  // distance the heading is still below the top bar. Re-running when the
-  // community list arrives was adding that offset again and landing past it.
-  useLayoutEffect(() => {
-    if (!isSelf || location.hash !== "#communities" || !profile) return;
-    const el = document.getElementById("profile-communities");
-    if (!el) return;
-    const bar = document.querySelector(".top-bar");
-    const offset = (bar?.getBoundingClientRect().height ?? 56) + 8;
-    const delta = el.getBoundingClientRect().top - offset;
-    if (Math.abs(delta) < 2) return;
-    window.scrollBy(0, delta);
-  }, [isSelf, location.hash, profile]);
+  useEffect(() => {
+    if (!isSelf) return;
+    if (location.hash === "#communities") setProfileTab("communities");
+    if (location.hash === "#plans" || location.hash === "#profile-plans-block") setProfileTab("plans");
+  }, [isSelf, location.hash]);
 
   useEffect(() => {
     if (!isSelf) return;
@@ -301,27 +295,13 @@ export function ProfilePage() {
 
   if (!isSelf) {
     const mutuals = profile.network.mutuals;
-    const mutualLabel = (() => {
-      if (mutuals.length === 0) return null;
-      if (mutuals.length === 1) {
-        return (
-          <>
-            Connected to <span className="profile-mutuals-name">{mutuals[0].firstName}</span> you know
-          </>
-        );
-      }
-      const rest = profile.network.mutualCount - 1;
-      return (
-        <>
-          Connected to <span className="profile-mutuals-name">{mutuals[0].firstName}</span>
-          {rest > 0 && (
-            <>
-              {" "}and {rest} other{rest === 1 ? "" : "s"} you know
-            </>
-          )}
-        </>
-      );
-    })();
+    const otherCommunities = profile.communities ?? [];
+    const shownOtherCommunities =
+      communityFilter === "running"
+        ? otherCommunities.filter((c) => c.myRole === "organizer")
+        : otherCommunities;
+    const inNetwork = profile.network.inMyNetwork;
+    const openProfile = !profile.profilePrivate;
 
     return (
       <main className={otherShell}>
@@ -331,11 +311,11 @@ export function ProfilePage() {
           onMore={() => setActionSheetOpen(true)}
         />
 
-        <section className="profile-other-hero">
-          <div className="profile-other-hero-row">
+        <section className="profile-hero">
+          <div className="profile-hero-main">
             <button
               type="button"
-              className="profile-other-avatar profile-avatar-zoom"
+              className="profile-hero-avatar-btn profile-avatar-zoom"
               aria-label={`View ${profile.user.firstName}'s photo`}
               onClick={() => setAvatarZoom(true)}
             >
@@ -345,81 +325,71 @@ export function ProfilePage() {
                 photoDataUrl={profile.user.avatarPhotoDataUrl}
                 params={profile.user.avatarParams}
                 name={profile.user.firstName}
-                size="lg"
+                size="xl"
               />
             </button>
-            <div className="profile-other-hero-text">
-              <div className="profile-other-name">{displayName}</div>
+            <div className="profile-hero-text">
+              <div className="profile-name">{displayName}</div>
               {locationLabel && (
-                <div className="profile-other-location">
-                  <MapPin size={12} strokeWidth={2.2} fill="currentColor" aria-hidden="true" />
+                <div className="profile-meta-line">
+                  <MapPin size={13} strokeWidth={2.2} aria-hidden="true" />
                   <span>{locationLabel}</span>
                 </div>
               )}
-              <div className="profile-other-stats" aria-label="Profile stats">
-                <div className="profile-other-stat">
-                  <span className="profile-other-stat-num">{profile.stats.hosted}</span>
-                  <span className="profile-other-stat-label">Started</span>
-                </div>
-                <span className="profile-other-stat-divider" aria-hidden="true" />
-                <div className="profile-other-stat">
-                  <span className="profile-other-stat-num">{profile.stats.joined}</span>
-                  <span className="profile-other-stat-label">Joined</span>
-                </div>
-              </div>
             </div>
           </div>
-
           {profile.user.bio?.trim() && (
-            <p className="profile-other-bio">
+            <p className="profile-bio">
               <LinkedText text={profile.user.bio.trim()} />
             </p>
           )}
-
+          <div className="profile-stats" aria-label="Profile stats">
+            <button
+              type="button"
+              className="profile-stat"
+              onClick={() => openProfile && setProfileTab("plans")}
+            >
+              <span className="profile-stat-num">{profile.stats.hosted}</span>
+              <span className="profile-stat-label">Started</span>
+            </button>
+            <span className="profile-stat-divider" aria-hidden="true" />
+            <button
+              type="button"
+              className="profile-stat"
+              onClick={() => openProfile && setProfileTab("plans")}
+            >
+              <span className="profile-stat-num">{profile.stats.joined}</span>
+              <span className="profile-stat-label">Joined</span>
+            </button>
+            <span className="profile-stat-divider" aria-hidden="true" />
+            <div className="profile-stat">
+              <span className="profile-stat-num">{profile.network.mutualCount}</span>
+              <span className="profile-stat-label">In common</span>
+            </div>
+          </div>
           <SocialPills
             isSelf={false}
             instagram={profile.socialLinks?.instagram}
             tiktok={profile.socialLinks?.tiktok}
           />
-
-          <div className="profile-other-ctas">
-            <div className="profile-other-cta-row">
-              <FriendButton profile={profile} onUpdated={reloadProfile} variant="other" />
-              <OtherMessageButton
-                sharedPlanId={profile.sharedPlanId}
-                profileUserId={userId}
-                inNetwork={profile.network.inMyNetwork}
-              />
-            </div>
-            <Link
-              to={`/plans/new?inviteUser=${encodeURIComponent(userId)}&inviteName=${encodeURIComponent(profile.user.firstName)}`}
-              className="profile-other-cta profile-other-cta--message"
-            >
-              <CalendarPlus size={16} strokeWidth={2} aria-hidden="true" />
-              Make a plan
-            </Link>
+          <div className="profile-hero-cta-row">
+            <FriendButton profile={profile} onUpdated={reloadProfile} variant="other" />
+            <OtherMessageButton
+              sharedPlanId={profile.sharedPlanId}
+              profileUserId={userId}
+              inNetwork={inNetwork}
+            />
           </div>
-
+          <Link
+            to={`/plans/new?inviteUser=${encodeURIComponent(userId)}&inviteName=${encodeURIComponent(profile.user.firstName)}`}
+            className="profile-hero-cta profile-hero-cta--plan"
+          >
+            <CalendarPlus size={14} strokeWidth={2.2} aria-hidden="true" />
+            Make a plan
+          </Link>
           <ProfileGallery photos={profile.profilePhotos ?? []} canEdit={false} />
-
-          {profile.network.mutualCount > 0 && mutualLabel && (
-            <div className="profile-other-mutuals">
-              <div className="profile-other-mutuals-avatars">
-                {mutuals.map((u) => (
-                  <span key={u.id} className="profile-other-mutuals-avatar">
-                    <Avatar
-                      seed={u.avatarSeed}
-                      style={u.avatarStyle}
-                      photoDataUrl={u.avatarPhotoDataUrl}
-                      params={u.avatarParams}
-                      name={u.firstName}
-                      size="sm"
-                    />
-                  </span>
-                ))}
-              </div>
-              <span className="profile-other-mutuals-text">{mutualLabel}</span>
-            </div>
+          {inNetwork && mutuals.length > 0 && (
+            <MutualStrip mutuals={mutuals} extra={Math.max(0, profile.network.mutualCount - mutuals.length)} />
           )}
         </section>
 
@@ -429,42 +399,90 @@ export function ProfilePage() {
           </section>
         ) : (
           <>
-            {(profile.communities?.length ?? 0) > 0 && (
-              <section className="profile-block profile-section-card">
+            <nav className="profile-nav" aria-label="Profile sections">
+              {([
+                ["communities", "Communities"],
+                ["plans", "Plans"],
+              ] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={profileTab === id ? "is-active" : ""}
+                  onClick={() => setProfileTab(id)}
+                >
+                  {label}
+                </button>
+              ))}
+            </nav>
+
+            {profileTab === "communities" && (
+              <section className="profile-block profile-section-card" id="profile-communities">
                 <div className="profile-block-heading-row">
                   <h3 className="profile-section-label profile-section-label--inline">Communities</h3>
+                  {inNetwork && (
+                    <div className="profile-plans-toggle" role="tablist" aria-label="Communities">
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={communityFilter === "all"}
+                        className={communityFilter === "all" ? "is-active" : ""}
+                        onClick={() => setCommunityFilter("all")}
+                      >
+                        All
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={communityFilter === "running"}
+                        className={communityFilter === "running" ? "is-active" : ""}
+                        onClick={() => setCommunityFilter("running")}
+                      >
+                        Running
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div className="profile-photo-row">
-                  {(profile.communities ?? []).map((c) => (
-                    <Link
-                      key={c.id}
-                      to={`/communities/${c.id}`}
-                      state={{ from: "profile", profileUserId: userId }}
-                      className="profile-photo-card"
-                    >
-                      <CommunityCoverThumb
-                        coverImage={c.coverImage}
-                        category={c.category}
-                        className="profile-photo-card-media"
-                      />
-                      <span className="profile-photo-card-title">{c.name}</span>
-                      {c.myRole === "organizer" && <span className="profile-photo-card-meta">Organizer</span>}
-                    </Link>
-                  ))}
-                </div>
+                {shownOtherCommunities.length > 0 ? (
+                  <div className="profile-tile-grid">
+                    {shownOtherCommunities.map((c) => (
+                      <Link
+                        key={c.id}
+                        to={`/communities/${c.id}`}
+                        state={{ from: "profile", profileUserId: userId }}
+                        className="profile-photo-card"
+                      >
+                        <CommunityCoverThumb
+                          coverImage={c.coverImage}
+                          category={c.category}
+                          className="profile-photo-card-media"
+                        />
+                        <span className="profile-photo-card-title">{c.name}</span>
+                        {c.myRole === "organizer" && <span className="profile-photo-card-meta">Organizer</span>}
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="profile-community-meta">
+                    {communityFilter === "running"
+                      ? `${firstName} isn’t running a community yet.`
+                      : `${firstName} hasn’t joined a community yet.`}
+                  </p>
+                )}
               </section>
             )}
 
-            {profile.upcoming.length > 0 && (
-              <section className="profile-block profile-section-card">
-                <div className="profile-block-heading-row">
-                  <h3 className="profile-section-label profile-section-label--inline">Plans</h3>
-                  <span className="profile-other-section-count">
-                    {profile.upcoming.length} plan{profile.upcoming.length === 1 ? "" : "s"}
-                  </span>
-                </div>
-                <OtherPlanCards plans={profile.upcoming} profileUserId={userId} />
-              </section>
+            {profileTab === "plans" && (
+              <YourPlansBlock
+                id="profile-plans-block"
+                upcoming={profile.upcoming}
+                past={profile.past}
+                isSelf={false}
+                allowCalendar={inNetwork}
+                profileUserId={userId}
+                view={plansView}
+                onViewChange={setPlansView}
+                emptyName={firstName}
+              />
             )}
           </>
         )}
@@ -556,7 +574,7 @@ export function ProfilePage() {
             <div className="profile-name">{displayName}</div>
             {locationLabel && (
               <div className="profile-meta-line">
-                <MapPin size={12} strokeWidth={2.2} fill="currentColor" aria-hidden="true" />
+                <MapPin size={13} strokeWidth={2.2} aria-hidden="true" />
                 <span>{locationLabel}</span>
               </div>
             )}
@@ -571,15 +589,15 @@ export function ProfilePage() {
           </p>
         )}
         <div className="profile-stats" aria-label="Profile stats">
-          <div className="profile-stat">
+          <button type="button" className="profile-stat" onClick={() => setProfileTab("plans")}>
             <span className="profile-stat-num">{profile.stats.hosted}</span>
             <span className="profile-stat-label">Started</span>
-          </div>
+          </button>
           <span className="profile-stat-divider" aria-hidden="true" />
-          <div className="profile-stat">
+          <button type="button" className="profile-stat" onClick={() => setProfileTab("plans")}>
             <span className="profile-stat-num">{profile.stats.joined}</span>
             <span className="profile-stat-label">Joined</span>
-          </div>
+          </button>
           <span className="profile-stat-divider" aria-hidden="true" />
           <Link to="/network" state={{ from: "profile" }} className="profile-stat profile-stat-link">
             <span className="profile-stat-num">{networkCount}</span>
@@ -604,8 +622,26 @@ export function ProfilePage() {
             reloadProfile();
           }}
         />
+        <NetworkCard network={network} />
       </section>
 
+      <nav className="profile-nav" aria-label="Profile sections">
+        {([
+          ["communities", "Communities"],
+          ["plans", "Plans"],
+        ] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className={profileTab === id ? "is-active" : ""}
+            onClick={() => setProfileTab(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {profileTab === "communities" && (
       <section className="profile-block profile-section-card" id="profile-communities">
         <div className="profile-block-heading-row">
           <h3 className="profile-section-label profile-section-label--inline">Communities</h3>
@@ -631,7 +667,7 @@ export function ProfilePage() {
           </div>
         </div>
         {shownCommunities.length > 0 ? (
-          <div className="profile-photo-row">
+          <div className="profile-tile-grid">
             {shownCommunities.map((c) => (
               <Link key={c.id} to={`/communities/${c.id}`} className="profile-photo-card">
                 <CommunityCoverThumb
@@ -655,9 +691,9 @@ export function ProfilePage() {
           </p>
         )}
       </section>
+      )}
 
-      <NetworkCard network={network} />
-
+      {profileTab === "plans" && (
       <YourPlansBlock
         id="profile-plans-block"
         upcoming={profile.upcoming}
@@ -667,6 +703,7 @@ export function ProfilePage() {
         view={plansView}
         onViewChange={setPlansView}
       />
+      )}
 
       <ProfileMenu />
 
@@ -763,7 +800,7 @@ function OtherMessageButton({
   const navigate = useNavigate();
   const inner = (
     <>
-      <MessageCircle size={15} strokeWidth={1.8} aria-hidden="true" />
+      <MessageCircle size={14} strokeWidth={2.2} aria-hidden="true" />
       Message
     </>
   );
@@ -773,7 +810,7 @@ function OtherMessageButton({
   return (
     <button
       type="button"
-      className="profile-other-cta profile-other-cta--message"
+      className="profile-hero-cta"
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -782,55 +819,6 @@ function OtherMessageButton({
     >
       {inner}
     </button>
-  );
-}
-
-function formatCompactPlanTime(time: string): string {
-  const [hStr, mStr = "00"] = time.split(":");
-  const h = Number(hStr);
-  if (Number.isNaN(h)) return time;
-  const ampm = h >= 12 ? "pm" : "am";
-  const hour12 = h % 12 === 0 ? 12 : h % 12;
-  const minutes = mStr.padStart(2, "0");
-  return minutes === "00" ? `${hour12}${ampm}` : `${hour12}:${minutes}${ampm}`;
-}
-
-function formatOtherPlanWhen(plan: PlanDTO): string {
-  const flexibleTime = plan.isFlexibleTime || plan.time === "Flexible" || !plan.time?.trim();
-  if (flexibleTime) {
-    return formatPlanWhenLine(plan.date, plan.time, plan.isFlexibleTime, {
-      isFlexibleDate: plan.isFlexibleDate,
-      isThisWeek: plan.isThisWeek,
-    });
-  }
-  const day = formatPlanDate(plan.date, {
-    isFlexibleDate: plan.isFlexibleDate,
-    isThisWeek: plan.isThisWeek,
-  });
-  return `${day} · ${formatCompactPlanTime(plan.time)}`;
-}
-
-function OtherPlanCards({ plans, profileUserId }: { plans: PlanDTO[]; profileUserId: string }) {
-  return (
-    <div className="profile-photo-row">
-      {plans.map((plan) => (
-        <Link
-          key={plan.id}
-          to={`/plans/${plan.id}`}
-          state={{ from: "profile", profileUserId }}
-          className="profile-photo-card"
-        >
-          <PlanCoverThumb
-            planId={plan.id}
-            flyerDataUrl={planPhotoUrl(plan)}
-            isIdea={isIdeaPlan(plan)}
-            className="profile-photo-card-media"
-          />
-          <span className="profile-photo-card-title">{plan.title}</span>
-          <span className="profile-photo-card-meta">{formatOtherPlanWhen(plan)}</span>
-        </Link>
-      ))}
-    </div>
   );
 }
 
@@ -1275,9 +1263,9 @@ function FriendButton({
   if (inNet) {
     if (other) {
       return (
-        <span className="profile-other-cta profile-other-cta--primary">
+        <span className="profile-hero-cta">
           <Check size={13} strokeWidth={2.5} aria-hidden="true" />
-          In Your Network
+          In your network
         </span>
       );
     }
@@ -1302,7 +1290,7 @@ function FriendButton({
       return (
         <button
           type="button"
-          className="profile-other-cta profile-other-cta--primary"
+          className="profile-hero-cta profile-hero-cta--accent"
           onClick={() => void call("/api/auth/network-accept")}
           disabled={busy}
         >
@@ -1336,7 +1324,7 @@ function FriendButton({
   if (requestSent) {
     if (other) {
       return (
-        <button type="button" className="profile-other-cta profile-other-cta--connected" disabled>
+        <button type="button" className="profile-hero-cta" disabled>
           Request sent
         </button>
       );
@@ -1351,18 +1339,16 @@ function FriendButton({
   // No relationship yet — send a request.
   if (other) {
     return (
-      <>
-        <button
-          type="button"
-          className="profile-other-cta profile-other-cta--primary"
-          onClick={() => void call("/api/auth/friend-add")}
-          disabled={busy}
-        >
-          <UserPlus size={13} strokeWidth={2} aria-hidden="true" />
-          {busy ? "…" : "Add to Network"}
-        </button>
-        {err && <p className="friend-request-err">{err}</p>}
-      </>
+      <button
+        type="button"
+        className="profile-hero-cta profile-hero-cta--accent"
+        onClick={() => void call("/api/auth/friend-add")}
+        disabled={busy}
+        title={err ?? undefined}
+      >
+        <UserPlus size={13} strokeWidth={2} aria-hidden="true" />
+        {busy ? "…" : err ? "Try again" : "Add to network"}
+      </button>
     );
   }
 
@@ -1481,17 +1467,21 @@ function YourPlansBlock({
   upcoming,
   past,
   isSelf,
+  allowCalendar = isSelf,
   profileUserId,
   view,
   onViewChange,
+  emptyName,
 }: {
   id?: string;
   upcoming: PlanDTO[];
   past: ProfilePastPlan[];
   isSelf: boolean;
+  allowCalendar?: boolean;
   profileUserId: string;
   view: "list" | "calendar";
   onViewChange: (v: "list" | "calendar") => void;
+  emptyName?: string;
 }) {
   const visibleUpcoming = upcoming.slice(0, 3);
   const profileBack: NavFromState = { from: "profile", profileUserId };
@@ -1500,7 +1490,7 @@ function YourPlansBlock({
     <section className="profile-block profile-section-card" id={id}>
       <div className="profile-block-heading-row">
         <h3 className="profile-section-label profile-section-label--inline">Plans</h3>
-        {isSelf && (
+        {allowCalendar && (
           <div className="profile-plans-toggle" role="tablist" aria-label="Plans view">
             <button
               type="button"
@@ -1535,7 +1525,7 @@ function YourPlansBlock({
         <>
           {visibleUpcoming.length > 0 ? (
             <>
-              <div className="profile-photo-row">
+              <div className="profile-tile-grid">
                 {visibleUpcoming.map((p) => (
                   <Link
                     key={p.id}
@@ -1560,15 +1550,15 @@ function YourPlansBlock({
           ) : isSelf ? (
             <PlansEmpty />
           ) : (
-            <p className="empty-state" style={{ marginTop: 8 }}>
-              Quiet over here.
+            <p className="profile-community-meta">
+              {emptyName ? `${emptyName} doesn’t have upcoming plans.` : "No upcoming plans."}
             </p>
           )}
 
           {past.length > 0 && (
             <>
               <h4 className="profile-section-label profile-past-label">Past</h4>
-              <div className="profile-photo-row">
+              <div className="profile-tile-grid">
                 {past.slice(0, 12).map((p) => (
                   <Link
                     key={p.id}
@@ -1626,55 +1616,103 @@ function MailIcon() {
   );
 }
 
-/** Network card — named faces, then a way to add more people. */
+function MutualStrip({ mutuals, extra }: { mutuals: PublicUser[]; extra: number }) {
+  return (
+    <section className="profile-network-strip" aria-label="People you both know">
+      <div className="profile-network-strip-head">
+        <span className="profile-network-strip-title">People you both know</span>
+        <span className="profile-network-strip-count">
+          {mutuals.length + extra} {(mutuals.length + extra) === 1 ? "person" : "people"}
+        </span>
+      </div>
+      <div className="profile-network-reel">
+        {mutuals.map((u) => (
+          <Link
+            key={u.id}
+            to={`/profile/${u.id}`}
+            state={{ from: "profile" }}
+            className="profile-network-orb"
+          >
+            <span className="profile-network-orb-face">
+              <Avatar
+                seed={u.avatarSeed}
+                style={u.avatarStyle}
+                photoDataUrl={u.avatarPhotoDataUrl}
+                params={u.avatarParams}
+                name={u.firstName}
+                size="md"
+              />
+            </span>
+            <span>{u.firstName || "Friend"}</span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** Network reel under the gallery — faces you can swipe, plus a way to add. */
 function NetworkCard({ network }: { network: PublicUser[] | null }) {
   const count = network?.length ?? 0;
-  const shown = (network ?? []).slice(0, 4);
+  const shown = (network ?? []).slice(0, 12);
+  const extra = Math.max(0, count - shown.length);
   const isEmpty = count === 0;
   return (
-    <div className="profile-network-card">
-      <div className="profile-network-card-head">
-        <Link to="/network" state={{ from: "profile" }} className="profile-network-card-head-link">
-          <span className="profile-network-card-label">Network</span>
-          <span className="profile-network-card-count">
-            {count} {count === 1 ? "person" : "people"}
-          </span>
-        </Link>
-      </div>
-      {isEmpty ? (
-        <p className="profile-network-card-empty">
-          Your people aren't here yet — find them or invite them.
-        </p>
-      ) : (
-        <div className="profile-network-people">
-          <div className="profile-network-faces">
-            {shown.map((u) => (
-              <Link key={u.id} to={`/profile/${u.id}`} state={{ from: "profile" }} className="profile-network-person">
-                <Avatar
-                  seed={u.avatarSeed}
-                  style={u.avatarStyle}
-                  photoDataUrl={u.avatarPhotoDataUrl}
-                  params={u.avatarParams}
-                  name={u.firstName}
-                  size="md"
-                />
-                <span>{u.firstName || "Friend"}</span>
-              </Link>
-            ))}
-          </div>
-          {count > shown.length && (
-            <Link to="/network" state={{ from: "profile" }} className="profile-network-person profile-network-person--more">
-              <span className="profile-network-more-count">+{count - shown.length}</span>
-              <span>More</span>
-            </Link>
-          )}
-        </div>
-      )}
-      <Link to="/network?add=1" state={{ from: "profile" }} className="profile-network-add-btn">
-        <Plus size={14} strokeWidth={2.4} aria-hidden="true" />
-        Add people
+    <section className="profile-network-strip" aria-label="Your network">
+      <Link to="/network" state={{ from: "profile" }} className="profile-network-strip-head">
+        <span className="profile-network-strip-title">Your people</span>
+        <span className="profile-network-strip-count">
+          {isEmpty ? "Start your circle" : `${count} ${count === 1 ? "person" : "people"}`}
+          <ChevronRight size={16} strokeWidth={2.2} aria-hidden="true" />
+        </span>
       </Link>
-    </div>
+      <div className="profile-network-reel">
+        <Link to="/network?add=1" state={{ from: "profile" }} className="profile-network-orb" aria-label="Add people">
+          <span className="profile-network-orb-face profile-network-orb-face--add">
+            <Plus size={18} strokeWidth={2.4} aria-hidden="true" />
+          </span>
+          <span>Add</span>
+        </Link>
+        {shown.map((u) => (
+          <Link
+            key={u.id}
+            to={`/profile/${u.id}`}
+            state={{ from: "profile" }}
+            className="profile-network-orb"
+          >
+            <span className="profile-network-orb-face">
+              <Avatar
+                seed={u.avatarSeed}
+                style={u.avatarStyle}
+                photoDataUrl={u.avatarPhotoDataUrl}
+                params={u.avatarParams}
+                name={u.firstName}
+                size="md"
+              />
+            </span>
+            <span>{u.firstName || "Friend"}</span>
+          </Link>
+        ))}
+        {extra > 0 && (
+          <Link to="/network" state={{ from: "profile" }} className="profile-network-orb">
+            <span className="profile-network-orb-face profile-network-orb-face--more">+{extra}</span>
+            <span>More</span>
+          </Link>
+        )}
+        {isEmpty && (
+          <>
+            <span className="profile-network-orb is-ghost" aria-hidden="true">
+              <span className="profile-network-orb-face profile-network-orb-face--ghost" />
+              <span>Someone</span>
+            </span>
+            <span className="profile-network-orb is-ghost" aria-hidden="true">
+              <span className="profile-network-orb-face profile-network-orb-face--ghost" />
+              <span>Someone</span>
+            </span>
+          </>
+        )}
+      </div>
+    </section>
   );
 }
 

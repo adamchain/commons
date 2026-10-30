@@ -8,6 +8,7 @@ const NotificationSchema = new mongoose.Schema<NotificationRecord>(
     kind: { type: String, required: true },
     body: { type: String, required: true },
     planId: { type: String },
+    planIds: { type: [String], default: undefined },
     conversationId: { type: String },
     profileUserId: { type: String },
     communityId: { type: String },
