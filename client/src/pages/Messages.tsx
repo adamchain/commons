@@ -237,6 +237,7 @@ export function MessagesPage() {
   const [dismissErr, setDismissErr] = useState<string | null>(null);
   const [pinErr, setPinErr] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const shellRef = useRef<HTMLElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const indicatorRef = useRef<HTMLDivElement>(null);
@@ -312,6 +313,27 @@ export function MessagesPage() {
   useEffect(() => {
     void loadInbox();
   }, [loadInbox]);
+
+  // On cold start the iOS WebView sometimes lays this fixed, full-height inbox
+  // shell out against a viewport that hasn't settled yet and never re-flows it,
+  // so the list stays collapsed (invisible) until you navigate away and back.
+  // Force a reflow after the first frame — and once more after the viewport has
+  // had a beat to settle — so it paints correctly the first time.
+  useEffect(() => {
+    const el = shellRef.current;
+    if (!el) return;
+    const reflow = () => {
+      el.style.display = "none";
+      void el.offsetHeight; // flush layout while detached, then re-measure
+      el.style.display = "";
+    };
+    const raf = requestAnimationFrame(reflow);
+    const timer = window.setTimeout(reflow, 120);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(timer);
+    };
+  }, []);
 
   useEffect(() => {
     if (!composeOpen) return;
@@ -458,7 +480,7 @@ export function MessagesPage() {
     : items;
 
   return (
-    <main className="app-shell app-shell--with-nav app-shell--with-topbar app-shell--messages-lock">
+    <main ref={shellRef} className="app-shell app-shell--with-nav app-shell--with-topbar app-shell--messages-lock">
       <div
         ref={indicatorRef}
         className="feed-pull-indicator"

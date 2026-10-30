@@ -947,14 +947,18 @@ function BulletinTab({
     setBusy(true);
     setPostErr(null);
     try {
-      await api(`/api/communities/${community.id}/posts`, {
+      const created = await api<CommunityPostDTO>(`/api/communities/${community.id}/posts`, {
         method: "POST",
         body: JSON.stringify({ content: draft.trim(), image: draftImage || undefined }),
       });
       setDraft("");
       setDraftImage(null);
       setComposerOpen(false);
+      // Show it immediately — don't wait on (or get clobbered by) a refetch that
+      // can lag the write, which left new posts invisible until you left and came back.
+      setPosts((prev) => (prev.some((p) => p.id === created.id) ? prev : [created, ...prev]));
       await load();
+      setPosts((prev) => (prev.some((p) => p.id === created.id) ? prev : [created, ...prev]));
       onPendingChange?.();
     } catch (e) {
       setPostErr(parseApiError(e));

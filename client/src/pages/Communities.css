@@ -1136,6 +1136,19 @@ button.cmy-joined-pill {
   scrollbar-width: none;
   touch-action: pan-y;
 }
+/* When the bar sticks, it pins below the status bar, leaving the strip above it
+   uncovered so posts scroll through behind the clock/battery. Extend the opaque
+   background up through that strip so the status-bar area stays clean. */
+.cmy-tabs::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: env(safe-area-inset-top, 0px);
+  background: var(--bg);
+  pointer-events: none;
+}
 .cmy-tabs:not(:has(.cmy-tab:nth-child(4))) {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
