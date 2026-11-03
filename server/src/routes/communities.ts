@@ -1519,6 +1519,8 @@ communitiesRouter.get("/:id/conversation", requireAuth, async (req, res) => {
     rejoinIds: [viewerId],
   });
   const users = await findUsersByIds(conv.participantIds);
+  store.markConversationRead(conv.id, viewerId);
+  store.markMessageNotificationsRead(viewerId, conv.id);
   const convMessages = store.listMessagesForConversation(conv.id);
   const withMessages = String(req.query.messages ?? "") === "1";
   const hostId = community.organizerId;

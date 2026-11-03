@@ -9,7 +9,7 @@ import {
   MoreVertical,
   Plus,
 } from "lucide-react";
-import { api, parseApiError } from "../api/http";
+import { api, isAuthFailure, parseApiError } from "../api/http";
 import { readScreen, writeScreen } from "../lib/screenCache";
 import { Avatar } from "../components/Avatar";
 import { ComposerField, MentionText } from "../components/ComposerField";
@@ -199,6 +199,7 @@ export function ChatPage() {
       setPendingImage(null);
       setReplyTo(null);
     } catch (e) {
+      if (isAuthFailure(e)) return;
       window.alert(parseApiError(e) || "Couldn't send that message.");
     } finally {
       setSending(false);

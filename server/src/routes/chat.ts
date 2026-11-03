@@ -130,6 +130,11 @@ chatRouter.post("/dm", requireAuth, async (req, res) => {
     // out of a thread they had already started.
     store.setDmHiddenFrom(conv.id, otherId, true);
   }
+  // Opening the thread is what the inbox treats as read. The message poll used
+  // to be the only place that stamped readBy, so leaving within a few seconds
+  // left the thread looking unopened.
+  store.markConversationRead(conv.id, userId);
+  store.markMessageNotificationsRead(userId, conv.id);
   const dto = await toConversationDto(conv, userId);
   const withMessages = String(req.query.messages ?? "") === "1";
   res.json(withMessages ? { ...dto, messages: await inlineMessages(conv.id, userId, dto.hostId) } : dto);
@@ -370,6 +375,8 @@ chatRouter.get("/plans/:planId/conversation", requireAuth, async (req, res) => {
     }
   }
 
+  store.markConversationRead(conv.id, userId);
+  store.markMessageNotificationsRead(userId, conv.id);
   const dto = await toConversationDto(conv, userId);
   res.json(withMessages ? { ...dto, messages: await inlineMessages(conv.id, userId, dto.hostId) } : dto);
 });

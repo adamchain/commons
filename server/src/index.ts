@@ -88,6 +88,7 @@ app.use(
       cb(null, false);
     },
     credentials: true,
+    exposedHeaders: ["X-Session-Token"],
   })
 );
 // Lift the default 100KB cap so resized avatar data URLs and richer plan

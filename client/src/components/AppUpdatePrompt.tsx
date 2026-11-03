@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { App as CapApp } from "@capacitor/app";
 import { api } from "../api/http";
 import { isNative } from "../lib/platform";
+import { APP_STORE_URL } from "../lib/appStore";
 
 const DISMISS_KEY = "commons_update_dismissed";
 
@@ -22,7 +23,9 @@ function compareVersions(installed: string, latest: string): number {
  */
 export function AppUpdatePrompt() {
   const [open, setOpen] = useState(false);
-  const [storeUrl, setStoreUrl] = useState<string | null>(null);
+  // Fall back to the hardcoded listing if the server doesn't advertise a URL,
+  // so a forgotten APP_STORE_URL env var can't leave a dead-end prompt.
+  const [storeUrl, setStoreUrl] = useState<string>(APP_STORE_URL);
   const [latest, setLatest] = useState<string | null>(null);
 
   useEffect(() => {
@@ -39,7 +42,7 @@ export function AppUpdatePrompt() {
         if (!release.version || compareVersions(info.version, release.version) >= 0) return;
         if (sessionStorage.getItem(DISMISS_KEY) === release.version) return;
         setLatest(release.version);
-        setStoreUrl(release.storeUrl);
+        if (release.storeUrl) setStoreUrl(release.storeUrl);
         setOpen(true);
       } catch {
         /* offline or an old server — stay quiet */
@@ -70,13 +73,9 @@ export function AppUpdatePrompt() {
       >
         <h2 id="app-update-title" className="app-update-title">Update Commons</h2>
         <p className="app-update-copy">A newer version is ready. Update to keep plans and messages in sync.</p>
-        {storeUrl ? (
-          <a className="btn-primary btn-block" href={storeUrl}>
-            Update
-          </a>
-        ) : (
-          <p className="app-update-copy">Open the App Store and update Commons.</p>
-        )}
+        <a className="btn-primary btn-block" href={storeUrl}>
+          Update
+        </a>
         <button type="button" className="btn-link app-update-later" onClick={dismiss}>
           Not now
         </button>

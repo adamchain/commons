@@ -1,5 +1,15 @@
 import { isNative } from "../lib/platform";
-import { getAuthToken, clearAuthToken } from "./authToken";
+import { getAuthToken, setAuthToken, clearAuthToken } from "./authToken";
+
+const SESSION_HEADER = "X-Session-Token";
+
+let sessionExpiredNoted = false;
+
+function noteSessionExpired(): void {
+  if (sessionExpiredNoted || typeof window === "undefined") return;
+  sessionExpiredNoted = true;
+  window.dispatchEvent(new Event("commons:session-expired"));
+}
 
 function resolveApiBase(): string {
   const envBase = import.meta.env.VITE_API_URL;
@@ -17,6 +27,14 @@ function resolveApiBase(): string {
 
 const API_BASE = resolveApiBase();
 
+function isSessionProbe(path: string): boolean {
+  return (
+    path.startsWith("/api/auth/verify-code") ||
+    path.startsWith("/api/auth/logout") ||
+    path.startsWith("/api/devices/")
+  );
+}
+
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   const method = (init?.method ?? "GET").toUpperCase();
@@ -31,26 +49,52 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
   // Native builds can't rely on cookies — attach the JWT as a Bearer token.
   // Web keeps cookie-based auth for backwards compatibility.
+  let sentToken = false;
   if (isNative()) {
     const token = await getAuthToken();
-    if (token) headers.set("Authorization", `Bearer ${token}`);
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+      sentToken = true;
+    }
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    credentials: init?.credentials ?? (isNative() ? "omit" : "include"),
-    headers,
-  });
+  const request = () =>
+    fetch(`${API_BASE}${path}`, {
+      ...init,
+      credentials: init?.credentials ?? (isNative() ? "omit" : "include"),
+      headers,
+    });
+
+  let response = await request();
+
+  // A keychain read can miss while the token is still stored. Retry once
+  // before treating the 401 as a dead session — clearing storage here used
+  // to delete a good token and the next send alerted "Unauthorized".
+  if (response.status === 401 && isNative() && !sentToken) {
+    const token = await getAuthToken();
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+      sentToken = true;
+      response = await request();
+    }
+  }
+
+  const renewed = response.headers.get(SESSION_HEADER);
+  if (renewed) {
+    sessionExpiredNoted = false;
+    await setAuthToken(renewed);
+  } else if (response.ok) {
+    sessionExpiredNoted = false;
+  }
 
   // A wrong verification code is a 401 too. Clearing storage here wiped a
   // session that a duplicate check had just saved, so sign-in looked expired.
-  if (
-    response.status === 401 &&
-    isNative() &&
-    !path.startsWith("/api/auth/verify-code") &&
-    !path.startsWith("/api/devices/")
-  ) {
-    await clearAuthToken();
+  if (response.status === 401 && !isSessionProbe(path)) {
+    if (sentToken) await clearAuthToken();
+    noteSessionExpired();
+    if (!isNative()) {
+      void fetch(`${API_BASE}/api/auth/logout`, { method: "POST", credentials: "include" }).catch(() => undefined);
+    }
   }
 
   if (!response.ok) {
@@ -59,6 +103,12 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return response.json() as Promise<T>;
+}
+
+/** A 401 from a signed-in request. The session handler sends them to sign in. */
+export function isAuthFailure(err: unknown): boolean {
+  const raw = err instanceof Error ? err.message : String(err);
+  return /^401:/.test(raw);
 }
 
 /** Turn `api()` errors into human-readable copy (parses JSON `{ error }` bodies). */

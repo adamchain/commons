@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, MessageCircle, MoreVertical, Plus } from "lucide-react";
-import { api, parseApiError } from "../api/http";
+import { api, isAuthFailure, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { ComposerField, MentionText } from "../components/ComposerField";
 import { ChatReplyButton, ChatReplyDraft, ChatReplyQuote, replyTarget } from "../components/ChatReply";
@@ -230,7 +230,7 @@ export function DmChatPage() {
       setBody(text);
       setPendingImage(image);
       setReplyTo(reply);
-      setError(parseApiError(e) || "Couldn't send that.");
+      if (!isAuthFailure(e)) setError(parseApiError(e) || "Couldn't send that.");
     } finally {
       setSending(false);
     }

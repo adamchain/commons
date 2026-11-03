@@ -42,6 +42,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refreshUser();
   }, []);
 
+  useEffect(() => {
+    const onExpired = () => {
+      setUser(null);
+      setLoading(false);
+    };
+    window.addEventListener("commons:session-expired", onExpired);
+    return () => window.removeEventListener("commons:session-expired", onExpired);
+  }, []);
+
   const value = useMemo(() => ({ user, loading, refreshUser, setUser }), [user, loading]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

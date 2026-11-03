@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
-import { sessionVersionMatches, verifySessionToken } from "../lib/jwt.js";
+import { readUsableSession, sessionVersionMatches } from "../lib/jwt.js";
+import { refreshSession } from "../lib/sessionCookie.js";
 import { findUserById } from "../userRepo.js";
 
 declare module "express-serve-static-core" {
@@ -24,7 +25,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 
   try {
-    const payload = verifySessionToken(token);
+    const payload = readUsableSession(token);
     const user = await findUserById(payload.sub);
     if (!user) {
       res.status(401).json({ error: "Unauthorized" });
@@ -38,6 +39,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
+    if (payload.refresh) refreshSession(res, user.id, user.sessionVersion ?? 0);
     req.userId = user.id;
     next();
   } catch {

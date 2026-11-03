@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { isAdminPhone } from "../lib/adminPhones.js";
-import { sessionVersionMatches, signSessionToken, verifySessionToken } from "../lib/jwt.js";
+import { sessionVersionMatches, verifySessionToken } from "../lib/jwt.js";
+import { setSessionCookie } from "../lib/sessionCookie.js";
 import { normalizePhone } from "../lib/phone.js";
 import {
   checkPhoneVerification,
@@ -92,21 +93,6 @@ function parseTwilioError(err: unknown): TwilioLikeError {
     status: typeof maybe.status === "number" ? maybe.status : undefined,
     message: typeof maybe.message === "string" ? maybe.message : undefined,
   };
-}
-
-export function setSessionCookie(
-  res: import("express").Response,
-  userId: string,
-  sessionVersion = 0,
-): string {
-  const token = signSessionToken(userId, sessionVersion);
-  res.cookie("session", token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 1000 * 60 * 60 * 24 * 30,
-  });
-  return token;
 }
 
 function generateCode(): string {
