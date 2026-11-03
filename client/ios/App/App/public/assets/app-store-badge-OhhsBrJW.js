@@ -1,0 +1,1 @@
+var e=`/assets/app-store-badge-DYUj62SX.png`;export{e as t};
