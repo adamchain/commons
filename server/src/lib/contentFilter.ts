@@ -31,10 +31,22 @@ function normalize(text: string): string {
     .replace(/[@$0]/g, (ch) => ({ "@": "a", $: "s", "0": "o" }[ch] ?? ch));
 }
 
+function escapeRegExp(term: string): string {
+  return term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Match each term as a whole word (optionally pluralized) rather than a raw
+// substring, so innocent words that merely contain a banned sequence are not
+// rejected \u2014 e.g. "grape"/"drape"/"scrape" vs. "rape", or "therapist" vs.
+// "rapist", or "despicable"/"conspicuous" vs. "spic".
+const TERM_PATTERNS = TERMS.map(
+  (term) => new RegExp(`\\b${escapeRegExp(term)}s?\\b`),
+);
+
 export function containsObjectionableContent(text: string): boolean {
   const hay = normalize(text);
   if (!hay.trim()) return false;
-  return TERMS.some((term) => hay.includes(term));
+  return TERM_PATTERNS.some((re) => re.test(hay));
 }
 
 export function textBlockedReason(
