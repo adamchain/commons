@@ -361,6 +361,10 @@ export interface ConversationDTO {
   planId: string;
   type: "group" | "dm";
   participants: PublicUser[];
+  /** Display name for a network group chat. Unset for plan / community / DM threads. */
+  name?: string;
+  /** True when this is a network group chat (no plan, no community). */
+  networkGroup?: boolean;
   lastMessageAt: string;
   unreadCount: number;
   /** True when the viewer has muted this conversation — chat still works, notifications go quiet. */
@@ -401,6 +405,8 @@ export interface ConversationSummaryDTO {
   communityName?: string;
   /** Set on a network direct message. The client opens /dm/:dmUserId. */
   dmUserId?: string;
+  /** Set on a network group chat. The client opens /chats/:conversationId. */
+  networkGroup?: boolean;
   /** Direct-message portrait. Plan and community rows leave these off. */
   avatarSeed?: string;
   avatarStyle?: "avataaars" | "big-smile" | "fun-emoji";

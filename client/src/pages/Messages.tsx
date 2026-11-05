@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { BarChart2, BellOff, MessageCircle, Pin, Search, SquarePen, Trash2 } from "lucide-react";
+import { BarChart2, BellOff, Check, MessageCircle, Pin, Search, SquarePen, Trash2, Users } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { PlanCoverThumb } from "../components/CoverThumb";
@@ -10,7 +10,7 @@ import { BottomSheet } from "../components/ui/BottomSheet";
 import { Button } from "../components/ui/Button";
 import { sentenceCaseTitle } from "../lib/format";
 import { readScreen, writeScreen } from "../lib/screenCache";
-import { type ConversationSummaryDTO, type PublicUser } from "../types/shared";
+import { type ConversationDTO, type ConversationSummaryDTO, type PublicUser } from "../types/shared";
 
 const PULL_THRESHOLD = 52;
 const PULL_MAX = 96;
@@ -231,6 +231,10 @@ export function MessagesPage() {
   const [inboxQuery, setInboxQuery] = useState("");
   const [composeOpen, setComposeOpen] = useState(false);
   const [composePeople, setComposePeople] = useState<PublicUser[] | null>(null);
+  const [composeSelected, setComposeSelected] = useState<string[]>([]);
+  const [groupName, setGroupName] = useState("");
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [composeErr, setComposeErr] = useState<string | null>(null);
   const [ready, setReady] = useState(() => readScreen<ConversationSummaryDTO[]>("inbox") != null);
   const [dismissTarget, setDismissTarget] = useState<ConversationSummaryDTO | null>(null);
   const [dismissBusy, setDismissBusy] = useState(false);
@@ -339,6 +343,9 @@ export function MessagesPage() {
     if (!composeOpen) return;
     const ac = new AbortController();
     setComposePeople(null);
+    setComposeSelected([]);
+    setGroupName("");
+    setComposeErr(null);
     void api<{ users: PublicUser[] }>("/api/auth/network", { signal: ac.signal })
       .then((r) => {
         if (!ac.signal.aborted) setComposePeople(r.users);
@@ -435,14 +442,50 @@ export function MessagesPage() {
     }
   }
 
-  function conversationKind(c: ConversationSummaryDTO): { key: "direct" | "community" | "plan"; label: string } {
+  function conversationKind(c: ConversationSummaryDTO): { key: "direct" | "community" | "plan" | "group"; label: string } {
     if (c.dmUserId) return { key: "direct", label: "DIRECT MESSAGE" };
+    if (c.networkGroup) return { key: "group", label: "GROUP" };
     if (c.communityId) return { key: "community", label: "COMMUNITY" };
     return { key: "plan", label: "PLAN" };
   }
 
   function rowKey(c: ConversationSummaryDTO) {
-    return c.dmUserId ? `dm-${c.dmUserId}` : c.communityId ? `comm-${c.communityId}` : c.planId;
+    if (c.dmUserId) return `dm-${c.dmUserId}`;
+    if (c.networkGroup && c.conversationId) return `grp-${c.conversationId}`;
+    return c.communityId ? `comm-${c.communityId}` : c.planId;
+  }
+
+  function toggleComposeSelected(id: string) {
+    setComposeErr(null);
+    setComposeSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  async function startComposedChat() {
+    if (composeSelected.length === 0 || creatingGroup) return;
+    // One person → a direct message. Two or more → a network group chat.
+    if (composeSelected.length === 1) {
+      const only = composeSelected[0]!;
+      setComposeOpen(false);
+      navigate(`/dm/${only}`, { state: { from: "messages" } });
+      return;
+    }
+    setCreatingGroup(true);
+    setComposeErr(null);
+    try {
+      const conv = await api<ConversationDTO>("/api/dm/group", {
+        method: "POST",
+        body: JSON.stringify({
+          userIds: composeSelected,
+          ...(groupName.trim() ? { name: groupName.trim() } : {}),
+        }),
+      });
+      setComposeOpen(false);
+      navigate(`/chats/${conv.id}`, { state: { from: "messages" } });
+    } catch (e) {
+      setComposeErr(parseApiError(e) || "Couldn't start that group.");
+    } finally {
+      setCreatingGroup(false);
+    }
   }
 
   async function dismissPastChat(target: ConversationSummaryDTO) {
@@ -559,6 +602,10 @@ export function MessagesPage() {
                           size="md"
                         />
                       </span>
+                    ) : c.networkGroup ? (
+                      <span className="messages-row-avatar messages-row-avatar--group" aria-hidden="true">
+                        <Users size={20} strokeWidth={1.8} />
+                      </span>
                     ) : (
                       <PlanCoverThumb
                         planId={c.communityId || c.planId || c.conversationId || "chat"}
@@ -594,7 +641,7 @@ export function MessagesPage() {
                 );
                 return (
                   <SwipeRemoveRow
-                    key={c.dmUserId ? `dm-${c.dmUserId}` : c.communityId ? `comm-${c.communityId}` : c.planId}
+                    key={rowKey(c)}
                     enabled={canDismiss}
                     pinned={Boolean(c.pinned)}
                     onPin={() => {
@@ -609,9 +656,11 @@ export function MessagesPage() {
                       to={
                         c.dmUserId
                           ? `/dm/${c.dmUserId}`
-                          : c.communityId
-                            ? `/communities/${c.communityId}/chat`
-                            : `/plans/${c.planId}/chat`
+                          : c.networkGroup && c.conversationId
+                            ? `/chats/${c.conversationId}`
+                            : c.communityId
+                              ? `/communities/${c.communityId}/chat`
+                              : `/plans/${c.planId}/chat`
                       }
                       state={{ from: "messages" }}
                       className={`messages-row${unread ? " is-unread" : ""}`}
@@ -629,9 +678,13 @@ export function MessagesPage() {
       </div>
 
       {composeOpen && (
-        <BottomSheet onClose={() => setComposeOpen(false)} ariaLabel="New message">
+        <BottomSheet onClose={() => !creatingGroup && setComposeOpen(false)} closeDisabled={creatingGroup} ariaLabel="New message">
           <h2 className="sheet-title">New message</h2>
-          <p className="sheet-copy">Message someone in your network.</p>
+          <p className="sheet-copy">
+            {composeSelected.length >= 2
+              ? "Start a group chat. Pick more people, or give it a name."
+              : "Message someone in your network, or pick a few for a group."}
+          </p>
           {composePeople === null ? (
             <div className="feed-skeleton" aria-busy="true" aria-label="Loading your network">
               <div className="feed-skeleton-card" />
@@ -644,29 +697,64 @@ export function MessagesPage() {
               </Button>
             </>
           ) : (
-            <div className="messages-compose-list">
-              {composePeople.map((person) => {
-                const name = [person.firstName, person.lastName].filter(Boolean).join(" ") || "Friend";
-                return (
-                  <button
-                    key={person.id}
-                    type="button"
-                    className="messages-compose-row"
-                    onClick={() => navigate(`/dm/${person.id}`, { state: { from: "messages" } })}
-                  >
-                    <Avatar
-                      seed={person.avatarSeed}
-                      style={person.avatarStyle}
-                      photoDataUrl={person.avatarPhotoDataUrl}
-                      params={person.avatarParams}
-                      name={person.firstName}
-                      size="sm"
-                    />
-                    <span>{name}</span>
-                  </button>
-                );
-              })}
-            </div>
+            <>
+              {composeSelected.length >= 2 && (
+                <input
+                  className="messages-compose-name"
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  placeholder="Group name (optional)"
+                  aria-label="Group name"
+                  maxLength={60}
+                  autoComplete="off"
+                />
+              )}
+              <div className="messages-compose-list">
+                {composePeople.map((person) => {
+                  const name = [person.firstName, person.lastName].filter(Boolean).join(" ") || "Friend";
+                  const selected = composeSelected.includes(person.id);
+                  return (
+                    <button
+                      key={person.id}
+                      type="button"
+                      className={`messages-compose-row${selected ? " is-selected" : ""}`}
+                      aria-pressed={selected}
+                      onClick={() => toggleComposeSelected(person.id)}
+                    >
+                      <Avatar
+                        seed={person.avatarSeed}
+                        style={person.avatarStyle}
+                        photoDataUrl={person.avatarPhotoDataUrl}
+                        params={person.avatarParams}
+                        name={person.firstName}
+                        size="sm"
+                      />
+                      <span className="messages-compose-name-text">{name}</span>
+                      <span className={`messages-compose-check${selected ? " is-on" : ""}`} aria-hidden="true">
+                        {selected ? <Check size={16} strokeWidth={2.4} /> : null}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {composeErr && <p className="error-text">{composeErr}</p>}
+              <div className="sheet-actions">
+                <Button
+                  variant="primary"
+                  block
+                  disabled={composeSelected.length === 0 || creatingGroup}
+                  onClick={() => void startComposedChat()}
+                >
+                  {creatingGroup
+                    ? "Starting…"
+                    : composeSelected.length >= 2
+                      ? `Start group · ${composeSelected.length}`
+                      : composeSelected.length === 1
+                        ? "Message"
+                        : "Select people"}
+                </Button>
+              </div>
+            </>
           )}
         </BottomSheet>
       )}

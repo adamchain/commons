@@ -290,6 +290,14 @@ export interface ConversationRecord {
   lastMessageAt: string;
   /** Network DM: these users cannot see the thread until they accept a connect request. */
   hiddenFromUserIds?: string[];
+  /**
+   * Optional display name for a network group chat (type "group", no plan and
+   * no community). Plan and community threads take their title from the plan /
+   * community instead and leave this unset.
+   */
+  name?: string;
+  /** Creator of a network group chat — acts as its host for polls / clearing. */
+  ownerId?: string;
 }
 
 export interface PollOption {
@@ -1718,6 +1726,37 @@ export const store = {
       participantIds: [a, b],
       createdAt: now,
       lastMessageAt: now,
+    };
+    snapshot.conversations.push(conv);
+    persist();
+    mongoMirror.upsertConversation(conv);
+    return conv;
+  },
+  /**
+   * Network group chat — a group thread not tied to any plan or community,
+   * started from Messages between people in the creator's network.
+   */
+  listNetworkGroups(userId: string): ConversationRecord[] {
+    return snapshot.conversations.filter(
+      (c) =>
+        c.type === "group" &&
+        c.planId === "" &&
+        !c.communityId &&
+        c.participantIds.includes(userId),
+    );
+  },
+  createNetworkGroup(ownerId: string, memberIds: string[], name?: string): ConversationRecord {
+    const now = new Date().toISOString();
+    const participantIds = Array.from(new Set([ownerId, ...memberIds]));
+    const conv: ConversationRecord = {
+      id: randomUUID(),
+      planId: "",
+      type: "group",
+      participantIds,
+      createdAt: now,
+      lastMessageAt: now,
+      ownerId,
+      ...(name ? { name } : {}),
     };
     snapshot.conversations.push(conv);
     persist();

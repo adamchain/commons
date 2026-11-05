@@ -34,6 +34,7 @@ const AdminPage = lazy(() => import("./pages/admin/FounderDashboard").then(m => 
 const ProfilePage = lazy(() => import("./pages/Profile").then(m => ({ default: m.ProfilePage })));
 const EditProfilePage = lazy(() => import("./pages/EditProfile").then(m => ({ default: m.EditProfilePage })));
 const DmChatPage = lazy(() => import("./pages/DmChat").then(m => ({ default: m.DmChatPage })));
+const GroupChatPage = lazy(() => import("./pages/GroupChat").then(m => ({ default: m.GroupChatPage })));
 const NetworkPage = lazy(() => import("./pages/Network").then(m => ({ default: m.NetworkPage })));
 const InvitePage = lazy(() => import("./pages/Invite").then(m => ({ default: m.InvitePage })));
 const SettingsPage = lazy(() => import("./pages/Settings").then(m => ({ default: m.SettingsPage })));
@@ -271,6 +272,7 @@ export default function App() {
         <Route path="/plans/:planId/chat" element={<Protected><ChatPage /></Protected>} />
         <Route path="/network" element={<Protected><NetworkPage /></Protected>} />
         <Route path="/dm/:userId" element={<Protected><DmChatPage /></Protected>} />
+        <Route path="/chats/:conversationId" element={<Protected><GroupChatPage /></Protected>} />
         <Route path="/invite" element={<Protected><InvitePage /></Protected>} />
         <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />
         <Route path="/settings/interests" element={<Protected><SettingsInterestsPage /></Protected>} />

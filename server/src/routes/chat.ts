@@ -18,6 +18,8 @@ import { planHasEnded } from "../lib/planTime.js";
 import type { ConversationDTO, ConversationSummaryDTO, MessageDTO, MessageReplyDTO, PollDTO } from "../types/shared.js";
 
 const MAX_CHAT_IMAGE_CHARS = 1_600_000;
+// A network group is you plus up to this many others.
+const MAX_GROUP_MEMBERS = 24;
 
 /** Build the inline messages array for ?messages=1 responses. */
 export async function inlineMessages(
@@ -138,6 +140,76 @@ chatRouter.post("/dm", requireAuth, async (req, res) => {
   const dto = await toConversationDto(conv, userId);
   const withMessages = String(req.query.messages ?? "") === "1";
   res.json(withMessages ? { ...dto, messages: await inlineMessages(conv.id, userId, dto.hostId) } : dto);
+});
+
+// POST /api/dm/group { userIds: string[], name? } — start a group chat with
+// people in your network. Not tied to any plan or community; every added member
+// must already be connected to you.
+chatRouter.post("/dm/group", requireAuth, async (req, res) => {
+  const userId = String(req.userId);
+  const rawIds = Array.isArray(req.body?.userIds) ? req.body.userIds : [];
+  const name = String(req.body?.name ?? "").trim().slice(0, 60);
+  const nameBlocked = name ? textBlockedReason(name) : null;
+  if (nameBlocked) {
+    res.status(400).json({ error: nameBlocked });
+    return;
+  }
+  const memberIds = Array.from(
+    new Set(
+      rawIds
+        .map((id: unknown) => String(id ?? "").trim())
+        .filter((id: string) => id && id !== userId),
+    ),
+  ) as string[];
+  if (memberIds.length < 2) {
+    res.status(400).json({ error: "Pick at least two people for a group chat." });
+    return;
+  }
+  if (memberIds.length > MAX_GROUP_MEMBERS) {
+    res.status(400).json({ error: `Groups can have up to ${MAX_GROUP_MEMBERS} other people.` });
+    return;
+  }
+  const me = await findUserById(userId);
+  if (!me) {
+    res.status(404).json({ error: "Couldn't find your account." });
+    return;
+  }
+  const network = new Set(me.networkIds ?? []);
+  const members = await findUsersByIds(memberIds);
+  for (const id of memberIds) {
+    if (!members.get(id)) {
+      res.status(404).json({ error: "Couldn't find one of those people." });
+      return;
+    }
+    if (!network.has(id)) {
+      res.status(403).json({ error: "You can only add people in your network." });
+      return;
+    }
+    if (store.isBlockedEitherWay(userId, id)) {
+      res.status(403).json({ error: "You can't add someone you've blocked." });
+      return;
+    }
+  }
+  const conv = store.createNetworkGroup(userId, memberIds, name || undefined);
+  const starterName = me.firstName || "Someone";
+  store.createSystemMessage(conv.id, `${starterName} started this group.`);
+  store.markConversationRead(conv.id, userId);
+  // Let each added member know — the thread already shows in their inbox.
+  const groupLabel = name ? `"${name}"` : "a group chat";
+  for (const id of memberIds) {
+    await emit({
+      userId: id,
+      kind: "newGroupChatMessage",
+      body: `${starterName} added you to ${groupLabel}`,
+      conversationId: conv.id,
+      dedupKey: `groupAdded:${conv.id}:${id}`,
+    });
+  }
+  const dto = await toConversationDto(conv, userId);
+  const withMessages = String(req.query.messages ?? "") === "1";
+  res.status(201).json(
+    withMessages ? { ...dto, messages: await inlineMessages(conv.id, userId, dto.hostId) } : dto,
+  );
 });
 
 // GET /api/conversations — unified inbox: plan chats, community chats, and
@@ -262,6 +334,43 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
       avatarSeed: other?.avatarSeed ?? otherId,
       avatarStyle: other?.avatarStyle ?? "avataaars",
       ...(other?.avatarParams ? { avatarParams: other.avatarParams } : {}),
+      pinned: pinRank.has(conv.id),
+      muted: store.isConversationMuted(userId, conv.id),
+    });
+  }
+
+  // Network group chats — group threads started from Messages, not tied to any
+  // plan or community. Keyed and opened by conversation id.
+  for (const conv of store.listNetworkGroups(userId)) {
+    if (store.hasLeftConversation(userId, conv.id)) continue;
+    if (!conv.participantIds.includes(userId)) continue;
+    const msgs = threadMessages(conv.id);
+    const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
+    const others = conv.participantIds.filter((id) => id !== userId);
+    let title = conv.name?.trim() ?? "";
+    if (!title) {
+      const names: string[] = [];
+      for (const id of others.slice(0, 3)) {
+        const u = await findUserById(id);
+        if (u?.firstName) names.push(u.firstName);
+      }
+      const extra = others.length - names.length;
+      title = names.length ? names.join(", ") + (extra > 0 ? ` +${extra}` : "") : "Group chat";
+    }
+    summaries.push({
+      planId: "",
+      planTitle: title,
+      hostEmoji: "👥",
+      planDate: conv.createdAt.slice(0, 10),
+      conversationId: conv.id,
+      lastMessageAt: msgs.length ? conv.lastMessageAt : null,
+      lastMessagePreview: lastMsg ? messagePreview(lastMsg) : null,
+      lastMessageSender: lastSenderName(lastMsg),
+      unreadCount: humanUnread(msgs, userId),
+      participantCount: conv.participantIds.length,
+      myRole: conv.ownerId === userId ? "hosting" : "going",
+      networkGroup: true,
+      coverImage: null,
       pinned: pinRank.has(conv.id),
       muted: store.isConversationMuted(userId, conv.id),
     });
@@ -418,6 +527,33 @@ chatRouter.get("/conversations/:id/messages", requireAuth, async (req, res) => {
   res.json(messages);
 });
 
+// GET /api/conversations/:id — conversation metadata (participants, name).
+// Drives the network group chat view. ?messages=1 inlines the thread.
+chatRouter.get("/conversations/:id", requireAuth, async (req, res) => {
+  const convId = String(req.params.id);
+  const userId = String(req.userId);
+  const conv = store.findConversationById(convId);
+  if (!conv) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
+  if (!canReadConversation(conv, userId)) {
+    res.status(403).json({ error: "Not a participant" });
+    return;
+  }
+  if ((conv.hiddenFromUserIds ?? []).includes(userId)) {
+    res.status(403).json({ error: "This chat isn't available yet." });
+    return;
+  }
+  const withMessages = String(req.query.messages ?? "") === "1";
+  if (withMessages) {
+    store.markConversationRead(convId, userId);
+    store.markMessageNotificationsRead(userId, convId);
+  }
+  const dto = await toConversationDto(conv, userId);
+  res.json(withMessages ? { ...dto, messages: await inlineMessages(convId, userId, dto.hostId) } : dto);
+});
+
 // POST /api/conversations/:id/messages { body?, imageUrl? }
 chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => {
   const convId = String(req.params.id);
@@ -527,7 +663,7 @@ chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => 
     const senderName = sender?.firstName || "Someone";
     const plan = store.findPlanById(conv.planId);
     const community = conv.communityId ? store.findCommunityById(conv.communityId) : undefined;
-    const place = community?.name ?? plan?.title ?? "your plan";
+    const place = community?.name ?? plan?.title ?? conv.name ?? "your group";
     const participants = storedBody.includes("@")
       ? [...(await findUsersByIds(conv.participantIds)).values()]
       : [];
@@ -979,7 +1115,16 @@ function conversationHostId(
   if (conv.communityId) {
     return store.findCommunityById(conv.communityId)?.organizerId ?? "";
   }
+  // Network group chat (no plan, no community): the creator is the host.
+  if (conv.type === "group" && !conv.planId) return conv.ownerId ?? "";
   return store.findPlanById(conv.planId)?.creatorId ?? "";
+}
+
+/** True for a group thread that isn't anchored to a plan or community. */
+function isNetworkGroup(
+  conv: NonNullable<ReturnType<typeof store.findConversationById>>,
+): boolean {
+  return conv.type === "group" && !conv.planId && !conv.communityId;
 }
 
 async function dmHoldFields(
@@ -1011,6 +1156,7 @@ async function toConversationDto(
     id: conv.id,
     planId: conv.planId,
     type: conv.type,
+    ...(isNetworkGroup(conv) ? { networkGroup: true, name: conv.name ?? "" } : {}),
     participants: conv.participantIds.map((id) => {
       const u = users.get(id);
       return u

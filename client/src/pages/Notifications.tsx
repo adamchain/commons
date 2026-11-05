@@ -343,6 +343,15 @@ function hrefFor(n: NotificationDTO): string | null {
     return n.conversationId ? `/communities/${n.communityId}/chat` : `/communities/${n.communityId}`;
   }
   if (n.kind === "newGroupChatMessage" && n.profileUserId && !n.planId) return `/dm/${n.profileUserId}`;
+  if (
+    n.kind === "newGroupChatMessage" &&
+    n.conversationId &&
+    !n.planId &&
+    !n.communityId &&
+    !n.profileUserId
+  ) {
+    return `/chats/${n.conversationId}`;
+  }
   if (n.kind === "newGroupChatMessage" && n.planId) return `/plans/${n.planId}/chat`;
   if (n.kind === "weeklyFridayDigest") return null;
   if (n.kind === "welcome") return "/settings/interests";

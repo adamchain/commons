@@ -5,6 +5,7 @@ import { api, isAuthFailure, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { ComposerField, MentionText } from "../components/ComposerField";
 import { ChatReplyButton, ChatReplyDraft, ChatReplyQuote, replyTarget } from "../components/ChatReply";
+import { ReactionBar } from "../components/ReactionBar";
 import { ChatAttachSheet } from "../components/ChatAttachSheet";
 import { ChatPersonLink } from "../components/ChatPersonLink";
 import { ChatSystemEvent } from "../components/ChatSystemEvent";
@@ -572,22 +573,13 @@ export function DmChatPage() {
                   {user && (
                     <div className="chat-bubble-actions">
                       <ChatReplyButton onClick={() => setReplyTo(replyTarget(m))} />
-                      {(() => {
-                        const hearts = m.reactions?.["❤️"] ?? [];
-                        const iReacted = hearts.includes(user.id);
-                        return (
-                          <button
-                            type="button"
-                            className={`chat-react-btn ${iReacted ? "is-reacted" : ""} ${hearts.length > 0 ? "has-count" : ""}`}
-                            onClick={() => void toggleHeart(m.id)}
-                            aria-label={iReacted ? "Remove heart" : "React with heart"}
-                            aria-pressed={iReacted}
-                          >
-                            <span aria-hidden="true">❤️</span>
-                            {hearts.length > 0 && <span className="chat-react-count">{hearts.length}</span>}
-                          </button>
-                        );
-                      })()}
+                      <ReactionBar
+                        hearts={m.reactions?.["❤️"] ?? []}
+                        meId={user.id}
+                        people={conv?.participants ?? []}
+                        profileFrom={personProfileFrom}
+                        onToggle={() => void toggleHeart(m.id)}
+                      />
                     </div>
                   )}
                 </div>

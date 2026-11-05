@@ -50,6 +50,15 @@ function pathForPushData(data: unknown): string | null {
     return `/communities/${d.communityId}?tab=bulletin`;
   }
   if (d.kind === "newGroupChatMessage" && d.profileUserId && !d.planId) return `/dm/${d.profileUserId}`;
+  if (
+    d.kind === "newGroupChatMessage" &&
+    d.conversationId &&
+    !d.planId &&
+    !d.communityId &&
+    !d.profileUserId
+  ) {
+    return `/chats/${d.conversationId}`;
+  }
   if (d.conversationId && d.planId) return `/plans/${d.planId}/chat`;
   if (
     d.communityId &&

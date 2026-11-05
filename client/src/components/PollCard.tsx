@@ -3,6 +3,8 @@ import { Check, ChevronDown } from "lucide-react";
 import type { NavFromState } from "../lib/navState";
 import { Avatar } from "./Avatar";
 import { ChatPersonLink } from "./ChatPersonLink";
+import { PersonRow } from "./PeopleListSheet";
+import { BottomSheet } from "./ui/BottomSheet";
 import type { PollDTO, PublicUser } from "../types/shared";
 
 interface PollCardProps {
@@ -54,6 +56,7 @@ export function PollCard({
   // Collapsible polls start open; once someone has voted or it closed, keep it
   // open so results are visible without a tap.
   const [open, setOpen] = useState(true);
+  const [showVotes, setShowVotes] = useState(false);
   const collapsed = collapsible && !open;
 
   // Results stay hidden until the viewer votes (Instagram-style) or the poll
@@ -171,8 +174,16 @@ export function PollCard({
           {total} {total === 1 ? "vote" : "votes"}
           {poll.closed && " · Final results"}
         </span>
-        {(onDelete || (!poll.closed && onClose) || (poll.closed && onReopen)) && (
+        {((revealed && total > 0 && variant === "card") ||
+          onDelete ||
+          (!poll.closed && onClose) ||
+          (poll.closed && onReopen)) && (
           <span className="poll-card-actions">
+            {revealed && total > 0 && variant === "card" && (
+              <button type="button" className="poll-card-seevotes" onClick={() => setShowVotes(true)}>
+                See votes
+              </button>
+            )}
             {onDelete && (
               <button type="button" className="poll-card-close" onClick={onDelete} disabled={busy}>
                 Delete
@@ -192,6 +203,34 @@ export function PollCard({
         )}
       </div>
       </>
+      )}
+
+      {showVotes && (
+        <BottomSheet onClose={() => setShowVotes(false)} ariaLabel="Poll results">
+          <h2 className="sheet-title">{poll.question}</h2>
+          <p className="sheet-copy">{total} {total === 1 ? "vote" : "votes"}{poll.closed ? " · Final" : ""}</p>
+          <div className="poll-votes-sheet">
+            {poll.options.map((opt) => (
+              <div key={opt.id} className="poll-votes-group">
+                <div className="poll-votes-group-head">
+                  <span className="poll-votes-option">{opt.text}</span>
+                  <span className="poll-votes-count">
+                    {opt.voterIds.length} {opt.voterIds.length === 1 ? "vote" : "votes"}
+                  </span>
+                </div>
+                {opt.voterIds.length === 0 ? (
+                  <p className="poll-votes-empty">No votes</p>
+                ) : (
+                  <div className="people-list-sheet">
+                    {opt.voterIds.map((id) => (
+                      <PersonRow key={id} id={id} person={byId.get(id)} profileFrom={profileFrom} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </BottomSheet>
       )}
     </div>
   );
