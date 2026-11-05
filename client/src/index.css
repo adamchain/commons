@@ -14299,9 +14299,12 @@ button.settings-row:disabled {
 .poll-card-foot {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 8px;
   margin-top: 10px;
+}
+.poll-card-foot:empty {
+  margin-top: 0;
 }
 .poll-card-meta {
   font-size: var(--text-body-small);

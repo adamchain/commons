@@ -2,7 +2,6 @@ import { useMemo, useState, type CSSProperties } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import type { NavFromState } from "../lib/navState";
 import { Avatar } from "./Avatar";
-import { ChatPersonLink } from "./ChatPersonLink";
 import { PersonRow } from "./PeopleListSheet";
 import { BottomSheet } from "./ui/BottomSheet";
 import type { PollDTO, PublicUser } from "../types/shared";
@@ -35,7 +34,6 @@ interface PollCardProps {
 
 export function PollCard({
   poll,
-  author,
   profileFrom,
   participants,
   onVote,
@@ -157,23 +155,6 @@ export function PollCard({
       </ul>
 
       <div className="poll-card-foot">
-        <span className="poll-card-meta">
-          {profileFrom ? (
-            <ChatPersonLink
-              userId={author.id}
-              name={author.firstName}
-              state={profileFrom}
-              className="poll-card-author"
-            >
-              {author.firstName}
-            </ChatPersonLink>
-          ) : (
-            author.firstName
-          )}
-          {" · "}
-          {total} {total === 1 ? "vote" : "votes"}
-          {poll.closed && " · Final results"}
-        </span>
         {((revealed && total > 0 && variant === "card") ||
           onDelete ||
           (!poll.closed && onClose) ||
