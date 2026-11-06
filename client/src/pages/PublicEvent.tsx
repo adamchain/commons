@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, parseApiError } from "../api/http";
-import { formatPhoneInput, formatPlanWhenLine, formatVenueName, isValidPhoneInput } from "../lib/format";
-import { INTEREST_EMOJI, INTEREST_LABELS, type PublicPlanDTO } from "../types/shared";
+import { formatPhoneInput, formatPlanWhenLine, isValidPhoneInput } from "../lib/format";
+import { type PublicPlanDTO } from "../types/shared";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { IdeaCoverFallback } from "../components/CoverThumb";
 import wordmark from "../assets/wordmark.png";
@@ -74,15 +74,16 @@ export function PublicEventPage() {
   }
   if (!plan) return <LoadingScreen simple tagline="Loading the plan…" />;
 
-  const dateLine = formatPlanWhenLine(plan.date, plan.time, plan.isFlexibleTime, {
-    isFlexibleDate: plan.isFlexibleDate,
-    isThisWeek: plan.isThisWeek,
-    isFlexibleLocation: plan.isFlexibleLocation,
-  });
-  const attendance =
-    plan.goingCount > 0 || plan.interestedCount > 0
-      ? `${plan.goingCount} going · ${plan.interestedCount} interested`
-      : "Be the first to join";
+  // Logged-out visitors only ever see the day (and neighborhood, unless the
+  // plan is private). The time, venue, host, and headcount are withheld by the
+  // server — you join Commons to see them.
+  const dayLine =
+    plan.dayLabel ||
+    formatPlanWhenLine(plan.date, "", true, {
+      isFlexibleDate: plan.isFlexibleDate,
+      isThisWeek: plan.isThisWeek,
+      isFlexibleLocation: true,
+    });
   const showCover = Boolean(plan.coverImage) && !coverFailed;
 
   return (
@@ -112,30 +113,12 @@ export function PublicEventPage() {
           </div>
 
           <h1 className="public-event-title">{plan.title}</h1>
-          <div className="public-event-meta">{dateLine}</div>
-          {!plan.isFlexibleLocation && plan.locationName ? (
-            <div className="public-event-meta">📍 {formatVenueName(plan.locationName)}</div>
-          ) : plan.isFlexibleLocation ? (
-            <div className="public-event-meta">📍 Flexible</div>
+          <div className="public-event-meta">{dayLine}</div>
+          {plan.neighborhoodName ? (
+            <div className="public-event-meta">📍 {plan.neighborhoodName}</div>
           ) : null}
-          <div className="public-event-host">Hosted by {plan.hostFirstName}</div>
 
-          <div className="public-event-attendance">{attendance}</div>
-
-          {(() => {
-            // Guard against legacy/unknown tags in older plan records.
-            const known = (plan.tags ?? []).filter((t) => INTEREST_LABELS[t]).slice(0, 4);
-            if (known.length === 0) return null;
-            return (
-              <div className="public-event-tags">
-                {known.map((t) => (
-                  <span key={t} className="public-event-tag">
-                    {INTEREST_EMOJI[t]} {INTEREST_LABELS[t]}
-                  </span>
-                ))}
-              </div>
-            );
-          })()}
+          <div className="public-event-attendance">Join Commons to see details</div>
 
           {plan.cancelled ? (
             <div className="public-event-cancelled">This plan was cancelled by the host.</div>

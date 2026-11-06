@@ -5,6 +5,7 @@ import { store, type UserRecord } from "../store.js";
 import { findUserById, findUsersByIds } from "../userRepo.js";
 import { INTEREST_LABELS, COMMUNITY_CATEGORY_LABELS, type InterestTag, type CommunityCategory } from "../types/shared.js";
 import { planSummary, planVisibleToViewer, userToPublic } from "./plans.js";
+import { planDetailAccess } from "../lib/planVisibility.js";
 import { communityCategoriesOf } from "../types/shared.js";
 import type { PersonSearchResultDTO, SearchResultsDTO, CommunityCardDTO, PublicUser } from "../types/shared.js";
 
@@ -88,8 +89,12 @@ searchRouter.get("/", requireAuth, async (req, res) => {
     if (p.cancelledAt) return false;
     if (!planVisibleToViewer(p, me)) return false;
     const titleMatch = p.title.toLowerCase().includes(q);
-    const venueMatch = (p.location?.name ?? "").toLowerCase().includes(q);
-    const tagMatch = matchingTags.length > 0 && p.tags.some((t) => matchingTags.includes(t));
+    // Don't let a search hit reveal a field the viewer can't see. On a plan
+    // whose details are hidden until you join, only the title is searchable.
+    const myState = store.listParticipationsForPlan(p.id).find((x) => x.userId === userId)?.state ?? null;
+    const detailsVisible = planDetailAccess(p, userId, myState) !== "hidden";
+    const venueMatch = detailsVisible && (p.location?.name ?? "").toLowerCase().includes(q);
+    const tagMatch = detailsVisible && matchingTags.length > 0 && p.tags.some((t) => matchingTags.includes(t));
     return titleMatch || venueMatch || tagMatch;
   });
   // Upcoming first, then by date.

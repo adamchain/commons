@@ -21,7 +21,7 @@ import { useCardImages, pickCoverImage } from "../lib/cardImages";
 import { formatPlanDate, formatPlanTime, formatPlanWhenLine, formatVenueAddressLine, formatVenueName, sentenceCaseTitle, firstHttpUrlInText, normalizeHttpUrl } from "../lib/format";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import { cachedPlan, peekPlan, prefetchPlan, rememberPlan } from "../lib/planPrefetch";
-import { INTEREST_LABELS, type ConversationDTO, type MessageDTO, type ParticipationState, type PlanDTO, type PublicUser } from "../types/shared";
+import { INTEREST_LABELS, type ConversationDTO, type MessageDTO, type ParticipationState, type PlanDetailAccess, type PlanDTO, type PublicUser } from "../types/shared";
 
 function flyerLinkHost(url: string): string {
   try {
@@ -305,6 +305,14 @@ export function PlanDetailPage() {
   const planPeoplePreview = planPeople.slice(0, peoplePreviewMax);
   const attachedUrl = planAttachedUrl(plan);
 
+  // Server-enforced detail gating. On "hidden" only the title + day are real;
+  // on "approval_gated" the address, map, and attendee identities are withheld
+  // until the host approves. Hosts and confirmed attendees always get "full".
+  const access: PlanDetailAccess = plan.detailAccess ?? "full";
+  const detailsHidden = access === "hidden";
+  const detailsGated = access === "approval_gated";
+  const detailsLocked = detailsHidden || detailsGated;
+
   function closeGuestsModal() {
     setShowGuestsModal(false);
     if (location.hash === "#guests") {
@@ -379,7 +387,7 @@ export function PlanDetailPage() {
           )}
           <div className="plan-detail-title-row">
             <h1 className="plan-detail-title">{sentenceCaseTitle(plan.title)}</h1>
-            {!isHosting && (
+            {!isHosting && !detailsHidden && (
               <PlanSafetyMenu
                 targetUserId={plan.creator.id}
                 targetFirstName={plan.creator.firstName}
@@ -388,13 +396,14 @@ export function PlanDetailPage() {
               />
             )}
           </div>
+          {!detailsHidden && (
           <button
             type="button"
             className="plan-detail-people"
             onClick={() => setShowGuestsModal(true)}
             aria-label={`${goingCount} going, ${interestedCount} interested. View who's going`}
           >
-            {planPeoplePreview.length > 0 && (
+            {!detailsLocked && planPeoplePreview.length > 0 && (
               <span className="avatar-stack">
                 {planPeoplePreview.map((person) => (
                   <span key={person.id} className="avatar-stack-link">
@@ -416,7 +425,8 @@ export function PlanDetailPage() {
             </span>
             <ChevronRight className="plan-detail-people-chevron" size={18} strokeWidth={2} aria-hidden="true" />
           </button>
-          {!isPast && !plan.cancelledAt && goingCount <= 1 && !(plan.communityId && !isHosting) && (
+          )}
+          {!isPast && !plan.cancelledAt && goingCount <= 1 && !(plan.communityId && !isHosting) && !detailsLocked && (
             <button
               type="button"
               className="plan-detail-share-nudge"
@@ -441,17 +451,28 @@ export function PlanDetailPage() {
           </div>
         )}
 
+        {detailsLocked && (
+          <div className="plan-detail-card plan-detail-locked-note">
+            <span aria-hidden="true">🔒</span>{" "}
+            {detailsHidden
+              ? "The host is keeping the time and location private until you join."
+              : "The street address and who's going appear once the host approves you."}
+          </div>
+        )}
+
         <div className="plan-meta-card">
           <div className="plan-meta-row">
             <span className="plan-meta-icon" aria-hidden="true"><CalendarIcon /></span>
             <div className="plan-meta-text">
-              <span className="plan-meta-label">Date &amp; time</span>
+              <span className="plan-meta-label">{detailsHidden ? "Day" : "Date & time"}</span>
               <span className="plan-meta-value">
-                {formatPlanWhenLine(plan.date, plan.time, plan.isFlexibleTime, {
-                  isFlexibleDate: plan.isFlexibleDate,
-                  isThisWeek: plan.isThisWeek,
-                  isFlexibleLocation: plan.isFlexibleLocation,
-                })}
+                {detailsHidden
+                  ? plan.dayLabel || "To be shared"
+                  : formatPlanWhenLine(plan.date, plan.time, plan.isFlexibleTime, {
+                      isFlexibleDate: plan.isFlexibleDate,
+                      isThisWeek: plan.isThisWeek,
+                      isFlexibleLocation: plan.isFlexibleLocation,
+                    })}
               </span>
               {!isPast && !plan.cancelledAt && plan.myState === "going" && canAddToCalendar(plan) && (
                 <button
@@ -464,7 +485,18 @@ export function PlanDetailPage() {
               )}
             </div>
           </div>
-          {plan.isFlexibleLocation ? (
+          {detailsHidden ? null : detailsGated ? (
+            <div className="plan-meta-row">
+              <span className="plan-meta-icon" aria-hidden="true"><PinIcon /></span>
+              <div className="plan-meta-text">
+                <span className="plan-meta-label">Location</span>
+                <span className="plan-meta-value">
+                  {formatVenueName(plan.location.name) || plan.location.name || "Shared after approval"}
+                </span>
+                <span className="plan-meta-sub">Street address shown once you're approved</span>
+              </div>
+            </div>
+          ) : plan.isFlexibleLocation ? (
             <div className="plan-meta-row">
               <span className="plan-meta-icon" aria-hidden="true"><PinIcon /></span>
               <div className="plan-meta-text">
@@ -539,6 +571,7 @@ export function PlanDetailPage() {
           </div>
         )}
 
+        {!detailsHidden && (
         <button
           type="button"
           className="host-row plan-detail-card"
@@ -565,6 +598,7 @@ export function PlanDetailPage() {
           </span>
           <span className="host-row-chevron" aria-hidden="true">›</span>
         </button>
+        )}
 
         {canLock && (
           <div className="plan-detail-card idea-lock-card">
@@ -912,17 +946,25 @@ export function PlanDetailPage() {
                 </button>
               </div>
               <div className="plan-guests-modal-body">
-                <PlanGuests
-                  plan={plan}
-                  userId={user.id}
-                  isHosting={isHosting}
-                  showAllGoing
-                  showAllInterested
-                  onToggleGoing={() => undefined}
-                  onToggleInterested={() => undefined}
-                  onApproved={() => void load()}
-                  variant="modal"
-                />
+                {detailsLocked ? (
+                  <p className="plan-detail-locked-note">
+                    {detailsGated
+                      ? `${goingCount} going — who's coming is shown once the host approves you.`
+                      : "Who's going is private until you join."}
+                  </p>
+                ) : (
+                  <PlanGuests
+                    plan={plan}
+                    userId={user.id}
+                    isHosting={isHosting}
+                    showAllGoing
+                    showAllInterested
+                    onToggleGoing={() => undefined}
+                    onToggleInterested={() => undefined}
+                    onApproved={() => void load()}
+                    variant="modal"
+                  />
+                )}
               </div>
         </BottomSheet>
       )}

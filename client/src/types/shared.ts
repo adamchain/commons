@@ -141,6 +141,9 @@ export type JoinType = "open" | "approve";
 
 export type ParticipationState = "interested" | "going";
 
+/** How much of a plan a viewer may see. See server/lib/planVisibility.ts. */
+export type PlanDetailAccess = "full" | "approval_gated" | "hidden";
+
 /**
  * Bitmoji-style presets. Each entry is a curated set of DiceBear `avataaars`
  * URL overrides that produces a recognizable look. Stored on the user as a
@@ -245,6 +248,10 @@ export interface PublicPlanDTO {
   isThisWeek?: boolean;
   isFlexibleLocation: boolean;
   locationName: string;
+  /** Neighborhood name for logged-out visitors (null when the plan hides details). */
+  neighborhoodName?: string | null;
+  /** Short day label ("This Friday" / "Fri, Nov 20") for the preview. */
+  dayLabel?: string;
   hostFirstName: string;
   hostEmoji: string;
   coverImage: string;
@@ -253,6 +260,8 @@ export interface PublicPlanDTO {
   goingCount: number;
   interestedCount: number;
   cancelled: boolean;
+  /** True when "keep details private until people join" is on. */
+  detailsHidden?: boolean;
 }
 
 export interface PlanDTO {
@@ -307,6 +316,18 @@ export interface PlanDTO {
   capacity: number | null;
   /** How RSVPs are accepted when capacity is set. */
   joinType: JoinType;
+  /** The host's "keep details private until people join" setting (raw toggle). */
+  hideDetailsUntilJoined?: boolean;
+  /**
+   * How much of this plan you may see. "full" = everything. "approval_gated" =
+   * approval-only plan you haven't been approved for (address, map, and attendee
+   * identities withheld). "hidden" = private plan you haven't joined (only title
+   * + dayLabel are real; everything else comes back empty). Absent on older
+   * servers — treat as "full".
+   */
+  detailAccess?: PlanDetailAccess;
+  /** Short day label ("This Friday" / "Fri, Nov 20") shown when details are hidden. */
+  dayLabel?: string;
   /** Plan is full. Join is closed, whether or not a capacity is set. */
   markedFull: boolean;
   /** Interested people are told 48h and 24h ahead if the plan stays full. */

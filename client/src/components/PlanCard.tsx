@@ -36,10 +36,13 @@ export function PlanCard({
 }) {
   const title = sentenceCaseTitle(plan.title);
   const isLooking = isIdeaPlan(plan);
+  // "Keep details private until people join" — everything but the title and day
+  // is withheld (the server already blanked it); the card shows a lock instead.
+  const detailsHidden = plan.detailAccess === "hidden";
   const coverPool = useCardImages();
-  const coverImage =
-    planPhotoUrl(plan) ??
-    (isIdeaPlan(plan) ? null : pickCoverImage(coverPool, plan.id));
+  const coverImage = detailsHidden
+    ? null
+    : planPhotoUrl(plan) ?? (isIdeaPlan(plan) ? null : pickCoverImage(coverPool, plan.id));
   const isCancelled = Boolean(plan.cancelledAt);
   const hasEnded = !isCancelled && planHasEnded(plan);
   const { user } = useAuth();
@@ -50,7 +53,11 @@ export function PlanCard({
 
   // Ideas: one "Flexible" when nothing concrete is set. Confirmed plans keep
   // date · time · place, with "flexible" only for the unset slots.
-  const metaLine = isLooking ? ideaMetaLine(plan) : confirmedMetaLine(plan);
+  const metaLine = detailsHidden
+    ? plan.dayLabel || ""
+    : isLooking
+      ? ideaMetaLine(plan)
+      : confirmedMetaLine(plan);
 
   const goingCount = plan.participants.going.length;
   const interestedCount = plan.participants.interested.length;
@@ -167,6 +174,11 @@ export function PlanCard({
               <span>{metaLine}</span>
             </p>
           </div>
+          {detailsHidden && (
+            <p className="plan-card-locked-note">
+              <span aria-hidden="true">🔒</span> Details after you join
+            </p>
+          )}
           {plan.description && (
             <p className="plan-card-description">{plan.description}</p>
           )}

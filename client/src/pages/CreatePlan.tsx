@@ -198,6 +198,7 @@ export function CreatePlanPage() {
     capacityOn: false,
     capacity: "6",
     joinType: "open" as JoinType,
+    hideDetailsUntilJoined: false,
     recurrence: "none" as Recurrence,
     // Weekdays (0=Sun) the plan repeats on, Zoom-style. Seeded from the start
     // date; only used when recurrence is weekly/biweekly.
@@ -283,6 +284,7 @@ export function CreatePlanPage() {
         capacityOn: form.capacityOn,
         capacity: form.capacity,
         joinType: form.joinType,
+        hideDetailsUntilJoined: form.hideDetailsUntilJoined,
         recurrence: form.recurrence,
         repeatDays: form.repeatDays,
         flyerLinkUrl: form.flyerLinkUrl,
@@ -472,6 +474,7 @@ export function CreatePlanPage() {
           capacityOn: prev.capacity !== null,
           capacity: prev.capacity !== null ? String(prev.capacity) : f.capacity,
           joinType: prev.joinType,
+          hideDetailsUntilJoined: prev.hideDetailsUntilJoined ?? false,
           flyerDataUrl: prev.flyerDataUrl ?? null,
           flyerAttachmentDataUrl: prev.flyerAttachmentDataUrl ?? null,
           chatEnabled: prev.chatEnabled !== false,
@@ -532,6 +535,7 @@ export function CreatePlanPage() {
           capacityOn: prev.capacity !== null,
           capacity: prev.capacity !== null ? String(prev.capacity) : f.capacity,
           joinType: prev.joinType,
+          hideDetailsUntilJoined: prev.hideDetailsUntilJoined ?? false,
           flyerDataUrl: prev.flyerDataUrl ?? null,
           flyerAttachmentDataUrl: prev.flyerAttachmentDataUrl ?? null,
           flyerLinkUrl: prev.flyerLinkUrl ?? "",
@@ -590,6 +594,7 @@ export function CreatePlanPage() {
           capacityOn: prev.capacity !== null,
           capacity: prev.capacity !== null ? String(prev.capacity) : f.capacity,
           joinType: prev.joinType,
+          hideDetailsUntilJoined: prev.hideDetailsUntilJoined ?? false,
           flyerDataUrl: prev.flyerDataUrl ?? null,
           flyerAttachmentDataUrl: prev.flyerAttachmentDataUrl ?? null,
           chatEnabled: prev.chatEnabled !== false,
@@ -748,6 +753,7 @@ export function CreatePlanPage() {
           visibility: form.visibility,
           capacity: capacityNum,
           joinType: capacityNum !== null && form.joinType === "approve" ? "approve" : "open",
+          hideDetailsUntilJoined: form.hideDetailsUntilJoined,
           isRecurring: form.recurrence !== "none",
           recurrence: form.recurrence,
           repeatDays:
@@ -826,6 +832,7 @@ export function CreatePlanPage() {
           visibility: form.visibility,
           capacity: capacityNum,
           joinType: capacityNum !== null && form.joinType === "approve" ? "approve" : "open",
+          hideDetailsUntilJoined: form.hideDetailsUntilJoined,
           flyerDataUrl: form.flyerDataUrl ?? null,
           flyerAttachmentDataUrl: form.flyerAttachmentDataUrl ?? null,
           flyerLinkUrl: normalizeHttpUrl(form.flyerLinkUrl) ?? null,
@@ -911,6 +918,7 @@ export function CreatePlanPage() {
           visibility: form.visibility,
           capacity: capacityNum,
           joinType: capacityNum !== null && form.joinType === "approve" ? "approve" : "open",
+          hideDetailsUntilJoined: form.hideDetailsUntilJoined,
           flyerDataUrl: form.flyerDataUrl ?? null,
           flyerAttachmentDataUrl: form.flyerAttachmentDataUrl ?? null,
           flyerLinkUrl: normalizeHttpUrl(form.flyerLinkUrl) ?? null,
@@ -1618,6 +1626,22 @@ export function CreatePlanPage() {
               </div>
             )}
 
+            <div className="plan-optional-row">
+              <span>
+                <strong>Keep details private until people join</strong>
+                <small>Only the plan name and day will show until someone joins.</small>
+              </span>
+              <FlexToggle
+                active={form.hideDetailsUntilJoined}
+                variant="switch"
+                label="Keep details private until people join"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setForm((f) => ({ ...f, hideDetailsUntilJoined: !f.hideDetailsUntilJoined }));
+                }}
+              />
+            </div>
+
             {editingPlanId && (
               <div className="plan-optional-row">
                 <span>
@@ -1935,6 +1959,7 @@ type FormShape = {
   capacityOn: boolean;
   capacity: string;
   joinType: JoinType;
+  hideDetailsUntilJoined: boolean;
   recurrence: Recurrence;
   repeatDays: number[];
   flyerDataUrl: string | null;

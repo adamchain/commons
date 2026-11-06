@@ -26,6 +26,7 @@ import { coverPoolSync } from "../lib/coverCatalog.js";
 import { store, type CommunityRecord, type PlanRecord } from "../store.js";
 import { communityCategoryLine } from "../types/shared.js";
 import { planToIcs } from "../lib/ics.js";
+import { planDayLabel } from "../lib/planVisibility.js";
 
 export const shareRouter = Router();
 
@@ -286,12 +287,18 @@ function buildTree(
   cover: string | null,
   counts: { going: number; interested: number },
 ): El {
-  const host = store.findUserById(plan.creatorId);
-  const hostName = host?.firstName ?? "A host";
-  const dateLine = [formatDate(plan.date, plan), formatTime(plan.time, plan.isFlexibleTime)].filter(Boolean).join("  ·  ");
-  const place = plan.isFlexibleLocation ? "Flexible location" : plan.location?.name || "";
+  // Logged-out card: neighborhood + day only (day only for a private plan).
+  // Never the time, venue, host, or headcount.
+  const detailsHidden = plan.hideDetailsUntilJoined === true;
+  const hoodName = store.findNeighborhoodById(plan.neighborhoodId)?.name ?? "";
+  const subLine = (detailsHidden ? [planDayLabel(plan)] : [hoodName, planDayLabel(plan)])
+    .filter(Boolean)
+    .join("  ·  ");
 
   const layers: unknown[] = [];
+
+  // A private plan's cover can give away the venue — fall back to the gradient.
+  if (detailsHidden) cover = null;
 
   // Background: cover photo, warm idea gradient, or brand gradient if none loaded.
   if (cover) {
@@ -338,17 +345,16 @@ function buildTree(
 
   // Bottom content block.
   const bottom: unknown[] = [
-    goingPill(counts.going, counts.interested),
     text(titleCase(plan.title), {
       color: "#fff", fontFamily: "Montserrat", fontWeight: 800, fontSize: 64,
       lineHeight: 1.08, letterSpacing: -1.2, maxHeight: 210, overflow: "hidden",
       textShadow: "0 3px 18px rgba(0,0,0,0.45)",
     }),
-    text([dateLine, place].filter(Boolean).join("  ·  "), {
+    text(subLine, {
       color: "rgba(255,255,255,0.9)", fontFamily: "Inter", fontWeight: 600, fontSize: 28,
       marginTop: 16, textShadow: "0 2px 10px rgba(0,0,0,0.5)",
     }),
-    text(`Hosted by ${hostName}`, {
+    text("Join Commons to see details", {
       color: "rgba(255,255,255,0.72)", fontFamily: "Inter", fontWeight: 400, fontSize: 24, marginTop: 8,
     }),
   ];
@@ -380,15 +386,15 @@ function cacheKey(plan: PlanRecord, going: number, interested: number): string {
   const fp = [
     plan.title,
     plan.date,
-    plan.time,
-    plan.location?.name,
+    plan.neighborhoodId,
+    plan.hideDetailsUntilJoined ? "hidden" : "",
     plan.flyerDataUrl ? `f${plan.flyerDataUrl.length}` : plan.flyerLinkPreview?.image ?? "",
     plan.planKind ?? "",
     plan.lockedAt ?? "",
-    plan.hostEmoji ?? "",
     plan.cancelledAt ?? "",
   ].join("|");
-  return `ogv4:${plan.id}:${going}:${interested}:${fp}`;
+  // Logged-out card no longer shows counts; keep the id-based key stable.
+  return `ogv5:${plan.id}:${fp}`;
 }
 
 async function renderPlanCard(plan: PlanRecord): Promise<Buffer> {
@@ -678,16 +684,18 @@ function esc(s: string): string {
  * ones just before the closing head tag. `origin` is the absolute public base.
  */
 export function injectPlanMeta(html: string, plan: PlanRecord, origin: string): string {
-  const counts = countsFor(plan.id);
   const title = titleCase(plan.title);
-  const dateLine = [formatDate(plan.date, plan), formatTime(plan.time, plan.isFlexibleTime)].filter(Boolean).join(" · ");
-  const place = plan.isFlexibleLocation ? "Flexible location" : plan.location?.name || "";
-  const badge = countBadge(counts.going, counts.interested);
-  const descParts = [dateLine, place, badge].filter(Boolean);
-  const description = `${descParts.join(" · ")} — join on Commons.`;
+  // A link preview is seen by people who aren't logged in — never leak the time,
+  // address, or headcount. Show only neighborhood + day, and for a private plan
+  // just the day. They join Commons to see the rest.
+  const detailsHidden = plan.hideDetailsUntilJoined === true;
+  const hoodName = store.findNeighborhoodById(plan.neighborhoodId)?.name ?? "";
+  const day = planDayLabel(plan);
+  const descParts = (detailsHidden ? [day] : [hoodName, day]).filter(Boolean);
+  const description = `${[...descParts, "Join Commons to see details"].join(" · ")}.`;
   const pageUrl = `${origin}/plans/${plan.id}`;
-  // Cache-buster: URL changes with the live count so crawlers refresh the card.
-  const imageUrl = `${origin}/plans/${plan.id}/og-image.png?c=${counts.going}&i=${counts.interested}`;
+  // Cache-buster: bump when the previewed fields (date) change so crawlers refresh.
+  const imageUrl = `${origin}/plans/${plan.id}/og-image.png?v=5&d=${encodeURIComponent(plan.date)}`;
 
   const tags = `
     <title>${esc(title)} · Commons</title>

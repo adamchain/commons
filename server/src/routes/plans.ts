@@ -31,6 +31,14 @@ import {
   syncPlanFullness,
 } from "../lib/planFull.js";
 import { canonicalPlanTime, planEndTimestamp, planHasEnded, planRequiresHostApproval, plansOverlap, FLEXIBLE_DATE_PLACEHOLDER, thisWeekAnchorDate } from "../lib/planTime.js";
+import {
+  planDetailAccess,
+  planHidesUntilJoined,
+  planDayLabel,
+  anonAttendee,
+  redactedHost,
+  type PlanDetailAccess,
+} from "../lib/planVisibility.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
 import { communityCreationBlockReason } from "../lib/communityAccess.js";
 import { unfurlLink } from "./linkPreview.js";
@@ -167,7 +175,9 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
       createdAt: s.createdAt,
     };
   });
-  return {
+  const access = planDetailAccess(plan, viewerId, mine?.state ?? null);
+
+  const dto: PlanDTO = {
     id: plan.id,
     title: plan.title,
     creator: creator ? userToPublic(creator) : pu(plan.creatorId),
@@ -195,6 +205,9 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     communityVisibility: plan.communityId ? plan.communityVisibility ?? "public" : null,
     capacity: plan.capacity ?? null,
     joinType: plan.joinType ?? "open",
+    hideDetailsUntilJoined: plan.hideDetailsUntilJoined === true,
+    detailAccess: access,
+    dayLabel: planDayLabel(plan),
     markedFull: plan.markedFull === true,
     notifyInterestedWhenFull: plan.notifyInterestedWhenFull === true,
     isRecurring: plan.isRecurring ?? false,
@@ -218,6 +231,51 @@ export async function planSummary(plan: PlanRecord, viewerId: string | null): Pr
     myState: mine?.state ?? null,
     distanceMiles: null,
   };
+
+  return applyDetailAccess(dto, access);
+}
+
+/**
+ * Strip fields the viewer isn't allowed to see. Hidden fields come back EMPTY
+ * (empty string / empty array / null), never missing — the live iOS app reads
+ * plan.location.name, plan.creator.firstName, etc. without guards and would
+ * crash on undefined. New clients branch on `detailAccess` to show the lock UI.
+ */
+function applyDetailAccess(dto: PlanDTO, access: PlanDetailAccess): PlanDTO {
+  if (access === "full") return dto;
+
+  if (access === "approval_gated") {
+    // Venue name + counts stay; street address, map pin, and attendee
+    // identities are withheld until the host approves.
+    dto.location = { name: dto.location.name, address: "" };
+    dto.participants = {
+      going: dto.participants.going.map((_, i) => anonAttendee(dto.id, i)),
+      interested: dto.participants.interested.map((_, i) => anonAttendee(dto.id, 1000 + i)),
+    };
+    return dto;
+  }
+
+  // access === "hidden": only the title and day survive.
+  dto.creator = redactedHost(dto.id);
+  dto.coHosts = [];
+  dto.neighborhoodId = "";
+  dto.location = { name: "", address: "" };
+  dto.time = "";
+  dto.isFlexibleTime = true;
+  dto.endTime = undefined;
+  dto.isFlexibleLocation = true;
+  dto.description = undefined;
+  dto.tags = [];
+  dto.hostEmoji = "✨";
+  dto.capacity = null;
+  dto.flyerDataUrl = undefined;
+  dto.flyerAttachmentDataUrl = undefined;
+  dto.flyerLinkUrl = undefined;
+  dto.flyerLinkPreview = undefined;
+  dto.pendingTimeProposal = null;
+  dto.suggestions = [];
+  dto.participants = { going: [], interested: [] };
+  return dto;
 }
 
 // Public preview for the pre-signup tease (PRD §3.1).
@@ -242,26 +300,32 @@ plansRouter.get("/:id/public", (req, res) => {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  const parts = store.listParticipationsForPlan(plan.id);
-  const host = store.findUserById(plan.creatorId);
+  // A logged-out visitor has not joined, so they never see time, venue,
+  // address, or headcount — just enough to decide to join Commons. Private
+  // plans drop the neighborhood too.
+  const detailsHidden = plan.hideDetailsUntilJoined === true;
+  const hoodName = store.findNeighborhoodById(plan.neighborhoodId)?.name ?? null;
   const dto: PublicPlanDTO = {
     id: plan.id,
     title: plan.title,
     date: plan.date,
-    time: plan.time,
-    isFlexibleTime: plan.isFlexibleTime,
+    time: "",
+    isFlexibleTime: true,
     isFlexibleDate: plan.isFlexibleDate ?? false,
     isThisWeek: plan.isThisWeek ?? false,
-    isFlexibleLocation: plan.isFlexibleLocation ?? false,
-    locationName: plan.isFlexibleLocation ? "Flexible location" : plan.location?.name ?? "",
-    hostFirstName: host?.firstName ?? "A host",
-    hostEmoji: plan.hostEmoji || "✨",
-    coverImage: coverUrlFor(plan),
-    description: plan.description?.trim() || undefined,
-    tags: plan.tags,
-    goingCount: parts.filter((p) => p.state === "going").length,
-    interestedCount: parts.filter((p) => p.state === "interested").length,
+    isFlexibleLocation: true,
+    locationName: "",
+    neighborhoodName: detailsHidden ? null : hoodName,
+    dayLabel: planDayLabel(plan),
+    hostFirstName: "A host",
+    hostEmoji: "✨",
+    coverImage: detailsHidden ? "" : coverUrlFor(plan),
+    description: undefined,
+    tags: [],
+    goingCount: 0,
+    interestedCount: 0,
     cancelled: Boolean(plan.cancelledAt),
+    detailsHidden,
   };
   res.json(dto);
 });
@@ -297,7 +361,8 @@ plansRouter.get("/", requireAuth, async (req, res) => {
   const summaries = await Promise.all(
     ranked.map(async (plan) => {
       const dto = await planSummary(plan, userId);
-      dto.distanceMiles = distanceMiles(me, plan);
+      // Distance is a location signal — withhold it on a fully hidden plan.
+      if (dto.detailAccess !== "hidden") dto.distanceMiles = distanceMiles(me, plan);
       return dto;
     }),
   );
@@ -482,6 +547,7 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   }
   // Capacity is a headcount. Approval is a separate choice: Interested until the host lets them in.
   const joinType: JoinType = capacity !== null && req.body?.joinType === "approve" ? "approve" : "open";
+  const hideDetailsUntilJoined = req.body?.hideDetailsUntilJoined === true;
 
   // Co-hosts — "make a plan with X" co-creates with the picked person. Validate
   // they're real users, never include the creator, cap at a sane number.
@@ -546,6 +612,7 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     communityVisibility,
     capacity,
     joinType,
+    hideDetailsUntilJoined,
     notifyInterestedWhenFull: false,
     isRecurring,
     lockedAt: null,
@@ -769,6 +836,9 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
     patch.joinType = "open";
   } else if (req.body?.joinType === "approve" || req.body?.joinType === "open") {
     patch.joinType = req.body.joinType;
+  }
+  if (typeof req.body?.hideDetailsUntilJoined === "boolean") {
+    patch.hideDetailsUntilJoined = req.body.hideDetailsUntilJoined;
   }
   // 48h/24h "still full" notes are paused. Ignore the toggle from builds that still show it.
   patch.notifyInterestedWhenFull = false;
@@ -1204,6 +1274,9 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
   } else if (req.body?.joinType === "approve" || req.body?.joinType === "open") {
     patch.joinType = req.body.joinType;
   }
+  if (typeof req.body?.hideDetailsUntilJoined === "boolean") {
+    patch.hideDetailsUntilJoined = req.body.hideDetailsUntilJoined;
+  }
   patch.notifyInterestedWhenFull = false;
   if (req.body?.neighborhoodId !== undefined) {
     const hood = store.resolveNeighborhoodId(String(req.body.neighborhoodId ?? "").trim());
@@ -1352,7 +1425,12 @@ plansRouter.put("/:id/participation", requireAuth, async (req, res) => {
   const previousState = existing?.state ?? null;
   store.upsertParticipation(planId, userId, state);
   forgetSpotWaitlist(planId, userId);
-  if (state === "going" || state === "interested") {
+  // The plan chat leaks the venue (lock-in / venue-change system messages), so
+  // when a plan withholds details until you join, only confirmed Going members
+  // get into the thread. Approval-gated applicants join via /approve once in.
+  const gatesDetails = planHidesUntilJoined(plan) || planRequiresHostApproval(plan);
+  const chatEligible = state === "going" || (state === "interested" && !gatesDetails);
+  if (chatEligible) {
     if (planChatOn(plan)) {
       const group = store.findGroupConversationByPlan(planId);
       if (group) store.setConversationLeft(userId, group.id, false);

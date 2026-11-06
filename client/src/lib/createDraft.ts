@@ -22,6 +22,7 @@ export type CreateDraft = {
   capacityOn: boolean;
   capacity: string;
   joinType: JoinType;
+  hideDetailsUntilJoined: boolean;
   recurrence: "none" | "weekly" | "biweekly" | "monthly";
   repeatDays: number[];
   flyerLinkUrl: string;
@@ -78,6 +79,7 @@ export function loadCreateDraft(path: CreateDraftPath): CreateDraft | null {
       capacityOn: Boolean(parsed.capacityOn),
       capacity: typeof parsed.capacity === "string" ? parsed.capacity : "6",
       joinType: parsed.joinType === "approve" ? "approve" : "open",
+      hideDetailsUntilJoined: Boolean(parsed.hideDetailsUntilJoined),
       recurrence:
         parsed.recurrence === "weekly" || parsed.recurrence === "biweekly" || parsed.recurrence === "monthly"
           ? parsed.recurrence

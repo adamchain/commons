@@ -186,6 +186,13 @@ export interface PlanRecord {
   capacity?: number | null;
   /** How RSVPs are accepted; defaults to "open" if absent. */
   joinType?: JoinType;
+  /**
+   * "Keep details private until people join." When true, anyone who hasn't
+   * joined (host, co-hosts, Going/approved) sees only the title and day —
+   * no time, venue, neighborhood, address, host, or attendees. Enforced
+   * server-side in planSummary and on every public/share surface.
+   */
+  hideDetailsUntilJoined?: boolean;
   /** Host closed the plan, or it filled because every spot was taken. */
   markedFull?: boolean;
   /**

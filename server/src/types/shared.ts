@@ -101,6 +101,9 @@ export type JoinType = "open" | "approve"; // Capacity plans are always `approve
 
 export type ParticipationState = "interested" | "going";
 
+/** How much of a plan a viewer may see — see server/lib/planVisibility.ts. */
+export type PlanDetailAccess = "full" | "approval_gated" | "hidden";
+
 export interface PublicUser {
   id: string;
   firstName: string;
@@ -148,6 +151,10 @@ export interface PublicPlanDTO {
   isThisWeek?: boolean;
   isFlexibleLocation: boolean;
   locationName: string;
+  /** Neighborhood name shown to logged-out visitors (null when the plan hides details). */
+  neighborhoodName: string | null;
+  /** Short day label ("This Friday" / "Fri, Nov 20") for the share preview. */
+  dayLabel: string;
   hostFirstName: string;
   hostEmoji: string;
   coverImage: string;
@@ -156,6 +163,8 @@ export interface PublicPlanDTO {
   goingCount: number;
   interestedCount: number;
   cancelled: boolean;
+  /** True when "keep details private until people join" is on. */
+  detailsHidden: boolean;
 }
 
 export interface PlanDTO {
@@ -200,6 +209,17 @@ export interface PlanDTO {
   capacity: number | null;
   /** How RSVPs are accepted when capacity is set. */
   joinType: JoinType;
+  /** The host's "keep details private until people join" setting (the raw toggle). */
+  hideDetailsUntilJoined: boolean;
+  /**
+   * How much of this plan the current viewer may see. "full" for hosts,
+   * confirmed attendees, and open plans. On "approval_gated" the address, map
+   * pin, and attendee identities are withheld. On "hidden" only title + day are
+   * populated and the rest come back empty (never missing — the app relies on it).
+   */
+  detailAccess: PlanDetailAccess;
+  /** Short day label ("This Friday" / "Fri, Nov 20") shown when details are hidden. */
+  dayLabel: string;
   /** Plan is full. Join is closed, whether or not a capacity is set. */
   markedFull: boolean;
   /** Interested people are told 48h and 24h ahead if the plan stays full. */
