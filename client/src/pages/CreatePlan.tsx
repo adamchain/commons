@@ -1626,22 +1626,6 @@ export function CreatePlanPage() {
               </div>
             )}
 
-            <div className="plan-optional-row">
-              <span>
-                <strong>Keep details private until people join</strong>
-                <small>Only the plan name and day will show until someone joins.</small>
-              </span>
-              <FlexToggle
-                active={form.hideDetailsUntilJoined}
-                variant="switch"
-                label="Keep details private until people join"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setForm((f) => ({ ...f, hideDetailsUntilJoined: !f.hideDetailsUntilJoined }));
-                }}
-              />
-            </div>
-
             {editingPlanId && (
               <div className="plan-optional-row">
                 <span>
@@ -1815,6 +1799,21 @@ export function CreatePlanPage() {
               onClick={(e) => {
                 e.preventDefault();
                 setForm((f) => ({ ...f, joinType: f.joinType === "approve" ? "open" : "approve" }));
+              }}
+            />
+          </div>
+          <div>
+            <span>
+              <strong>Keep details private</strong>
+              <small>Only the plan name and day show until someone joins.</small>
+            </span>
+            <FlexToggle
+              variant="switch"
+              active={form.hideDetailsUntilJoined}
+              label={form.hideDetailsUntilJoined ? "On" : "Off"}
+              onClick={(e) => {
+                e.preventDefault();
+                setForm((f) => ({ ...f, hideDetailsUntilJoined: !f.hideDetailsUntilJoined }));
               }}
             />
           </div>
