@@ -10,6 +10,8 @@ interface AvatarProps {
   params?: string;
   /** When set (and no photo), show initials instead of illustrated avatar. */
   name?: string;
+  /** Show initials even when a photo/preset exists — used to anonymize faces on locked plans. */
+  forceInitials?: boolean;
 }
 
 const PIXEL_SIZE: Record<NonNullable<AvatarProps["size"]>, number> = {
@@ -67,9 +69,21 @@ export function Avatar({
   photoDataUrl,
   params,
   name,
+  forceInitials = false,
 }: AvatarProps) {
   const px = PIXEL_SIZE[size];
   const cls = `avatar avatar-${size}`;
+  if (forceInitials && name?.trim()) {
+    return (
+      <span
+        className={`${cls} avatar-initials`}
+        style={{ width: px, height: px, fontSize: px * 0.35 }}
+        aria-hidden
+      >
+        {initialsFrom(name)}
+      </span>
+    );
+  }
   if (photoDataUrl) {
     return <img src={photoDataUrl} width={px} height={px} className={cls} alt="" loading="lazy" />;
   }

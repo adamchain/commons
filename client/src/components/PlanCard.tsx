@@ -206,6 +206,8 @@ export function PlanCard({
                           style={person.avatarStyle}
                           photoDataUrl={person.avatarPhotoDataUrl}
                           params={person.avatarParams}
+                          name={person.firstName}
+                          forceInitials={detailsHidden}
                           size="xs"
                         />
                       </button>
