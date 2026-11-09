@@ -11,7 +11,7 @@ import { IdeaCoverFallback, planPhotoUrl } from "./CoverThumb";
 import { BottomSheet } from "./ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
 import type { PlanDTO } from "../types/shared";
-import { formatPlanDate, formatPlanTime, formatPlanWhenWhereLine, formatVenueName, sentenceCaseTitle } from "../lib/format";
+import { formatPlanDate, formatPlanTime, formatPlanWhenWhereLine, formatVenueName, presentPlanCopy } from "../lib/format";
 import { saveFeedScroll, type NavFromState } from "../lib/navState";
 import { prefetchPlan, rememberPlan } from "../lib/planPrefetch";
 import { isIdeaPlan, isPlanAtCapacity, planCapacityValue, planHasEnded, planRequiresHostApproval } from "../lib/planTime";
@@ -34,7 +34,7 @@ export function PlanCard({
   /** Hub past list already groups these, so the card doesn't repeat the tag. */
   hideHappened?: boolean;
 }) {
-  const title = sentenceCaseTitle(plan.title);
+  const copy = presentPlanCopy(plan.title, plan.description);
   const isLooking = isIdeaPlan(plan);
   // "Keep details private until people join" — everything but the title and day
   // is withheld (the server already blanked it); the card shows a lock instead.
@@ -168,7 +168,7 @@ export function PlanCard({
               </span>
             ) : null}
           </header>
-          <h3 className="plan-card-title">{title}</h3>
+          <h3 className="plan-card-title">{copy.title}</h3>
           <div className="plan-card-meta-row">
             <p className="plan-card-meta-line plan-card-meta-line--single">
               <span>{metaLine}</span>
@@ -179,8 +179,8 @@ export function PlanCard({
               <span aria-hidden="true">🔒</span> Details after you join
             </p>
           )}
-          {plan.description && (
-            <p className="plan-card-description">{plan.description}</p>
+          {copy.description && (
+            <p className="plan-card-description">{copy.description}</p>
           )}
 
           {(facepile.length > 0 || showWentLabel || showGoingLabel || showInterestedLabel || (!isHosting && !hasEnded && !isCancelled)) && (

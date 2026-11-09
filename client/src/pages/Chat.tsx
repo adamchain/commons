@@ -26,7 +26,7 @@ import { ChatEmpty } from "../components/ui";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { Button } from "../components/ui/Button";
 import { useAuth } from "../context/AuthContext";
-import { sentenceCaseTitle } from "../lib/format";
+import { planHeadline } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import { pickPhotoNative } from "../lib/photoPicker";
@@ -409,9 +409,9 @@ export function ChatPage() {
           to={`/plans/${planId}`}
           state={planLinkState}
           className="chat-thread-heading"
-          aria-label={`Open ${sentenceCaseTitle(plan.title)}`}
+          aria-label={`Open ${planHeadline(plan.title)}`}
         >
-          <div className="chat-thread-title">{sentenceCaseTitle(plan.title)}</div>
+          <div className="chat-thread-title">{planHeadline(plan.title)}</div>
           <div className="chat-thread-sub">{participantLabel}</div>
         </Link>
         <div className="chat-header-menu-wrap" ref={headerMenuRef}>

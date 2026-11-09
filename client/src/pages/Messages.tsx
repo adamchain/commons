@@ -8,7 +8,7 @@ import { PlanCoverThumb } from "../components/CoverThumb";
 import { EmptyCard } from "../components/ui";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { Button } from "../components/ui/Button";
-import { sentenceCaseTitle } from "../lib/format";
+import { planHeadline } from "../lib/format";
 import { readScreen, writeScreen } from "../lib/screenCache";
 import { type ConversationDTO, type ConversationSummaryDTO, type PublicUser } from "../types/shared";
 
@@ -582,7 +582,7 @@ export function MessagesPage() {
                 const preview = cleanPreview(c.lastMessagePreview);
                 const isPoll = previewLooksLikePoll(c.lastMessagePreview);
                 const canDismiss = true;
-                const title = c.communityName ?? sentenceCaseTitle(c.planTitle);
+                const title = c.communityName ?? planHeadline(c.planTitle);
                 const time = formatInboxTime(c.lastMessageAt ?? c.planDate);
                 const unread = c.unreadCount > 0;
                 const kind = conversationKind(c);

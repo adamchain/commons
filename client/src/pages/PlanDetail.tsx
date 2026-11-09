@@ -18,7 +18,7 @@ import { Button } from "../components/ui/Button";
 import { useAuth } from "../context/AuthContext";
 import { isIdeaPlan, isPlanAtCapacity, planHasEnded, planRequiresHostApproval } from "../lib/planTime";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
-import { formatPlanDate, formatPlanTime, formatPlanWhenLine, formatVenueAddressLine, formatVenueName, sentenceCaseTitle, firstHttpUrlInText, normalizeHttpUrl } from "../lib/format";
+import { formatPlanDate, formatPlanTime, formatPlanWhenLine, formatVenueAddressLine, formatVenueName, presentPlanCopy, firstHttpUrlInText, normalizeHttpUrl } from "../lib/format";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import { cachedPlan, peekPlan, prefetchPlan, rememberPlan } from "../lib/planPrefetch";
 import { INTEREST_LABELS, type ConversationDTO, type MessageDTO, type ParticipationState, type PlanDetailAccess, type PlanDTO, type PublicUser } from "../types/shared";
@@ -304,6 +304,7 @@ export function PlanDetailPage() {
   const peoplePreviewMax = 4;
   const planPeoplePreview = planPeople.slice(0, peoplePreviewMax);
   const attachedUrl = planAttachedUrl(plan);
+  const copy = presentPlanCopy(plan.title, plan.description);
 
   // Server-enforced detail gating. On "hidden" only the title + day are real;
   // on "approval_gated" the address, map, and attendee identities are withheld
@@ -386,7 +387,7 @@ export function PlanDetailPage() {
             </Link>
           )}
           <div className="plan-detail-title-row">
-            <h1 className="plan-detail-title">{sentenceCaseTitle(plan.title)}</h1>
+            <h1 className="plan-detail-title">{copy.title}</h1>
             {!isHosting && !detailsHidden && (
               <PlanSafetyMenu
                 targetUserId={plan.creator.id}
@@ -437,15 +438,15 @@ export function PlanDetailPage() {
           )}
         </header>
 
-        {plan.description && (
+        {copy.description && (
           <div className="plan-detail-card">
             {plan.planKind === "looking_for" ? (
               <p className="plan-description plan-description-quote" style={{ margin: 0 }}>
-                &ldquo;{linkifyText(plan.description)}&rdquo;
+                &ldquo;{linkifyText(copy.description)}&rdquo;
               </p>
             ) : (
               <p className="plan-description" style={{ margin: 0 }}>
-                {linkifyText(plan.description)}
+                {linkifyText(copy.description)}
               </p>
             )}
           </div>
@@ -1042,7 +1043,7 @@ export function PlanDetailPage() {
               Cancel this plan?
             </h2>
             <p className="sheet-copy">
-              Cancel &ldquo;{plan.title}&rdquo;? Everyone who RSVP&apos;d will be notified.
+              Cancel &ldquo;{copy.title}&rdquo;? Everyone who RSVP&apos;d will be notified.
             </p>
             {cancelError && <p className="error-text">{cancelError}</p>}
             <div className="sheet-actions">

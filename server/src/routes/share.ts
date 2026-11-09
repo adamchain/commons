@@ -27,6 +27,7 @@ import { store, type CommunityRecord, type PlanRecord } from "../store.js";
 import { communityCategoryLine } from "../types/shared.js";
 import { planToIcs } from "../lib/ics.js";
 import { planDayLabel } from "../lib/planVisibility.js";
+import { splitPlanTitle } from "../lib/planTitle.js";
 
 export const shareRouter = Router();
 
@@ -345,7 +346,7 @@ function buildTree(
 
   // Bottom content block.
   const bottom: unknown[] = [
-    text(titleCase(plan.title), {
+    text(titleCase(splitPlanTitle(plan.title).title), {
       color: "#fff", fontFamily: "Montserrat", fontWeight: 800, fontSize: 64,
       lineHeight: 1.08, letterSpacing: -1.2, maxHeight: 210, overflow: "hidden",
       textShadow: "0 3px 18px rgba(0,0,0,0.45)",
@@ -684,7 +685,7 @@ function esc(s: string): string {
  * ones just before the closing head tag. `origin` is the absolute public base.
  */
 export function injectPlanMeta(html: string, plan: PlanRecord, origin: string): string {
-  const title = titleCase(plan.title);
+  const title = titleCase(splitPlanTitle(plan.title).title);
   // A link preview is seen by people who aren't logged in — never leak the time,
   // address, or headcount. Show only neighborhood + day, and for a private plan
   // just the day. They join Commons to see the rest.

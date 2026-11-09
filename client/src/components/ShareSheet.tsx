@@ -5,6 +5,7 @@ import { getPublicWebOrigin } from "../lib/platform";
 import { getActiveInviteCode } from "../lib/inviteCode";
 import { BottomSheet } from "./ui/BottomSheet";
 import { API_BASE } from "../api/http";
+import { planHeadline } from "../lib/format";
 
 /** Card images use the public site. The API host is a Railway URL, and that
  *  host is what iMessage has been previewing. */
@@ -51,7 +52,7 @@ export function ShareSheet({ plan, isOwn = false, onClose }: { plan: PlanDTO; is
 
   // F.14 — "my plan" when the viewer is the host, "this plan" otherwise.
   const shareText = isOwn ? "Join my plan on COMMONS" : "Join this plan on COMMONS";
-  const smsBody = encodeURIComponent(`${shareText}: "${plan.title}" ${url}`);
+  const smsBody = encodeURIComponent(`${shareText}: "${planHeadline(plan.title)}" ${url}`);
   const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   async function nativeShare() {
@@ -142,7 +143,7 @@ export function ShareSheet({ plan, isOwn = false, onClose }: { plan: PlanDTO; is
           {imgFailed ? (
             <div className="share-preview-fallback">
               <div className="share-preview-fallback-emoji">{plan.hostEmoji || "✨"}</div>
-              <div className="share-preview-fallback-title">{plan.title}</div>
+              <div className="share-preview-fallback-title">{planHeadline(plan.title)}</div>
             </div>
           ) : (
             <img

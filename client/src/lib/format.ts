@@ -8,6 +8,59 @@ export function sentenceCaseTitle(raw: string): string {
     .join(" ");
 }
 
+/**
+ * Plan titles are a headline, not the body. Keep this in sync with
+ * server/src/lib/planTitle.ts — both sides split the same way.
+ */
+export const MAX_PLAN_TITLE_LEN = 80;
+
+/** Cut a too-long title at a sentence, then a word, so the headline stays glanceable. */
+export function splitPlanTitle(raw: string, max = MAX_PLAN_TITLE_LEN): { title: string; rest: string } {
+  const text = raw.trim().replace(/\s+/g, " ");
+  if (text.length <= max) return { title: text, rest: "" };
+
+  let cut = -1;
+  const re = /[.!?](?=\s|$)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text))) {
+    const end = match.index + match[0].length;
+    if (end > max) break;
+    if (end >= 24) cut = end;
+  }
+  if (cut < 0) {
+    const space = text.lastIndexOf(" ", max);
+    cut = space >= 24 ? space : max;
+  }
+  let title = text.slice(0, cut).trim().replace(/[,\-–—:;]+$/, "").trim();
+  let rest = text.slice(cut).trim();
+  if (!title) {
+    title = text.slice(0, max).trim();
+    rest = text.slice(max).trim();
+  }
+  return { title, rest };
+}
+
+/** Short title plus any overflow folded into the description, without duplicating it. */
+export function limitPlanFields(title: string, description?: string | null): { title: string; description: string } {
+  const split = splitPlanTitle(title);
+  const existing = (description ?? "").trim();
+  if (!split.rest) return { title: split.title, description: existing };
+  const probe = split.rest.slice(0, Math.min(40, split.rest.length));
+  if (probe && existing.startsWith(probe)) return { title: split.title, description: existing };
+  return { title: split.title, description: [split.rest, existing].filter(Boolean).join("\n\n") };
+}
+
+/** Headline for cards, chats, and share text. Overflow stays out of the title. */
+export function planHeadline(title: string): string {
+  return sentenceCaseTitle(splitPlanTitle(title).title);
+}
+
+/** What a card or detail page should show: a short title, and the leftover as the body. */
+export function presentPlanCopy(title: string, description?: string | null): { title: string; description: string } {
+  const limited = limitPlanFields(title, description);
+  return { title: sentenceCaseTitle(limited.title), description: limited.description };
+}
+
 /** Accept pasted links with or without a scheme. */
 export function normalizeHttpUrl(raw: string | null | undefined): string | undefined {
   if (!raw) return undefined;

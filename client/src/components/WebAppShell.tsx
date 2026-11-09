@@ -16,7 +16,7 @@ import { api } from "../api/http";
 import { clearAuthToken } from "../api/authToken";
 import { useAuth } from "../context/AuthContext";
 import { needsOnboarding } from "../lib/onboarding";
-import { formatPlanWhenWhereLine, sentenceCaseTitle } from "../lib/format";
+import { formatPlanWhenWhereLine, planHeadline } from "../lib/format";
 import { planBelongsInPast } from "../lib/planTime";
 import { Avatar } from "./Avatar";
 import { openCreateLauncher } from "./CreateLauncher";
@@ -194,7 +194,7 @@ export function WebAppShell() {
             ) : (
               upcoming.map((plan) => (
                 <NavLink key={plan.id} to={`/plans/${plan.id}`} className="web-rail-row">
-                  <span className="web-rail-row-name">{sentenceCaseTitle(plan.title)}</span>
+                  <span className="web-rail-row-name">{planHeadline(plan.title)}</span>
                   <span className="web-rail-row-meta">{formatPlanWhenWhereLine(plan)}</span>
                 </NavLink>
               ))

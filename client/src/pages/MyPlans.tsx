@@ -6,7 +6,7 @@ import { PlanCoverThumb, planPhotoUrl } from "../components/CoverThumb";
 import { InterestGlyph } from "../components/InterestGlyph";
 import { EmptyCard, Label, ScreenTitle } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
-import { formatPlanWhenWhereLine, sentenceCaseTitle } from "../lib/format";
+import { formatPlanWhenWhereLine, planHeadline } from "../lib/format";
 import { hrefForBack } from "../lib/navState";
 import { cachedFeedPlans, rememberFeedPlans } from "../lib/feedPrefetch";
 import { isIdeaPlan, planBelongsInPast } from "../lib/planTime";
@@ -161,7 +161,7 @@ function PlanRow({ plan }: { plan: PlanDTO }) {
         {plan.tags[0] ? <InterestGlyph tag={plan.tags[0]} size={22} /> : null}
       </span>
       <span className="my-plans-row-text">
-        <span className="my-plans-row-name">{sentenceCaseTitle(plan.title)}</span>
+        <span className="my-plans-row-name">{planHeadline(plan.title)}</span>
         <span className="my-plans-row-meta">{meta}</span>
       </span>
     </Link>

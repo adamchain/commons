@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, parseApiError } from "../api/http";
-import { formatPhoneInput, formatPlanWhenLine, isValidPhoneInput } from "../lib/format";
+import { formatPhoneInput, formatPlanWhenLine, isValidPhoneInput, planHeadline } from "../lib/format";
 import { type PublicPlanDTO } from "../types/shared";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { IdeaCoverFallback } from "../components/CoverThumb";
@@ -112,7 +112,7 @@ export function PublicEventPage() {
             <span className="public-event-invited">You're invited</span>
           </div>
 
-          <h1 className="public-event-title">{plan.title}</h1>
+          <h1 className="public-event-title">{planHeadline(plan.title)}</h1>
           <div className="public-event-meta">{dayLine}</div>
           {plan.neighborhoodName ? (
             <div className="public-event-meta">📍 {plan.neighborhoodName}</div>

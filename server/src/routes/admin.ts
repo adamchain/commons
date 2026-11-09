@@ -16,6 +16,7 @@ import {
 } from "../lib/adminDashboard.js";
 import type { AdminDashboardView } from "../store.js";
 import { buildCoverCatalog, invalidateCoverCatalogCache } from "../lib/coverCatalog.js";
+import { limitPlanTitle, MAX_PLAN_DESCRIPTION_LEN } from "../lib/planTitle.js";
 
 const adminRouter = Router();
 
@@ -636,10 +637,12 @@ adminRouter.patch("/plans/:id", (req, res) => {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const patch: Partial<PlanRecord> = {};
   if (typeof body.title === "string" && body.title.trim()) {
-    patch.title = body.title.trim().slice(0, 140);
-  }
-  if (typeof body.description === "string") {
-    patch.description = body.description.slice(0, 4000);
+    const nextDescription = typeof body.description === "string" ? body.description : plan.description;
+    const limited = limitPlanTitle(body.title, nextDescription);
+    patch.title = limited.title;
+    patch.description = limited.description;
+  } else if (typeof body.description === "string") {
+    patch.description = body.description.slice(0, MAX_PLAN_DESCRIPTION_LEN);
   }
   if (typeof body.date === "string" && body.date.trim()) patch.date = body.date.trim();
   if (typeof body.time === "string" && body.time.trim()) patch.time = body.time.trim();

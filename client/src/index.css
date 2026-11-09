@@ -2290,9 +2290,20 @@ img.avatar {
 .idea-builder-prompt > div small {
   margin-top: 3px;
 }
+.idea-builder-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.idea-builder-details > span {
+  font-size: var(--text-body-small);
+  font-weight: 700;
+  color: var(--muted);
+}
 .idea-builder-prompt .idea-textarea {
   width: 100%;
-  min-height: 132px;
+  min-height: 96px;
   resize: none;
   border: 0;
   border-radius: 16px;
@@ -8587,6 +8598,9 @@ a.sheet-link {
   color: var(--ink);
   letter-spacing: -0.2px;
   line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .my-plans-row-meta {
   font-size: var(--text-body-small);
@@ -12045,6 +12059,10 @@ a.sheet-link {
   margin: 0 0 4px;
   overflow-wrap: anywhere;
   min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .plan-card--compact .plan-card-posted-by {

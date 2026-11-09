@@ -12,7 +12,7 @@ import { fileToResizedDataUrl } from "../lib/imageResize";
 import { interestVisual } from "../lib/interestIcons";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
-import { formatPlanDate, formatPlanTime, formatVenueAddressLine, formatVenueName, normalizeHttpUrl } from "../lib/format";
+import { formatPlanDate, formatPlanTime, formatVenueAddressLine, formatVenueName, limitPlanFields, MAX_PLAN_TITLE_LEN, normalizeHttpUrl } from "../lib/format";
 import { isPlanAtCapacity } from "../lib/planTime";
 import {
   INTEREST_LABELS,
@@ -109,9 +109,10 @@ function EditForm({
     () => VIBE_OPTIONS.filter((o) => plan.tags.includes(o.tag)).map((o) => o.id),
     [plan.tags],
   );
+  const seededCopy = limitPlanFields(plan.title, plan.description);
   const [form, setForm] = useState({
-    title: plan.title,
-    description: plan.description ?? "",
+    title: seededCopy.title,
+    description: seededCopy.description,
     vibes: initialVibes,
     neighborhoodId: plan.neighborhoodId,
     isFlexibleLocation: plan.isFlexibleLocation,
@@ -462,11 +463,19 @@ function EditForm({
           <input
             id="title"
             value={form.title}
+            maxLength={MAX_PLAN_TITLE_LEN}
             onChange={(e) => {
               lastInstantGroup.current = "basics";
-              setForm((f) => ({ ...f, title: e.target.value }));
+              setForm((f) => ({ ...f, title: e.target.value.slice(0, MAX_PLAN_TITLE_LEN) }));
             }}
           />
+          {form.title.length >= MAX_PLAN_TITLE_LEN - 15 && (
+            <p className="plan-title-hint">
+              {MAX_PLAN_TITLE_LEN - form.title.length === 0
+                ? "That's the limit — keep the title short and put the rest in details."
+                : `${MAX_PLAN_TITLE_LEN - form.title.length} characters left.`}
+            </p>
+          )}
           <label className="form-question" htmlFor="description">Details</label>
           <textarea
             id="description"

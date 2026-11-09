@@ -31,6 +31,7 @@ import {
   syncPlanFullness,
 } from "../lib/planFull.js";
 import { canonicalPlanTime, planEndTimestamp, planHasEnded, planRequiresHostApproval, plansOverlap, FLEXIBLE_DATE_PLACEHOLDER, thisWeekAnchorDate } from "../lib/planTime.js";
+import { limitPlanTitle } from "../lib/planTitle.js";
 import {
   planDetailAccess,
   planHidesUntilJoined,
@@ -400,7 +401,7 @@ plansRouter.post("/", requireAuth, async (req, res) => {
     return;
   }
 
-  const title = String(req.body?.title ?? "").trim();
+  const titleInput = String(req.body?.title ?? "").trim();
   const location = req.body?.location ?? {};
   const locationName = String(location.name ?? "").trim();
   const locationAddress = String(location.address ?? "").trim();
@@ -420,7 +421,10 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   const isFlexibleDate = Boolean(req.body?.isFlexibleDate);
   const isThisWeek = Boolean(req.body?.isThisWeek) && !isFlexibleDate;
   const isFlexibleLocation = Boolean(req.body?.isFlexibleLocation);
-  const description = req.body?.description ? String(req.body.description).trim() : undefined;
+  const descriptionInput = req.body?.description ? String(req.body.description).trim() : undefined;
+  const limitedCopy = limitPlanTitle(titleInput, descriptionInput);
+  const title = limitedCopy.title;
+  const description = limitedCopy.description;
   const hostEmoji = String(req.body?.hostEmoji ?? "").trim() || "✨";
   // Prefer body, then profile, then nearest hood to venue coords. Never block
   // posting on a missing/invalid profile neighborhood (Flexible location and
@@ -734,17 +738,20 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
 
   const patch: Partial<Omit<PlanRecord, "id" | "createdAt">> = {};
 
-  if (req.body?.title !== undefined) {
-    const t = String(req.body.title).trim();
-    if (!t) {
+  if (req.body?.title !== undefined || req.body?.description !== undefined) {
+    const nextTitle =
+      req.body?.title !== undefined ? String(req.body.title).trim() : plan.title;
+    if (!nextTitle) {
       res.status(400).json({ error: "Title can't be empty" });
       return;
     }
-    patch.title = t;
-  }
-  if (req.body?.description !== undefined) {
-    const d = String(req.body.description ?? "").trim();
-    patch.description = d || undefined;
+    const nextDescription =
+      req.body?.description !== undefined ? String(req.body.description ?? "").trim() : plan.description;
+    const limited = limitPlanTitle(nextTitle, nextDescription);
+    if (req.body?.title !== undefined || limited.title !== plan.title) patch.title = limited.title;
+    if (req.body?.description !== undefined || limited.description !== plan.description) {
+      patch.description = limited.description;
+    }
   }
   const filtered = textBlockedReason(
     typeof patch.title === "string" ? patch.title : undefined,
@@ -1154,10 +1161,13 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
   const timeRaw = String(req.body?.time ?? "").trim();
   const time = canonicalPlanTime(timeRaw) ?? timeRaw;
   const isFlexibleTime = Boolean(req.body?.isFlexibleTime);
-  const title = String(req.body?.title ?? "").trim();
-  const description = req.body?.description !== undefined
+  const titleInput = String(req.body?.title ?? "").trim();
+  const descriptionInput = req.body?.description !== undefined
     ? String(req.body.description).trim()
     : undefined;
+  const limitedCopy = limitPlanTitle(titleInput || plan.title, descriptionInput !== undefined ? descriptionInput : plan.description);
+  const title = titleInput ? limitedCopy.title : "";
+  const description = titleInput || descriptionInput !== undefined ? limitedCopy.description : undefined;
   const tagsInput = Array.isArray(req.body?.tags) ? (req.body.tags as unknown[]) : null;
   const tags = tagsInput
     ? Array.from(

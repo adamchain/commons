@@ -27,7 +27,7 @@ import { LinkedText } from "../components/LinkedText";
 import { ReportModal } from "../components/PlanSafetyMenu";
 import { BottomSheet } from "../components/ui/BottomSheet";
 import { useAuth } from "../context/AuthContext";
-import { formatAreaLabel, formatPlanDate } from "../lib/format";
+import { formatAreaLabel, formatPlanDate, planHeadline } from "../lib/format";
 import { fileToResizedDataUrl, shrinkDataUrl } from "../lib/imageResize";
 import { resolvePhotoDataUrl } from "../lib/photoPicker";
 import { getPublicWebOrigin, isNative } from "../lib/platform";
@@ -1446,7 +1446,7 @@ function MonthCalendar({ plans, profileUserId }: { plans: PlanDTO[]; profileUser
                       state={profileBack}
                       className="month-cal-dropdown-item"
                     >
-                      <span className="month-cal-dot-title">{p.title}</span>
+                      <span className="month-cal-dot-title">{planHeadline(p.title)}</span>
                     </Link>
                   ))}
                 </div>
@@ -1539,7 +1539,7 @@ function YourPlansBlock({
                       isIdea={isIdeaPlan(p)}
                       className="profile-photo-card-media"
                     />
-                    <span className="profile-photo-card-title">{p.title}</span>
+                    <span className="profile-photo-card-title">{planHeadline(p.title)}</span>
                     <span className="profile-photo-card-meta">
                       {formatPlanDate(p.date, { isFlexibleDate: p.isFlexibleDate, isThisWeek: p.isThisWeek })}
                     </span>
@@ -1572,7 +1572,7 @@ function YourPlansBlock({
                       isIdea={isIdeaPlan(p)}
                       className="profile-photo-card-media"
                     />
-                    <span className="profile-photo-card-title">{p.title}</span>
+                    <span className="profile-photo-card-title">{planHeadline(p.title)}</span>
                     <span className="profile-photo-card-meta">{formatPlanDate(p.date)}</span>
                   </Link>
                 ))}

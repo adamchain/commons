@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { api, parseApiError } from "../api/http";
 import { FLEXIBLE_DATE_PLACEHOLDER, thisWeekAnchorDate } from "../lib/planTime";
-import { formatPlanDate, formatPlanTime, formatVenueAddressLine, normalizeHttpUrl } from "../lib/format";
+import { formatPlanDate, formatPlanTime, formatVenueAddressLine, limitPlanFields, MAX_PLAN_TITLE_LEN, normalizeHttpUrl } from "../lib/format";
 import { Avatar } from "../components/Avatar";
 import { PageLoading } from "../components/LoadingScreen";
 import { AvatarCropModal } from "../components/AvatarCropModal";
@@ -72,12 +72,6 @@ type Recurrence = "none" | "weekly" | "biweekly" | "monthly";
 // Single-letter labels for the weekly day picker, indexed Sun..Sat to match
 // Date.getDay().
 const DAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
-
-// Cap the plan title — people were pasting whole paragraphs into the title
-// field. Keep it to a glanceable headline and push the rest to the description.
-// (The "Just an idea" form deliberately reuses `title` as a free-text area, so
-// this cap applies only to the Make-a-plan title input.)
-const MAX_PLAN_TITLE_LEN = 80;
 
 // Day-of-week (0=Sun) for a YYYY-MM-DD string, parsed in local time to avoid
 // the UTC-midnight off-by-one that `new Date("2026-06-23")` produces.
@@ -178,8 +172,9 @@ export function CreatePlanPage() {
     return [];
   }, [forumVibe, prefillVibe]);
 
+  const seededCopy = limitPlanFields(prefillTitle, prefillDescription);
   const [form, setForm] = useState({
-    title: prefillTitle,
+    title: seededCopy.title,
     locationName: prefillName,
     locationAddress: prefillAddress,
     locationLat: undefined as number | undefined,
@@ -193,7 +188,7 @@ export function CreatePlanPage() {
     isFlexibleDate: startAsIdea,
     isThisWeek: false,
     vibes: defaultVibes,
-    description: prefillDescription,
+    description: seededCopy.description,
     visibility: (inviteUserId || inviteUserIds.length > 0 ? "network" : "everyone") as PlanVisibility,
     capacityOn: false,
     capacity: "6",
@@ -253,9 +248,12 @@ export function CreatePlanPage() {
     restoredForPath.current = path;
     const draft = loadCreateDraft(path);
     if (!draft) return;
+    const limited = limitPlanFields(draft.title, draft.description);
     setForm((f) => ({
       ...f,
       ...draft,
+      title: limited.title,
+      description: limited.description,
       flyerDataUrl: f.flyerDataUrl,
       flyerAttachmentDataUrl: f.flyerAttachmentDataUrl,
       flyerLinkPreview: f.flyerLinkPreview,
@@ -458,9 +456,10 @@ export function CreatePlanPage() {
         const vibeIds = Array.from(
           new Set(VIBE_OPTIONS.filter((o) => prev.tags.includes(o.tag)).map((o) => o.id)),
         );
+        const limited = limitPlanFields(prev.title, prev.description);
         setForm((f) => ({
           ...f,
-          title: prev.title,
+          title: limited.title,
           locationName: prev.isFlexibleLocation ? "" : prev.location.name,
           locationAddress: prev.isFlexibleLocation ? "" : prev.location.address,
           locationLat: prev.isFlexibleLocation ? undefined : prev.location.lat,
@@ -469,7 +468,7 @@ export function CreatePlanPage() {
           neighborhoodId: prev.neighborhoodId || f.neighborhoodId,
           isFlexibleLocation: false,
           vibes: vibeIds.length ? vibeIds : f.vibes,
-          description: prev.description ?? "",
+          description: limited.description,
           visibility: inviteUserId || inviteUserIds.length > 0 ? "network" : prev.visibility,
           capacityOn: prev.capacity !== null,
           capacity: prev.capacity !== null ? String(prev.capacity) : f.capacity,
@@ -514,9 +513,10 @@ export function CreatePlanPage() {
           isFlexibleDate: flexDate,
           isThisWeek: Boolean(prev.isThisWeek) && !flexDate,
         };
+        const limited = limitPlanFields(prev.title, prev.description);
         setForm((f) => ({
           ...f,
-          title: prev.title,
+          title: limited.title,
           locationName: prev.isFlexibleLocation ? "" : prev.location.name,
           locationAddress: prev.isFlexibleLocation ? "" : prev.location.address,
           locationLat: prev.isFlexibleLocation ? undefined : prev.location.lat,
@@ -530,7 +530,7 @@ export function CreatePlanPage() {
           isThisWeek: Boolean(prev.isThisWeek) && !formFlexDate,
           isFlexibleLocation: Boolean(prev.isFlexibleLocation),
           vibes: vibeIds.length ? vibeIds : f.vibes,
-          description: prev.description ?? "",
+          description: limited.description,
           visibility: prev.visibility,
           capacityOn: prev.capacity !== null,
           capacity: prev.capacity !== null ? String(prev.capacity) : f.capacity,
@@ -573,9 +573,10 @@ export function CreatePlanPage() {
           new Set(VIBE_OPTIONS.filter((o) => prev.tags.includes(o.tag)).map((o) => o.id)),
         );
         const flexDate = Boolean(prev.isFlexibleDate) || prev.date.startsWith("2099-12-31");
+        const limited = limitPlanFields(prev.title, prev.description);
         setForm((f) => ({
           ...f,
-          title: prev.title,
+          title: limited.title,
           locationName: prev.isFlexibleLocation ? "" : prev.location.name,
           locationAddress: prev.isFlexibleLocation ? "" : prev.location.address,
           locationLat: prev.isFlexibleLocation ? undefined : prev.location.lat,
@@ -589,7 +590,7 @@ export function CreatePlanPage() {
           isThisWeek: false,
           isFlexibleLocation: false,
           vibes: vibeIds.length ? vibeIds : f.vibes,
-          description: prev.description ?? "",
+          description: limited.description,
           visibility: prev.visibility,
           capacityOn: prev.capacity !== null,
           capacity: prev.capacity !== null ? String(prev.capacity) : f.capacity,
@@ -2182,17 +2183,38 @@ function IdeaForm({
           <section className="idea-builder-prompt">
             <div>
               <span>Your idea</span>
-              <small>Keep it casual. You can make it a plan later.</small>
+              <small>A short headline. You can make it a plan later.</small>
             </div>
             <textarea
               ref={textareaRef}
               className="idea-textarea"
               placeholder={IDEA_PLACEHOLDERS[placeholderIdx]}
               value={form.title}
+              maxLength={MAX_PLAN_TITLE_LEN}
               aria-invalid={titleMissing}
-              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-              rows={5}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, title: e.target.value.slice(0, MAX_PLAN_TITLE_LEN) }))
+              }
+              rows={3}
             />
+            {form.title.length >= MAX_PLAN_TITLE_LEN - 15 && (
+              <p className="plan-title-hint">
+                {MAX_PLAN_TITLE_LEN - form.title.length === 0
+                  ? "That's the limit — keep the headline short."
+                  : `${MAX_PLAN_TITLE_LEN - form.title.length} characters left.`}
+              </p>
+            )}
+            {form.description.trim() ? (
+              <label className="idea-builder-details">
+                <span>Details</span>
+                <textarea
+                  className="idea-textarea"
+                  value={form.description}
+                  rows={4}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                />
+              </label>
+            ) : null}
           </section>
           {titleMissing && <p className="luma-inline-error">Add a few words about the idea.</p>}
 
