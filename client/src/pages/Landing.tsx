@@ -95,7 +95,6 @@ function Hero() {
             COMMONS is where women actually make plans — find someone to do it with, or bring your people together. Either way, something happens.
           </p>
           <AppStoreBadge />
-          <p style={{ fontFamily: B, fontSize: 11, color: MUTED, letterSpacing: "0.05em", marginTop: 22 }}>Invite-only · Built for iOS</p>
         </div>
       </div>
     </section>
@@ -203,7 +202,6 @@ function Footer() {
           Post what you're doing — or just float an idea. The people are already out there.
         </p>
         <AppStoreBadge onDark />
-        <p style={{ fontFamily: B, fontSize: 11, color: "rgba(255,255,255,0.42)", letterSpacing: "0.05em", marginTop: 22 }}>Invite-only · Built for iOS</p>
         <div style={{ marginTop: 80, paddingTop: 28, borderTop: `1px solid rgba(255,255,255,0.12)`, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
           <img src={wordmark} alt="Commons" style={{ height: 22, width: "auto", filter: "brightness(0) invert(1)" }} />
           <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
