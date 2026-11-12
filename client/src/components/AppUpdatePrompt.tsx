@@ -1,49 +1,31 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { App as CapApp } from "@capacitor/app";
 import { api } from "../api/http";
+import { useAuth } from "../context/AuthContext";
 import { isNative } from "../lib/platform";
-import { APP_STORE_URL } from "../lib/appStore";
-
-const DISMISS_KEY = "commons_update_dismissed";
-
-function compareVersions(installed: string, latest: string): number {
-  const a = installed.split(".").map((n) => parseInt(n, 10) || 0);
-  const b = latest.split(".").map((n) => parseInt(n, 10) || 0);
-  const len = Math.max(a.length, b.length);
-  for (let i = 0; i < len; i++) {
-    const d = (a[i] ?? 0) - (b[i] ?? 0);
-    if (d !== 0) return d;
-  }
-  return 0;
-}
 
 /**
- * Shown on launch when the installed iOS build is behind the version the
- * server is advertising. Dismiss lasts for this app session.
+ * When this install is behind the version the server is advertising, add a
+ * row to Activity. The old blocking card is gone.
  */
-export function AppUpdatePrompt() {
-  const [open, setOpen] = useState(false);
-  // Fall back to the hardcoded listing if the server doesn't advertise a URL,
-  // so a forgotten APP_STORE_URL env var can't leave a dead-end prompt.
-  const [storeUrl, setStoreUrl] = useState<string>(APP_STORE_URL);
-  const [latest, setLatest] = useState<string | null>(null);
+export function useAppUpdateNotice(): void {
+  const { user } = useAuth();
 
   useEffect(() => {
-    if (!isNative()) return;
+    if (!isNative() || !user) return;
     let cancelled = false;
 
     async function check() {
       try {
-        const [info, release] = await Promise.all([
-          CapApp.getInfo(),
-          api<{ version: string; storeUrl: string | null }>("/api/app/release"),
-        ]);
+        const info = await CapApp.getInfo();
         if (cancelled) return;
-        if (!release.version || compareVersions(info.version, release.version) >= 0) return;
-        if (sessionStorage.getItem(DISMISS_KEY) === release.version) return;
-        setLatest(release.version);
-        if (release.storeUrl) setStoreUrl(release.storeUrl);
-        setOpen(true);
+        await api<{ needed: boolean }>("/api/notifications/app-update", {
+          method: "POST",
+          body: JSON.stringify({ installed: info.version }),
+        });
+        if (!cancelled) {
+          window.dispatchEvent(new CustomEvent("commons:notifications-changed"));
+        }
       } catch {
         /* offline or an old server — stay quiet */
       }
@@ -53,33 +35,5 @@ export function AppUpdatePrompt() {
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  if (!open) return null;
-
-  function dismiss() {
-    if (latest) sessionStorage.setItem(DISMISS_KEY, latest);
-    setOpen(false);
-  }
-
-  return (
-    <div className="app-update-backdrop" role="presentation" onClick={dismiss}>
-      <div
-        className="app-update-card"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="app-update-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 id="app-update-title" className="app-update-title">Update Commons</h2>
-        <p className="app-update-copy">A newer version is ready. Update to keep plans and messages in sync.</p>
-        <a className="btn-primary btn-block" href={storeUrl}>
-          Update
-        </a>
-        <button type="button" className="btn-link app-update-later" onClick={dismiss}>
-          Not now
-        </button>
-      </div>
-    </div>
-  );
+  }, [user?.id]);
 }

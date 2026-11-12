@@ -1,5 +1,5 @@
 import { sendTransactionalSms } from "./sms.js";
-import { planEndTimestamp, planHasEnded, planStartTimestamp } from "./planTime.js";
+import { calendarDayInPlanZone, planEndTimestamp, planHasEnded, planStartTimestamp } from "./planTime.js";
 import { store, type PlanRecord } from "../store.js";
 import { findUserById, findUsersByIds } from "../userRepo.js";
 import { emit } from "./notify.js";
@@ -301,24 +301,31 @@ export async function runDayOfReminders(): Promise<void> {
 }
 
 /**
- * Interested nudge (6.2) — ~24h before, Interested people get a convert/remove prompt.
+ * Day before, for people who tapped Interested. Fires once the plan is about
+ * 24 hours out, and still catches it if the server was down for that exact
+ * hour. One ping per person per plan. The morning-of note is separate.
  */
 const INTERESTED_NUDGE_SENT = new Set<string>();
 export async function runInterestedNudges(): Promise<void> {
   const now = Date.now();
-  const windowStart = now + 23.5 * 60 * 60 * 1000;
-  const windowEnd = now + 24.5 * 60 * 60 * 1000;
 
   for (const plan of store.listPlans()) {
     if (plan.cancelledAt) continue;
+    if (plan.isFlexibleDate || plan.isThisWeek) continue;
     if (plan.isFlexibleTime && !plan.time) continue;
     if (planHasEnded(plan)) continue;
+    if (planIsFull(plan)) continue;
     const start = planStartTimestamp(plan);
-    if (start < windowStart || start > windowEnd) continue;
+    const hoursUntil = (start - now) / (60 * 60 * 1000);
+    if (!Number.isFinite(hoursUntil) || hoursUntil < 18 || hoursUntil > 24) continue;
 
     const interested = store
       .listParticipationsForPlan(plan.id)
       .filter((p) => p.state === "interested" && p.userId !== plan.creatorId);
+    const venue = plan.location?.name?.trim();
+    const body = venue
+      ? `Want to join? "${plan.title}" is tomorrow at ${venue}.`
+      : `Want to join? "${plan.title}" is tomorrow.`;
 
     for (const row of interested) {
       const key = `${plan.id}:${row.userId}`;
@@ -326,11 +333,64 @@ export async function runInterestedNudges(): Promise<void> {
       const created = await emit({
         userId: row.userId,
         kind: "interestedNudge",
-        body: `Still thinking about it? ${plan.title} is tomorrow.`,
+        body,
         planId: plan.id,
         dedupKey: `interestedNudge:${plan.id}:${row.userId}`,
       });
       if (created) INTERESTED_NUDGE_SENT.add(key);
+    }
+  }
+}
+
+function hourInPlanZone(now = new Date()): number {
+  const hour = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hourCycle: "h23",
+    hour: "2-digit",
+  }).format(now);
+  const n = Number(hour);
+  return n === 24 ? 0 : n;
+}
+
+/**
+ * Day-of, for people who tapped Interested but haven't joined. Asks them
+ * whether they want to go. Morning of the plan, or earlier when it starts
+ * before the morning window. One ping per person per plan.
+ */
+export async function runInterestedDayOfNudges(): Promise<void> {
+  const now = Date.now();
+  const today = calendarDayInPlanZone();
+  const hour = hourInPlanZone();
+
+  for (const plan of store.listPlans()) {
+    if (plan.cancelledAt) continue;
+    if (plan.isFlexibleDate || plan.isThisWeek) continue;
+    if (plan.date.slice(0, 10) !== today) continue;
+    if (planHasEnded(plan)) continue;
+    const start = planStartTimestamp(plan);
+    const hoursUntil = (start - now) / (60 * 60 * 1000);
+    if (!Number.isFinite(hoursUntil) || hoursUntil <= 0) continue;
+    const morningOpen = hour >= 9;
+    const startingSoon = hoursUntil <= 3;
+    if (!morningOpen && !startingSoon) continue;
+    if (planIsFull(plan)) continue;
+
+    const interested = store
+      .listParticipationsForPlan(plan.id)
+      .filter((p) => p.state === "interested" && p.userId !== plan.creatorId);
+    const venue = plan.location?.name?.trim();
+    const body = venue
+      ? `Want to join? "${plan.title}" is today at ${venue}.`
+      : `Want to join? "${plan.title}" is today.`;
+
+    for (const row of interested) {
+      await emit({
+        userId: row.userId,
+        kind: "interestedNudge",
+        body,
+        planId: plan.id,
+        dedupKey: `interestedDayOf:${plan.id}:${row.userId}`,
+      });
     }
   }
 }
@@ -487,6 +547,7 @@ export function startNudgeSchedulers(): void {
     void runPlanTomorrowReminders().catch((e) => console.error(e));
     void runDayOfReminders().catch((e) => console.error(e));
     void runInterestedNudges().catch((e) => console.error(e));
+    void runInterestedDayOfNudges().catch((e) => console.error(e));
     void evictInterestedFromClosedPlans().catch((e) => console.error(e));
     // The old 48h/24h "still full" notes stay off. Fullness removes people immediately.
     void runDidThisHappenPrompts().catch((e) => console.error(e));

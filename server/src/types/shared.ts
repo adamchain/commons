@@ -513,7 +513,8 @@ export type NotificationKind =
   | "planFullInterested"
   | "welcome"
   | "communityReview"
-  | "helpReply";
+  | "helpReply"
+  | "appUpdate";
 
 export interface NotificationDTO {
   id: string;

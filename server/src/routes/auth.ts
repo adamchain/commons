@@ -27,6 +27,33 @@ import { emit } from "../lib/notify.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
 import { isLaunchAccessCode } from "../lib/accessCodes.js";
 
+function clipAttr(value: unknown, max: number): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const text = value.trim().slice(0, max);
+  return text || undefined;
+}
+
+function cleanPlatform(raw: unknown): UserRecord["signupPlatform"] {
+  if (raw === "web" || raw === "ios" || raw === "android") return raw;
+  return null;
+}
+
+/** First-touch signup source sent by the client. Drop anything that isn't a short label. */
+function cleanSignupSource(raw: unknown): UserRecord["signupSource"] {
+  if (!raw || typeof raw !== "object") return null;
+  const body = raw as Record<string, unknown>;
+  const label = clipAttr(body.label, 40);
+  if (!label || !/^[A-Za-z0-9 ._+-]{1,40}$/.test(label)) return null;
+  return {
+    label,
+    utmSource: clipAttr(body.utmSource, 80),
+    utmMedium: clipAttr(body.utmMedium, 80),
+    utmCampaign: clipAttr(body.utmCampaign, 120),
+    referrer: clipAttr(body.referrer, 120),
+    landingPath: clipAttr(body.landingPath, 200),
+  };
+}
+
 const US_STATE_ABBR: Record<string, string> = {
   Alabama:"AL",Alaska:"AK",Arizona:"AZ",Arkansas:"AR",California:"CA",
   Colorado:"CO",Connecticut:"CT",Delaware:"DE","District of Columbia":"DC",
@@ -318,6 +345,15 @@ authRouter.post("/verify-code", limitVerifyByPhone, limitVerifyByIp, async (req,
   // F.9 — every new account lands with at least one notification instead of
   // an empty bell. Best-effort: never block sign-in on this.
   if (isNewUser) {
+    const signupSource = cleanSignupSource(req.body?.attribution);
+    const signupPlatform = cleanPlatform(req.body?.platform);
+    if (signupSource || signupPlatform) {
+      user =
+        (await updateUser(user.id, {
+          ...(signupSource ? { signupSource } : {}),
+          ...(signupPlatform ? { signupPlatform } : {}),
+        })) ?? user;
+    }
     void emit({
       userId: user.id,
       kind: "welcome",
@@ -329,6 +365,19 @@ authRouter.post("/verify-code", limitVerifyByPhone, limitVerifyByIp, async (req,
   }
   const token = setSessionCookie(res, user.id, user.sessionVersion ?? 0);
   res.json({ ...meFromUser(user), token });
+});
+
+/** A web signup opened the installed app. Recorded once. */
+authRouter.post("/opened-mobile", requireAuth, async (req, res) => {
+  const user = await findUserById(String(req.userId));
+  if (!user) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  if (user.signupPlatform === "web" && !user.mobileOpenedAt) {
+    await updateUser(user.id, { mobileOpenedAt: new Date().toISOString() });
+  }
+  res.json({ ok: true });
 });
 
 authRouter.get("/me", requireAuth, async (req, res) => {

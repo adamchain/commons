@@ -10,6 +10,26 @@ const UserSchema = new mongoose.Schema<UserRecord>(
       enum: ["verify", "seed"],
       default: "verify",
     },
+    signupSource: {
+      type: new mongoose.Schema(
+        {
+          label: { type: String },
+          utmSource: { type: String },
+          utmMedium: { type: String },
+          utmCampaign: { type: String },
+          referrer: { type: String },
+          landingPath: { type: String },
+        },
+        { _id: false },
+      ),
+      default: undefined,
+    },
+    signupPlatform: {
+      type: String,
+      enum: ["web", "ios", "android"],
+      default: undefined,
+    },
+    mobileOpenedAt: { type: String, default: null },
     firstName: { type: String, default: "" },
     lastName: { type: String, default: "" },
     email: { type: String, default: null },

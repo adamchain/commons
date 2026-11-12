@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
 import { ScreenTitle } from "../components/ui";
+import { withJoinChannel } from "../lib/attribution";
 import { getPublicWebOrigin } from "../lib/platform";
 import type { InviteCodeDTO } from "../types/shared";
 
@@ -35,7 +36,9 @@ export function InvitePage() {
       void nav.share(data).catch(() => undefined);
       return;
     }
-    window.location.href = `sms:?&body=${encodeURIComponent(body)}`;
+    const textUrl = withJoinChannel(url, "sms");
+    const textBody = `${firstName} invited you to Commons — neighborhood plans, no pressure. Code: ${code}\n${textUrl}`;
+    window.location.href = `sms:?&body=${encodeURIComponent(textBody)}`;
   }
 
   async function copyCode(code: string) {

@@ -4,6 +4,13 @@ export function isNative(): boolean {
   return Capacitor.isNativePlatform();
 }
 
+/** Where this session is running. Sent once, when the account is created. */
+export function clientPlatform(): "ios" | "android" | "web" {
+  const platform = Capacitor.getPlatform();
+  if (platform === "ios" || platform === "android") return platform;
+  return "web";
+}
+
 const PUBLIC_SITE = "https://www.oncommons.co";
 
 /** A real public site, not the API host and not the app's localhost webview. */

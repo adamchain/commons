@@ -35,12 +35,27 @@ import { pickPhotoNative } from "../lib/photoPicker";
 import { isIdeaPlan } from "../lib/planTime";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import {
+  AGE_RANGE_LABELS,
+  type AgeRange,
   type CommunityCardDTO,
   type InterestTag,
   type MeDTO,
   type PlanDTO,
   type PublicUser,
 } from "../types/shared";
+
+function ProfileBio({ bio, ageRange }: { bio?: string; ageRange?: AgeRange | null }) {
+  const age = ageRange ? AGE_RANGE_LABELS[ageRange] : null;
+  const text = bio?.trim();
+  if (!age && !text) return null;
+  return (
+    <p className="profile-bio">
+      {age ? <span className="profile-bio-age">{age}</span> : null}
+      {age && text ? <span className="profile-bio-sep"> · </span> : null}
+      {text ? <LinkedText text={text} /> : null}
+    </p>
+  );
+}
 
 function profileBackLabel(state: NavFromState | null): string {
   switch (state?.from) {
@@ -338,11 +353,7 @@ export function ProfilePage() {
               )}
             </div>
           </div>
-          {profile.user.bio?.trim() && (
-            <p className="profile-bio">
-              <LinkedText text={profile.user.bio.trim()} />
-            </p>
-          )}
+          <ProfileBio bio={profile.user.bio} ageRange={profile.user.ageRange} />
           <div className="profile-stats" aria-label="Profile stats">
             <button
               type="button"
@@ -583,11 +594,7 @@ export function ProfilePage() {
             Edit
           </Link>
         </div>
-        {profile.user.bio && (
-          <p className="profile-bio">
-            <LinkedText text={profile.user.bio} />
-          </p>
-        )}
+        <ProfileBio bio={profile.user.bio} ageRange={profile.user.ageRange} />
         <div className="profile-stats" aria-label="Profile stats">
           <button type="button" className="profile-stat" onClick={() => setProfileTab("plans")}>
             <span className="profile-stat-num">{profile.stats.hosted}</span>

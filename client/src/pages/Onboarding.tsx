@@ -11,9 +11,11 @@ import { AvatarCropModal } from "../components/AvatarCropModal";
 import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
-import { isNative } from "../lib/platform";
+import { clientPlatform, isNative } from "../lib/platform";
 import { getCurrentCoords } from "../lib/geolocate";
+import { signupAttributionPayload } from "../lib/attribution";
 import { hasOnboardingPhoto, needsOnboarding, safePostAuthPath } from "../lib/onboarding";
+import { trackSignup } from "../lib/pixels";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { LegalContent } from "../components/LegalContent";
 import { BottomSheet } from "../components/ui/BottomSheet";
@@ -225,7 +227,12 @@ export function OnboardingPage() {
     try {
       const result = await api<MeDTO & { token?: string }>("/api/auth/verify-code", {
         method: "POST",
-        body: JSON.stringify({ phoneNumber: sentPhone || phoneNumber, code }),
+        body: JSON.stringify({
+          phoneNumber: sentPhone || phoneNumber,
+          code,
+          attribution: signupAttributionPayload(),
+          platform: clientPlatform(),
+        }),
       });
       verified.current = true;
       const { token, ...me } = result;
@@ -497,6 +504,7 @@ export function OnboardingPage() {
           });
           // Set the step BEFORE refreshUser resolves so the completion guard
           // above sees "welcome" and doesn't redirect out from under it.
+          trackSignup();
           const uid = user?.id;
           if (uid) {
             setStep("welcome");

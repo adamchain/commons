@@ -8,6 +8,7 @@ import { api, parseApiError } from "../api/http";
 import { formatPhoneInput, isValidPhoneInput } from "../lib/format";
 import { setAuthToken } from "../api/authToken";
 import { useAuth } from "../context/AuthContext";
+import { signupAttributionPayload } from "../lib/attribution";
 import { needsOnboarding } from "../lib/onboarding";
 import type { MeDTO } from "../types/shared";
 
@@ -157,7 +158,7 @@ export function NewLandingPage() {
     try {
       const res = await api<MeDTO & { token?: string }>(
         "/api/auth/verify-code",
-        { method: "POST", body: JSON.stringify({ phoneNumber: e164, code: digits }) },
+        { method: "POST", body: JSON.stringify({ phoneNumber: e164, code: digits, attribution: signupAttributionPayload() }) },
       );
       if (res.token) await setAuthToken(res.token);
       setUser(res);

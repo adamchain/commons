@@ -1,28 +1,14 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { appPathFromHref } from "../lib/appLinks";
 
 /**
- * Renders a bio or community description with clickable links.
- * In-app profile and community URLs stay inside the app. Everything else
- * that is http(s) opens in a new tab.
+ * Renders a bio, chat message, or description with clickable links.
+ * Commons plan, profile, and community URLs stay inside the app. Everything
+ * else that is http(s) opens in a new tab.
  */
 const TOKEN =
-  /\[([^\]]+)\]\((https?:\/\/[^\s)]+|\/(?:profile|communities)\/[A-Za-z0-9_-]+)\)|https?:\/\/[^\s<]+/g;
-
-function internalPath(href: string): string | null {
-  try {
-    const url = href.startsWith("/") ? new URL(href, window.location.origin) : new URL(href);
-    const host = url.hostname;
-    const own = url.origin === window.location.origin;
-    const commons = host === "oncommons.co" || host === "www.oncommons.co";
-    if (!own && !commons) return null;
-    const path = url.pathname.replace(/\/$/, "");
-    if (/^\/profile\/[^/]+$/.test(path) || /^\/communities\/[^/]+$/.test(path)) return path;
-    return null;
-  } catch {
-    return null;
-  }
-}
+  /\[([^\]]+)\]\((https?:\/\/[^\s)]+|\/(?:profile|communities|plans|dm)\/[A-Za-z0-9_-]+(?:\/(?:edit|chat))?(?:\?[^\s)]*)?)\)|https?:\/\/[^\s<]+/g;
 
 export function LinkedText({ text }: { text: string }) {
   const nodes: ReactNode[] = [];
@@ -36,10 +22,15 @@ export function LinkedText({ text }: { text: string }) {
     const trail = !isMarkdown ? (consumed.match(/[).,]+$/)?.[0] ?? "") : "";
     const href = isMarkdown ? match[2] : consumed.slice(0, consumed.length - trail.length);
     const label = isMarkdown ? match[1] : href.replace(/^https?:\/\//, "");
-    const internal = internalPath(href);
+    const internal = appPathFromHref(href);
     if (internal) {
       nodes.push(
-        <Link key={`${match.index}-in`} to={internal} className="linked-text-link">
+        <Link
+          key={`${match.index}-in`}
+          to={internal}
+          className="linked-text-link"
+          onClick={(event) => event.stopPropagation()}
+        >
           {label}
         </Link>,
       );

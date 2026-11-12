@@ -56,6 +56,8 @@ const PREF_KEY: Record<NotificationKind, keyof NotificationPrefs> = {
   // Ops alert for COMMONS admins. Not gated by a member preference.
   communityReview: "someoneJoinedYourPlan",
   helpReply: "someoneJoinedYourPlan",
+  // Version notice. Delivered even when plan reminders are off.
+  appUpdate: "planTomorrow",
 };
 
 export async function emit(input: {
@@ -68,6 +70,8 @@ export async function emit(input: {
   conversationId?: string;
   profileUserId?: string;
   communityId?: string;
+  /** In-app only. Used for the update notice, which fires while the app is open. */
+  skipPush?: boolean;
 }): Promise<NotificationRecord | null> {
   const user = await findUserById(input.userId);
   if (!user) return null;
@@ -80,7 +84,8 @@ export async function emit(input: {
   const alwaysDeliver =
     input.kind === "communityReview" ||
     input.kind === "networkRequest" ||
-    input.kind === "networkAccepted";
+    input.kind === "networkAccepted" ||
+    input.kind === "appUpdate";
   if (!alwaysDeliver && prefs[PREF_KEY[input.kind]] === false) return null;
   // Muted chats stay quiet — the conversation itself still works, it just
   // doesn't ping. Only applies to notifications tied to a specific thread.
@@ -98,7 +103,7 @@ export async function emit(input: {
     profileUserId: input.profileUserId,
     communityId: input.communityId,
   });
-  if (row && prefs.pushEnabled !== false) {
+  if (row && !input.skipPush && prefs.pushEnabled !== false) {
     const data: Record<string, string> = { kind: input.kind };
     if (input.planId) data.planId = input.planId;
     if (input.conversationId) data.conversationId = input.conversationId;

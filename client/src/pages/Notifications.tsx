@@ -25,8 +25,10 @@ import {
   Pin,
   Hand,
   Clock,
+  Download,
 } from "lucide-react";
 import { api } from "../api/http";
+import { APP_STORE_URL } from "../lib/appStore";
 import { Avatar } from "../components/Avatar";
 import { EmptyCard } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
@@ -268,7 +270,8 @@ function NotifRow({
   digestPlans: PlanDTO[];
   onDismiss: () => void;
 }) {
-  const href = hrefFor(item);
+  const href = item.kind === "appUpdate" ? null : hrefFor(item);
+  const storeHref = item.kind === "appUpdate" ? APP_STORE_URL : null;
   const isGrabs = item.kind === "planUpForGrabs";
   const isNetworkAdd =
     item.kind === "networkRequest" &&
@@ -297,6 +300,7 @@ function NotifRow({
           <div className="notif-row-title">{item.body}</div>
         )}
         {isGrabs && <span className="notif-row-cta">Take over hosting</span>}
+        {storeHref && <span className="notif-row-cta">Update</span>}
         {isNetworkAdd && item.profileUserId && (
           <NetworkRespond userId={item.profileUserId} resolution={item.resolution} />
         )}
@@ -317,22 +321,28 @@ function NotifRow({
       </button>
     </>
   );
+  const rowClass = `notif-row${isGrabs ? " notif-row--grabs" : ""}${item.kind === "weeklyFridayDigest" ? " notif-row--digest" : ""}${item.readAt === null ? " is-unread" : ""}`;
+  if (storeHref) {
+    return (
+      <a href={storeHref} className={rowClass} target="_blank" rel="noreferrer">
+        {inner}
+      </a>
+    );
+  }
   if (href) {
     const linkState: NavFromState = { from: "notifications" };
     return (
       <Link
         to={href}
         state={linkState}
-        className={`notif-row${isGrabs ? " notif-row--grabs" : ""}${item.kind === "weeklyFridayDigest" ? " notif-row--digest" : ""}${item.readAt === null ? " is-unread" : ""}`}
+        className={rowClass}
       >
         {inner}
       </Link>
     );
   }
   return (
-    <div
-      className={`notif-row${isGrabs ? " notif-row--grabs" : ""}${item.kind === "weeklyFridayDigest" ? " notif-row--digest" : ""}${item.readAt === null ? " is-unread" : ""}`}
-    >
+    <div className={rowClass}>
       {inner}
     </div>
   );
@@ -547,6 +557,8 @@ function iconFor(kind: NotificationKind): ReactNode {
       return <MessageCircle {...props} />;
     case "welcome":
       return <Users {...props} />;
+    case "appUpdate":
+      return <Download {...props} />;
     case "communityReview":
       return <Shield {...props} />;
     case "helpReply":

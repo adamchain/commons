@@ -1,4 +1,5 @@
 import { App as CapacitorApp } from "@capacitor/app";
+import { noteAppLanding } from "./attribution";
 import { isNative } from "./platform";
 
 /**
@@ -35,9 +36,15 @@ export function listenForDeepLinks(navigate: (path: string, opts?: { replace?: b
   if (!isNative()) return () => undefined;
 
   let removeListener: (() => void) | undefined;
+  const open = (raw: string, replace = false) => {
+    const path = pathFromDeepLinkUrl(raw);
+    if (!path) return;
+    noteAppLanding(path);
+    navigate(path, replace ? { replace: true } : undefined);
+  };
+
   void CapacitorApp.addListener("appUrlOpen", (event) => {
-    const path = pathFromDeepLinkUrl(event.url);
-    if (path) navigate(path);
+    open(event.url);
   }).then((handle) => {
     removeListener = () => handle.remove();
   });
@@ -45,8 +52,7 @@ export function listenForDeepLinks(navigate: (path: string, opts?: { replace?: b
   void CapacitorApp.getLaunchUrl()
     .then((launch) => {
       if (!launch?.url) return;
-      const path = pathFromDeepLinkUrl(launch.url);
-      if (path) navigate(path, { replace: true });
+      open(launch.url, true);
     })
     .catch(() => undefined);
 

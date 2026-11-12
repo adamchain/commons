@@ -6,17 +6,19 @@ import { useAuth } from "./context/AuthContext";
 import { BottomNav } from "./components/BottomNav";
 import { RouteStage } from "./components/RouteStage";
 import { CreateLauncher } from "./components/CreateLauncher";
-import { AppUpdatePrompt } from "./components/AppUpdatePrompt";
+import { useAppUpdateNotice } from "./components/AppUpdatePrompt";
 import { ChatCleanupPrompt } from "./components/ChatCleanupPrompt";
 import { SmsConsentPrompt } from "./components/SmsConsentPrompt";
 import { CoachMarks } from "./components/CoachMarks";
 import { TopBar } from "./components/TopBar";
 import { WebAppShell, webShellVisible, webShellHasRail } from "./components/WebAppShell";
 import { LoadingScreen } from "./components/LoadingScreen";
+import { appPathFromHref } from "./lib/appLinks";
 import { listenForDeepLinks } from "./lib/deepLinks";
 import { resetFeedFilters } from "./lib/feedFilters";
 import { needsOnboarding } from "./lib/onboarding";
 import { getCurrentCoords } from "./lib/geolocate";
+import { installSignupPixels } from "./lib/pixels";
 import { api } from "./api/http";
 import { isNative } from "./lib/platform";
 
@@ -174,6 +176,30 @@ function useDeepLinkNavigation() {
   }, [navigate]);
 }
 
+// A pasted Commons plan link used to be a normal anchor, so iOS opened Safari
+// on the public signup page. Keep plan, profile, and community links in the app.
+function useInAppLinkNavigation() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    function onClick(event: MouseEvent) {
+      if (event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const anchor = target.closest("a[href]");
+      if (!(anchor instanceof HTMLAnchorElement)) return;
+      const path = appPathFromHref(anchor.href);
+      if (!path) return;
+      const leavesApp = anchor.target === "_blank" || anchor.host !== window.location.host;
+      if (!leavesApp) return;
+      event.preventDefault();
+      navigate(path);
+    }
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, [navigate]);
+}
+
 const LOCATION_REFRESH_INTERVAL_MS = 30 * 60 * 1000; // 30 min
 
 // Silently refreshes the user's stored location each time they bring the app
@@ -209,6 +235,15 @@ function useLocationRefresh() {
   }, [user?.location, refreshUser]);
 }
 
+/** Web accounts that later open the installed app get counted in admin. */
+function useMobileOpenPing() {
+  const { user } = useAuth();
+  useEffect(() => {
+    if (!user || !isNative()) return;
+    void api("/api/auth/opened-mobile", { method: "POST" }).catch(() => undefined);
+  }, [user?.id]);
+}
+
 // Reset the feed filters every time the app is opened — on cold start and each
 // time it returns to the foreground — so a session always begins unfiltered.
 // Clears the saved filters and tells a mounted FeedPage to drop its live state.
@@ -225,9 +260,15 @@ function useFilterResetOnOpen() {
 export default function App() {
   usePushOpenNavigation();
   useDeepLinkNavigation();
+  useInAppLinkNavigation();
   useLocationRefresh();
   useFilterResetOnOpen();
+  useAppUpdateNotice();
+  useMobileOpenPing();
   useWarmRoutes();
+  useEffect(() => {
+    installSignupPixels();
+  }, []);
   const { user } = useAuth();
   const { pathname } = useLocation();
   const webShell = !isNative() && webShellVisible(pathname, user);
@@ -238,7 +279,6 @@ export default function App() {
     <div className={shellClass}>
       {!isNative() && <WebAppShell />}
       <TopBar />
-      <AppUpdatePrompt />
       <ChatCleanupPrompt />
       <SmsConsentPrompt />
       <Suspense fallback={PAGE_FALLBACK}>

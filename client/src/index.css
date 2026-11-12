@@ -11067,42 +11067,6 @@ a.sheet-link {
   flex: 1 1 140px;
 }
 /* Celebratory join confirmation — centered card, never overlays plan-card counts. */
-.app-update-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 140;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(0, 0, 0, 0.35);
-}
-.app-update-card {
-  width: 100%;
-  max-width: 320px;
-  text-align: center;
-  background: var(--card);
-  border-radius: 20px;
-  padding: 28px 22px 18px;
-  box-shadow: var(--shadow);
-}
-.app-update-title {
-  margin: 0 0 8px;
-  font-family: var(--font-display);
-  font-size: var(--text-screen-title);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-.app-update-copy {
-  margin: 0 0 16px;
-  color: var(--muted);
-  font-size: var(--text-body);
-  line-height: 1.4;
-}
-.app-update-later {
-  margin-top: 10px;
-}
-
 .join-confirm-backdrop {
   position: fixed;
   inset: 0;
@@ -16850,6 +16814,10 @@ button.xpl-photo-tile {
   line-height: 1.45;
   color: var(--text-muted);
   white-space: pre-wrap;
+}
+.profile-bio-age {
+  color: var(--text);
+  font-weight: 650;
 }
 .linked-text-link {
   color: var(--accent);

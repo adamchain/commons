@@ -5,9 +5,11 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { captureSignupAttribution } from "./lib/attribution";
 import { installAxisScroll } from "./lib/axisScroll";
 import "./index.css";
 
+captureSignupAttribution();
 installAxisScroll();
 
 // Prevent the browser from auto-restoring scroll on navigation — the app

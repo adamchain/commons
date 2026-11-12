@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/http";
 import { Avatar } from "./Avatar";
 import { BottomSheet } from "./ui/BottomSheet";
+import { withJoinChannel } from "../lib/attribution";
 import { getPublicWebOrigin } from "../lib/platform";
 import { getActiveInviteCode } from "../lib/inviteCode";
 import type { PublicUser } from "../types/shared";
@@ -65,7 +66,8 @@ export function InviteSheet({
         /* user canceled — fall through */
       }
     }
-    window.location.href = `sms:?&body=${encodeURIComponent(smsBody)}`;
+    const textBody = `Come to ${planTitle} on Commons — ${withJoinChannel(planUrl, "sms")}`;
+    window.location.href = `sms:?&body=${encodeURIComponent(textBody)}`;
   }
 
   async function copyLink() {

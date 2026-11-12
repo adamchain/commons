@@ -19,6 +19,7 @@ import { useAuth } from "../context/AuthContext";
 import { isIdeaPlan, isPlanAtCapacity, planHasEnded, planRequiresHostApproval } from "../lib/planTime";
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
 import { formatPlanDate, formatPlanTime, formatPlanWhenLine, formatVenueAddressLine, formatVenueName, presentPlanCopy, firstHttpUrlInText, normalizeHttpUrl } from "../lib/format";
+import { appPathFromHref } from "../lib/appLinks";
 import { hrefForBack, type NavFromState } from "../lib/navState";
 import { cachedPlan, peekPlan, prefetchPlan, rememberPlan } from "../lib/planPrefetch";
 import { INTEREST_LABELS, type ConversationDTO, type MessageDTO, type ParticipationState, type PlanDetailAccess, type PlanDTO, type PublicUser } from "../types/shared";
@@ -44,10 +45,22 @@ function linkifyText(text: string): ReactNode[] {
     const href = normalizeHttpUrl(part.replace(/[),.;!?]+$/, ""));
     if (!href || (!/^https?:\/\//i.test(part) && !/^www\./i.test(part))) return part;
     const trail = part.match(/[),.;!?]+$/)?.[0] ?? "";
+    const label = part.slice(0, part.length - trail.length);
+    const internal = appPathFromHref(href);
+    if (internal) {
+      return (
+        <span key={i}>
+          <Link to={internal} className="plan-description-link">
+            {label}
+          </Link>
+          {trail}
+        </span>
+      );
+    }
     return (
       <span key={i}>
         <a href={href} target="_blank" rel="noopener noreferrer" className="plan-description-link">
-          {part.slice(0, part.length - trail.length)}
+          {label}
         </a>
         {trail}
       </span>

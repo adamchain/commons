@@ -39,6 +39,22 @@ export interface UserRecord {
   phoneNumber: string;
   /** `verify` = signed up via Twilio Verify; `seed` = demo data. */
   accountSource?: "verify" | "seed";
+  /**
+   * First touch at signup: an ad pixel/UTM, a shared plan, an invite, or a
+   * direct open. Set once when the account is created.
+   */
+  signupSource?: {
+    label: string;
+    utmSource?: string;
+    utmMedium?: string;
+    utmCampaign?: string;
+    referrer?: string;
+    landingPath?: string;
+  } | null;
+  /** Where the account was created. Missing on accounts from before this was stored. */
+  signupPlatform?: "web" | "ios" | "android" | null;
+  /** Set when a web signup later opens the iOS or Android app. */
+  mobileOpenedAt?: string | null;
   firstName: string;
   lastName?: string;
   /** Optional digest email. Phone is still the login. */
@@ -628,7 +644,8 @@ export interface NotificationRecord {
     | "planFullInterested"
     | "welcome"
     | "communityReview"
-    | "helpReply";
+    | "helpReply"
+    | "appUpdate";
   body: string;
   planId?: string;
   /** Weekly digest — each listed plan, in body order. */
@@ -2315,6 +2332,15 @@ export const store = {
     }
     if (count > 0) persist();
     return count;
+  },
+  deleteNotificationsByKind(userId: string, kind: NotificationRecord["kind"]): number {
+    const doomed = snapshot.notifications.filter((n) => n.userId === userId && n.kind === kind);
+    if (doomed.length === 0) return 0;
+    const ids = new Set(doomed.map((n) => n.id));
+    snapshot.notifications = snapshot.notifications.filter((n) => !ids.has(n.id));
+    persist();
+    for (const row of doomed) mongoMirror.deleteNotification(row.id);
+    return doomed.length;
   },
   deleteNotification(userId: string, notificationId: string): boolean {
     const before = snapshot.notifications.length;

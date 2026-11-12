@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Clipboard } from "@capacitor/clipboard";
 import type { PlanDTO } from "../types/shared";
+import { withJoinChannel } from "../lib/attribution";
 import { getPublicWebOrigin } from "../lib/platform";
 import { getActiveInviteCode } from "../lib/inviteCode";
 import { BottomSheet } from "./ui/BottomSheet";
@@ -52,7 +53,7 @@ export function ShareSheet({ plan, isOwn = false, onClose }: { plan: PlanDTO; is
 
   // F.14 — "my plan" when the viewer is the host, "this plan" otherwise.
   const shareText = isOwn ? "Join my plan on COMMONS" : "Join this plan on COMMONS";
-  const smsBody = encodeURIComponent(`${shareText}: "${planHeadline(plan.title)}" ${url}`);
+  const smsBody = encodeURIComponent(`${shareText}: "${planHeadline(plan.title)}" ${withJoinChannel(url, "sms")}`);
   const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   async function nativeShare() {
@@ -89,7 +90,7 @@ export function ShareSheet({ plan, isOwn = false, onClose }: { plan: PlanDTO; is
   // DM, or bio. Best-effort deep link; silently no-ops if IG isn't installed.
   async function shareToInstagram() {
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(withJoinChannel(url, "instagram"));
     } catch {
       /* clipboard unavailable — the deep link still opens the app */
     }
@@ -115,13 +116,17 @@ export function ShareSheet({ plan, isOwn = false, onClose }: { plan: PlanDTO; is
       key: "whatsapp",
       label: "WhatsApp",
       icon: <WhatsAppIcon />,
-      onClick: () => openExternal(`https://wa.me/?text=${encodeURIComponent(`${shareText} ${url}`)}`),
+      onClick: () =>
+        openExternal(`https://wa.me/?text=${encodeURIComponent(`${shareText} ${withJoinChannel(url, "whatsapp")}`)}`),
     },
     {
       key: "facebook",
       label: "Facebook",
       icon: <FacebookIcon />,
-      onClick: () => openExternal(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`),
+      onClick: () =>
+        openExternal(
+          `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(withJoinChannel(url, "facebook"))}`,
+        ),
     },
     {
       key: "x",
@@ -129,7 +134,7 @@ export function ShareSheet({ plan, isOwn = false, onClose }: { plan: PlanDTO; is
       icon: <XIcon />,
       onClick: () =>
         openExternal(
-          `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`,
+          `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(withJoinChannel(url, "x"))}`,
         ),
     },
   ];
@@ -225,7 +230,7 @@ export function CommunityShareSheet({
     [communityId, memberCount],
   );
   const shareText = `Join ${name} on COMMONS`;
-  const smsBody = encodeURIComponent(`${shareText} ${url}`);
+  const smsBody = encodeURIComponent(`${shareText} ${withJoinChannel(url, "sms")}`);
   const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
   const memberLabel = memberCount === 1 ? "1 member" : `${memberCount} members`;
 
@@ -267,7 +272,7 @@ export function CommunityShareSheet({
 
   async function shareToInstagram() {
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(withJoinChannel(url, "instagram"));
     } catch {
       /* clipboard unavailable — the deep link still opens the app */
     }
@@ -293,13 +298,17 @@ export function CommunityShareSheet({
       key: "whatsapp",
       label: "WhatsApp",
       icon: <WhatsAppIcon />,
-      onClick: () => openExternal(`https://wa.me/?text=${encodeURIComponent(`${shareText} ${url}`)}`),
+      onClick: () =>
+        openExternal(`https://wa.me/?text=${encodeURIComponent(`${shareText} ${withJoinChannel(url, "whatsapp")}`)}`),
     },
     {
       key: "facebook",
       label: "Facebook",
       icon: <FacebookIcon />,
-      onClick: () => openExternal(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`),
+      onClick: () =>
+        openExternal(
+          `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(withJoinChannel(url, "facebook"))}`,
+        ),
     },
     {
       key: "x",
@@ -307,7 +316,7 @@ export function CommunityShareSheet({
       icon: <XIcon />,
       onClick: () =>
         openExternal(
-          `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`,
+          `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(withJoinChannel(url, "x"))}`,
         ),
     },
   ];

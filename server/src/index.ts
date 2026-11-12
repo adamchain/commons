@@ -131,6 +131,54 @@ app.use("/api/reports", reportsRouter);
 app.use("/api/helpchat", helpchatRouter);
 app.use("/api", chatRouter); // chat router defines its own paths under /plans/.../conversation and /conversations/...
 
+function pixelId(name: string, pattern: RegExp): string | null {
+  const value = process.env[name]?.trim() ?? "";
+  return pattern.test(value) ? value : null;
+}
+
+// Public. The marketing site loads these when the IDs are set. The iOS app
+// does not. META_PIXEL_ID, GA_MEASUREMENT_ID, TIKTOK_PIXEL_ID.
+app.get("/api/app/pixels", (_req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=300");
+  res.json({
+    metaPixelId: pixelId("META_PIXEL_ID", /^[0-9]{5,20}$/),
+    gaMeasurementId: pixelId("GA_MEASUREMENT_ID", /^G-[A-Z0-9]+$/i),
+    tiktokPixelId: pixelId("TIKTOK_PIXEL_ID", /^[A-Za-z0-9]{10,40}$/),
+  });
+});
+
+// Universal links. A shared plan opens the installed app on that plan instead
+// of the public signup page. Must be application/json and must not redirect.
+const APPLE_APP_SITE_ASSOCIATION = {
+  applinks: {
+    apps: [],
+    details: [
+      {
+        appID: "WU33P9WH4C.com.oncommons.mvp",
+        paths: [
+          "NOT /plans/*/og-image.png",
+          "NOT /plans/*/calendar.ics",
+          "NOT /api/*",
+          "NOT /admin",
+          "NOT /admin/*",
+          "/plans/*",
+          "/communities/*",
+          "/profile/*",
+        ],
+      },
+    ],
+  },
+};
+
+function sendAppleAppSiteAssociation(_req: express.Request, res: express.Response): void {
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.json(APPLE_APP_SITE_ASSOCIATION);
+}
+
+app.get("/.well-known/apple-app-site-association", sendAppleAppSiteAssociation);
+app.get("/apple-app-site-association", sendAppleAppSiteAssociation);
+
 // Public. The installed app compares this to its own version on launch.
 app.get("/api/app/release", (_req, res) => {
   const version = process.env.APP_LATEST_VERSION?.trim() || "1.7";
