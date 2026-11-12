@@ -703,6 +703,7 @@ authRouter.post("/network-add", requireAuth, async (req, res) => {
       targetId: id,
       kind: "network",
       source: "post_plan_modal",
+      planId,
     });
   }
   const me = await userToMe(userId);

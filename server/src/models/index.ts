@@ -93,6 +93,8 @@ const PlanSchema = new Schema<PlanRecord>(
     lockedAt: { type: String, default: null },
     cancelledAt: { type: String, default: null },
     upForGrabsAt: { type: String, default: null },
+    happenedOutcome: { type: String, enum: ["yes", "no", "rescheduled", null], default: null },
+    happenedAt: { type: String, default: null },
     chatEnabled: { type: Boolean, default: true },
     chatKeptAt: { type: String, default: null },
     audienceUserIds: { type: [String], default: undefined },

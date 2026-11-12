@@ -252,6 +252,8 @@ export interface PlanRecord {
    * yes | no | rescheduled — null/absent = unanswered.
    */
   happenedOutcome?: "yes" | "no" | "rescheduled" | null;
+  /** When the host answered "Did this happen?". */
+  happenedAt?: string | null;
   /** Group chat for this event. Absent or true = on. False hides and blocks the thread. */
   chatEnabled?: boolean;
   /** Host chose to keep the group chat after the event ended. */
@@ -467,6 +469,8 @@ export interface RelationshipRecord {
    * "member" at read time.
    */
   role?: CommunityRole | null;
+  /** Set when the edge was created from the after-plan prompt. */
+  planId?: string | null;
   createdAt: string;
 }
 
@@ -2217,6 +2221,7 @@ export const store = {
     kind: "network" | "community";
     source?: RelationshipRecord["source"];
     role?: CommunityRole;
+    planId?: string | null;
   }): RelationshipRecord {
     const existing = snapshot.relationships.find(
       (r) => r.userId === input.userId && r.targetId === input.targetId && r.kind === input.kind,
@@ -2229,6 +2234,7 @@ export const store = {
       kind: input.kind,
       source: input.source ?? "other",
       role: input.kind === "community" ? (input.role ?? "member") : null,
+      planId: input.kind === "network" ? (input.planId ?? null) : null,
       createdAt: new Date().toISOString(),
     };
     snapshot.relationships.push(row);

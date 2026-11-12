@@ -17,6 +17,7 @@ const RelationshipSchema = new mongoose.Schema<RelationshipRecord>(
       enum: ["member", "admin", "owner"],
       default: null,
     },
+    planId: { type: String, default: null },
     createdAt: { type: String, required: true },
   },
   { collection: "relationships" },

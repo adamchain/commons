@@ -55,6 +55,14 @@ type Dashboard = {
     weekNumber: number | null;
     sinceLabel: string | null;
     plansCompleted: Delta;
+    happened: { yes: number; no: number; rescheduled: number; unanswered: number };
+    happenedPlans: { id: string; title: string; date: string; peopleAdded: number }[];
+    networkAfterPlan: {
+      people: number;
+      adds: number;
+      added: number;
+      rows: { planId: string | null; planTitle: string | null; date: string; people: number }[];
+    };
     avgPeople: Delta;
     zeroJoins: Delta;
     wau: Delta;
@@ -120,6 +128,9 @@ type Dashboard = {
     age: { label: string; count: number }[];
     neighborhoods: { name: string; count: number }[];
     signupCount: number;
+    sources: { label: string; count: number }[];
+    joined: { web: number; app: number; webThenApp: number; unknown: number };
+    pixels: { meta: boolean; google: boolean; tiktok: boolean };
     waitlist: { available: false; reason: string; formUrl: string };
   };
   communities: {
@@ -780,10 +791,60 @@ function Overview({
         updated={data.updatedLabel}
       />
       <section className="fdash-kpis">
-        <Kpi label="Plans completed" value={fmt(o.plansCompleted.value)} delta={o.plansCompleted.delta} spark={o.plansCompleted.spark} compare={data.view.compareLabel} />
+        <Kpi label="Plans that happened" value={fmt(o.plansCompleted.value)} delta={o.plansCompleted.delta} spark={o.plansCompleted.spark} compare={data.view.compareLabel} />
         <Kpi label="Average people per plan" value={fmt(o.avgPeople.value, 1)} delta={o.avgPeople.delta} spark={o.avgPeople.spark} compare={data.view.compareLabel} />
         <Kpi label="Plans with zero joins" value={fmt(o.zeroJoins.value)} delta={o.zeroJoins.delta} spark={o.zeroJoins.spark} compare={data.view.compareLabel} />
         <Kpi label="Active users" value={fmt(o.wau.value)} delta={o.wau.delta} spark={o.wau.spark} compare={data.view.compareLabel} />
+      </section>
+
+      <section className="fdash-metrics">
+        <article className="fdash-card">
+          <div className="fdash-card-label">Plans that actually happened</div>
+          <div className="fdash-metric-value">{fmt(o.happened.yes)}</div>
+          <p className="fdash-muted">
+            Hosts confirmed {o.happened.yes} {o.happened.yes === 1 ? "plan" : "plans"} in this range.
+            {o.happened.no > 0 ? ` ${o.happened.no} marked as not happening.` : ""}
+            {o.happened.rescheduled > 0 ? ` ${o.happened.rescheduled} rescheduled.` : ""}
+            {o.happened.unanswered > 0
+              ? ` ${o.happened.unanswered} already ended and still have no answer.`
+              : o.happened.yes + o.happened.no + o.happened.rescheduled > 0
+                ? " Every ended plan in this range has an answer."
+                : " No plans in this range have ended yet."}
+          </p>
+          {o.happenedPlans.length > 0 ? (
+            <ul className="fdash-metric-list">
+              {o.happenedPlans.map((plan) => (
+                <li key={plan.id}>
+                  <span>{pretty(plan.date)} · {plan.title}</span>
+                  <span>
+                    {plan.peopleAdded === 0
+                      ? "No one added"
+                      : `${plan.peopleAdded} ${plan.peopleAdded === 1 ? "person" : "people"} added`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </article>
+        <article className="fdash-card">
+          <div className="fdash-card-label">Added someone after a plan</div>
+          <div className="fdash-metric-value">{fmt(o.networkAfterPlan.added)}</div>
+          <p className="fdash-muted">
+            {o.networkAfterPlan.added === 0
+              ? "Nobody used the after-plan prompt to add someone in this range."
+              : `${o.networkAfterPlan.people} ${o.networkAfterPlan.people === 1 ? "person" : "people"} added ${o.networkAfterPlan.added} ${o.networkAfterPlan.added === 1 ? "person" : "people"} they went out with.`}
+          </p>
+          {o.networkAfterPlan.rows.length > 0 ? (
+            <ul className="fdash-metric-list">
+              {o.networkAfterPlan.rows.map((row) => (
+                <li key={row.planId ?? row.date}>
+                  <span>{pretty(row.date)}{row.planTitle ? ` · ${row.planTitle}` : ""}</span>
+                  <span>{row.people} {row.people === 1 ? "person" : "people"}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </article>
       </section>
 
       <section className="fdash-row">
@@ -795,12 +856,12 @@ function Overview({
           <div className="fdash-funnel">
             <FunnelStep label="Posted" value={o.funnel.posted} pct={null} width={o.funnel.posted ? 100 : 0} />
             <FunnelStep label="Joined · 1+ person" value={o.funnel.joined} pct={o.funnel.postedToJoinedPct} width={o.funnel.posted ? (o.funnel.joined / o.funnel.posted) * 100 : 0} />
-            <FunnelStep label="Completed" value={o.funnel.completed} pct={o.funnel.joinedToCompletedPct} width={o.funnel.posted ? (o.funnel.completed / o.funnel.posted) * 100 : 0} />
+            <FunnelStep label="Happened" value={o.funnel.completed} pct={o.funnel.joinedToCompletedPct} width={o.funnel.posted ? (o.funnel.completed / o.funnel.posted) * 100 : 0} />
           </div>
           <p className="fdash-note">
             {o.funnel.happenedPct === null
               ? "No plans were posted in this window."
-              : `${fmtPct(o.funnel.happenedPct)} of posted plans were marked happened. ${o.funnel.zeroJoins} got no joins${o.funnel.shortNoticeZeroJoins ? ` — ${o.funnel.shortNoticeZeroJoins} of those were posted with under 24 hours' notice` : ""}.`}
+              : `${fmtPct(o.funnel.happenedPct)} of posted plans were marked happened. ${o.happened.unanswered} ended without an answer. ${o.funnel.zeroJoins} got no joins${o.funnel.shortNoticeZeroJoins ? ` — ${o.funnel.shortNoticeZeroJoins} of those were posted with under 24 hours' notice` : ""}.`}
           </p>
         </article>
         <article className="fdash-card fdash-alert">
@@ -1055,6 +1116,25 @@ function HBars({ rows }: { rows: { label: string; count: number }[] }) {
   );
 }
 
+function pixelStatus(pixels: Dashboard["acquisition"]["pixels"]): string {
+  const on = [pixels.meta && "Meta", pixels.google && "Google", pixels.tiktok && "TikTok"].filter(Boolean);
+  const pixelsLine =
+    on.length === 0
+      ? "Ad pixels are off until META_PIXEL_ID, GA_MEASUREMENT_ID, or TIKTOK_PIXEL_ID is set."
+      : `${on.join(", ")} ${on.length === 1 ? "pixel is" : "pixels are"} on.`;
+  return `${pixelsLine} Each bar is the first link opened before the account was created. A link can add its own row with ?from= on the URL, which is how a QR code or a flyer shows up. Older accounts say Not tracked yet.`;
+}
+
+function webThenAppCopy(joined: Dashboard["acquisition"]["joined"]): string {
+  const webLine =
+    joined.web === 0
+      ? "No web signups in this range yet."
+      : `${joined.webThenApp} of ${joined.web} people who signed up on the web later opened the app.`;
+  const older =
+    joined.unknown > 0 ? ` ${joined.unknown} older accounts don't have a signup device saved.` : "";
+  return `${webLine} ${joined.app} signed up in the app.${older}`;
+}
+
 function Acquisition({ data }: { data: Dashboard }) {
   const a = data.acquisition;
   const maxType = Math.max(1, ...a.byType.map((t) => t.signups));
@@ -1103,6 +1183,22 @@ function Acquisition({ data }: { data: Dashboard }) {
           <p className="fdash-note">Conversion = active after 7 days ÷ signups. Downloads per code aren't collected.</p>
         </article>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <article className="fdash-card">
+            <div className="fdash-card-head">
+              <h2>Where signups came from</h2>
+              <span className="fdash-card-sub">{a.signupCount}</span>
+            </div>
+            <HBars rows={a.sources} />
+            <p className="fdash-note">{pixelStatus(a.pixels)}</p>
+          </article>
+          <article className="fdash-card">
+            <div className="fdash-card-head">
+              <h2>Web, then the app</h2>
+              <span className="fdash-card-sub">{a.joined.webThenApp}</span>
+            </div>
+            <div className="fdash-metric-value">{a.joined.webThenApp}</div>
+            <p className="fdash-muted">{webThenAppCopy(a.joined)}</p>
+          </article>
           <article className="fdash-card">
             <div className="fdash-card-head">
               <h2>Signups by age</h2>

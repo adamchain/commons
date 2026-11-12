@@ -6,7 +6,7 @@
 import twilio from "twilio";
 import { isMongoConnected } from "./db.js";
 import { planPoint } from "./geo.js";
-import { planStartTimestamp } from "./planTime.js";
+import { planEndTimestamp, planHasEnded, planStartTimestamp } from "./planTime.js";
 import { LogModel } from "../models/index.js";
 import { store, type AdminDashboardView, type PlanRecord, type UserRecord } from "../store.js";
 import { AGE_RANGE_LABELS, type AgeRange } from "../types/shared.js";
@@ -68,6 +68,14 @@ export interface AdminDashboard {
     weekNumber: number | null;
     sinceLabel: string | null;
     plansCompleted: DashboardDelta;
+    happened: { yes: number; no: number; rescheduled: number; unanswered: number };
+    happenedPlans: { id: string; title: string; date: string; peopleAdded: number }[];
+    networkAfterPlan: {
+      people: number;
+      adds: number;
+      added: number;
+      rows: { planId: string | null; planTitle: string | null; date: string; people: number }[];
+    };
     avgPeople: DashboardDelta;
     zeroJoins: DashboardDelta;
     wau: DashboardDelta;
@@ -133,6 +141,9 @@ export interface AdminDashboard {
     age: { label: string; count: number }[];
     neighborhoods: { name: string; count: number }[];
     signupCount: number;
+    sources: { label: string; count: number }[];
+    joined: { web: number; app: number; webThenApp: number; unknown: number };
+    pixels: { meta: boolean; google: boolean; tiktok: boolean };
     waitlist: { available: false; reason: string; formUrl: string };
   };
   communities: {
@@ -582,7 +593,16 @@ export async function buildAdminDashboard(
   const logs = await loadLogs(logSince);
   const interestPairs = new Set<string>();
   const convertedPairs = new Set<string>();
+  const happenedLog = new Map<string, { outcome: "yes" | "no" | "rescheduled"; at: string }>();
   for (const log of logs) {
+    if (log.event === "plan_happened_outcome") {
+      const planId = payloadField(log.payload, "planId");
+      const outcome = payloadField(log.payload, "outcome");
+      if (planId && (outcome === "yes" || outcome === "no" || outcome === "rescheduled")) {
+        const prev = happenedLog.get(planId);
+        if (!prev || log.createdAt >= prev.at) happenedLog.set(planId, { outcome, at: log.createdAt });
+      }
+    }
     const day = dayKeyFromIso(log.createdAt);
     if (!day || day < ADMIN_DATA_START || day > scope.to) continue;
     const inSelected = day >= scope.from;
@@ -614,11 +634,23 @@ export async function buildAdminDashboard(
     const end = days[days.length - 1]!;
     return livePlans.filter((p) => inRange(dayKeyFromIso(p.createdAt), start, end));
   }
+  function outcomeOf(plan: PlanRecord): "yes" | "no" | "rescheduled" | null {
+    const stored =
+      plan.happenedOutcome === "yes" || plan.happenedOutcome === "no" || plan.happenedOutcome === "rescheduled"
+        ? plan.happenedOutcome
+        : null;
+    const logged = happenedLog.get(plan.id);
+    if (stored && logged) {
+      if (plan.happenedAt && plan.happenedAt < logged.at) return logged.outcome;
+      return stored;
+    }
+    return stored ?? logged?.outcome ?? null;
+  }
   function completedOn(days: string[]): PlanRecord[] {
     if (days.length === 0) return [];
     const start = days[0]!;
     const end = days[days.length - 1]!;
-    return livePlans.filter((p) => p.happenedOutcome === "yes" && inRange(p.date.slice(0, 10), start, end));
+    return livePlans.filter((p) => outcomeOf(p) === "yes" && inRange(p.date.slice(0, 10), start, end));
   }
   function zeroJoinCount(rows: PlanRecord[]): number {
     return rows.filter((p) => !hasJoin(p, seedIds)).length;
@@ -634,8 +666,86 @@ export async function buildAdminDashboard(
   const prevPosted = postedOn(prevDays);
   const completed = completedOn(weekDays);
   const prevCompleted = completedOn(prevDays);
+  const endedInRange = livePlans.filter((plan) => {
+    if (plan.isFlexibleDate || plan.isThisWeek) return false;
+    if (plan.date.startsWith("2099")) return false;
+    if (!inRange(plan.date.slice(0, 10), weekStart, weekEnd)) return false;
+    return planHasEnded(plan, now);
+  });
+  const happened = {
+    yes: completed.length,
+    no: endedInRange.filter((plan) => outcomeOf(plan) === "no").length,
+    rescheduled: endedInRange.filter((plan) => outcomeOf(plan) === "rescheduled").length,
+    unanswered: endedInRange.filter((plan) => !outcomeOf(plan)).length,
+  };
+  const networkAdds = store.listAllRelationships().filter((row) => {
+    if (row.kind !== "network" || row.source !== "post_plan_modal") return false;
+    if (!actorOk(row.userId)) return false;
+    if (memberIds && !memberIds.has(row.userId)) return false;
+    return inRange(dayKeyFromIso(row.createdAt), weekStart, weekEnd);
+  });
+  const goingOn = new Map<string, Set<string>>();
+  for (const plan of livePlans) goingOn.set(plan.id, new Set([plan.creatorId]));
+  for (const part of store.listAllParticipations()) {
+    if (part.state !== "going") continue;
+    goingOn.get(part.planId)?.add(part.userId);
+  }
+  function attributedPlan(row: { planId?: string | null; userId: string; targetId: string; createdAt: string }): PlanRecord | null {
+    if (row.planId) return store.findPlanById(row.planId) ?? null;
+    const created = Date.parse(row.createdAt);
+    let best: PlanRecord | null = null;
+    let bestEnd = -Infinity;
+    for (const plan of livePlans) {
+      const members = goingOn.get(plan.id);
+      if (!members?.has(row.userId) || !members.has(row.targetId)) continue;
+      const end = planEndTimestamp(plan);
+      if (!Number.isFinite(end) || end > created + 60 * 60 * 1000) continue;
+      if (end >= bestEnd) {
+        best = plan;
+        bestEnd = end;
+      }
+    }
+    return best;
+  }
+  const addedTargets = new Set<string>();
+  const addsByPlan = new Map<string, { planId: string | null; planTitle: string | null; date: string; targets: Set<string> }>();
+  for (const row of networkAdds) {
+    addedTargets.add(row.targetId);
+    const plan = attributedPlan(row);
+    const date = plan?.date.slice(0, 10) || dayKeyFromIso(row.createdAt) || "";
+    const key = plan?.id ?? `day:${date}`;
+    let bucket = addsByPlan.get(key);
+    if (!bucket) {
+      bucket = { planId: plan?.id ?? null, planTitle: plan?.title ?? null, date, targets: new Set() };
+      addsByPlan.set(key, bucket);
+    }
+    bucket.targets.add(row.targetId);
+  }
+  const networkRows = [...addsByPlan.values()]
+    .map((bucket) => ({
+      planId: bucket.planId,
+      planTitle: bucket.planTitle,
+      date: bucket.date,
+      people: bucket.targets.size,
+    }))
+    .filter((row) => isDay(row.date))
+    .sort((a, b) => b.date.localeCompare(a.date) || (a.planTitle ?? "").localeCompare(b.planTitle ?? ""));
+  const networkAfterPlan = {
+    people: new Set(networkAdds.map((row) => row.userId)).size,
+    adds: networkAdds.length,
+    added: addedTargets.size,
+    rows: networkRows,
+  };
+  const happenedPlans = [...completed]
+    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
+    .map((plan) => ({
+      id: plan.id,
+      title: plan.title,
+      date: plan.date.slice(0, 10),
+      peopleAdded: addsByPlan.get(plan.id)?.targets.size ?? 0,
+    }));
   const joined = posted.filter((p) => hasJoin(p, seedIds));
-  const completedPosted = posted.filter((p) => p.happenedOutcome === "yes");
+  const completedPosted = posted.filter((p) => outcomeOf(p) === "yes");
   const zeroJoins = zeroJoinCount(posted);
   let shortNotice = 0;
   for (const plan of posted) {
@@ -801,6 +911,9 @@ export async function buildAdminDashboard(
       weekNumber: firstSignup ? Math.max(1, Math.floor((Date.parse(weekEnd) - Date.parse(firstSignup)) / (7 * 86400000)) + 1) : null,
       sinceLabel: firstSignup ? `since first signup ${prettyDay(firstSignup)}` : null,
       plansCompleted: deltaOf(completed.length, hasPrev ? prevCompleted.length : null, completedSpark),
+      happened,
+      happenedPlans,
+      networkAfterPlan,
       avgPeople: deltaOf(meanPeople(completed), hasPrev ? meanPeople(prevCompleted) : null, peopleSpark),
       zeroJoins: deltaOf(zeroJoins, hasPrev ? zeroJoinCount(prevPosted) : null, zeroSpark),
       wau: deltaOf(wau, prevWau, wauSpark),
@@ -1116,11 +1229,32 @@ function buildAcquisition(input: {
   ];
   const ageCounts = new Map<string, number>(ageOrder.map((a) => [a.id, 0]));
   const hoodCounts = new Map<string, number>();
+  const sourceCounts = new Map<string, number>();
+  const mobileIds = new Set(
+    store
+      .listAllDevices()
+      .filter((device) => device.platform === "ios" || device.platform === "android")
+      .map((device) => device.userId),
+  );
+  const joined = { web: 0, app: 0, webThenApp: 0, unknown: 0 };
   for (const user of input.realUsers) {
     const age = user.ageRange ?? "unset";
     ageCounts.set(age, (ageCounts.get(age) ?? 0) + 1);
     const hood = (user.neighborhoodId && input.hoodName.get(user.neighborhoodId)) || "Other";
     hoodCounts.set(hood, (hoodCounts.get(hood) ?? 0) + 1);
+    const source = user.signupSource?.label?.trim() || "Not tracked yet";
+    sourceCounts.set(source, (sourceCounts.get(source) ?? 0) + 1);
+    if (user.signupPlatform === "web") {
+      joined.web += 1;
+      if (user.mobileOpenedAt || mobileIds.has(user.id)) joined.webThenApp += 1;
+    } else if (user.signupPlatform === "ios" || user.signupPlatform === "android") {
+      joined.app += 1;
+    } else {
+      joined.unknown += 1;
+    }
+  }
+  for (const label of ["Facebook", "Landing", "SMS or iMessage"]) {
+    if (!sourceCounts.has(label)) sourceCounts.set(label, 0);
   }
 
   const codes = store.listAllInviteCodes()
@@ -1172,6 +1306,15 @@ function buildAcquisition(input: {
       .sort((a, b) => b.count - a.count)
       .slice(0, 8),
     signupCount: input.realUsers.length,
+    sources: [...sourceCounts.entries()]
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)),
+    joined,
+    pixels: {
+      meta: /^[0-9]{5,20}$/.test(process.env.META_PIXEL_ID?.trim() ?? ""),
+      google: /^G-[A-Z0-9]+$/i.test(process.env.GA_MEASUREMENT_ID?.trim() ?? ""),
+      tiktok: /^[A-Za-z0-9]{10,40}$/.test(process.env.TIKTOK_PIXEL_ID?.trim() ?? ""),
+    },
     waitlist: {
       available: false,
       reason: "Waitlist emails live in a Google Form and aren't stored on accounts, so this rate can't be calculated yet.",

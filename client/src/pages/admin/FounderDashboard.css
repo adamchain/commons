@@ -543,6 +543,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
+  margin-top: 14px;
 }
 
 .fdash-metric-value {
@@ -557,6 +558,32 @@
   font-size: 13px;
   line-height: 1.45;
   margin: 0;
+}
+
+.fdash-metric-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.fdash-metric-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  font-size: 13px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.fdash-metric-list li span:first-child {
+  min-width: 0;
+}
+
+.fdash-metric-list li span:last-child {
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .fdash-flag {

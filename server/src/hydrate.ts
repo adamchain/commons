@@ -138,12 +138,43 @@ export async function hydrateSnapshotFromMongo(): Promise<void> {
     // Unify legacy 8-option community categories with InterestTag *before*
     // any other community writes (promote/update upserts must pass the new enum).
     const categoryMigrated = store.migrateCommunityCategories();
+    const happenedRestored = await restoreHappenedOutcomes();
 
     console.log(
       `[hydrate] loaded from Mongo: ${users.length} users, ${neighborhoods.length} hoods, ${plans.length} plans, ${participations.length} rsvps, ${conversations.length} convos, ${messages.length} msgs, ${interestForums.length} forums, ${forumPosts.length} forumPosts` +
-        (categoryMigrated ? `, migrated ${categoryMigrated} community categories` : ""),
+        (categoryMigrated ? `, migrated ${categoryMigrated} community categories` : "") +
+        (happenedRestored ? `, restored ${happenedRestored} plan outcomes` : ""),
     );
   } catch (err) {
     console.error("[hydrate] failed to load from Mongo — running with stale snapshot", err);
   }
+}
+
+/**
+ * Host "yes / no / rescheduled" answers were written to the plan log, but the
+ * plan document dropped the field until it was on the schema. Copy the latest
+ * answer back onto the plan so the admin count keeps every plan, not just the
+ * one answered since the last restart.
+ */
+async function restoreHappenedOutcomes(): Promise<number> {
+  const rows = await LogModel.find({ event: "plan_happened_outcome" })
+    .select({ payload: 1, createdAt: 1, _id: 0 })
+    .lean();
+  const latest = new Map<string, { outcome: "yes" | "no" | "rescheduled"; at: string }>();
+  for (const row of rows) {
+    const payload = row.payload as { planId?: unknown; outcome?: unknown } | null;
+    const planId = typeof payload?.planId === "string" ? payload.planId : "";
+    const outcome = payload?.outcome;
+    if (!planId || (outcome !== "yes" && outcome !== "no" && outcome !== "rescheduled")) continue;
+    const prev = latest.get(planId);
+    if (!prev || row.createdAt >= prev.at) latest.set(planId, { outcome, at: row.createdAt });
+  }
+  let restored = 0;
+  for (const [planId, row] of latest) {
+    const plan = store.findPlanById(planId);
+    if (!plan || plan.happenedOutcome) continue;
+    store.updatePlan(planId, { happenedOutcome: row.outcome, happenedAt: row.at });
+    restored += 1;
+  }
+  return restored;
 }

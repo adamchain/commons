@@ -1834,7 +1834,7 @@ plansRouter.post("/:id/happened-outcome", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Only the host can answer" });
     return;
   }
-  store.updatePlan(planId, { happenedOutcome: outcome });
+  store.updatePlan(planId, { happenedOutcome: outcome, happenedAt: new Date().toISOString() });
   store.log("plan_happened_outcome", { planId, by: userId, outcome });
   res.json({ ok: true, happenedOutcome: outcome });
 });
