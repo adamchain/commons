@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import wordmark from "../assets/wordmark.png";
 import appStoreBadge from "../assets/app-store-badge.png";
 import { APP_STORE_URL } from "../lib/appStore";
+import { trackAppStoreClick } from "../lib/pixels";
 
 /**
  * Public marketing landing (routed at /welcome) — a warm, editorial one-pager:
@@ -31,7 +32,7 @@ const picnicImg = "/landing/photo-picnic.jpg";
 
 function Nav() {
   return (
-    <nav style={{ position: "sticky", top: 0, zIndex: 50, background: BEIGE }}>
+    <nav className="landing-nav" style={{ position: "sticky", top: 0, zIndex: 50, background: BEIGE }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 48px", height: 68, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid rgba(20,17,48,0.06)` }}>
         <img src={wordmark} alt="Commons" style={{ height: 26, width: "auto" }} />
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -65,6 +66,8 @@ function AppStoreBadge({ onDark = false }: { onDark?: boolean }) {
       href={APP_STORE_URL}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={() => trackAppStoreClick()}
+      className="landing-store"
       style={{ display: "inline-block", lineHeight: 0 }}
     >
       <img
@@ -91,10 +94,18 @@ function Hero() {
             More people.<br />
             <em style={{ fontStyle: "normal", color: RED }}>More showing up.</em>
           </h1>
-          <p style={{ fontFamily: B, fontSize: 16, color: MUTED, lineHeight: 1.8, marginBottom: 44, maxWidth: 400 }}>
+          <p style={{ fontFamily: B, fontSize: 16, color: MUTED, lineHeight: 1.8, marginBottom: 18, maxWidth: 400 }}>
             COMMONS is where women actually make plans — find someone to do it with, or bring your people together. Either way, something happens.
           </p>
-          <AppStoreBadge />
+          <p className="landing-kicker" style={{ fontFamily: B, fontSize: 13, fontWeight: 600, letterSpacing: "0.04em", color: NAVY, marginBottom: 22 }}>
+            Free on iPhone and the web.
+          </p>
+          <div className="landing-ctas">
+            <AppStoreBadge />
+            <Link to="/onboarding" className="landing-web-signup">
+              Sign up on the web
+            </Link>
+          </div>
         </div>
       </div>
     </section>
@@ -217,9 +228,30 @@ function Footer() {
 
 export function LandingPage() {
   return (
-    <div style={{ background: BEIGE, minHeight: "100vh" }}>
+    <div className="landing-page" style={{ background: BEIGE, minHeight: "100vh" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap');
+        .landing-ctas {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 14px;
+        }
+        .landing-web-signup {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 48px;
+          padding: 0 22px;
+          border-radius: 999px;
+          background: ${NAVY};
+          color: ${WHITE};
+          font-family: ${B};
+          font-size: 15px;
+          font-weight: 600;
+          text-decoration: none;
+        }
+        .landing-dock { display: none; }
         @media (max-width: 920px) {
           .hero-grid, .pathways-header-grid, .pathway-grid, .how-grid {
             grid-template-columns: 1fr !important;
@@ -239,6 +271,54 @@ export function LandingPage() {
             gap: 8px !important;
           }
         }
+        @media (max-width: 720px) {
+          .landing-nav > div {
+            padding-left: 16px !important;
+            padding-right: 16px !important;
+          }
+          .landing-ctas {
+            flex-direction: column;
+            align-items: stretch;
+            width: 100%;
+            max-width: 360px;
+          }
+          .landing-ctas .landing-store {
+            display: flex;
+            justify-content: center;
+          }
+          .landing-ctas .landing-store img {
+            height: 56px !important;
+          }
+          .landing-web-signup {
+            width: 100%;
+            min-height: 52px;
+            font-size: 16px;
+          }
+          .landing-dock {
+            display: flex;
+            position: fixed;
+            z-index: 80;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+            background: rgba(235, 228, 218, 0.97);
+            border-top: 1px solid rgba(20, 17, 48, 0.08);
+            box-shadow: 0 -8px 24px rgba(20, 17, 48, 0.08);
+          }
+          .landing-dock .landing-store img { height: 44px !important; }
+          .landing-dock .landing-web-signup {
+            width: auto;
+            min-height: 44px;
+            padding: 0 16px;
+            font-size: 14px;
+            background: ${RED};
+          }
+          .landing-page { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+        }
       `}</style>
       <Nav />
       <Hero />
@@ -246,6 +326,12 @@ export function LandingPage() {
       <TwoPathways />
       <HowItWorks />
       <Footer />
+      <div className="landing-dock">
+        <AppStoreBadge />
+        <Link to="/onboarding" className="landing-web-signup">
+          Sign up on the web
+        </Link>
+      </div>
     </div>
   );
 }

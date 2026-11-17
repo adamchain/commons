@@ -27,6 +27,13 @@ function resolveApiBase(): string {
 
 const API_BASE = resolveApiBase();
 
+/** Turn `/api/img/...` (and any other API-relative path) into a fetchable URL. */
+export function mediaSrc(url: string | null | undefined): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("/api/")) return `${API_BASE}${url}`;
+  return url;
+}
+
 function isSessionProbe(path: string): boolean {
   return (
     path.startsWith("/api/auth/verify-code") ||

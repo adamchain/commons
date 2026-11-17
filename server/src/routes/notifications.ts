@@ -81,7 +81,7 @@ notificationsRouter.post("/app-update", requireAuth, async (req, res) => {
     res.status(400).json({ error: "installed version required" });
     return;
   }
-  const latest = (process.env.APP_LATEST_VERSION?.trim() || "1.7").slice(0, 20);
+  const latest = (process.env.APP_LATEST_VERSION?.trim() || "3.9").slice(0, 20);
   const userId = String(req.userId);
   if (!/^\d+(\.\d+){0,3}$/.test(latest) || compareVersions(installed, latest) >= 0) {
     store.deleteNotificationsByKind(userId, "appUpdate");
@@ -91,9 +91,8 @@ notificationsRouter.post("/app-update", requireAuth, async (req, res) => {
   await emit({
     userId,
     kind: "appUpdate",
-    body: "A newer version of Commons is ready. Update to keep plans and messages in sync.",
+    body: "A newer version of Commons is ready. Update to keep chatting and posting.",
     dedupKey: `appUpdate:${userId}:${latest}`,
-    skipPush: true,
   });
   res.json({ ok: true, needed: true });
 });

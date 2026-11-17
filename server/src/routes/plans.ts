@@ -629,17 +629,8 @@ plansRouter.post("/", requireAuth, async (req, res) => {
   });
 
   store.upsertParticipation(plan.id, userId, "going");
-  // Co-hosts are committed + dropped into the group chat, and pinged that
-  // they're hosting it together.
   for (const coId of coHostIds) {
     store.upsertParticipation(plan.id, coId, "going");
-    await emit({
-      userId: coId,
-      kind: "planInvite",
-      body: `${me.firstName || "Someone"} made you a co-host of "${title}"`,
-      planId: plan.id,
-      dedupKey: `coHost:${plan.id}:${coId}`,
-    });
   }
   const newConv = planChatOn(plan)
     ? store.ensureGroupConversation(plan.id, [userId, ...coHostIds])
@@ -684,40 +675,63 @@ plansRouter.post("/", requireAuth, async (req, res) => {
           `🔁 ${me.firstName || "The host"} planned "${title}" again — ${whenLabel}. Same crew, new date.`,
         );
       }
-      for (const attId of prevAttendees) {
-        await emit({
-          userId: attId,
-          kind: "planInvite",
-          body: `${me.firstName || "Someone"} is doing "${title}" again — you're in the group`,
-          planId: plan.id,
-          conversationId: newConv?.id,
-          dedupKey: `replan:${plan.id}:${attId}`,
-        });
-      }
       store.log("plan_replanned", { planId: plan.id, fromPlanId, carried: prevAttendees.length });
     }
   }
 
   store.log("plan_created", { planId: plan.id, creatorId: userId, coHosts: coHostIds.length });
   void onPlanCreatedVenueNudge(plan).catch((err) => console.error("[nudge] venue", err));
-
-  // Ping the organizer when a member (not the organizer) tags a plan to their
-  // community, so they know activity is landing on their events board.
-  if (communityId) {
-    const community = store.findCommunityById(communityId);
-    if (community && community.organizerId !== userId) {
-      await emit({
-        userId: community.organizerId,
-        kind: "communityPlanPosted",
-        body: `${me.firstName || "Someone"} posted "${title}" to ${community.name}`,
-        planId: plan.id,
-        communityId,
-        dedupKey: `communityPlanPosted:${plan.id}`,
-      });
-    }
-  }
-
   res.status(201).json(await planSummary(plan, userId));
+  void (async () => {
+    const hostName = me.firstName || "Someone";
+    await Promise.all(
+      coHostIds.map((coId) =>
+        emit({
+          userId: coId,
+          kind: "planInvite",
+          body: `${hostName} made you a co-host of "${title}"`,
+          planId: plan.id,
+          dedupKey: `coHost:${plan.id}:${coId}`,
+        }),
+      ),
+    );
+    if (fromPlanId && fromPlanId !== plan.id) {
+      const prevPlan = store.findPlanById(fromPlanId);
+      if (prevPlan) {
+        const prevAttendees = store
+          .listParticipationsForPlan(fromPlanId)
+          .filter((p) => p.state === "going" && p.userId !== userId)
+          .map((p) => p.userId);
+        await Promise.all(
+          prevAttendees.map((attId) =>
+            emit({
+              userId: attId,
+              kind: "planInvite",
+              body: `${hostName} is doing "${title}" again — you're in the group`,
+              planId: plan.id,
+              conversationId: newConv?.id,
+              dedupKey: `replan:${plan.id}:${attId}`,
+            }),
+          ),
+        );
+      }
+    }
+    if (communityId) {
+      const community = store.findCommunityById(communityId);
+      if (community && community.organizerId !== userId) {
+        await emit({
+          userId: community.organizerId,
+          kind: "communityPlanPosted",
+          body: `${hostName} posted "${title}" to ${community.name}`,
+          planId: plan.id,
+          communityId,
+          dedupKey: `communityPlanPosted:${plan.id}`,
+        });
+      }
+    }
+  })().catch((err) => {
+    console.error("[plans] create notify failed", err instanceof Error ? err.message : err);
+  });
 });
 
 // Host-only patch for instant fields. Date/time are deliberately excluded —
@@ -891,9 +905,7 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
   store.updatePlan(planId, patch);
   await syncPlanFullness(planId);
   const updated = store.findPlanById(planId)!;
-  if (wasHostClosed && updated.markedFull !== true) {
-    await notifySpotOpened(planId);
-  }
+  const reopenSpots = wasHostClosed && updated.markedFull !== true;
 
   if (venueChanged) {
     const stamp = new Date().toISOString();
@@ -917,6 +929,11 @@ plansRouter.patch("/:id", requireAuth, async (req, res) => {
   }
 
   res.json(await planSummary(updated, userId));
+  if (reopenSpots) {
+    void notifySpotOpened(planId).catch((err) => {
+      console.error("[plans] spot-open notify failed", err instanceof Error ? err.message : err);
+    });
+  }
 });
 
 // Host proposes a new date/time. The proposal is stored on the plan but the
@@ -1070,6 +1087,13 @@ plansRouter.post("/:id/invite", requireAuth, async (req, res) => {
 
   let invited = 0;
   let hiddenForSome = false;
+  const pings: Array<{
+    userId: string;
+    kind: "planInvite";
+    body: string;
+    planId: string;
+    dedupKey: string;
+  }> = [];
   for (const id of userIds) {
     if (id === userId) continue;
     if (store.isBlockedEitherWay(userId, id)) continue;
@@ -1082,17 +1106,19 @@ plansRouter.post("/:id/invite", requireAuth, async (req, res) => {
     const body = hidden
       ? `${inviterName} invited you to "${plan.title}" — it's private to ${creator?.firstName ?? "the host"}'s network, so add them to see it`
       : `${inviterName} invited you to "${plan.title}"`;
-    await emit({
+    pings.push({
       userId: id,
-      kind: "planInvite",
+      kind: "planInvite" as const,
       body,
       planId: plan.id,
-      // One invite ping per (plan, invitee) — re-inviting won't spam.
       dedupKey: `planInvite:${plan.id}:${id}`,
     });
     invited++;
   }
   res.json({ ok: true, invited, hiddenForSome });
+  void Promise.all(pings.map((p) => emit(p))).catch((err) => {
+    console.error("[plans] invite notify failed", err instanceof Error ? err.message : err);
+  });
 });
 
 plansRouter.post("/:id/suggestions", requireAuth, async (req, res) => {
@@ -1320,8 +1346,6 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
     );
   }
 
-  await notifyInterestedPlanLocked(updated, hostName);
-
   const creator = store.findUserById(updated.creatorId);
   const creatorNet = new Set(creator?.networkIds ?? []);
   const isNetworkOnly = (updated.visibility ?? "everyone") === "network";
@@ -1352,6 +1376,9 @@ plansRouter.post("/:id/lock", requireAuth, async (req, res) => {
   }
 
   res.json(await planSummary(updated, userId));
+  void notifyInterestedPlanLocked(updated, hostName).catch((err) => {
+    console.error("[plans] lock notify failed", err instanceof Error ? err.message : err);
+  });
 });
 
 plansRouter.get("/:id", requireAuth, async (req, res) => {
@@ -1453,41 +1480,14 @@ plansRouter.put("/:id/participation", requireAuth, async (req, res) => {
     from: previousState,
     to: state,
   });
-  // Host (and co-hosts) hear about a new Join or Interested. Copy names the
-  // action so the two aren't easy to mix up. Deduped once per person per action.
-  if (
+  const shouldPingHosts =
     (state === "going" || state === "interested") &&
     previousState !== state &&
-    plan.creatorId !== userId
-  ) {
+    plan.creatorId !== userId;
+  if (shouldPingHosts) {
     const joiner = await findUserById(userId);
     const joinerName = joiner?.firstName || "Someone";
     const joined = state === "going";
-    const communityNote = communityPlanNotify(plan);
-    const body = joined
-      ? communityNote.name
-        ? `${joinerName} joined "${plan.title}" in ${communityNote.name}`
-        : `${joinerName} joined your plan "${plan.title}"`
-      : communityNote.name
-        ? `${joinerName} is interested in "${plan.title}" in ${communityNote.name}`
-        : `${joinerName} is interested in your plan "${plan.title}"`;
-    const dedupKey = joined
-      ? `someoneJoinedYourPlan:${plan.id}:${userId}`
-      : `planInterested:${plan.id}:${userId}`;
-    const hostIds = [plan.creatorId, ...(plan.coHostIds ?? []), ...communityNote.extraIds].filter(
-      (id, index, all) => id !== userId && all.indexOf(id) === index,
-    );
-    for (const hostId of hostIds) {
-      await emit({
-        userId: hostId,
-        kind: "someoneJoinedYourPlan",
-        body,
-        planId: plan.id,
-        profileUserId: userId,
-        ...(plan.communityId ? { communityId: plan.communityId } : {}),
-        dedupKey: hostId === plan.creatorId ? dedupKey : `${dedupKey}:${hostId}`,
-      });
-    }
     const conv = store.findGroupConversationByPlan(planId);
     if (conv) {
       store.createSystemMessage(
@@ -1498,6 +1498,42 @@ plansRouter.put("/:id/participation", requireAuth, async (req, res) => {
   }
   await syncPlanFullness(planId);
   res.json({ ok: true });
+  if (shouldPingHosts) {
+    void (async () => {
+      const joiner = await findUserById(userId);
+      const joinerName = joiner?.firstName || "Someone";
+      const joined = state === "going";
+      const communityNote = communityPlanNotify(plan);
+      const body = joined
+        ? communityNote.name
+          ? `${joinerName} joined "${plan.title}" in ${communityNote.name}`
+          : `${joinerName} joined your plan "${plan.title}"`
+        : communityNote.name
+          ? `${joinerName} is interested in "${plan.title}" in ${communityNote.name}`
+          : `${joinerName} is interested in your plan "${plan.title}"`;
+      const dedupKey = joined
+        ? `someoneJoinedYourPlan:${plan.id}:${userId}`
+        : `planInterested:${plan.id}:${userId}`;
+      const hostIds = [plan.creatorId, ...(plan.coHostIds ?? []), ...communityNote.extraIds].filter(
+        (id, index, all) => id !== userId && all.indexOf(id) === index,
+      );
+      await Promise.all(
+        hostIds.map((hostId) =>
+          emit({
+            userId: hostId,
+            kind: "someoneJoinedYourPlan",
+            body,
+            planId: plan.id,
+            profileUserId: userId,
+            ...(plan.communityId ? { communityId: plan.communityId } : {}),
+            dedupKey: hostId === plan.creatorId ? dedupKey : `${dedupKey}:${hostId}`,
+          }),
+        ),
+      );
+    })().catch((err) => {
+      console.error("[plans] join notify failed", err instanceof Error ? err.message : err);
+    });
+  }
 });
 
 // Approve-mode host control: promote an "interested" applicant to "going".
@@ -1565,10 +1601,20 @@ plansRouter.delete("/:id/participation", requireAuth, async (req, res) => {
   // drop a conscious act rather than a silent ghost. Skips when the host is
   // the one dropping (handled via cancel/transfer) and skips when the user
   // was only "interested" (tentative — not worth pinging).
-  if (existing?.state === "going") {
-    if (plan && plan.creatorId !== userId && !plan.cancelledAt) {
-      const leaver = await findUserById(userId);
-      const leaverName = leaver?.firstName || "Someone";
+  let leaverName = "";
+  if (existing?.state === "going" && plan && plan.creatorId !== userId && !plan.cancelledAt) {
+    const leaver = await findUserById(userId);
+    leaverName = leaver?.firstName || "Someone";
+    const conv = store.findGroupConversationByPlan(planId);
+    if (conv) {
+      store.createSystemMessage(conv.id, `${leaverName} can no longer make it`);
+    }
+  }
+  await syncPlanFullness(planId);
+  const after = store.findPlanById(planId);
+  res.json({ ok: true });
+  void (async () => {
+    if (existing?.state === "going" && plan && plan.creatorId !== userId && !plan.cancelledAt) {
       await emit({
         userId: plan.creatorId,
         kind: "someoneJoinedYourPlan",
@@ -1576,11 +1622,6 @@ plansRouter.delete("/:id/participation", requireAuth, async (req, res) => {
         planId: plan.id,
         dedupKey: `dropOut:${plan.id}:${userId}:${Date.now()}`,
       });
-      const conv = store.findGroupConversationByPlan(planId);
-      if (conv) {
-        store.createSystemMessage(conv.id, `${leaverName} can no longer make it`);
-      }
-      // Spot reopened on a previously-full plan — nudge the host to fill it.
       if (wasFull) {
         await emit({
           userId: plan.creatorId,
@@ -1591,38 +1632,35 @@ plansRouter.delete("/:id/participation", requireAuth, async (req, res) => {
         });
       }
     }
-  }
-  await syncPlanFullness(planId);
-  const after = store.findPlanById(planId);
-  // A capacity plan that hadn't been flagged full yet still opened a seat.
-  // Flagged ones already notified inside the fullness sync.
-  if (
-    existing?.state === "going" &&
-    after &&
-    wasFull &&
-    !wasCapacityClosed &&
-    !planIsClosed(after)
-  ) {
-    await notifySpotOpened(planId);
-  }
-  // Still closed (the host marked it full). The seat didn't open, but people
-  // already waiting should know someone left. Anyone just taken off got that
-  // note from the fullness sync, so they aren't pinged twice.
-  if (existing?.state === "going" && after && planIsClosed(after)) {
-    const stamp = Date.now();
-    const skip = new Set([userId, after.creatorId, ...(after.coHostIds ?? [])]);
-    for (const id of waitlistBefore) {
-      if (skip.has(id)) continue;
-      await emit({
-        userId: id,
-        kind: "planSpotReopen",
-        body: `Someone dropped out of "${after.title}". Keep an eye out in case a spot opens.`,
-        planId,
-        dedupKey: `planDropWatch:${planId}:${id}:${stamp}`,
-      });
+    if (
+      existing?.state === "going" &&
+      after &&
+      wasFull &&
+      !wasCapacityClosed &&
+      !planIsClosed(after)
+    ) {
+      await notifySpotOpened(planId);
     }
-  }
-  res.json({ ok: true });
+    if (existing?.state === "going" && after && planIsClosed(after)) {
+      const stamp = Date.now();
+      const skip = new Set([userId, after.creatorId, ...(after.coHostIds ?? [])]);
+      await Promise.all(
+        waitlistBefore
+          .filter((id) => !skip.has(id))
+          .map((id) =>
+            emit({
+              userId: id,
+              kind: "planSpotReopen",
+              body: `Someone dropped out of "${after.title}". Keep an eye out in case a spot opens.`,
+              planId,
+              dedupKey: `planDropWatch:${planId}:${id}:${stamp}`,
+            }),
+          ),
+      );
+    }
+  })().catch((err) => {
+    console.error("[plans] drop-out notify failed", err instanceof Error ? err.message : err);
+  });
 });
 
 // Host transfer — current host hands the plan to another going participant.
@@ -1670,14 +1708,16 @@ plansRouter.post("/:id/transfer-host", requireAuth, async (req, res) => {
   store.deleteParticipation(planId, userId);
   store.recordDropOut(userId, planId, outgoing?.state ?? "going");
   store.log("plan_host_transferred", { planId, from: userId, to: newHostId });
-  await emit({
+  res.json({ ok: true, newHostId });
+  void emit({
     userId: newHostId,
     kind: "someoneJoinedYourPlan",
     body: `You're hosting "${plan.title}" now`,
     planId: plan.id,
     dedupKey: `hostTransfer:${plan.id}:${newHostId}`,
+  }).catch((err) => {
+    console.error("[plans] transfer notify failed", err instanceof Error ? err.message : err);
   });
-  res.json({ ok: true, newHostId });
 });
 
 // Host puts hosting "up for grabs" instead of cancelling — anyone who's in can
@@ -1707,19 +1747,24 @@ plansRouter.post("/:id/up-for-grabs", requireAuth, async (req, res) => {
       `${host?.firstName ?? "The host"} can't make it — this plan is up for grabs. Tap "Take over hosting" to keep it alive.`,
     );
   }
-  for (const p of store.listParticipationsForPlan(planId)) {
-    if (p.userId === userId) continue;
-    if (p.state !== "going" && p.state !== "interested") continue;
-    await emit({
-      userId: p.userId,
-      kind: "planUpForGrabs",
-      body: `"${plan.title}" needs a new host — tap to take over hosting`,
-      planId: plan.id,
-      dedupKey: `upForGrabs:${plan.id}:${p.userId}`,
-    });
-  }
   store.log("plan_up_for_grabs", { planId, by: userId });
   res.json(await planSummary(store.findPlanById(planId)!, userId));
+  void Promise.all(
+    store
+      .listParticipationsForPlan(planId)
+      .filter((p) => p.userId !== userId && (p.state === "going" || p.state === "interested"))
+      .map((p) =>
+        emit({
+          userId: p.userId,
+          kind: "planUpForGrabs",
+          body: `"${plan.title}" needs a new host — tap to take over hosting`,
+          planId: plan.id,
+          dedupKey: `upForGrabs:${plan.id}:${p.userId}`,
+        }),
+      ),
+  ).catch((err) => {
+    console.error("[plans] up-for-grabs notify failed", err instanceof Error ? err.message : err);
+  });
 });
 
 // Any going/interested participant claims an up-for-grabs plan and becomes the
@@ -1753,15 +1798,17 @@ plansRouter.post("/:id/claim-host", requireAuth, async (req, res) => {
     const conv = store.ensureGroupConversation(planId, [userId]);
     store.createSystemMessage(conv.id, `${newHost?.firstName ?? "Someone"} took over hosting. 🙌`);
   }
-  await emit({
+  store.log("plan_host_claimed", { planId, from: oldHostId, to: userId });
+  res.json(await planSummary(store.findPlanById(planId)!, userId));
+  void emit({
     userId: oldHostId,
     kind: "someoneJoinedYourPlan",
     body: `${newHost?.firstName ?? "Someone"} took over hosting "${plan.title}"`,
     planId: plan.id,
     dedupKey: `claimHost:${plan.id}:${userId}`,
+  }).catch((err) => {
+    console.error("[plans] claim-host notify failed", err instanceof Error ? err.message : err);
   });
-  store.log("plan_host_claimed", { planId, from: oldHostId, to: userId });
-  res.json(await planSummary(store.findPlanById(planId)!, userId));
 });
 
 // Host-only plan cancellation. Marks the plan cancelled and notifies every
@@ -1803,17 +1850,21 @@ plansRouter.post("/:id/cancel", requireAuth, async (req, res) => {
         .filter((id) => id !== userId),
     ),
   );
-  for (const uid of recipientIds) {
-    await emit({
-      userId: uid,
-      kind: "planCancellation",
-      body: `"${plan.title}" was cancelled by the host`,
-      planId: plan.id,
-      dedupKey: `planCancellation:${plan.id}:${uid}`,
-    });
-  }
   store.log("plan_cancelled", { planId, by: userId, notified: recipientIds.length });
   res.json({ ok: true, cancelledAt });
+  void Promise.all(
+    recipientIds.map((uid) =>
+      emit({
+        userId: uid,
+        kind: "planCancellation",
+        body: `"${plan.title}" was cancelled by the host`,
+        planId: plan.id,
+        dedupKey: `planCancellation:${plan.id}:${uid}`,
+      }),
+    ),
+  ).catch((err) => {
+    console.error("[plans] cancel notify failed", err instanceof Error ? err.message : err);
+  });
 });
 
 /** Host answers "Did this happen?" — yes / no / rescheduled (metric #1). */

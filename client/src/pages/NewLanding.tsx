@@ -10,6 +10,7 @@ import { setAuthToken } from "../api/authToken";
 import { useAuth } from "../context/AuthContext";
 import { signupAttributionPayload } from "../lib/attribution";
 import { needsOnboarding } from "../lib/onboarding";
+import { accountWasJustCreated, trackAppStoreClick, trackSignup } from "../lib/pixels";
 import type { MeDTO } from "../types/shared";
 
 /** Compose a raw phone field value into E.164 (defaulting bare 10-digit input to US +1). */
@@ -162,6 +163,7 @@ export function NewLandingPage() {
       );
       if (res.token) await setAuthToken(res.token);
       setUser(res);
+      if (accountWasJustCreated(res)) trackSignup();
       navigate(needsOnboarding(res) ? "/onboarding" : "/", { replace: true });
     } catch (e) {
       setErr(parseApiError(e).includes("401") ? "That code didn't match. Try again." : parseApiError(e));
@@ -310,7 +312,7 @@ export function NewLandingPage() {
               </>
             )}
 
-            <a className="cl-appstore" href={APP_STORE_URL} target="_blank" rel="noopener noreferrer">
+            <a className="cl-appstore" href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" onClick={() => trackAppStoreClick()}>
               <img src={appStoreBadge} alt="Download on the App Store" />
             </a>
 

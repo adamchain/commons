@@ -32,13 +32,14 @@ export function TopBar() {
     pathname.startsWith("/admin") ||
     pathname === "/plans/new" ||
     pathname === "/communities/new" ||
-    pathname === "/explore" ||
+    pathname.startsWith("/settings") ||
     pathname.startsWith("/forums/") ||
     pathname.startsWith("/notifications") ||
     /^\/plans\/[^/]+(\/chat)?$/.test(pathname) ||
     /^\/plans\/[^/]+\/edit$/.test(pathname) ||
     /^\/communities\/[^/]+(\/.*)?$/.test(pathname) ||
     /^\/dm\/[^/]+$/.test(pathname) ||
+    /^\/chats\/[^/]+$/.test(pathname) ||
     pathname === "/helpchat" ||
     isOtherUserProfile;
 

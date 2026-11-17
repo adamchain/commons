@@ -2,6 +2,10 @@ import UIKit
 import Capacitor
 
 class MainViewController: CAPBridgeViewController {
+    override func capacitorDidLoad() {
+        bridge?.registerPluginInstance(MetaEventsPlugin())
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         // Capacitor disables bounce globally; re-enable vertical rubber-band

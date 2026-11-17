@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, MoreVertical, Plus } from "lucide-react";
-import { api, isAuthFailure, parseApiError } from "../api/http";
+import { api, isAuthFailure, mediaSrc, parseApiError } from "../api/http";
 import { Avatar } from "../components/Avatar";
 import { ComposerField, MentionText } from "../components/ComposerField";
 import { ChatReplyButton, ChatReplyDraft, ChatReplyQuote, replyTarget } from "../components/ChatReply";
@@ -17,14 +17,14 @@ import { Button } from "../components/ui/Button";
 import { ChatEmpty } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { fileToResizedDataUrl } from "../lib/imageResize";
-import type { NavFromState } from "../lib/navState";
+import { popOrNavigate, type NavFromState } from "../lib/navState";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
+import { mergeChatMessages, postOwnChatMessage, toggleChatHeart, useLiveChatMessages } from "../lib/useLiveChatMessages";
 import { useStickToBottom } from "../lib/useStickToBottom";
 import { readScreen, writeScreen } from "../lib/screenCache";
 import type { ConversationDTO, MessageDTO, MessageReplyDTO } from "../types/shared";
 
-const POLL_MS = 4000;
 const CHAT_IMAGE_MAX_PX = 1024;
 const CHAT_IMAGE_QUALITY = 0.85;
 
@@ -66,59 +66,45 @@ export function GroupChatPage() {
   const deletedIdsRef = useRef(new Set<string>());
   const lastId = messages[messages.length - 1]?.id ?? "";
   const { scrollRef, endRef, shellRef, stickOnSend } = useStickToBottom(ready, `${lastId}:${messages.length}`);
+  const live = useLiveChatMessages(conv?.id, setMessages, deletedIdsRef);
+  live.messagesRef.current = messages;
 
   useEffect(() => {
-    let live = true;
+    let liveFlag = true;
     if (!cached) setReady(false);
     setError(null);
     void (async () => {
       try {
-        const c = await api<ConversationDTO & { messages?: MessageDTO[] }>(
-          `/api/conversations/${conversationId}?messages=1`,
-        );
-        if (!live) return;
+        const c = await api<ConversationDTO>(`/api/conversations/${conversationId}`);
+        if (!liveFlag) return;
         setError(null);
         setGateMsg(null);
-        const msgs = c.messages ?? [];
-        const freshConv: ConversationDTO = { ...c, messages: undefined };
-        const freshMessages = visibleMessages(msgs, deletedIdsRef.current);
-        setConv(freshConv);
-        setMessages(freshMessages);
-        writeScreen(`group:${conversationId}`, { conv: freshConv, messages: freshMessages });
+        setConv(c);
+        setReady(true);
+        const msgs = await api<MessageDTO[]>(`/api/conversations/${c.id}/messages`);
+        if (!liveFlag) return;
+        setMessages((prev) => {
+          const locals = prev.filter((m) => m.id.startsWith("local-"));
+          const fresh = mergeChatMessages(
+            visibleMessages(msgs, deletedIdsRef.current),
+            locals,
+            deletedIdsRef.current,
+          );
+          writeScreen(`group:${conversationId}`, { conv: c, messages: fresh });
+          return fresh;
+        });
       } catch (e) {
-        if (!live) return;
+        if (!liveFlag) return;
         const message = parseApiError(e) || "Couldn't open this chat.";
         if (!cached) setGateMsg(message);
       } finally {
-        if (live) setReady(true);
+        if (liveFlag) setReady(true);
       }
     })();
     return () => {
-      live = false;
+      liveFlag = false;
     };
   }, [conversationId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Poll for new messages — only fetch messages newer than the last one we have.
-  useEffect(() => {
-    if (!conv) return;
-    const interval = setInterval(() => {
-      setMessages((prev) => {
-        const since = prev[prev.length - 1]?.createdAt ?? "";
-        void api<MessageDTO[]>(
-          `/api/conversations/${conv.id}/messages${since ? `?since=${encodeURIComponent(since)}` : ""}`,
-        ).then((incoming) => {
-          if (!incoming.length) return;
-          setMessages((cur) => {
-            const ids = new Set(cur.map((m) => m.id));
-            const fresh = incoming.filter((m) => !ids.has(m.id) && !deletedIdsRef.current.has(m.id));
-            return fresh.length ? [...cur, ...fresh].sort((a, b) => a.createdAt.localeCompare(b.createdAt)) : cur;
-          });
-        }).catch(() => undefined);
-        return prev;
-      });
-    }, POLL_MS);
-    return () => clearInterval(interval);
-  }, [conv]);
 
   useEffect(() => {
     if (!headerMenuOpen) return;
@@ -137,37 +123,34 @@ export function GroupChatPage() {
     conv?.participants.length != null ? `${conv.participants.length} ${conv.participants.length === 1 ? "member" : "members"}` : "";
 
   function goBack() {
-    navigate("/messages");
+    popOrNavigate(navigate, "/messages");
   }
 
   async function send() {
     const text = body.trim();
-    if (!conv || sending || (!text && !pendingImage)) return;
-    setSending(true);
-    setBody("");
+    if (!conv || sending || (!text && !pendingImage) || !user) return;
     const image = pendingImage;
     const reply = replyTo;
+    setBody("");
     setPendingImage(null);
     setReplyTo(null);
-    try {
-      const msg = await api<MessageDTO>(`/api/conversations/${conv.id}/messages`, {
-        method: "POST",
-        body: JSON.stringify({
-          ...(text ? { body: text } : {}),
-          ...(image ? { imageUrl: image } : {}),
-          ...(reply ? { replyToId: reply.id } : {}),
-        }),
-      });
-      setMessages((prev) => [...prev, msg]);
-      stickOnSend();
-    } catch (e) {
-      setBody(text);
-      setPendingImage(image);
-      setReplyTo(reply);
+    setSending(true);
+    stickOnSend();
+    void postOwnChatMessage({
+      convId: conv.id,
+      text,
+      imageUrl: image,
+      replyTo: reply,
+      me: user,
+      deletedIds: deletedIdsRef.current,
+      setMessages,
+    }).catch((e) => {
+      setBody((cur) => cur || text);
+      setPendingImage((cur) => cur ?? image);
+      setReplyTo((cur) => cur ?? reply);
       if (!isAuthFailure(e)) setError(parseApiError(e) || "Couldn't send that.");
-    } finally {
-      setSending(false);
-    }
+    });
+    setSending(false);
   }
 
   async function pickImage() {
@@ -251,16 +234,8 @@ export function GroupChatPage() {
   }
 
   async function toggleHeart(messageId: string) {
-    if (!conv) return;
-    try {
-      const updated = await api<MessageDTO>(`/api/conversations/${conv.id}/messages/${messageId}/react`, {
-        method: "POST",
-        body: JSON.stringify({ emoji: "❤️" }),
-      });
-      setMessages((prev) => prev.map((m) => (m.id === messageId ? updated : m)));
-    } catch {
-      /* they can tap again */
-    }
+    if (!conv || !user) return;
+    await toggleChatHeart({ convId: conv.id, messageId, meId: user.id, setMessages });
   }
 
   async function toggleMute() {
@@ -284,7 +259,7 @@ export function GroupChatPage() {
     try {
       await api(`/api/conversations/${conv.id}/leave`, { method: "POST" });
       setConfirmLeave(false);
-      goBack();
+      navigate("/messages", { replace: true });
     } catch (e) {
       setLeaveErr(parseApiError(e) || "Couldn't leave this chat.");
     } finally {
@@ -387,7 +362,7 @@ export function GroupChatPage() {
             ref={scrollRef}
             className={`chat-messages${ready && messages.length === 0 ? " chat-messages--empty" : ""}`}
           >
-            {!ready && <p className="network-empty">Opening chat…</p>}
+            {!ready && messages.length === 0 && <div className="chat-open-skeleton" aria-hidden="true" />}
             {ready && messages.length === 0 && (
               <ChatEmpty title="It's quiet in here." body="Say hi — this group is just getting started." />
             )}
@@ -449,8 +424,8 @@ export function GroupChatPage() {
                       )}
                       {m.replyTo && <ChatReplyQuote reply={m.replyTo} />}
                       {m.imageUrl && (
-                        <a href={m.imageUrl} target="_blank" rel="noopener noreferrer" className="chat-bubble-image-link">
-                          <img src={m.imageUrl} alt="" className="chat-bubble-image" />
+                        <a href={mediaSrc(m.imageUrl) ?? m.imageUrl} target="_blank" rel="noopener noreferrer" className="chat-bubble-image-link">
+                          <img src={mediaSrc(m.imageUrl) ?? m.imageUrl} alt="" className="chat-bubble-image" />
                         </a>
                       )}
                       {m.body && !(m.imageUrl && m.body === "📷 Photo") && (

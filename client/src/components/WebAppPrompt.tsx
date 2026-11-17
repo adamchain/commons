@@ -4,6 +4,7 @@ import appStoreBadge from "../assets/app-store-badge.png";
 import wordmark from "../assets/wordmark.png";
 import { APP_STORE_URL } from "../lib/appStore";
 import { isNative } from "../lib/platform";
+import { trackAppStoreClick } from "../lib/pixels";
 
 const STORAGE_KEY = "commons.webAppPrompt.auth";
 
@@ -54,6 +55,7 @@ export function WebAppPrompt() {
             href={APP_STORE_URL}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => trackAppStoreClick()}
           >
             <img src={appStoreBadge} alt="Download on the App Store" />
           </a>

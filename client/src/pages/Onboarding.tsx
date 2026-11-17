@@ -15,7 +15,7 @@ import { clientPlatform, isNative } from "../lib/platform";
 import { getCurrentCoords } from "../lib/geolocate";
 import { signupAttributionPayload } from "../lib/attribution";
 import { hasOnboardingPhoto, needsOnboarding, safePostAuthPath } from "../lib/onboarding";
-import { trackSignup } from "../lib/pixels";
+import { accountWasJustCreated, trackAppStoreClick, trackSignup } from "../lib/pixels";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { LegalContent } from "../components/LegalContent";
 import { BottomSheet } from "../components/ui/BottomSheet";
@@ -238,6 +238,7 @@ export function OnboardingPage() {
       const { token, ...me } = result;
       if (token) await setAuthToken(token);
       setUser(me);
+      if (accountWasJustCreated(me)) trackSignup();
       if (me.canAccessAdmin) {
         sessionStorage.setItem("commons_pending_admin_choice", "1");
         setStep("admin_choice");
@@ -504,7 +505,6 @@ export function OnboardingPage() {
           });
           // Set the step BEFORE refreshUser resolves so the completion guard
           // above sees "welcome" and doesn't redirect out from under it.
-          trackSignup();
           const uid = user?.id;
           if (uid) {
             setStep("welcome");
@@ -585,7 +585,7 @@ function WelcomeStep({
         ) : (
           <div className="download-app">
             {APP_STORE_URL ? (
-              <a className="btn-primary btn-block" href={APP_STORE_URL} target="_blank" rel="noopener noreferrer">
+              <a className="btn-primary btn-block" href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" onClick={() => trackAppStoreClick()}>
                 Download for iPhone
               </a>
             ) : (

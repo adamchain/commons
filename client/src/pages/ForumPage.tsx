@@ -107,6 +107,17 @@ export function ForumPage() {
   };
 
   const toggleLike = async (postId: string) => {
+    setData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        posts: prev.posts.map((p) => {
+          if (p.id !== postId) return p;
+          const liked = !p.likedByMe;
+          return { ...p, likedByMe: liked, likeCount: Math.max(0, (p.likeCount ?? 0) + (liked ? 1 : -1)) };
+        }),
+      };
+    });
     const updated = await api<ForumPostDTO>(`/api/forums/posts/${postId}/like`, { method: "POST" }).catch(
       () => null,
     );

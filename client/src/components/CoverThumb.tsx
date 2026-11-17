@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { mediaSrc } from "../api/http";
 import { CommunityCover } from "./CommunityCover";
 import { pickCoverImage, useCardImages } from "../lib/cardImages";
 import { photoForInterest } from "../lib/placePhotos";
@@ -39,7 +40,7 @@ export function CoverThumb({
   className?: string;
   onError?: () => void;
 }) {
-  return <img src={src} alt="" className={`cover-thumb ${className}`.trim()} loading="lazy" onError={onError} />;
+  return <img src={mediaSrc(src) ?? src} alt="" className={`cover-thumb ${className}`.trim()} loading="lazy" onError={onError} />;
 }
 
 /** Gradient background for ideas with no image — color is stable per seed (plan/tag id). */

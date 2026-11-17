@@ -22,7 +22,9 @@ end
 
 target 'App' do
   capacitor_pods
-  # Add your Pods here
+  # Meta app events: installs and in-app sign-ups. Stays idle until
+  # FacebookAppID and FacebookClientToken are in Info.plist.
+  pod 'FBSDKCoreKit', '~> 19.0'
 end
 
 post_install do |installer|

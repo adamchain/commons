@@ -33,7 +33,7 @@ import { resolvePhotoDataUrl } from "../lib/photoPicker";
 import { getPublicWebOrigin, isNative } from "../lib/platform";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isIdeaPlan } from "../lib/planTime";
-import { hrefForBack, type NavFromState } from "../lib/navState";
+import { hrefForBack, popOrNavigate, type NavFromState } from "../lib/navState";
 import {
   AGE_RANGE_LABELS,
   type AgeRange,
@@ -226,15 +226,7 @@ export function ProfilePage() {
   }, [isSelf, user?.id]);
 
   function goBack() {
-    if (navFrom?.from) {
-      navigate(backHref);
-      return;
-    }
-    if (window.history.length > 1) {
-      navigate(-1);
-      return;
-    }
-    navigate("/");
+    popOrNavigate(navigate, navFrom?.from ? backHref : "/");
   }
 
   const otherShell = "app-shell app-shell--with-nav profile-shell profile-other";

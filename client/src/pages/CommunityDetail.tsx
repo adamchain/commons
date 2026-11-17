@@ -42,7 +42,7 @@ import { formatAreaLabel, formatRelative } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { planHasEnded } from "../lib/planTime";
 import { pickPhotoNative } from "../lib/photoPicker";
-import { hrefForBack, type NavFromState } from "../lib/navState";
+import { hrefForBack, popOrNavigate, type NavFromState } from "../lib/navState";
 import { isNative } from "../lib/platform";
 import "./Communities.css";
 
@@ -146,7 +146,7 @@ export function CommunityDetailPage() {
   }, [community, tab]);
 
   if (loading) {
-    return <PageLoading belowBar onBack={() => navigate(backHref)} />;
+    return <PageLoading belowBar onBack={() => popOrNavigate(navigate, backHref)} />;
   }
   if (notFound || !community) {
     return (
@@ -227,7 +227,7 @@ export function CommunityDetailPage() {
             type="button"
             className="cmy-detail-back"
             aria-label="Back"
-            onClick={() => navigate(backHref)}
+            onClick={() => popOrNavigate(navigate, backHref)}
           >
             <ArrowLeft size={21} strokeWidth={2} aria-hidden="true" />
           </button>
@@ -942,12 +942,10 @@ function BulletinTab({
   const [draftImage, setDraftImage] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
   const [postErr, setPostErr] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [openReplies, setOpenReplies] = useState<Record<string, boolean>>({});
   const [replyDraft, setReplyDraft] = useState("");
-  const [replyBusy, setReplyBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [editBusy, setEditBusy] = useState(false);
@@ -965,27 +963,63 @@ function BulletinTab({
   }, [load]);
 
   async function submit() {
-    if ((!draft.trim() && !draftImage) || busy) return;
-    setBusy(true);
+    if ((!draft.trim() && !draftImage) || !user) return;
+    const content = draft.trim();
+    const image = draftImage;
+    const needsApproval = community.bulletinRequiresApproval && !community.isOrganizer;
+    const localId = `local-post-${Date.now()}`;
+    const optimistic: CommunityPostDTO = {
+      id: localId,
+      author: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        bio: user.bio,
+        ageRange: user.ageRange,
+        neighborhoodId: user.neighborhoodId ?? null,
+        avatarSeed: user.avatarSeed,
+        avatarStyle: user.avatarStyle,
+        avatarPhotoDataUrl: user.avatarPhotoDataUrl,
+        avatarParams: user.avatarParams,
+      },
+      authorIsOrganizer: community.isOrganizer,
+      content,
+      image,
+      pinned: false,
+      approvalStatus: needsApproval ? "pending" : "approved",
+      createdAt: new Date().toISOString(),
+      canDelete: true,
+      likeCount: 0,
+      likedByMe: false,
+      replies: [],
+    };
+    setDraft("");
+    setDraftImage(null);
+    setComposerOpen(false);
     setPostErr(null);
+    if (needsApproval) {
+      setPending((prev) => [optimistic, ...prev]);
+    } else {
+      setPosts((prev) => [optimistic, ...prev]);
+    }
     try {
       const created = await api<CommunityPostDTO>(`/api/communities/${community.id}/posts`, {
         method: "POST",
-        body: JSON.stringify({ content: draft.trim(), image: draftImage || undefined }),
+        body: JSON.stringify({ content, image: image || undefined }),
       });
-      setDraft("");
-      setDraftImage(null);
-      setComposerOpen(false);
-      // Show it immediately — don't wait on (or get clobbered by) a refetch that
-      // can lag the write, which left new posts invisible until you left and came back.
-      setPosts((prev) => (prev.some((p) => p.id === created.id) ? prev : [created, ...prev]));
-      await load();
-      setPosts((prev) => (prev.some((p) => p.id === created.id) ? prev : [created, ...prev]));
+      if (needsApproval) {
+        setPending((prev) => prev.map((p) => (p.id === localId ? created : p)));
+      } else {
+        setPosts((prev) => prev.map((p) => (p.id === localId ? created : p)));
+      }
       onPendingChange?.();
+      void load();
     } catch (e) {
+      setDraft((cur) => cur || content);
+      setDraftImage((cur) => cur ?? image);
+      if (needsApproval) setPending((prev) => prev.filter((p) => p.id !== localId));
+      else setPosts((prev) => prev.filter((p) => p.id !== localId));
       setPostErr(parseApiError(e));
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -1017,35 +1051,91 @@ function BulletinTab({
   }
 
   async function submitReply(parentId: string) {
-    if (!replyDraft.trim() || replyBusy) return;
-    setReplyBusy(true);
+    if (!replyDraft.trim() || !user) return;
+    const content = replyDraft.trim();
+    const localId = `local-reply-${Date.now()}`;
+    const optimistic: CommunityPostDTO = {
+      id: localId,
+      author: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        bio: user.bio,
+        ageRange: user.ageRange,
+        neighborhoodId: user.neighborhoodId ?? null,
+        avatarSeed: user.avatarSeed,
+        avatarStyle: user.avatarStyle,
+        avatarPhotoDataUrl: user.avatarPhotoDataUrl,
+        avatarParams: user.avatarParams,
+      },
+      authorIsOrganizer: community.isOrganizer,
+      content,
+      image: null,
+      pinned: false,
+      approvalStatus: "approved",
+      createdAt: new Date().toISOString(),
+      canDelete: true,
+      likeCount: 0,
+      likedByMe: false,
+      replies: [],
+    };
+    setReplyDraft("");
+    setReplyTo(null);
     setPostErr(null);
+    setPosts((prev) =>
+      prev.map((p) => (p.id === parentId ? { ...p, replies: [...p.replies, optimistic] } : p)),
+    );
     try {
-      await api(`/api/communities/${community.id}/posts`, {
+      const created = await api<CommunityPostDTO>(`/api/communities/${community.id}/posts`, {
         method: "POST",
-        body: JSON.stringify({ content: replyDraft.trim(), parentId }),
+        body: JSON.stringify({ content, parentId }),
       });
-      setReplyDraft("");
-      setReplyTo(null);
-      await load();
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === parentId
+            ? { ...p, replies: p.replies.map((r) => (r.id === localId ? created : r)) }
+            : p,
+        ),
+      );
+      void load();
     } catch (e) {
+      setReplyDraft((cur) => cur || content);
+      setReplyTo(parentId);
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === parentId ? { ...p, replies: p.replies.filter((r) => r.id !== localId) } : p,
+        ),
+      );
       setPostErr(parseApiError(e));
-    } finally {
-      setReplyBusy(false);
     }
   }
 
   async function del(postId: string) {
-    await api(`/api/communities/${community.id}/posts/${postId}`, { method: "DELETE" });
-    await load();
-    onPendingChange?.();
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+    setPending((prev) => prev.filter((p) => p.id !== postId));
+    try {
+      await api(`/api/communities/${community.id}/posts/${postId}`, { method: "DELETE" });
+      onPendingChange?.();
+      void load();
+    } catch (e) {
+      setPostErr(parseApiError(e));
+      void load();
+    }
   }
   async function togglePin(post: CommunityPostDTO) {
-    await api(`/api/communities/${community.id}/posts/${post.id}/pin`, {
-      method: "POST",
-      body: JSON.stringify({ pinned: !post.pinned }),
-    });
-    await load();
+    setPosts((prev) =>
+      prev.map((p) => (p.id === post.id ? { ...p, pinned: !p.pinned } : p)),
+    );
+    try {
+      await api(`/api/communities/${community.id}/posts/${post.id}/pin`, {
+        method: "POST",
+        body: JSON.stringify({ pinned: !post.pinned }),
+      });
+      void load();
+    } catch (e) {
+      setPostErr(parseApiError(e));
+      void load();
+    }
   }
   async function approve(postId: string) {
     await api(`/api/communities/${community.id}/posts/${postId}/approve`, { method: "POST" });
@@ -1103,7 +1193,7 @@ function BulletinTab({
       });
       setEditingId(null);
       setEditDraft("");
-      await load();
+      void load();
     } catch (e) {
       setPostErr(parseApiError(e));
     } finally {
@@ -1238,13 +1328,12 @@ function BulletinTab({
               value={draft}
               onChange={setDraft}
               people={people}
-              disabled={busy}
               autoFocus
               onEscape={() => {
                 if (!draft.trim() && !draftImage) setComposerOpen(false);
               }}
               onSubmit={() => {
-                if (!busy && (draft.trim() || draftImage)) void submit();
+                if (draft.trim() || draftImage) void submit();
               }}
             />
             {draftImage && (
@@ -1267,7 +1356,6 @@ function BulletinTab({
               <button
                 type="button"
                 className="cmy-btn cmy-btn--ghost cmy-btn--sm"
-                disabled={busy}
                 onClick={() => {
                   setComposerOpen(false);
                   setDraft("");
@@ -1279,7 +1367,7 @@ function BulletinTab({
               <button
                 type="button"
                 className="cmy-btn cmy-btn--primary cmy-btn--sm"
-                disabled={busy || (!draft.trim() && !draftImage)}
+                disabled={!draft.trim() && !draftImage}
                 onClick={() => void submit()}
               >
                 {community.bulletinRequiresApproval && !community.isOrganizer ? "Submit" : "Post"}
@@ -1468,10 +1556,9 @@ function BulletinTab({
                   value={replyDraft}
                   autoFocus
                   people={people}
-                  disabled={replyBusy}
                   onChange={setReplyDraft}
                   onSubmit={() => {
-                    if (!replyBusy && replyDraft.trim()) void submitReply(p.id);
+                    if (replyDraft.trim()) void submitReply(p.id);
                   }}
                   onEscape={() => {
                     setReplyTo(null);
@@ -1481,7 +1568,7 @@ function BulletinTab({
                 <button
                   type="button"
                   className="cmy-btn cmy-btn--primary cmy-btn--sm"
-                  disabled={replyBusy || !replyDraft.trim()}
+                  disabled={!replyDraft.trim()}
                   onClick={() => void submitReply(p.id)}
                 >
                   Reply
@@ -1489,7 +1576,6 @@ function BulletinTab({
                 <button
                   type="button"
                   className="cmy-btn cmy-btn--ghost cmy-btn--sm"
-                  disabled={replyBusy}
                   onClick={() => {
                     setReplyTo(null);
                     setReplyDraft("");

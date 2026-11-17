@@ -1,11 +1,22 @@
 /**
- * Meta, Google, and TikTok pixels for the public site. IDs come from the
- * server (`META_PIXEL_ID`, `GA_MEASUREMENT_ID`, `TIKTOK_PIXEL_ID`) so they
- * can be turned on without an app rebuild. The native app does not load them.
+ * Meta, Google, and TikTok pixels for the public site. The Meta Pixel ID is
+ * shipped with the site (index.html) and can be overridden with META_PIXEL_ID.
+ * Google and TikTok still come from the server. The native app does not load
+ * these; iOS sign-ups go through the Meta SDK instead.
  */
 
+import { registerPlugin } from "@capacitor/core";
 import { api } from "../api/http";
 import { isNative } from "./platform";
+
+/** COMMONS Website pixel. Public by design — it is in the page source. */
+export const DEFAULT_META_PIXEL_ID = "1549893153826243";
+
+type MetaEventsPlugin = {
+  logCompleteRegistration: () => Promise<void>;
+};
+
+const MetaEvents = registerPlugin<MetaEventsPlugin>("MetaEvents");
 
 type PixelConfig = {
   metaPixelId: string | null;
@@ -50,6 +61,7 @@ function callPixel(name: "fbq" | "gtag" | "ttq", args: unknown[]): void {
 
 function installMeta(id: string): void {
   const w = win();
+  if (w.__commonsMetaInited === id) return;
   if (typeof w.fbq !== "function") {
     const queue: unknown[][] = [];
     const fbq = (...args: unknown[]) => {
@@ -63,6 +75,7 @@ function installMeta(id: string): void {
   loadScript("https://connect.facebook.net/en_US/fbevents.js");
   callPixel("fbq", ["init", id]);
   callPixel("fbq", ["track", "PageView"]);
+  w.__commonsMetaInited = id;
 }
 
 function installGoogle(id: string): void {
@@ -101,15 +114,6 @@ function installTikTok(id: string): void {
 
 function flushSignup(): void {
   if (!pendingSignup || !ready) return;
-  try {
-    if (sessionStorage.getItem(FIRED)) {
-      pendingSignup = false;
-      return;
-    }
-    sessionStorage.setItem(FIRED, "1");
-  } catch {
-    /* ignore */
-  }
   pendingSignup = false;
   if (metaId) callPixel("fbq", ["track", "CompleteRegistration"]);
   if (gaId) callPixel("gtag", ["event", "sign_up"]);
@@ -125,23 +129,65 @@ export function installSignupPixels(): void {
   started = true;
   void api<PixelConfig>("/api/app/pixels")
     .then((config) => {
-      metaId = config.metaPixelId && isMetaId(config.metaPixelId) ? config.metaPixelId : null;
+      const fromPage = win().__commonsMetaInited;
+      const fromServer = config.metaPixelId && isMetaId(config.metaPixelId) ? config.metaPixelId : null;
+      metaId =
+        (typeof fromPage === "string" && isMetaId(fromPage) ? fromPage : null) ??
+        fromServer ??
+        DEFAULT_META_PIXEL_ID;
       gaId = config.gaMeasurementId && isGaId(config.gaMeasurementId) ? config.gaMeasurementId : null;
       tiktokId = config.tiktokPixelId && isTikTokId(config.tiktokPixelId) ? config.tiktokPixelId : null;
       if (metaId) installMeta(metaId);
       if (gaId) installGoogle(gaId);
       if (tiktokId) installTikTok(tiktokId);
     })
-    .catch(() => undefined)
+    .catch(() => {
+      metaId = DEFAULT_META_PIXEL_ID;
+      installMeta(metaId);
+    })
     .finally(() => {
       ready = true;
       flushSignup();
     });
 }
 
-/** Fire once when someone finishes creating an account. */
-export function trackSignup(): void {
+/** Another PageView after a client-side route change. The first one is the base pixel. */
+export function trackPageView(): void {
   if (isNative()) return;
+  callPixel("fbq", ["track", "PageView"]);
+}
+
+/** App Store badge / download button. No personal data. */
+export function trackAppStoreClick(): void {
+  if (isNative()) return;
+  callPixel("fbq", ["track", "Lead", { content_name: "app_store_click" }]);
+}
+
+/** True only for an account that was just created, not a returning sign-in. */
+export function accountWasJustCreated(user: {
+  created?: boolean;
+  createdAt?: string;
+  onboardingComplete?: boolean;
+}): boolean {
+  if (user.created === true) return true;
+  if (user.created === false) return false;
+  if (user.onboardingComplete !== false || !user.createdAt) return false;
+  const age = Date.now() - new Date(user.createdAt).getTime();
+  return age >= 0 && age < 2 * 60 * 1000;
+}
+
+/** Fire once when someone creates an account. Web uses the Pixel; iOS uses the SDK. */
+export function trackSignup(): void {
+  try {
+    if (sessionStorage.getItem(FIRED)) return;
+    sessionStorage.setItem(FIRED, "1");
+  } catch {
+    /* ignore */
+  }
+  if (isNative()) {
+    void MetaEvents.logCompleteRegistration().catch(() => undefined);
+    return;
+  }
   pendingSignup = true;
   flushSignup();
 }

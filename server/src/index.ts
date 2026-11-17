@@ -141,7 +141,7 @@ function pixelId(name: string, pattern: RegExp): string | null {
 app.get("/api/app/pixels", (_req, res) => {
   res.setHeader("Cache-Control", "public, max-age=300");
   res.json({
-    metaPixelId: pixelId("META_PIXEL_ID", /^[0-9]{5,20}$/),
+    metaPixelId: pixelId("META_PIXEL_ID", /^[0-9]{5,20}$/) ?? "1549893153826243",
     gaMeasurementId: pixelId("GA_MEASUREMENT_ID", /^G-[A-Z0-9]+$/i),
     tiktokPixelId: pixelId("TIKTOK_PIXEL_ID", /^[A-Za-z0-9]{10,40}$/),
   });
@@ -181,9 +181,14 @@ app.get("/apple-app-site-association", sendAppleAppSiteAssociation);
 
 // Public. The installed app compares this to its own version on launch.
 app.get("/api/app/release", (_req, res) => {
-  const version = process.env.APP_LATEST_VERSION?.trim() || "1.7";
+  const version = process.env.APP_LATEST_VERSION?.trim() || "3.9";
+  const minVersion = process.env.APP_MIN_VERSION?.trim() || "";
   const storeUrl = process.env.APP_STORE_URL?.trim() || null;
-  res.json({ version, storeUrl: storeUrl && /^https?:\/\//.test(storeUrl) ? storeUrl : null });
+  res.json({
+    version,
+    minVersion: minVersion && /^\d+(\.\d+){0,3}$/.test(minVersion) ? minVersion : null,
+    storeUrl: storeUrl && /^https?:\/\//.test(storeUrl) ? storeUrl : null,
+  });
 });
 
 // Public share-card image endpoint (no auth — crawlers fetch it). Reachable in

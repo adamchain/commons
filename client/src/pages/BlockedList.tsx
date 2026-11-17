@@ -33,7 +33,7 @@ export function BlockedListPage() {
 
   if (users === null) {
     return (
-      <main className="app-shell app-shell--with-nav app-shell--with-topbar">
+      <main className="app-shell app-shell--with-nav">
         <header className="app-header app-header--minimal">
           <Link to="/settings" className="back-circle" aria-label="Back">
             <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
@@ -49,7 +49,7 @@ export function BlockedListPage() {
   }
 
   return (
-    <main className="app-shell app-shell--with-nav app-shell--with-topbar">
+    <main className="app-shell app-shell--with-nav">
       <header className="app-header app-header--minimal">
         <Link to="/settings" className="back-circle" aria-label="Back">
           <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />

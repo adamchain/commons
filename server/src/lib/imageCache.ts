@@ -54,11 +54,12 @@ function register(dataUrl: string): string | null {
 export function toImageUrl<T extends string | null | undefined>(value: T): T {
   if (typeof value !== "string" || !value) return value;
   if (!value.startsWith("data:image/")) return value;
-  const base = originBase();
-  if (!base) return value; // no absolute origin yet — keep inline rather than emit a native-breaking relative URL
   const hash = register(value);
   if (!hash) return value;
-  return `${base}/api/img/${hash}` as T;
+  const base = originBase();
+  // Relative `/api/img/...` is fine: the client prefixes VITE_API_URL on native.
+  // Inlining the data URL here is what made feed, inbox, and chat JSON huge.
+  return `${base ? `${base}/api/img/${hash}` : `/api/img/${hash}`}` as T;
 }
 
 /**

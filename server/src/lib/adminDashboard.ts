@@ -1311,7 +1311,7 @@ function buildAcquisition(input: {
       .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)),
     joined,
     pixels: {
-      meta: /^[0-9]{5,20}$/.test(process.env.META_PIXEL_ID?.trim() ?? ""),
+      meta: /^[0-9]{5,20}$/.test(process.env.META_PIXEL_ID?.trim() || "1549893153826243"),
       google: /^G-[A-Z0-9]+$/i.test(process.env.GA_MEASUREMENT_ID?.trim() ?? ""),
       tiktok: /^[A-Za-z0-9]{10,40}$/.test(process.env.TIKTOK_PIXEL_ID?.trim() ?? ""),
     },

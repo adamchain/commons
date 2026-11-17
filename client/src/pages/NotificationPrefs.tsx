@@ -55,7 +55,7 @@ export function NotificationPrefsPage() {
   }
 
   return (
-    <main className="app-shell app-shell--with-nav app-shell--with-topbar notif-prefs-page">
+    <main className="app-shell app-shell--with-nav notif-prefs-page">
       <header className="app-header app-header--minimal">
         <Link to="/settings" className="back-circle" aria-label="Back">
           <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />

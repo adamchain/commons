@@ -9,7 +9,7 @@ import {
   MoreVertical,
   Plus,
 } from "lucide-react";
-import { api, isAuthFailure, parseApiError } from "../api/http";
+import { api, isAuthFailure, mediaSrc, parseApiError } from "../api/http";
 import { readScreen, writeScreen } from "../lib/screenCache";
 import { Avatar } from "../components/Avatar";
 import { ComposerField, MentionText } from "../components/ComposerField";
@@ -28,14 +28,14 @@ import { Button } from "../components/ui/Button";
 import { useAuth } from "../context/AuthContext";
 import { planHeadline } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
-import { hrefForBack, type NavFromState } from "../lib/navState";
+import { hrefForBack, popOrNavigate, type NavFromState } from "../lib/navState";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
 import { planHasEnded, isIdeaPlan } from "../lib/planTime";
+import { useLiveChatMessages, mergeChatMessages, postOwnChatMessage, toggleChatHeart } from "../lib/useLiveChatMessages";
 import { useStickToBottom } from "../lib/useStickToBottom";
 import type { ConversationDTO, MessageDTO, MessageReplyDTO, PlanDTO, PublicUser } from "../types/shared";
 
-const POLL_MS = 4000;
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 const CHAT_IMAGE_MAX_PX = 1024;
 const CHAT_IMAGE_QUALITY = 0.85;
@@ -94,21 +94,31 @@ export function ChatPage() {
   const deletedIdsRef = useRef(new Set<string>());
   const lastMessageId = messages[messages.length - 1]?.id ?? "";
   const { scrollRef, endRef, shellRef, stickOnSend } = useStickToBottom(chatReady, `${lastMessageId}:${messages.length}`);
+  const live = useLiveChatMessages(conv?.id, setMessages, deletedIdsRef);
+  live.messagesRef.current = messages;
 
   useEffect(() => {
     void (async () => {
       try {
         const [p, c] = await Promise.all([
           api<PlanDTO>(`/api/plans/${planId}`),
-          api<ConversationDTO & { messages?: MessageDTO[] }>(`/api/plans/${planId}/conversation?messages=1`),
+          api<ConversationDTO>(`/api/plans/${planId}/conversation`),
         ]);
-        const msgs = c.messages ?? [];
         const freshConv: ConversationDTO = { ...c, messages: undefined };
-        const freshMessages = visibleMessages(msgs, deletedIdsRef.current);
         setPlan(p);
         setConv(freshConv);
-        setMessages(freshMessages);
-        writeScreen(`chat:${planId}`, { plan: p, conv: freshConv, messages: freshMessages });
+        setChatReady(true);
+        const msgs = await api<MessageDTO[]>(`/api/conversations/${c.id}/messages`);
+        setMessages((prev) => {
+          const locals = prev.filter((m) => m.id.startsWith("local-"));
+          const fresh = mergeChatMessages(
+            visibleMessages(msgs, deletedIdsRef.current),
+            locals,
+            deletedIdsRef.current,
+          );
+          writeScreen(`chat:${planId}`, { plan: p, conv: freshConv, messages: fresh });
+          return fresh;
+        });
       } catch (e) {
         if (!cached) setChatError(parseApiError(e));
       } finally {
@@ -116,30 +126,6 @@ export function ChatPage() {
       }
     })();
   }, [planId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Poll for new messages — only fetch messages newer than the last one we have.
-  useEffect(() => {
-    if (!conv) return;
-    const interval = setInterval(async () => {
-      try {
-        setMessages((prev) => {
-          const since = prev[prev.length - 1]?.createdAt ?? "";
-          void api<MessageDTO[]>(
-            `/api/conversations/${conv.id}/messages${since ? `?since=${encodeURIComponent(since)}` : ""}`,
-          ).then((incoming) => {
-            if (!incoming.length) return;
-            setMessages((cur) => {
-              const ids = new Set(cur.map((m) => m.id));
-              const fresh = incoming.filter((m) => !ids.has(m.id) && !deletedIdsRef.current.has(m.id));
-              return fresh.length ? [...cur, ...fresh].sort((a, b) => a.createdAt.localeCompare(b.createdAt)) : cur;
-            });
-          }).catch(() => { /* swallow */ });
-          return prev;
-        });
-      } catch { /* swallow */ }
-    }, POLL_MS);
-    return () => clearInterval(interval);
-  }, [conv]);
 
   useEffect(() => {
     if (!headerMenuOpen) return;
@@ -166,9 +152,9 @@ export function ChatPage() {
     return (
       <main className="app-shell app-shell--chat">
         <header className="app-header app-header--minimal chat-header-bar chat-header-bar--thread app-header--sticky">
-          <Link to={backHref} className="detail-back chat-back-link" aria-label={backLabel}>
+          <button type="button" className="detail-back chat-back-link" aria-label={backLabel} onClick={() => popOrNavigate(navigate, backHref)}>
             <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
-          </Link>
+          </button>
           <div className="chat-thread-heading">
             <div className="chat-thread-title">Chat</div>
           </div>
@@ -183,28 +169,29 @@ export function ChatPage() {
 
   async function send() {
     const trimmed = body.trim();
-    if ((!trimmed && !pendingImage) || !conv || sending) return;
+    if ((!trimmed && !pendingImage) || !conv || sending || !user) return;
+    const image = pendingImage;
+    const reply = replyTo;
+    setBody("");
+    setPendingImage(null);
+    setReplyTo(null);
     setSending(true);
-    try {
-      const msg = await api<MessageDTO>(`/api/conversations/${conv.id}/messages`, {
-        method: "POST",
-        body: JSON.stringify({
-          ...(trimmed ? { body: trimmed } : {}),
-          ...(pendingImage ? { imageUrl: pendingImage } : {}),
-          ...(replyTo ? { replyToId: replyTo.id } : {}),
-        }),
-      });
-      stickOnSend();
-      setMessages((prev) => [...prev, msg]);
-      setBody("");
-      setPendingImage(null);
-      setReplyTo(null);
-    } catch (e) {
-      if (isAuthFailure(e)) return;
-      window.alert(parseApiError(e) || "Couldn't send that message.");
-    } finally {
-      setSending(false);
-    }
+    stickOnSend();
+    void postOwnChatMessage({
+      convId: conv.id,
+      text: trimmed,
+      imageUrl: image,
+      replyTo: reply,
+      me: user,
+      deletedIds: deletedIdsRef.current,
+      setMessages,
+    }).catch((e) => {
+      setBody((cur) => cur || trimmed);
+      setPendingImage((cur) => cur ?? image);
+      setReplyTo((cur) => cur ?? reply);
+      if (!isAuthFailure(e)) window.alert(parseApiError(e) || "Couldn't send that message.");
+    });
+    setSending(false);
   }
 
   async function attachImage(dataUrl: string) {
@@ -265,7 +252,7 @@ export function ChatPage() {
     try {
       await api(`/api/conversations/${conv.id}/leave`, { method: "POST" });
       setConfirmLeave(false);
-      navigate("/messages");
+      navigate("/messages", { replace: true });
     } catch (e) {
       setLeaveErr(parseApiError(e));
     } finally {
@@ -303,16 +290,8 @@ export function ChatPage() {
   }
 
   async function toggleHeart(messageId: string) {
-    if (!conv) return;
-    try {
-      const updated = await api<MessageDTO>(
-        `/api/conversations/${conv.id}/messages/${messageId}/react`,
-        { method: "POST", body: JSON.stringify({ emoji: "❤️" }) },
-      );
-      setMessages((prev) => prev.map((m) => (m.id === messageId ? updated : m)));
-    } catch {
-      /* swallow — they can tap again */
-    }
+    if (!conv || !user) return;
+    await toggleChatHeart({ convId: conv.id, messageId, meId: user.id, setMessages });
   }
 
   async function createPoll(question: string, options: string[]) {
@@ -402,9 +381,9 @@ export function ChatPage() {
   return (
     <main ref={shellRef} className="app-shell app-shell--chat">
       <header className="app-header app-header--minimal chat-header-bar chat-header-bar--thread app-header--sticky">
-        <Link to={backHref} className="detail-back chat-back-link" aria-label={backLabel}>
+        <button type="button" className="detail-back chat-back-link" aria-label={backLabel} onClick={() => popOrNavigate(navigate, backHref)}>
           <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
-        </Link>
+        </button>
         <Link
           to={`/plans/${planId}`}
           state={planLinkState}
@@ -642,12 +621,12 @@ export function ChatPage() {
                     {entry.replyTo && <ChatReplyQuote reply={entry.replyTo} />}
                     {entry.imageUrl && (
                       <a
-                        href={entry.imageUrl}
+                        href={mediaSrc(entry.imageUrl) ?? entry.imageUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="chat-bubble-image-link"
                       >
-                        <img src={entry.imageUrl} alt="" className="chat-bubble-image" />
+                        <img src={mediaSrc(entry.imageUrl) ?? entry.imageUrl} alt="" className="chat-bubble-image" />
                       </a>
                     )}
                     {entry.body && !(entry.imageUrl && entry.body === "📷 Photo") && (

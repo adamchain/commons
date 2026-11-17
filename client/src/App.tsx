@@ -6,7 +6,7 @@ import { useAuth } from "./context/AuthContext";
 import { BottomNav } from "./components/BottomNav";
 import { RouteStage } from "./components/RouteStage";
 import { CreateLauncher } from "./components/CreateLauncher";
-import { useAppUpdateNotice } from "./components/AppUpdatePrompt";
+import { AppUpdatePrompt, useAppUpdateNotice } from "./components/AppUpdatePrompt";
 import { ChatCleanupPrompt } from "./components/ChatCleanupPrompt";
 import { SmsConsentPrompt } from "./components/SmsConsentPrompt";
 import { CoachMarks } from "./components/CoachMarks";
@@ -18,7 +18,7 @@ import { listenForDeepLinks } from "./lib/deepLinks";
 import { resetFeedFilters } from "./lib/feedFilters";
 import { needsOnboarding } from "./lib/onboarding";
 import { getCurrentCoords } from "./lib/geolocate";
-import { installSignupPixels } from "./lib/pixels";
+import { installSignupPixels, trackPageView } from "./lib/pixels";
 import { api } from "./api/http";
 import { isNative } from "./lib/platform";
 
@@ -73,6 +73,10 @@ function useWarmRoutes() {
       void import("./pages/Notifications");
       void import("./pages/MyPlans");
       void import("./pages/Search");
+      void import("./pages/Chat");
+      void import("./pages/DmChat");
+      void import("./pages/GroupChat");
+      void import("./pages/CommunityChat");
     };
     const id = window.setTimeout(warm, 0);
     return () => window.clearTimeout(id);
@@ -148,6 +152,29 @@ function PlanRoute() {
     );
   }
   return <PublicEventPage />;
+}
+
+function useNativeBackButton() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  useEffect(() => {
+    if (!isNative()) return;
+    const handle = CapApp.addListener("backButton", ({ canGoBack }) => {
+      const tabRoot =
+        location.pathname === "/" ||
+        location.pathname === "/communities" ||
+        location.pathname === "/messages" ||
+        location.pathname === "/network";
+      if (canGoBack && !tabRoot) {
+        navigate(-1);
+        return;
+      }
+      void CapApp.minimizeApp();
+    });
+    return () => {
+      void handle.then((h) => h.remove());
+    };
+  }, [navigate, location.pathname]);
 }
 
 // Listens for the `commons:push-open` CustomEvent dispatched by push.ts when
@@ -258,6 +285,7 @@ function useFilterResetOnOpen() {
 }
 
 export default function App() {
+  useNativeBackButton();
   usePushOpenNavigation();
   useDeepLinkNavigation();
   useInAppLinkNavigation();
@@ -271,6 +299,16 @@ export default function App() {
   }, []);
   const { user } = useAuth();
   const { pathname } = useLocation();
+  const pageRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (pageRef.current === null) {
+      pageRef.current = pathname;
+      return;
+    }
+    if (pageRef.current === pathname) return;
+    pageRef.current = pathname;
+    trackPageView();
+  }, [pathname]);
   const webShell = !isNative() && webShellVisible(pathname, user);
   const shellClass = webShell
     ? `commons-web${webShellHasRail(pathname) ? " commons-web--rail" : ""}`
@@ -281,6 +319,7 @@ export default function App() {
       <TopBar />
       <ChatCleanupPrompt />
       <SmsConsentPrompt />
+      <AppUpdatePrompt />
       <Suspense fallback={PAGE_FALLBACK}>
       <RouteStage>
       <Routes>

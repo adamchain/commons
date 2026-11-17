@@ -7,7 +7,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // Installs are logged only after FacebookAppID and FacebookClientToken
+        // are added to Info.plist. Until then this is a no-op.
+        MetaAppEvents.start(application, launchOptions: launchOptions)
         return true
     }
 
@@ -26,7 +28,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
-        // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
+        MetaAppEvents.becomeActive()
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
@@ -34,9 +36,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        // Called when the app was launched with a url. Feel free to add additional processing here,
-        // but if you want the App API to support tracking app url opens, make sure to keep this call
-        return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
+        let handledByMeta = MetaAppEvents.open(app, url: url, options: options)
+        let handledByCapacitor = ApplicationDelegateProxy.shared.application(app, open: url, options: options)
+        return handledByMeta || handledByCapacitor
     }
 
     func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {

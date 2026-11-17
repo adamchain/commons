@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { store } from "../store.js";
-import type { ConversationRecord } from "../store.js";
+import type { ConversationRecord, MessageRecord } from "../store.js";
 import { findUserById, findUsersByIds } from "../userRepo.js";
 import { userToPublic } from "./plans.js";
 import { mentionedUserIds } from "../lib/mentions.js";
@@ -13,6 +13,7 @@ import {
   isCommunityOrganizer,
 } from "../lib/communityAccess.js";
 import { isGcsConfigured, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
+import { toImageUrl } from "../lib/imageCache.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
 import { planHasEnded } from "../lib/planTime.js";
 import type { ConversationDTO, ConversationSummaryDTO, MessageDTO, MessageReplyDTO, PollDTO } from "../types/shared.js";
@@ -27,7 +28,7 @@ export async function inlineMessages(
   userId: string,
   hostId: string,
 ): Promise<MessageDTO[]> {
-  const raw = store.listMessagesForConversation(convId).filter((m) => {
+  let raw = store.listMessagesForConversation(convId).filter((m) => {
     if (m.kind === "system") return true;
     if (m.senderId === userId) return true;
     if (store.isUserEjected(m.senderId)) return false;
@@ -35,15 +36,8 @@ export async function inlineMessages(
     if (store.viewerReportedContent(userId, "message", m.id)) return false;
     return true;
   });
+  if (raw.length > 200) raw = raw.slice(-200);
   return Promise.all(raw.map((m) => toMessageDto(m, userId, hostId)));
-}
-
-/** Real messages from other people. System lines don't light the inbox badge. */
-function humanUnread(
-  msgs: { kind?: string; senderId: string; readBy: string[] }[],
-  userId: string,
-): number {
-  return msgs.filter((m) => m.kind !== "system" && m.senderId !== userId && !m.readBy.includes(userId)).length;
 }
 
 function messagePreview(msg: { kind?: string; body: string; imageUrl?: string | null }): string {
@@ -79,6 +73,124 @@ async function resolveChatImageUrl(raw: string): Promise<string | null> {
     }
   }
   return raw;
+}
+
+/** Pings happen after the HTTP response so a 33-person plan chat doesn't stall the sender. */
+async function notifyNewChatMessage(
+  conv: ConversationRecord,
+  userId: string,
+  message: MessageRecord,
+  storedBody: string,
+): Promise<void> {
+  if (conv.type === "dm" && !conv.planId && !conv.communityId) {
+    const otherId = conv.participantIds.find((id) => id !== userId);
+    const stillHidden = !!otherId && (conv.hiddenFromUserIds ?? []).includes(otherId);
+    if (otherId && !stillHidden && !store.isBlockedEitherWay(userId, otherId)) {
+      if (store.hasLeftConversation(otherId, conv.id)) {
+        store.setConversationLeft(otherId, conv.id, false);
+      }
+      const sender = await findUserById(userId);
+      const senderName = sender?.firstName || "Someone";
+      const other = await findUserById(otherId);
+      const tagged = other ? mentionedUserIds(storedBody, [other]).has(otherId) : false;
+      await emit({
+        userId: otherId,
+        kind: "newGroupChatMessage",
+        body: tagged ? `${senderName} mentioned you` : `${senderName}: ${messagePreview(message)}`,
+        conversationId: conv.id,
+        profileUserId: userId,
+        dedupKey: tagged
+          ? `mention:${message.id}:${otherId}`
+          : `newDirectMessage:${message.id}:${otherId}`,
+      });
+    }
+    return;
+  }
+  if (conv.type !== "group") return;
+  const sender = await findUserById(userId);
+  const senderName = sender?.firstName || "Someone";
+  const plan = store.findPlanById(conv.planId);
+  const community = conv.communityId ? store.findCommunityById(conv.communityId) : undefined;
+  const place = community?.name ?? plan?.title ?? conv.name ?? "your group";
+  const participants = storedBody.includes("@")
+    ? [...(await findUsersByIds(conv.participantIds)).values()]
+    : [];
+  const mentioned = mentionedUserIds(storedBody, participants);
+  const recipients = conv.planId
+    ? [...(planChatMemberIds(conv.planId) ?? [])]
+    : conv.participantIds;
+  await Promise.all(
+    recipients.map(async (recipientId) => {
+      if (recipientId === userId) return;
+      if (store.hasLeftConversation(recipientId, conv.id)) return;
+      if (store.isBlockedEitherWay(userId, recipientId)) return;
+      const tagged = mentioned.has(recipientId);
+      await emit({
+        userId: recipientId,
+        kind: "newGroupChatMessage",
+        body: tagged
+          ? `${senderName} mentioned you in "${place}"`
+          : `${senderName} in "${place}": ${messagePreview(message)}`,
+        planId: conv.planId,
+        communityId: conv.communityId ?? undefined,
+        conversationId: conv.id,
+        dedupKey: tagged
+          ? `mention:${message.id}:${recipientId}`
+          : `newGroupChatMessage:${message.id}:${recipientId}`,
+      });
+    }),
+  );
+}
+
+async function notifyNewPollMessage(
+  conv: ConversationRecord,
+  userId: string,
+  message: MessageRecord,
+  question: string,
+): Promise<void> {
+  if (conv.type === "dm" && !conv.planId && !conv.communityId) {
+    const otherId = conv.participantIds.find((id) => id !== userId);
+    const stillHidden = !!otherId && (conv.hiddenFromUserIds ?? []).includes(otherId);
+    if (otherId && !stillHidden && !store.isBlockedEitherWay(userId, otherId)) {
+      if (store.hasLeftConversation(otherId, conv.id)) {
+        store.setConversationLeft(otherId, conv.id, false);
+      }
+      const sender = await findUserById(userId);
+      const senderName = sender?.firstName || "Someone";
+      await emit({
+        userId: otherId,
+        kind: "newGroupChatMessage",
+        body: `${senderName}: ${truncate(question, 70)}`,
+        conversationId: conv.id,
+        profileUserId: userId,
+        dedupKey: `newDirectMessage:${message.id}:${otherId}`,
+      });
+    }
+    return;
+  }
+  if (conv.type !== "group") return;
+  const sender = await findUserById(userId);
+  const senderName = sender?.firstName || "Someone";
+  const plan = store.findPlanById(conv.planId);
+  const planTitle = plan?.title ?? "your plan";
+  const recipients = conv.planId
+    ? [...(planChatMemberIds(conv.planId) ?? [])]
+    : conv.participantIds;
+  await Promise.all(
+    recipients.map(async (recipientId) => {
+      if (recipientId === userId) return;
+      if (store.hasLeftConversation(recipientId, conv.id)) return;
+      if (store.isBlockedEitherWay(userId, recipientId)) return;
+      await emit({
+        userId: recipientId,
+        kind: "newGroupChatMessage",
+        body: `${senderName} posted a poll in "${planTitle}": ${truncate(question, 70)}`,
+        planId: conv.planId,
+        conversationId: conv.id,
+        dedupKey: `newGroupChatMessage:${message.id}:${recipientId}`,
+      });
+    }),
+  );
 }
 
 export const chatRouter = Router();
@@ -194,22 +306,25 @@ chatRouter.post("/dm/group", requireAuth, async (req, res) => {
   const starterName = me.firstName || "Someone";
   store.createSystemMessage(conv.id, `${starterName} started this group.`);
   store.markConversationRead(conv.id, userId);
-  // Let each added member know — the thread already shows in their inbox.
-  const groupLabel = name ? `"${name}"` : "a group chat";
-  for (const id of memberIds) {
-    await emit({
-      userId: id,
-      kind: "newGroupChatMessage",
-      body: `${starterName} added you to ${groupLabel}`,
-      conversationId: conv.id,
-      dedupKey: `groupAdded:${conv.id}:${id}`,
-    });
-  }
   const dto = await toConversationDto(conv, userId);
   const withMessages = String(req.query.messages ?? "") === "1";
   res.status(201).json(
     withMessages ? { ...dto, messages: await inlineMessages(conv.id, userId, dto.hostId) } : dto,
   );
+  const groupLabel = name ? `"${name}"` : "a group chat";
+  void Promise.all(
+    memberIds.map((id) =>
+      emit({
+        userId: id,
+        kind: "newGroupChatMessage",
+        body: `${starterName} added you to ${groupLabel}`,
+        conversationId: conv.id,
+        dedupKey: `groupAdded:${conv.id}:${id}`,
+      }),
+    ),
+  ).catch((err) => {
+    console.error("[chat] group-added notify failed", err instanceof Error ? err.message : err);
+  });
 });
 
 // GET /api/conversations — unified inbox: plan chats, community chats, and
@@ -232,7 +347,6 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
   }
 
   const pinRank = new Map(store.pinnedConversationIds(userId).map((id, i) => [id, i]));
-  const threadMessages = (id: string | null | undefined) => (id ? store.listMessagesForConversation(id) : []);
   const summaries: ConversationSummaryDTO[] = [];
   for (const [planId, myRole] of roleByPlan) {
     const plan = store.findPlanById(planId);
@@ -242,9 +356,8 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
     const groups = store.listGroupConversationsByPlan(planId);
     const conv = groups[0];
     if (groups.some((c) => store.hasLeftConversation(userId, c.id))) continue;
-    const msgs = threadMessages(conv?.id);
-    const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
-    const hasRealChatter = msgs.some((m) => m.kind !== "system");
+    const lastMsg = conv?.id ? store.peekLastMessage(conv.id) ?? null : null;
+    const hasRealChatter = conv?.id ? store.conversationHasNonSystem(conv.id) : false;
     const isUpcoming = (plan.date ?? "") >= todayIso;
     if (!isUpcoming && !hasRealChatter) continue;
 
@@ -260,13 +373,14 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
       hostEmoji: plan.hostEmoji,
       planDate: plan.date,
       conversationId: conv?.id ?? null,
-      lastMessageAt: conv && msgs.length ? conv.lastMessageAt : null,
+      lastMessageAt: conv && lastMsg ? conv.lastMessageAt : null,
       lastMessagePreview: lastMsg ? messagePreview(lastMsg) : null,
       lastMessageSender: lastSenderName(lastMsg),
-      unreadCount: conv ? humanUnread(msgs, userId) : 0,
+      unreadCount: conv?.id ? store.countHumanUnread(conv.id, userId) : 0,
       participantCount,
       myRole,
-      coverImage: plan.flyerDataUrl || plan.flyerLinkPreview?.image || null,
+      coverImage:
+        toImageUrl(plan.flyerDataUrl) || toImageUrl(plan.flyerLinkPreview?.image ?? null) || null,
       isIdea: plan.planKind === "looking_for" && !plan.lockedAt,
       pinned: conv ? pinRank.has(conv.id) : false,
       muted: conv ? store.isConversationMuted(userId, conv.id) : false,
@@ -283,39 +397,49 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
     const groups = store.listCommunityConversations(community.id);
     const conv = groups[0] ?? store.findCommunityConversation(community.id);
     if (groups.some((c) => store.hasLeftConversation(userId, c.id))) continue;
-    const msgs = threadMessages(conv?.id);
-    const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
+    const lastMsg = conv?.id ? store.peekLastMessage(conv.id) ?? null : null;
     summaries.push({
       planId: "",
       planTitle: community.name,
       hostEmoji: "🏙️",
       planDate: community.createdAt.slice(0, 10),
       conversationId: conv?.id ?? null,
-      lastMessageAt: conv && msgs.length ? conv.lastMessageAt : null,
+      lastMessageAt: conv && lastMsg ? conv.lastMessageAt : null,
       lastMessagePreview: lastMsg ? messagePreview(lastMsg) : null,
       lastMessageSender: lastSenderName(lastMsg),
-      unreadCount: conv ? humanUnread(msgs, userId) : 0,
+      unreadCount: conv?.id ? store.countHumanUnread(conv.id, userId) : 0,
       participantCount: community.memberCount,
       myRole: community.organizerId === userId ? "hosting" : "going",
       communityId: community.id,
       communityName: community.name,
-      coverImage: community.coverImage ?? null,
+      coverImage: toImageUrl(community.coverImage ?? null),
       pinned: conv ? pinRank.has(conv.id) : false,
       muted: conv ? store.isConversationMuted(userId, conv.id) : false,
     });
   }
 
-  for (const conv of store.listDirectDms(userId)) {
-    if (store.hasLeftConversation(userId, conv.id)) continue;
-    if (!conv.participantIds.includes(userId)) continue;
-    if ((conv.hiddenFromUserIds ?? []).includes(userId)) continue;
+  const dmRows = store.listDirectDms(userId).filter((conv) => {
+    if (store.hasLeftConversation(userId, conv.id)) return false;
+    if (!conv.participantIds.includes(userId)) return false;
+    if ((conv.hiddenFromUserIds ?? []).includes(userId)) return false;
     const otherId = conv.participantIds.find((id) => id !== userId);
-    if (!otherId || store.isBlockedEitherWay(userId, otherId)) continue;
-    const other = await findUserById(otherId);
-    const msgs = threadMessages(conv.id);
-    // The other person stays hidden until they accept. The sender still sees
-    // the thread they just opened, even before the first message.
-    const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
+    return Boolean(otherId) && !store.isBlockedEitherWay(userId, otherId);
+  });
+  const groupRows = store.listNetworkGroups(userId).filter((conv) => {
+    if (store.hasLeftConversation(userId, conv.id)) return false;
+    return conv.participantIds.includes(userId);
+  });
+  const inboxUserIds = [
+    ...dmRows.map((c) => c.participantIds.find((id) => id !== userId)).filter((id): id is string => Boolean(id)),
+    ...groupRows.flatMap((c) => c.participantIds.filter((id) => id !== userId).slice(0, 3)),
+  ];
+  const inboxUsers = await findUsersByIds(inboxUserIds);
+
+  for (const conv of dmRows) {
+    const otherId = conv.participantIds.find((id) => id !== userId);
+    if (!otherId) continue;
+    const other = inboxUsers.get(otherId);
+    const lastMsg = store.peekLastMessage(conv.id) ?? null;
     const name = [other?.firstName, other?.lastName].filter(Boolean).join(" ") || "Message";
     summaries.push({
       planId: "",
@@ -323,14 +447,14 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
       hostEmoji: "💬",
       planDate: conv.createdAt.slice(0, 10),
       conversationId: conv.id,
-      lastMessageAt: msgs.length ? conv.lastMessageAt : null,
+      lastMessageAt: lastMsg ? conv.lastMessageAt : null,
       lastMessagePreview: lastMsg ? messagePreview(lastMsg) : null,
       lastMessageSender: lastSenderName(lastMsg),
-      unreadCount: humanUnread(msgs, userId),
+      unreadCount: store.countHumanUnread(conv.id, userId),
       participantCount: 2,
       myRole: "going",
       dmUserId: otherId,
-      coverImage: other?.avatarPhotoDataUrl ?? null,
+      coverImage: toImageUrl(other?.avatarPhotoDataUrl ?? null),
       avatarSeed: other?.avatarSeed ?? otherId,
       avatarStyle: other?.avatarStyle ?? "avataaars",
       ...(other?.avatarParams ? { avatarParams: other.avatarParams } : {}),
@@ -341,19 +465,15 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
 
   // Network group chats — group threads started from Messages, not tied to any
   // plan or community. Keyed and opened by conversation id.
-  for (const conv of store.listNetworkGroups(userId)) {
-    if (store.hasLeftConversation(userId, conv.id)) continue;
-    if (!conv.participantIds.includes(userId)) continue;
-    const msgs = threadMessages(conv.id);
-    const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
+  for (const conv of groupRows) {
+    const lastMsg = store.peekLastMessage(conv.id) ?? null;
     const others = conv.participantIds.filter((id) => id !== userId);
     let title = conv.name?.trim() ?? "";
     if (!title) {
-      const names: string[] = [];
-      for (const id of others.slice(0, 3)) {
-        const u = await findUserById(id);
-        if (u?.firstName) names.push(u.firstName);
-      }
+      const names = others
+        .slice(0, 3)
+        .map((id) => inboxUsers.get(id)?.firstName)
+        .filter((n): n is string => Boolean(n));
       const extra = others.length - names.length;
       title = names.length ? names.join(", ") + (extra > 0 ? ` +${extra}` : "") : "Group chat";
     }
@@ -363,10 +483,10 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
       hostEmoji: "👥",
       planDate: conv.createdAt.slice(0, 10),
       conversationId: conv.id,
-      lastMessageAt: msgs.length ? conv.lastMessageAt : null,
+      lastMessageAt: lastMsg ? conv.lastMessageAt : null,
       lastMessagePreview: lastMsg ? messagePreview(lastMsg) : null,
       lastMessageSender: lastSenderName(lastMsg),
-      unreadCount: humanUnread(msgs, userId),
+      unreadCount: store.countHumanUnread(conv.id, userId),
       participantCount: conv.participantIds.length,
       myRole: conv.ownerId === userId ? "hosting" : "going",
       networkGroup: true,
@@ -514,7 +634,7 @@ chatRouter.get("/conversations/:id/messages", requireAuth, async (req, res) => {
     store.markMessageNotificationsRead(userId, convId);
   }
   const hostId = conversationHostId(conv);
-  const raw = store.listMessagesForConversation(convId).filter((m) => {
+  let raw = store.listMessagesForConversation(convId).filter((m) => {
     if (since && m.createdAt <= since) return false;
     if (m.kind === "system") return true;
     if (m.senderId === userId) return true;
@@ -523,6 +643,10 @@ chatRouter.get("/conversations/:id/messages", requireAuth, async (req, res) => {
     if (store.viewerReportedContent(userId, "message", m.id)) return false;
     return true;
   });
+  // Opening a long-lived group thread used to serialize every photo in the
+  // history before the composer could paint. Keep the recent window; poll
+  // with `since` still fills anything newer.
+  if (!since && raw.length > 200) raw = raw.slice(-200);
   const messages = await Promise.all(raw.map((m) => toMessageDto(m, userId, hostId)));
   res.json(messages);
 });
@@ -632,70 +756,10 @@ chatRouter.post("/conversations/:id/messages", requireAuth, async (req, res) => 
     }
   }
   const message = store.createMessage(convId, userId, storedBody, imageUrl, replyToId);
-  // Group chats ping every other participant. A network DM pings the other
-  // person, brings the thread back if they had left it, and stays quiet when
-  // they've muted this chat (emit checks mutedConversationIds). A held DM
-  // stays quiet until they accept the request to connect.
-  if (conv.type === "dm" && !conv.planId && !conv.communityId) {
-    const otherId = conv.participantIds.find((id) => id !== userId);
-    const stillHidden = !!otherId && (conv.hiddenFromUserIds ?? []).includes(otherId);
-    if (otherId && !stillHidden && !store.isBlockedEitherWay(userId, otherId)) {
-      if (store.hasLeftConversation(otherId, convId)) {
-        store.setConversationLeft(otherId, convId, false);
-      }
-      const sender = await findUserById(userId);
-      const senderName = sender?.firstName || "Someone";
-      const other = await findUserById(otherId);
-      const tagged = other ? mentionedUserIds(storedBody, [other]).has(otherId) : false;
-      await emit({
-        userId: otherId,
-        kind: "newGroupChatMessage",
-        body: tagged ? `${senderName} mentioned you` : `${senderName}: ${messagePreview(message)}`,
-        conversationId: convId,
-        profileUserId: userId,
-        dedupKey: tagged
-          ? `mention:${message.id}:${otherId}`
-          : `newDirectMessage:${message.id}:${otherId}`,
-      });
-    }
-  } else if (conv.type === "group") {
-    const sender = await findUserById(userId);
-    const senderName = sender?.firstName || "Someone";
-    const plan = store.findPlanById(conv.planId);
-    const community = conv.communityId ? store.findCommunityById(conv.communityId) : undefined;
-    const place = community?.name ?? plan?.title ?? conv.name ?? "your group";
-    const participants = storedBody.includes("@")
-      ? [...(await findUsersByIds(conv.participantIds)).values()]
-      : [];
-    const mentioned = mentionedUserIds(storedBody, participants);
-    // Dedup per (conversation, recipient) — one "new message" until the user
-    // reads. A tagged person gets a mention instead of the generic ping.
-    // Plan threads only ping people actually on the plan. participantIds still
-    // holds people who only opened the plan.
-    const recipients = conv.planId
-      ? [...(planChatMemberIds(conv.planId) ?? [])]
-      : conv.participantIds;
-    for (const recipientId of recipients) {
-      if (recipientId === userId) continue;
-      if (store.hasLeftConversation(recipientId, conv.id)) continue;
-      if (store.isBlockedEitherWay(userId, recipientId)) continue;
-      const tagged = mentioned.has(recipientId);
-      await emit({
-        userId: recipientId,
-        kind: "newGroupChatMessage",
-        body: tagged
-          ? `${senderName} mentioned you in "${place}"`
-          : `${senderName} in "${place}": ${messagePreview(message)}`,
-        planId: conv.planId,
-        communityId: conv.communityId ?? undefined,
-        conversationId: convId,
-        dedupKey: tagged
-          ? `mention:${message.id}:${recipientId}`
-          : `newGroupChatMessage:${message.id}:${recipientId}`,
-      });
-    }
-  }
   res.status(201).json(await toMessageDto(message, userId));
+  void notifyNewChatMessage(conv, userId, message, storedBody).catch((err) => {
+    console.error("[chat] notify failed", err instanceof Error ? err.message : err);
+  });
 });
 
 // POST /api/conversations/:id/polls { question, options: string[] }
@@ -738,48 +802,11 @@ chatRouter.post("/conversations/:id/polls", requireAuth, async (req, res) => {
     return;
   }
   const message = store.createPollMessage(convId, userId, question, options);
-  if (conv.type === "dm" && !conv.planId && !conv.communityId) {
-    const otherId = conv.participantIds.find((id) => id !== userId);
-    const stillHidden = !!otherId && (conv.hiddenFromUserIds ?? []).includes(otherId);
-    if (otherId && !stillHidden && !store.isBlockedEitherWay(userId, otherId)) {
-      if (store.hasLeftConversation(otherId, convId)) {
-        store.setConversationLeft(otherId, convId, false);
-      }
-      const sender = await findUserById(userId);
-      const senderName = sender?.firstName || "Someone";
-      await emit({
-        userId: otherId,
-        kind: "newGroupChatMessage",
-        body: `${senderName}: ${truncate(question, 70)}`,
-        conversationId: convId,
-        profileUserId: userId,
-        dedupKey: `newDirectMessage:${message.id}:${otherId}`,
-      });
-    }
-  } else if (conv.type === "group") {
-    const sender = await findUserById(userId);
-    const senderName = sender?.firstName || "Someone";
-    const plan = store.findPlanById(conv.planId);
-    const planTitle = plan?.title ?? "your plan";
-    const recipients = conv.planId
-      ? [...(planChatMemberIds(conv.planId) ?? [])]
-      : conv.participantIds;
-    for (const recipientId of recipients) {
-      if (recipientId === userId) continue;
-      if (store.hasLeftConversation(recipientId, conv.id)) continue;
-      if (store.isBlockedEitherWay(userId, recipientId)) continue;
-      await emit({
-        userId: recipientId,
-        kind: "newGroupChatMessage",
-        body: `${senderName} posted a poll in "${planTitle}": ${truncate(question, 70)}`,
-        planId: conv.planId,
-        conversationId: convId,
-        dedupKey: `newGroupChatMessage:${message.id}:${recipientId}`,
-      });
-    }
-  }
   const hostId = conversationHostId(conv);
   res.status(201).json(await toMessageDto(message, userId, hostId));
+  void notifyNewPollMessage(conv, userId, message, question).catch((err) => {
+    console.error("[chat] poll notify failed", err instanceof Error ? err.message : err);
+  });
 });
 
 // POST /api/conversations/:id/messages/:msgId/vote { optionId }
@@ -1214,7 +1241,7 @@ async function toMessageDto(
     body: m.body,
     createdAt: m.createdAt,
     reactions: m.reactions ?? {},
-    ...(m.imageUrl ? { imageUrl: m.imageUrl } : {}),
+    ...(m.imageUrl ? { imageUrl: toImageUrl(m.imageUrl) } : {}),
     ...(replyTo ? { replyTo } : {}),
   };
 }

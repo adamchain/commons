@@ -15,6 +15,33 @@ import { type ConversationDTO, type ConversationSummaryDTO, type PublicUser } fr
 const PULL_THRESHOLD = 52;
 const PULL_MAX = 96;
 const PULL_MIN_SPIN_MS = 1250;
+const NETWORK_CACHE_KEY = "network-people";
+const NETWORK_SESSION_KEY = "commons.networkPeople";
+
+function readNetworkPeople(): PublicUser[] | null {
+  const mem = readScreen<PublicUser[]>(NETWORK_CACHE_KEY);
+  if (mem?.length) return mem;
+  try {
+    const raw = sessionStorage.getItem(NETWORK_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PublicUser[];
+    if (!Array.isArray(parsed) || parsed.length === 0) return null;
+    writeScreen(NETWORK_CACHE_KEY, parsed);
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeNetworkPeople(users: PublicUser[]): void {
+  writeScreen(NETWORK_CACHE_KEY, users);
+  if (users.some((u) => (u.avatarPhotoDataUrl ?? "").startsWith("data:"))) return;
+  try {
+    sessionStorage.setItem(NETWORK_SESSION_KEY, JSON.stringify(users));
+  } catch {
+    /* quota */
+  }
+}
 
 function rubberBandPull(dy: number): number {
   return Math.min(dy * 0.5, PULL_MAX);
@@ -230,7 +257,7 @@ export function MessagesPage() {
   );
   const [inboxQuery, setInboxQuery] = useState("");
   const [composeOpen, setComposeOpen] = useState(false);
-  const [composePeople, setComposePeople] = useState<PublicUser[] | null>(null);
+  const [composePeople, setComposePeople] = useState<PublicUser[] | null>(() => readNetworkPeople());
   const [composeSelected, setComposeSelected] = useState<string[]>([]);
   const [groupName, setGroupName] = useState("");
   const [creatingGroup, setCreatingGroup] = useState(false);
@@ -318,6 +345,12 @@ export function MessagesPage() {
     void loadInbox();
   }, [loadInbox]);
 
+  useEffect(() => {
+    void api<{ users: PublicUser[] }>("/api/auth/network")
+      .then((r) => writeNetworkPeople(r.users))
+      .catch(() => undefined);
+  }, []);
+
   // On cold start the iOS WebView sometimes lays this fixed, full-height inbox
   // shell out against a viewport that hasn't settled yet and never re-flows it,
   // so the list stays collapsed (invisible) until you navigate away and back.
@@ -342,16 +375,19 @@ export function MessagesPage() {
   useEffect(() => {
     if (!composeOpen) return;
     const ac = new AbortController();
-    setComposePeople(null);
+    const cachedPeople = readNetworkPeople();
+    setComposePeople(cachedPeople);
     setComposeSelected([]);
     setGroupName("");
     setComposeErr(null);
     void api<{ users: PublicUser[] }>("/api/auth/network", { signal: ac.signal })
       .then((r) => {
-        if (!ac.signal.aborted) setComposePeople(r.users);
+        if (ac.signal.aborted) return;
+        writeNetworkPeople(r.users);
+        setComposePeople(r.users);
       })
       .catch(() => {
-        if (!ac.signal.aborted) setComposePeople([]);
+        if (!ac.signal.aborted && !cachedPeople) setComposePeople([]);
       });
     return () => ac.abort();
   }, [composeOpen]);
@@ -687,7 +723,11 @@ export function MessagesPage() {
           </p>
           {composePeople === null ? (
             <div className="feed-skeleton" aria-busy="true" aria-label="Loading your network">
-              <div className="feed-skeleton-card" />
+              <div className="feed-skeleton-strip" />
+              <div className="feed-skeleton-strip" />
+              <div className="feed-skeleton-strip" />
+              <div className="feed-skeleton-strip" />
+              <div className="feed-skeleton-strip" />
             </div>
           ) : composePeople.length === 0 ? (
             <>

@@ -364,7 +364,7 @@ authRouter.post("/verify-code", limitVerifyByPhone, limitVerifyByIp, async (req,
     });
   }
   const token = setSessionCookie(res, user.id, user.sessionVersion ?? 0);
-  res.json({ ...meFromUser(user), token });
+  res.json({ ...meFromUser(user), token, created: isNewUser });
 });
 
 /** A web signup opened the installed app. Recorded once. */
@@ -696,20 +696,20 @@ authRouter.get("/network-prompt", requireAuth, async (req, res) => {
   // Persist the nudge as a notification too, so the user has a record of it
   // even after the modal closes. Dedup'd per (user, plan) so dismissing the
   // modal doesn't keep producing new entries.
+  res.json({ prompt });
   if (prompt) {
     const otherNames = prompt.others
       .map((o) => o.firstName)
       .slice(0, 3)
       .join(", ");
-    await emit({
+    void emit({
       userId,
       kind: "postPlanNetworkNudge",
       body: `You went to "${prompt.planTitle}" with ${prompt.others.length} ${prompt.others.length === 1 ? "person" : "people"}${otherNames ? ` (${otherNames})` : ""} — add them to your network?`,
       planId: prompt.planId,
       dedupKey: `postPlanNetworkNudge:${prompt.planId}:${userId}`,
-    });
+    }).catch(() => undefined);
   }
-  res.json({ prompt });
 });
 
 authRouter.post("/network-add", requireAuth, async (req, res) => {
@@ -777,13 +777,13 @@ export async function ensureConnectRequest(
   if ((viewer.networkIds ?? []).includes(targetId)) return "connected";
   if ((viewer.incomingNetworkRequests ?? []).includes(targetId)) {
     await connectNetwork(userId, targetId);
-    await emit({
+    void emit({
       userId: targetId,
       kind: "networkAccepted",
       body: `${viewer.firstName || "Someone"} connected with you on COMMONS`,
       dedupKey: `networkAccepted:${userId}:${targetId}`,
       profileUserId: userId,
-    });
+    }).catch(() => undefined);
     return "connected";
   }
   const targetIncoming = new Set(target.incomingNetworkRequests ?? []);
@@ -793,13 +793,13 @@ export async function ensureConnectRequest(
   }
   // Already on their request list used to return quietly. If the first
   // notification never landed, asking again has to tell them again.
-  await emit({
+  void emit({
     userId: targetId,
     kind: "networkRequest",
     body: `${viewer.firstName || "Someone"} wants to join your network. Accept to connect.`,
     dedupKey: `networkRequest:${userId}:${targetId}:${Date.now()}`,
     profileUserId: userId,
-  });
+  }).catch(() => undefined);
   return "requested";
 }
 
@@ -842,14 +842,14 @@ authRouter.post("/network-accept", requireAuth, async (req, res) => {
     return;
   }
   await connectNetwork(userId, requesterId);
-  await emit({
+  res.json({ ok: true, me: await userToMe(userId) });
+  void emit({
     userId: requesterId,
     kind: "networkAccepted",
     body: `${me.firstName || "Someone"} accepted your network request`,
     dedupKey: `networkAccepted:${userId}:${requesterId}`,
     profileUserId: userId,
-  });
-  res.json({ ok: true, me: await userToMe(userId) });
+  }).catch(() => undefined);
 });
 
 /** Decline (or cancel) a pending request from `userId`. */
@@ -893,17 +893,20 @@ async function connectNetwork(aId: string, bId: string): Promise<void> {
   if (!released) return;
   const sender = await findUserById(released.senderId);
   const senderName = sender?.firstName || "Someone";
-  for (const recipientId of released.revealedTo) {
-    if (recipientId === released.senderId) continue;
-    await emit({
-      userId: recipientId,
-      kind: "newGroupChatMessage",
-      body: `${senderName}: ${released.preview}`,
-      conversationId: released.conversationId,
-      profileUserId: released.senderId,
-      dedupKey: `heldDmReveal:${released.conversationId}:${recipientId}`,
-    });
-  }
+  void Promise.all(
+    released.revealedTo
+      .filter((recipientId) => recipientId !== released.senderId)
+      .map((recipientId) =>
+        emit({
+          userId: recipientId,
+          kind: "newGroupChatMessage",
+          body: `${senderName}: ${released.preview}`,
+          conversationId: released.conversationId,
+          profileUserId: released.senderId,
+          dedupKey: `heldDmReveal:${released.conversationId}:${recipientId}`,
+        }),
+      ),
+  ).catch(() => undefined);
 }
 
 authRouter.post("/friend-remove", requireAuth, async (req, res) => {

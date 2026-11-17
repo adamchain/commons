@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, BarChart2, Plus } from "lucide-react";
-import { api, isAuthFailure, parseApiError } from "../api/http";
+import { api, isAuthFailure, mediaSrc, parseApiError } from "../api/http";
 import { readScreen, writeScreen } from "../lib/screenCache";
 import { Avatar } from "../components/Avatar";
 import { ComposerField, MentionText } from "../components/ComposerField";
@@ -21,14 +21,14 @@ import { sentenceCaseTitle } from "../lib/format";
 import { fileToResizedDataUrl } from "../lib/imageResize";
 import { pickPhotoNative } from "../lib/photoPicker";
 import { isNative } from "../lib/platform";
-import type { NavFromState } from "../lib/navState";
+import { popOrNavigate, type NavFromState } from "../lib/navState";
+import { mergeChatMessages, postOwnChatMessage, toggleChatHeart, useLiveChatMessages } from "../lib/useLiveChatMessages";
 import { useStickToBottom } from "../lib/useStickToBottom";
 import type { CommunityCategory, MessageDTO, MessageReplyDTO, PublicUser } from "../types/shared";
 
 const CHAT_IMAGE_MAX_PX = 1024;
 const CHAT_IMAGE_QUALITY = 0.85;
 
-const POLL_MS = 4000;
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 const CHAT_HEADER_CLASS =
   "app-header app-header--minimal chat-header-bar chat-header-bar--thread app-header--sticky";
@@ -89,6 +89,8 @@ export function CommunityChatPage() {
     chatReady && !needsJoin,
     `${lastMessageId}:${messages.length}`,
   );
+  const live = useLiveChatMessages(conv?.id, setMessages, deletedIdsRef);
+  live.messagesRef.current = messages;
 
   useEffect(() => {
     let alive = true;
@@ -101,15 +103,22 @@ export function CommunityChatPage() {
     setNeedsJoin(false);
     void (async () => {
       try {
-        const c = await api<CommunityConversation & { messages?: MessageDTO[] }>(
-          `/api/communities/${id}/conversation?messages=1`,
-        );
+        const c = await api<CommunityConversation>(`/api/communities/${id}/conversation`);
         if (!alive) return;
-        const freshMessages = visibleMessages(c.messages ?? [], deletedIdsRef.current);
-        const freshConv: CommunityConversation = { ...c, messages: undefined } as CommunityConversation;
-        setConv(freshConv);
-        setMessages(freshMessages);
-        writeScreen(`community-chat:${id}`, { conv: freshConv, messages: freshMessages });
+        setConv(c);
+        setChatReady(true);
+        const msgs = await api<MessageDTO[]>(`/api/conversations/${c.id}/messages`);
+        if (!alive) return;
+        setMessages((prev) => {
+          const locals = prev.filter((m) => m.id.startsWith("local-"));
+          const fresh = mergeChatMessages(
+            visibleMessages(msgs, deletedIdsRef.current),
+            locals,
+            deletedIdsRef.current,
+          );
+          writeScreen(`community-chat:${id}`, { conv: c, messages: fresh });
+          return fresh;
+        });
       } catch (e) {
         if (!alive) return;
         const msg = parseApiError(e);
@@ -126,28 +135,6 @@ export function CommunityChatPage() {
       alive = false;
     };
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Poll for new messages — only fetch messages newer than the last one we have.
-  useEffect(() => {
-    if (!conv) return;
-    const interval = setInterval(() => {
-      setMessages((prev) => {
-        const since = prev[prev.length - 1]?.createdAt ?? "";
-        void api<MessageDTO[]>(
-          `/api/conversations/${conv.id}/messages${since ? `?since=${encodeURIComponent(since)}` : ""}`,
-        ).then((incoming) => {
-          if (!incoming.length) return;
-          setMessages((cur) => {
-            const ids = new Set(cur.map((m) => m.id));
-            const fresh = incoming.filter((m) => !ids.has(m.id) && !deletedIdsRef.current.has(m.id));
-            return fresh.length ? [...cur, ...fresh].sort((a, b) => a.createdAt.localeCompare(b.createdAt)) : cur;
-          });
-        }).catch(() => { /* swallow */ });
-        return prev;
-      });
-    }, POLL_MS);
-    return () => clearInterval(interval);
-  }, [conv]);
 
   useEffect(() => {
     if (!headerMenuOpen) {
@@ -177,9 +164,9 @@ export function CommunityChatPage() {
     return (
       <main className="app-shell app-shell--chat">
         <header className={CHAT_HEADER_CLASS}>
-          <Link to={backTo} className="detail-back chat-back-link" aria-label={backLabel}>
+          <button type="button" className="detail-back chat-back-link" aria-label={backLabel} onClick={() => popOrNavigate(navigate, backTo)}>
             <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
-          </Link>
+          </button>
           <div className="chat-thread-heading">
             <div className="chat-thread-title">Chat</div>
           </div>
@@ -199,9 +186,9 @@ export function CommunityChatPage() {
     return (
       <main className="app-shell app-shell--chat">
         <header className={CHAT_HEADER_CLASS}>
-          <Link to={backTo} className="detail-back chat-back-link" aria-label={backLabel}>
+          <button type="button" className="detail-back chat-back-link" aria-label={backLabel} onClick={() => popOrNavigate(navigate, backTo)}>
             <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
-          </Link>
+          </button>
           <div className="chat-thread-heading">
             <div className="chat-thread-title">Chat</div>
           </div>
@@ -216,28 +203,29 @@ export function CommunityChatPage() {
 
   async function send() {
     const trimmed = body.trim();
-    if ((!trimmed && !pendingImage) || !conv || sending) return;
+    if ((!trimmed && !pendingImage) || !conv || sending || !user) return;
+    const image = pendingImage;
+    const reply = replyTo;
+    setBody("");
+    setPendingImage(null);
+    setReplyTo(null);
     setSending(true);
-    try {
-      const msg = await api<MessageDTO>(`/api/conversations/${conv.id}/messages`, {
-        method: "POST",
-        body: JSON.stringify({
-          ...(trimmed ? { body: trimmed } : {}),
-          ...(pendingImage ? { imageUrl: pendingImage } : {}),
-          ...(replyTo ? { replyToId: replyTo.id } : {}),
-        }),
-      });
-      stickOnSend();
-      setMessages((prev) => [...prev, msg]);
-      setBody("");
-      setPendingImage(null);
-      setReplyTo(null);
-    } catch (e) {
-      if (isAuthFailure(e)) return;
-      window.alert(parseApiError(e) || "Couldn't send that message.");
-    } finally {
-      setSending(false);
-    }
+    stickOnSend();
+    void postOwnChatMessage({
+      convId: conv.id,
+      text: trimmed,
+      imageUrl: image,
+      replyTo: reply,
+      me: user,
+      deletedIds: deletedIdsRef.current,
+      setMessages,
+    }).catch((e) => {
+      setBody((cur) => cur || trimmed);
+      setPendingImage((cur) => cur ?? image);
+      setReplyTo((cur) => cur ?? reply);
+      if (!isAuthFailure(e)) window.alert(parseApiError(e) || "Couldn't send that message.");
+    });
+    setSending(false);
   }
 
   async function attachImage(dataUrl: string) {
@@ -296,7 +284,7 @@ export function CommunityChatPage() {
     if (!window.confirm("Leave this chat? It leaves the inbox. You're still in.")) return;
     try {
       await api(`/api/conversations/${conv.id}/leave`, { method: "POST" });
-      navigate("/messages");
+      navigate(backTo, { replace: true });
     } catch {
       /* swallow */
     }
@@ -332,16 +320,8 @@ export function CommunityChatPage() {
   }
 
   async function toggleHeart(messageId: string) {
-    if (!conv) return;
-    try {
-      const updated = await api<MessageDTO>(
-        `/api/conversations/${conv.id}/messages/${messageId}/react`,
-        { method: "POST", body: JSON.stringify({ emoji: "❤️" }) },
-      );
-      setMessages((prev) => prev.map((m) => (m.id === messageId ? updated : m)));
-    } catch {
-      /* swallow — they can tap again */
-    }
+    if (!conv || !user) return;
+    await toggleChatHeart({ convId: conv.id, messageId, meId: user.id, setMessages });
   }
 
   async function createPoll(question: string, options: string[]) {
@@ -423,9 +403,9 @@ export function CommunityChatPage() {
   return (
     <main ref={shellRef} className="app-shell app-shell--chat">
       <header className={CHAT_HEADER_CLASS}>
-        <Link to={backTo} className="detail-back chat-back-link" aria-label={backLabel}>
+        <button type="button" className="detail-back chat-back-link" aria-label={backLabel} onClick={() => popOrNavigate(navigate, backTo)}>
           <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
-        </Link>
+        </button>
         <div className="chat-thread-heading">
           <div className="chat-thread-title">{sentenceCaseTitle(conv.communityName)}</div>
         </div>
@@ -659,12 +639,12 @@ export function CommunityChatPage() {
                     {entry.replyTo && <ChatReplyQuote reply={entry.replyTo} />}
                     {entry.imageUrl && (
                       <a
-                        href={entry.imageUrl}
+                        href={mediaSrc(entry.imageUrl) ?? entry.imageUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="chat-bubble-image-link"
                       >
-                        <img src={entry.imageUrl} alt="" className="chat-bubble-image" />
+                        <img src={mediaSrc(entry.imageUrl) ?? entry.imageUrl} alt="" className="chat-bubble-image" />
                       </a>
                     )}
                     {entry.body && !(entry.imageUrl && entry.body === "📷 Photo") && (
@@ -805,7 +785,7 @@ export function CommunityChatPage() {
           onClose={() => setBlockOpen(false)}
           onBlocked={async () => {
             await api(`/api/conversations/${conv.id}/leave`, { method: "POST" }).catch(() => undefined);
-            navigate("/messages");
+            navigate("/messages", { replace: true });
           }}
         />
       )}

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { mediaSrc } from "../api/http";
 import { interestVisual } from "../lib/interestIcons";
 import { photoForInterest } from "../lib/placePhotos";
 import type { CommunityCategory } from "../types/shared";
@@ -27,7 +28,7 @@ export function CommunityCover({
   return (
     <div className={`cmy-cover-media ${className}`.trim()}>
       {photo ? (
-        <img src={photo} alt="" className="cmy-cover-media-img" loading="lazy" />
+        <img src={mediaSrc(photo) ?? photo} alt="" className="cmy-cover-media-img" loading="lazy" />
       ) : (
         <div
           className="cmy-cover-fallback"

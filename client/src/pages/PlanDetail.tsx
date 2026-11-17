@@ -20,7 +20,7 @@ import { isIdeaPlan, isPlanAtCapacity, planHasEnded, planRequiresHostApproval } 
 import { useCardImages, pickCoverImage } from "../lib/cardImages";
 import { formatPlanDate, formatPlanTime, formatPlanWhenLine, formatVenueAddressLine, formatVenueName, presentPlanCopy, firstHttpUrlInText, normalizeHttpUrl } from "../lib/format";
 import { appPathFromHref } from "../lib/appLinks";
-import { hrefForBack, type NavFromState } from "../lib/navState";
+import { hrefForBack, popOrNavigate, type NavFromState } from "../lib/navState";
 import { cachedPlan, peekPlan, prefetchPlan, rememberPlan } from "../lib/planPrefetch";
 import { INTEREST_LABELS, type ConversationDTO, type MessageDTO, type ParticipationState, type PlanDetailAccess, type PlanDTO, type PublicUser } from "../types/shared";
 
@@ -340,7 +340,7 @@ export function PlanDetailPage() {
       navigate(location.pathname, { replace: true, state: navFrom });
       return;
     }
-    navigate(backHref);
+    popOrNavigate(navigate, backHref);
   }
 
   return (

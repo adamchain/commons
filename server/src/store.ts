@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFile } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { isMongoConnected } from "./db.js";
 import { mongoMirror } from "./mongoMirror.js";
 import type {
   AgeRange,
@@ -907,9 +908,51 @@ function rebuildIndexes(): void {
 
 rebuildIndexes();
 
-function persist(): void {
+let persistDirty = false;
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+let persistWriting = false;
+
+function writeSnapshotToDisk(): void {
   mkdirSync(dirname(DATA_PATH), { recursive: true });
-  writeFileSync(DATA_PATH, JSON.stringify(snapshot, null, 2));
+  persistWriting = true;
+  const payload = JSON.stringify(snapshot);
+  writeFile(DATA_PATH, payload, (err) => {
+    persistWriting = false;
+    if (err) {
+      persistDirty = true;
+      console.error("[store] persist failed", err.message);
+    }
+    if (persistDirty) persist();
+  });
+}
+
+/**
+ * Disk backup of the in-memory snapshot. Pretty-printing the whole store
+ * (chat images as data URLs) on every message blocked the Node process for
+ * tens of seconds in large group chats — the HTTP send sat there until the
+ * write finished, so the bubble never appeared until a refresh.
+ *
+ * Production already mirrors each row to Mongo; delay that backup. Local
+ * data.json-only mode still writes, just coalesced onto the next tick.
+ */
+function persist(): void {
+  persistDirty = true;
+  if (persistTimer != null || persistWriting) return;
+  persistTimer = setTimeout(
+    () => {
+      persistTimer = null;
+      if (!persistDirty || persistWriting) return;
+      persistDirty = false;
+      try {
+        writeSnapshotToDisk();
+      } catch (err) {
+        persistDirty = true;
+        persistWriting = false;
+        console.error("[store] persist failed", err instanceof Error ? err.message : err);
+      }
+    },
+    isMongoConnected() ? 4000 : 200,
+  );
 }
 
 export const store = {
@@ -1862,6 +1905,20 @@ export const store = {
   },
   listMessagesForConversation(conversationId: string): MessageRecord[] {
     return [...(messagesByConvIndex.get(conversationId) ?? [])];
+  },
+  peekLastMessage(conversationId: string): MessageRecord | undefined {
+    return messagesByConvIndex.get(conversationId)?.at(-1);
+  },
+  conversationHasNonSystem(conversationId: string): boolean {
+    return Boolean(messagesByConvIndex.get(conversationId)?.some((m) => m.kind !== "system"));
+  },
+  countHumanUnread(conversationId: string, userId: string): number {
+    let n = 0;
+    for (const m of messagesByConvIndex.get(conversationId) ?? []) {
+      if (m.kind === "system" || m.senderId === userId || m.readBy.includes(userId)) continue;
+      n++;
+    }
+    return n;
   },
   /** Opening a thread marks every message read so the inbox badge can drop. */
   markConversationRead(conversationId: string, userId: string): number {

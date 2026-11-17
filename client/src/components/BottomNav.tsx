@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Home, UserRound, Users, Plus, MessageCircle } from "lucide-react";
 import { api } from "../api/http";
 import { useAuth } from "../context/AuthContext";
@@ -22,6 +22,7 @@ function warmNav(to: string) {
 
 export function BottomNav() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
@@ -95,6 +96,7 @@ export function BottomNav() {
     pathname.match(/^\/plans\/[^/]+\/edit$/) ||
     pathname.match(/^\/plans\/[^/]+\/chat$/) ||
     pathname.match(/^\/communities\/[^/]+\/chat$/) ||
+    pathname.match(/^\/chats\/[^/]+$/) ||
     pathname.match(/^\/dm\/[^/]+$/) ||
     pathname === "/helpchat" ||
     (!user && Boolean(pathname.match(/^\/plans\/[^/]+$/))) ||
@@ -127,8 +129,9 @@ export function BottomNav() {
 
       <NavLink
         to="/communities"
-        end
-        className={({ isActive }) => `bottom-nav-item ${isActive ? "is-active" : ""}`}
+        className={() =>
+          `bottom-nav-item ${pathname.startsWith("/communities") ? "is-active" : ""}`
+        }
         aria-label="Communities"
         onPointerDown={() => warmNav("/communities")}
       >
@@ -150,9 +153,19 @@ export function BottomNav() {
 
       <NavLink
         to="/messages"
-        className={({ isActive }) => `bottom-nav-item ${isActive ? "is-active" : ""}`}
+        className={() =>
+          `bottom-nav-item ${
+            pathname.startsWith("/messages") || pathname.startsWith("/forums/") ? "is-active" : ""
+          }`
+        }
         aria-label={unreadMessages > 0 ? `Messages, ${unreadMessages} unread` : "Messages"}
         onPointerDown={() => warmNav("/messages")}
+        onClick={(e) => {
+          if (pathname.startsWith("/forums/")) {
+            e.preventDefault();
+            navigate("/messages?tab=interests");
+          }
+        }}
       >
         <span className="bottom-nav-icon-wrap">
           <MessageCircle size={23} strokeWidth={1.7} />

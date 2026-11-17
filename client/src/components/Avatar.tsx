@@ -1,3 +1,4 @@
+import { mediaSrc } from "../api/http";
 import type { AvatarStyle } from "../types/shared";
 
 interface AvatarProps {
@@ -85,7 +86,7 @@ export function Avatar({
     );
   }
   if (photoDataUrl) {
-    return <img src={photoDataUrl} width={px} height={px} className={cls} alt="" loading="lazy" />;
+    return <img src={mediaSrc(photoDataUrl) ?? photoDataUrl} width={px} height={px} className={cls} alt="" loading="lazy" />;
   }
   // When the user has picked a preset, render the customized DiceBear directly.
   if (params) {

@@ -57,15 +57,19 @@ async function evictInterested(plan: PlanRecord): Promise<void> {
   if (conv) store.createSystemMessage(conv.id, "Anyone who wasn't going has been taken off.");
   store.updatePlan(plan.id, { spotWaitlistUserIds: [...waitlist] });
   const stamp = new Date().toISOString();
-  for (const row of rows) {
-    await emit({
-      userId: row.userId,
-      kind: "planFullInterested",
-      body: FULL_INTERESTED_BODY(plan.title),
-      planId: plan.id,
-      dedupKey: `planFullEvict:${plan.id}:${row.userId}:${stamp}`,
-    });
-  }
+  void Promise.all(
+    rows.map((row) =>
+      emit({
+        userId: row.userId,
+        kind: "planFullInterested",
+        body: FULL_INTERESTED_BODY(plan.title),
+        planId: plan.id,
+        dedupKey: `planFullEvict:${plan.id}:${row.userId}:${stamp}`,
+      }),
+    ),
+  ).catch((err) => {
+    console.error("[planFull] evict notify failed", err instanceof Error ? err.message : err);
+  });
 }
 
 /** Take Interested people off any plan that is already full. */
@@ -86,15 +90,19 @@ function spotAudience(plan: PlanRecord): string[] {
 }
 
 async function notifyWaitlist(plan: PlanRecord, stamp: string): Promise<void> {
-  for (const userId of spotAudience(plan)) {
-    await emit({
-      userId,
-      kind: "planSpotReopen",
-      body: `A spot opened up on "${plan.title}".`,
-      planId: plan.id,
-      dedupKey: `planSpotOpened:${plan.id}:${userId}:${stamp}`,
-    });
-  }
+  void Promise.all(
+    spotAudience(plan).map((userId) =>
+      emit({
+        userId,
+        kind: "planSpotReopen",
+        body: `A spot opened up on "${plan.title}".`,
+        planId: plan.id,
+        dedupKey: `planSpotOpened:${plan.id}:${userId}:${stamp}`,
+      }),
+    ),
+  ).catch((err) => {
+    console.error("[planFull] waitlist notify failed", err instanceof Error ? err.message : err);
+  });
 }
 
 /** Tell people who were interested that they can try again. No-op if nobody is waiting. */

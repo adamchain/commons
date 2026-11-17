@@ -10,6 +10,7 @@ import { findUserById, findUsersByIds } from "../userRepo.js";
 import { userToPublic, planSummary } from "./plans.js";
 import { inlineMessages } from "./chat.js";
 import { mentionedUserIds } from "../lib/mentions.js";
+import { toImageUrl } from "../lib/imageCache.js";
 import { emit } from "../lib/notify.js";
 import { listAdminPhones } from "../lib/adminPhones.js";
 import { isQaOrTestCommunityName } from "../lib/qaCommunities.js";
@@ -243,7 +244,7 @@ function postDTO(
     author: publicFor(post.authorId, users),
     authorIsOrganizer: post.authorId === organizerId,
     content: post.content,
-    image: post.image ?? null,
+    image: toImageUrl(post.image ?? null),
     pinned: post.pinned,
     approvalStatus: status === "pending" ? "pending" : "approved",
     createdAt: post.createdAt,
@@ -752,22 +753,6 @@ communitiesRouter.post("/:id/join", requireAuth, async (req, res) => {
       screeningAnswer: answer || null,
     });
     if (answer) rememberScreeningAnswer(community, userId, answer);
-    // Notify the organizer (in-app + push). Never fail the join if notify hiccups.
-    try {
-      await emit({
-        userId: community.organizerId,
-        kind: "communityJoinRequest",
-        body: `${me?.firstName || "Someone"} asked to join ${community.name}`,
-        communityId: community.id,
-        profileUserId: userId,
-        dedupKey: `communityJoinRequest:${community.id}:${userId}`,
-      });
-    } catch (err) {
-      console.error(
-        "[communities] join-request notify failed",
-        err instanceof Error ? err.message : err,
-      );
-    }
     store.log("community_join_requested", { communityId: community.id, userId });
   } else {
     store.upsertCommunityMembership({
@@ -784,6 +769,21 @@ communitiesRouter.post("/:id/join", requireAuth, async (req, res) => {
     store.log("community_joined", { communityId: community.id, userId });
   }
   res.json(await toCommunityDTO(store.findCommunityById(community.id)!, userId));
+  if (communityRequiresJoinApproval(community)) {
+    void emit({
+      userId: community.organizerId,
+      kind: "communityJoinRequest",
+      body: `${me?.firstName || "Someone"} asked to join ${community.name}`,
+      communityId: community.id,
+      profileUserId: userId,
+      dedupKey: `communityJoinRequest:${community.id}:${userId}`,
+    }).catch((err) => {
+      console.error(
+        "[communities] join-request notify failed",
+        err instanceof Error ? err.message : err,
+      );
+    });
+  }
 });
 
 // POST /api/communities/:id/leave — members can leave anytime. Organizers must
@@ -854,16 +854,17 @@ communitiesRouter.post("/:id/transfer-organizer", requireAuth, async (req, res) 
     to: newOrganizerId,
     by: userId,
   });
-  await emit({
+  const updated = store.findCommunityById(community.id)!;
+  res.json({ ok: true, newOrganizerId, community: await toCommunityDTO(updated, userId) });
+  void emit({
     userId: newOrganizerId,
     kind: "communityRequestApproved",
     body: `You're now the organizer of ${community.name}`,
     communityId: community.id,
     dedupKey: `communityOrganizerTransfer:${community.id}:${newOrganizerId}`,
+  }).catch((err) => {
+    console.error("[communities] transfer notify failed", err instanceof Error ? err.message : err);
   });
-
-  const updated = store.findCommunityById(community.id)!;
-  res.json({ ok: true, newOrganizerId, community: await toCommunityDTO(updated, userId) });
 });
 
 // DELETE /api/communities/:id — organizer (or admin) permanently deletes the
@@ -889,35 +890,40 @@ communitiesRouter.delete("/:id", requireAuth, async (req, res) => {
     return;
   }
 
-  for (const planId of result.cancelledPlanIds) {
-    const plan = store.findPlanById(planId);
-    if (!plan) continue;
-    const participants = store.listParticipationsForPlan(planId);
-    const recipientIds = Array.from(
-      new Set(
-        participants
-          .filter((p) => p.state === "going" || p.state === "interested")
-          .map((p) => p.userId)
-          .filter((id) => id !== userId),
-      ),
-    );
-    for (const uid of recipientIds) {
-      await emit({
-        userId: uid,
-        kind: "planCancellation",
-        body: `"${plan.title}" was cancelled — ${name} was deleted`,
-        planId: plan.id,
-        dedupKey: `planCancellation:${plan.id}:${uid}`,
-      });
-    }
-  }
-
   store.log("community_deleted", {
     communityId,
     by: userId,
     cancelledPlans: result.cancelledPlanIds.length,
   });
   res.json({ ok: true });
+  void (async () => {
+    for (const planId of result.cancelledPlanIds) {
+      const plan = store.findPlanById(planId);
+      if (!plan) continue;
+      const participants = store.listParticipationsForPlan(planId);
+      const recipientIds = Array.from(
+        new Set(
+          participants
+            .filter((p) => p.state === "going" || p.state === "interested")
+            .map((p) => p.userId)
+            .filter((id) => id !== userId),
+        ),
+      );
+      await Promise.all(
+        recipientIds.map((uid) =>
+          emit({
+            userId: uid,
+            kind: "planCancellation",
+            body: `"${plan.title}" was cancelled — ${name} was deleted`,
+            planId: plan.id,
+            dedupKey: `planCancellation:${plan.id}:${uid}`,
+          }),
+        ),
+      );
+    }
+  })().catch((err) => {
+    console.error("[communities] delete notify failed", err instanceof Error ? err.message : err);
+  });
 });
 
 // GET /api/communities/:id/members — active members always; pending requests
@@ -972,15 +978,17 @@ communitiesRouter.post("/:id/members/:userId/approve", requireAuth, async (req, 
   if (community.chatEnabled && store.findCommunityConversation(community.id)) {
     store.ensureCommunityConversation(community.id, [targetId]);
   }
-  await emit({
+  store.log("community_member_approved", { communityId: community.id, userId: targetId });
+  res.json({ ok: true });
+  void emit({
     userId: targetId,
     kind: "communityRequestApproved",
     body: `You're in — welcome to ${community.name}`,
     communityId: community.id,
     dedupKey: `communityApproved:${community.id}:${targetId}`,
+  }).catch((err) => {
+    console.error("[communities] approve notify failed", err instanceof Error ? err.message : err);
   });
-  store.log("community_member_approved", { communityId: community.id, userId: targetId });
-  res.json({ ok: true });
 });
 
 // POST /api/communities/:id/members/:userId/decline
@@ -1002,15 +1010,17 @@ communitiesRouter.post("/:id/members/:userId/decline", requireAuth, async (req, 
     return;
   }
   store.removeCommunityMembership(community.id, targetId);
-  await emit({
+  store.log("community_member_declined", { communityId: community.id, userId: targetId });
+  res.json({ ok: true });
+  void emit({
     userId: targetId,
     kind: "communityRequestDeclined",
     body: `Your request to join ${community.name} wasn't approved`,
     communityId: community.id,
     dedupKey: `communityDeclined:${community.id}:${targetId}:${membership.joinedAt}`,
+  }).catch((err) => {
+    console.error("[communities] decline notify failed", err instanceof Error ? err.message : err);
   });
-  store.log("community_member_declined", { communityId: community.id, userId: targetId });
-  res.json({ ok: true });
 });
 
 // POST /api/communities/:id/members — organizer adds a member directly (no screening).
@@ -1051,15 +1061,17 @@ communitiesRouter.post("/:id/members", requireAuth, async (req, res) => {
   if (community.chatEnabled && store.findCommunityConversation(community.id)) {
     store.ensureCommunityConversation(community.id, [targetId]);
   }
-  await emit({
+  store.log("community_member_added", { communityId: community.id, userId: targetId });
+  res.status(201).json({ ok: true });
+  void emit({
     userId: targetId,
     kind: "communityRequestApproved",
     body: `You were added to ${community.name}`,
     communityId: community.id,
     dedupKey: `communityAdded:${community.id}:${targetId}`,
+  }).catch((err) => {
+    console.error("[communities] add-member notify failed", err instanceof Error ? err.message : err);
   });
-  store.log("community_member_added", { communityId: community.id, userId: targetId });
-  res.status(201).json({ ok: true });
 });
 
 // DELETE /api/communities/:id/members/:userId — organizer removes a member.
@@ -1164,18 +1176,20 @@ async function notifyBulletinPosted(
   const ids = new Set(store.listActiveCommunityMembers(community.id).map((m) => m.userId));
   ids.add(community.organizerId);
   const skip = new Set([authorId, ...skipUserIds]);
-  for (const userId of ids) {
-    if (skip.has(userId)) continue;
-    if (store.isBlockedEitherWay(authorId, userId)) continue;
-    await emit({
-      userId,
-      kind: "communityBulletinPosted",
-      body,
-      communityId: community.id,
-      profileUserId: authorId,
-      dedupKey: `communityBulletinPosted:${postId}:${userId}`,
-    });
-  }
+  await Promise.all(
+    [...ids]
+      .filter((userId) => !skip.has(userId) && !store.isBlockedEitherWay(authorId, userId))
+      .map((userId) =>
+        emit({
+          userId,
+          kind: "communityBulletinPosted",
+          body,
+          communityId: community.id,
+          profileUserId: authorId,
+          dedupKey: `communityBulletinPosted:${postId}:${userId}`,
+        }),
+      ),
+  );
 }
 
 /** A live bulletin post tells each tagged member they were mentioned. */
@@ -1267,31 +1281,6 @@ communitiesRouter.post("/:id/posts", requireAuth, async (req, res) => {
     approvalStatus: needsApproval ? "pending" : "approved",
     parentId,
   });
-  if (!needsApproval) {
-    try {
-      await notifyBulletinMentions(community, viewerId, content, post.id);
-      if (!parentId) await notifyBulletinPosted(community, viewerId, content, post.id);
-    } catch (err) {
-      console.error("[communities] mention notify failed", err instanceof Error ? err.message : err);
-    }
-  }
-  if (needsApproval) {
-    const author = await findUserById(viewerId);
-    try {
-      await emit({
-        userId: community.organizerId,
-        kind: "communityPostPending",
-        body: `${author?.firstName || "Someone"} posted in ${community.name} — waiting for your approval`,
-        communityId: community.id,
-        dedupKey: `communityPostPending:${post.id}`,
-      });
-    } catch (err) {
-      console.error(
-        "[communities] post-approval notify failed",
-        err instanceof Error ? err.message : err,
-      );
-    }
-  }
   const users = await findUsersByIds([post.authorId]);
   store.log("community_post_created", {
     communityId: community.id,
@@ -1301,6 +1290,23 @@ communitiesRouter.post("/:id/posts", requireAuth, async (req, res) => {
   res
     .status(201)
     .json(postDTO(post, users, community.organizerId, viewerId, viewerIsOrganizer));
+  void (async () => {
+    if (!needsApproval) {
+      await notifyBulletinMentions(community, viewerId, content, post.id);
+      if (!parentId) await notifyBulletinPosted(community, viewerId, content, post.id);
+      return;
+    }
+    const author = await findUserById(viewerId);
+    await emit({
+      userId: community.organizerId,
+      kind: "communityPostPending",
+      body: `${author?.firstName || "Someone"} posted in ${community.name} — waiting for your approval`,
+      communityId: community.id,
+      dedupKey: `communityPostPending:${post.id}`,
+    });
+  })().catch((err) => {
+    console.error("[communities] bulletin notify failed", err instanceof Error ? err.message : err);
+  });
 });
 
 // POST /api/communities/:id/posts/:postId/approve — organizer approves a pending post.
@@ -1322,15 +1328,15 @@ communitiesRouter.post("/:id/posts/:postId/approve", requireAuth, async (req, re
   }
   store.setCommunityPostApprovalStatus(post.id, "approved");
   store.log("community_post_approved", { communityId: community.id, postId: post.id });
-  try {
+  res.json({ ok: true });
+  void (async () => {
     await notifyBulletinMentions(community, post.authorId, post.content, post.id);
     if (!post.parentId) {
       await notifyBulletinPosted(community, post.authorId, post.content, post.id, [viewerId]);
     }
-  } catch (err) {
+  })().catch((err) => {
     console.error("[communities] mention notify failed", err instanceof Error ? err.message : err);
-  }
-  res.json({ ok: true });
+  });
 });
 
 // POST /api/communities/:id/posts/:postId/decline — organizer declines a pending post.

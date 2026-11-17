@@ -16,6 +16,7 @@ import {
 } from "../types/shared.js";
 import { textBlockedReason } from "../lib/contentFilter.js";
 import { isGcsConfigured, parseDataUrl, uploadCardImage } from "../lib/gcs.js";
+import { toImageUrl } from "../lib/imageCache.js";
 
 export const forumsRouter = Router();
 
@@ -72,7 +73,7 @@ function postDTO(
     interestTag: post.interestTag,
     author: publicFor(post.authorId, users),
     content: post.content,
-    imageUrl: post.imageUrl ?? null,
+    imageUrl: toImageUrl(post.imageUrl ?? null),
     isSponsored: post.isSponsored,
     sponsorName: post.sponsorName ?? null,
     createdAt: post.createdAt,
@@ -89,7 +90,7 @@ function replyDTO(reply: ForumReplyRecord, users: Map<string, Awaited<ReturnType
     postId: reply.postId,
     author: publicFor(reply.authorId, users),
     content: reply.content,
-    imageUrl: reply.imageUrl ?? null,
+    imageUrl: toImageUrl(reply.imageUrl ?? null),
     createdAt: reply.createdAt,
   };
 }

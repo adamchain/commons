@@ -18,6 +18,12 @@ PODS:
     - Capacitor
   - CapacitorPushNotifications (7.0.6):
     - Capacitor
+  - FBAEMKit (19.0.0):
+    - FBSDKCoreKit_Basics (= 19.0.0)
+  - FBSDKCoreKit (19.0.0):
+    - FBAEMKit (= 19.0.0)
+    - FBSDKCoreKit_Basics (= 19.0.0)
+  - FBSDKCoreKit_Basics (19.0.0)
   - IONGeolocationLib (1.0.1)
   - KeychainSwift (21.0.0)
 
@@ -31,9 +37,13 @@ DEPENDENCIES:
   - "CapacitorGeolocation (from `../../node_modules/@capacitor/geolocation`)"
   - "CapacitorPreferences (from `../../node_modules/@capacitor/preferences`)"
   - "CapacitorPushNotifications (from `../../node_modules/@capacitor/push-notifications`)"
+  - FBSDKCoreKit (~> 19.0)
 
 SPEC REPOS:
   trunk:
+    - FBAEMKit
+    - FBSDKCoreKit
+    - FBSDKCoreKit_Basics
     - IONGeolocationLib
     - KeychainSwift
 
@@ -67,9 +77,12 @@ SPEC CHECKSUMS:
   CapacitorGeolocation: ab54d708e2fcf99a7bafe0219eaa6f7a932f001a
   CapacitorPreferences: 69d9991307507aeab8ef8019c10b9babfda0e9ca
   CapacitorPushNotifications: b8e30637549ce91468b8c4dddbef2657be831f4c
+  FBAEMKit: feeb39dc63c2de0ce729b642749766f872bb5cae
+  FBSDKCoreKit: 8ab2f41763606700686aff3dde1f997e3e7669c8
+  FBSDKCoreKit_Basics: 89dc0713ac15ffd0b2cf22a05bbf083eb426d6da
   IONGeolocationLib: 20f9d0248a0b5264511fb57a37e25dd2badf797a
   KeychainSwift: 4a71a45c802fd9e73906457c2dcbdbdc06c9419d
 
-PODFILE CHECKSUM: 78702a1420610856c60cacd168c72727825a0858
+PODFILE CHECKSUM: e1c23fdcf5494b5025564e173fe734f2965ecd72
 
 COCOAPODS: 1.16.2

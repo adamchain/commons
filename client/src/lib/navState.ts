@@ -1,3 +1,5 @@
+import type { NavigateFunction } from "react-router-dom";
+
 /** Where the user came from — passed via react-router `location.state`. */
 export type NavFromState = {
   from?:
@@ -39,6 +41,15 @@ export function forumBackState(navFrom: NavFromState | null | undefined, tag: st
     return { ...navFrom, messagesTab: navFrom.messagesTab ?? "interests" };
   }
   return navFrom;
+}
+
+/** Prefer the real history stack so Back and the iOS edge-swipe land on the same screen. */
+export function popOrNavigate(navigate: NavigateFunction, fallback: string): void {
+  if (typeof window !== "undefined" && window.history.length > 1) {
+    navigate(-1);
+    return;
+  }
+  navigate(fallback);
 }
 
 export function hrefForBack(state: NavFromState | null | undefined): string {
