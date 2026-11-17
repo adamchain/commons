@@ -107,7 +107,6 @@ export function ChatPage() {
         const freshConv: ConversationDTO = { ...c, messages: undefined };
         setPlan(p);
         setConv(freshConv);
-        setChatReady(true);
         const msgs = await api<MessageDTO[]>(`/api/conversations/${c.id}/messages`);
         setMessages((prev) => {
           const locals = prev.filter((m) => m.id.startsWith("local-"));

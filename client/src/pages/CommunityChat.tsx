@@ -106,7 +106,6 @@ export function CommunityChatPage() {
         const c = await api<CommunityConversation>(`/api/communities/${id}/conversation`);
         if (!alive) return;
         setConv(c);
-        setChatReady(true);
         const msgs = await api<MessageDTO[]>(`/api/conversations/${c.id}/messages`);
         if (!alive) return;
         setMessages((prev) => {

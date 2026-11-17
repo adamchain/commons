@@ -80,7 +80,6 @@ export function GroupChatPage() {
         setError(null);
         setGateMsg(null);
         setConv(c);
-        setReady(true);
         const msgs = await api<MessageDTO[]>(`/api/conversations/${c.id}/messages`);
         if (!liveFlag) return;
         setMessages((prev) => {
