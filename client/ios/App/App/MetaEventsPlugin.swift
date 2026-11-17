@@ -3,8 +3,7 @@ import Capacitor
 import FBSDKCoreKit
 import UIKit
 
-/// Meta app events stay off until the App ID and client token from the Meta
-/// developer dashboard are in Info.plist. Those values are not in the repo.
+/// Meta app events. FacebookAppID and FacebookClientToken live in Info.plist.
 enum MetaAppEvents {
     static var isConfigured: Bool {
         let appId = (Bundle.main.object(forInfoDictionaryKey: "FacebookAppID") as? String)?

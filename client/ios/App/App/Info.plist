@@ -61,10 +61,25 @@
 	<true/>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>This lets Commons measure which ads led to an install or a new account. It is not used for anything else in the app.</string>
+	<key>FacebookAppID</key>
+	<string>1815312392924142</string>
+	<key>FacebookClientToken</key>
+	<string>7da19b1a3678d50178cae6d24b1975cd</string>
 	<key>FacebookDisplayName</key>
 	<string>COMMONS</string>
+	<key>FacebookAutoLogAppEventsEnabled</key>
+	<true/>
 	<key>FacebookAdvertiserIDCollectionEnabled</key>
 	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>fb1815312392924142</string>
+			</array>
+		</dict>
+	</array>
 	<key>SKAdNetworkItems</key>
 	<array>
 		<dict>

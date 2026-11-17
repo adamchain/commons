@@ -7,8 +7,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Installs are logged only after FacebookAppID and FacebookClientToken
-        // are added to Info.plist. Until then this is a no-op.
         MetaAppEvents.start(application, launchOptions: launchOptions)
         return true
     }
