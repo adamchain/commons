@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFile } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { isMongoConnected } from "./db.js";
+import { isMongoConnected } from "./lib/db.js";
 import { mongoMirror } from "./mongoMirror.js";
 import type {
   AgeRange,

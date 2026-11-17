@@ -1645,7 +1645,7 @@ plansRouter.delete("/:id/participation", requireAuth, async (req, res) => {
       const stamp = Date.now();
       const skip = new Set([userId, after.creatorId, ...(after.coHostIds ?? [])]);
       await Promise.all(
-        waitlistBefore
+        [...waitlistBefore]
           .filter((id) => !skip.has(id))
           .map((id) =>
             emit({

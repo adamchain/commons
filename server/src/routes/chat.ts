@@ -423,7 +423,8 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
     if (!conv.participantIds.includes(userId)) return false;
     if ((conv.hiddenFromUserIds ?? []).includes(userId)) return false;
     const otherId = conv.participantIds.find((id) => id !== userId);
-    return Boolean(otherId) && !store.isBlockedEitherWay(userId, otherId);
+    if (!otherId) return false;
+    return !store.isBlockedEitherWay(userId, otherId);
   });
   const groupRows = store.listNetworkGroups(userId).filter((conv) => {
     if (store.hasLeftConversation(userId, conv.id)) return false;
