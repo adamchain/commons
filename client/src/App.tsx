@@ -27,7 +27,6 @@ const CreatePlanPage = lazy(() => import("./pages/CreatePlan").then(m => ({ defa
 const FeedPage = lazy(() => import("./pages/Feed").then(m => ({ default: m.FeedPage })));
 const NotificationsPage = lazy(() => import("./pages/Notifications").then(m => ({ default: m.NotificationsPage })));
 const OnboardingPage = lazy(() => import("./pages/Onboarding").then(m => ({ default: m.OnboardingPage })));
-const LandingPage = lazy(() => import("./pages/Landing").then(m => ({ default: m.LandingPage })));
 const NewLandingPage = lazy(() => import("./pages/NewLanding").then(m => ({ default: m.NewLandingPage })));
 const LegalPage = lazy(() => import("./pages/Legal").then(m => ({ default: m.LegalPage })));
 const PlanDetailPage = lazy(() => import("./pages/PlanDetail").then(m => ({ default: m.PlanDetailPage })));
@@ -323,8 +322,8 @@ export default function App() {
       <Suspense fallback={PAGE_FALLBACK}>
       <RouteStage>
       <Routes>
-        <Route path="/welcome" element={<LandingPage />} />
-        <Route path="/new" element={<NewLandingPage />} />
+        <Route path="/welcome" element={<NewLandingPage />} />
+        <Route path="/new" element={<Navigate to="/welcome" replace />} />
         <Route path="/legal/:slug" element={<LegalPage />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route path="/admin" element={<AdminPage />} />

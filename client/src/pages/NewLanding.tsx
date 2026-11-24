@@ -69,8 +69,8 @@ function DualCta({
 }
 
 /**
- * Preview marketing landing (routed at /new). The live page stays at /welcome.
- * Join opens the existing phone onboarding flow.
+ * Public marketing landing (routed at /welcome). Logged-out web visits to /
+ * land here. Join opens the existing phone onboarding flow.
  */
 export function NewLandingPage() {
   const navigate = useNavigate();
