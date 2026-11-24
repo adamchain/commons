@@ -64,6 +64,7 @@
 .cl-lede {
   max-width: 34rem;
   margin: 22px 0 24px;
+  font-family: Poppins, sans-serif;
   font-size: 17px;
   line-height: 1.5;
   color: var(--cl-muted);
