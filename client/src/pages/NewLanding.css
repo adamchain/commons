@@ -94,20 +94,6 @@
 .cl-dual--dark .cl-btn--fill { background: #fff; color: var(--cl-navy); }
 .cl-dual--dark .cl-btn--ghost { color: #fff; border-color: rgba(255,255,255,0.35); }
 
-.cl-film {
-  margin: 8px -16px 0;
-  background: #111;
-  overflow: hidden;
-}
-.cl-film video,
-.cl-film img {
-  display: block;
-  width: 100%;
-  height: min(78vh, 720px);
-  object-fit: cover;
-  background: #111;
-}
-
 .cl-band {
   margin: 0 -16px;
   padding: 72px 24px;
@@ -382,9 +368,6 @@
 @media (min-width: 860px) {
   .cl { padding: 22px 28px 0; }
   .cl-hero { padding: 48px 8px 40px; }
-  .cl-film { margin: 0 -28px; }
-  .cl-film video,
-  .cl-film img { height: min(82vh, 820px); }
   .cl-split { grid-template-columns: 1fr 1fr; gap: 64px; padding: 88px 8px; }
   .cl-sticky { display: none; }
   .cl-foot { margin-bottom: 0; padding-bottom: 64px; }

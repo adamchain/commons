@@ -7,8 +7,6 @@ import { needsOnboarding } from "../lib/onboarding";
 import { trackAppStoreClick } from "../lib/pixels";
 import "./NewLanding.css";
 
-const POSTER = "/landing/video/poster.png?v=2";
-const VIDEO_MP4 = "/landing/video/hero.mp4?v=2";
 const INSTAGRAM = "https://www.instagram.com/oncommons/";
 const APP_ID = "6785627674";
 
@@ -77,7 +75,6 @@ function DualCta({
 export function NewLandingPage() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
-  const [videoOk, setVideoOk] = useState(true);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [planBeat, setPlanBeat] = useState(0);
   const [commBeat, setCommBeat] = useState(0);
@@ -137,18 +134,8 @@ export function NewLandingPage() {
         </div>
       </header>
 
-      <figure className="cl-film">
-        {videoOk && !reduceMotion ? (
-          <video autoPlay muted loop playsInline poster={POSTER} onError={() => setVideoOk(false)}>
-            <source src={VIDEO_MP4} type="video/mp4" />
-          </video>
-        ) : (
-          <img src={POSTER} alt="" />
-        )}
-      </figure>
-
-      <section className="cl-band cl-band--red" aria-label="This week">
-        <p className="cl-band-kicker">this week, finally doing</p>
+      <section className="cl-band cl-band--red" aria-label="Your plans this week">
+        <p className="cl-band-kicker">Your plans this week</p>
         <p className="cl-band-line" key={planBeat}>
           {PLAN_BEATS[planBeat]}
         </p>
