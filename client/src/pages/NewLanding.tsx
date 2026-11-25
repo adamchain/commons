@@ -127,7 +127,7 @@ export function NewLandingPage() {
       <header className="cl-hero">
         <div className="cl-hero-copy">
           <h1 className="cl-display">Let's do more, together.</h1>
-          <p className="cl-lede">a place for plans meant to be shared</p>
+          <p className="cl-lede">A plans and communities app for women</p>
           <DualCta onJoin={join} />
         </div>
       </header>
